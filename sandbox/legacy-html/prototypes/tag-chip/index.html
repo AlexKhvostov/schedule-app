@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>01 — Метка</title>
+    <link rel="stylesheet" href="../../assets/sandbox.css" />
+    <style>
+      .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0; }
+      .tag {
+        width: 52px;
+        height: 36px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: 0.04em;
+      }
+      label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+      input, select {
+        background: var(--bg-raise);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="kicker"><a href="../../index.html">← песочница</a></p>
+      <h1>Метка</h1>
+      <p class="lead">У участника три поля: текст, фон, шрифт. Ниже можно покрутить.</p>
+
+      <div class="row" id="preview"></div>
+
+      <label for="text">Текст (2 символа)</label>
+      <input id="text" maxlength="2" value="PL" />
+
+      <label for="bg">Фон</label>
+      <input id="bg" type="color" value="#ffd966" />
+
+      <label for="fg">Шрифт</label>
+      <input id="fg" type="color" value="#1a2118" />
+    </div>
+    <script>
+      const text = document.getElementById("text");
+      const bg = document.getElementById("bg");
+      const fg = document.getElementById("fg");
+      const preview = document.getElementById("preview");
+
+      function render() {
+        const el = document.createElement("div");
+        el.className = "tag";
+        el.textContent = (text.value || "??").slice(0, 2).toUpperCase();
+        el.style.background = bg.value;
+        el.style.color = fg.value;
+        preview.replaceChildren(el);
+      }
+
+      text.addEventListener("input", render);
+      bg.addEventListener("input", render);
+      fg.addEventListener("input", render);
+      render();
+    </script>
+  </body>
+</html>

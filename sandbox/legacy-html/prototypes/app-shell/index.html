@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Расписание — прототип</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css"
+    />
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body class="shell" data-bs-theme="dark">
+    <div class="layout">
+      <div class="brand">
+        <div>
+          schedule
+          <small>песочница</small>
+        </div>
+      </div>
+
+      <header class="topbar">
+        <span class="stat">CET · сентябрь 2026</span>
+        <span class="stat">покрытие 50 <b>98%</b> · 100 <b>100%</b></span>
+        <div class="grow"></div>
+        <a class="btn btn-sm" href="../../index.html">к списку черновиков</a>
+        <div class="userchip">
+          <div class="avatar">YO</div>
+          <span>Вы · ученик</span>
+        </div>
+      </header>
+
+      <nav class="sidebar">
+        <button class="nav-btn is-on" type="button" data-view="schedule">Расписание</button>
+        <button class="nav-btn" type="button" data-view="cabinet">Кабинет</button>
+        <button class="nav-btn" type="button" data-view="admin">Админка</button>
+        <button class="nav-btn" type="button" disabled>Дистанция <span class="soon">в разработке</span></button>
+        <button class="nav-btn" type="button" disabled>Графики <span class="soon">в разработке</span></button>
+        <button class="nav-btn" type="button" disabled>Дашборды <span class="soon">в разработке</span></button>
+      </nav>
+
+      <main class="workspace">
+        <section class="view is-on" id="view-schedule">
+          <div class="toolbar">
+            <label>рум</label>
+            <select class="form-select form-select-sm" style="width: 110px">
+              <option>Рум 1</option>
+            </select>
+            <label>лимит</label>
+            <select class="form-select form-select-sm" style="width: 72px">
+              <option>50</option>
+              <option>100</option>
+              <option>25</option>
+            </select>
+            <label>формат</label>
+            <select class="form-select form-select-sm" style="width: 110px">
+              <option>турнир</option>
+              <option>кэш</option>
+            </select>
+            <label>вариант</label>
+            <select class="form-select form-select-sm" style="width: 110px">
+              <option>nitro</option>
+              <option>regular</option>
+            </select>
+            <span class="stat">ячейка 30 мин · клик ставит вашу метку YO · ещё клик снимает</span>
+          </div>
+          <div class="month-scroll" id="month-root"></div>
+        </section>
+
+        <section class="view" id="view-cabinet">
+          <div class="stub">
+            <h2>Кабинет</h2>
+            <p>Карточка участника. Поля ещё согласуем — здесь только каркас.</p>
+            <div class="mini-grid">
+              <span>Метка</span><div><span class="mark" style="background:#ffd966;color:#1a2118">YO</span></div>
+              <span>Статус</span><div>ученик</div>
+              <span>Discord</span><div>youvelir · ник на сервере обновляется при входе</div>
+              <span>Игрок / рум</span><div>ник на руме 1</div>
+              <span>Пояс в шапке</span><div>UTC+3 (сетка всегда CET)</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-admin">
+          <div class="stub">
+            <h2>Админка</h2>
+            <p>Заявки, справочники, ёмкость, роли. Пока заглушка списка.</p>
+            <table class="table table-sm table-vcenter">
+              <thead>
+                <tr>
+                  <th>id</th>
+                  <th>метка</th>
+                  <th>заявка</th>
+                  <th>статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PH-014</td>
+                  <td>NS</td>
+                  <td>ждёт апрув</td>
+                  <td>школа</td>
+                </tr>
+                <tr>
+                  <td>PH-002</td>
+                  <td>SV</td>
+                  <td>активен</td>
+                  <td>клуб</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

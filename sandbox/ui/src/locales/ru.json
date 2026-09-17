@@ -1,0 +1,89 @@
+{
+  "brand": { "name": "schedule", "sandbox": "песочница" },
+  "nav": {
+    "schedule": "Расписание",
+    "heatmap": "Сетка",
+    "cabinet": "Кабинет",
+    "admin": "Админка",
+    "distance": "Дистанция · скоро",
+    "charts": "Графики · скоро",
+    "dashboards": "Дашборды · скоро",
+    "menu": "Меню",
+    "openMenu": "Открыть меню",
+    "closeMenu": "Закрыть меню"
+  },
+  "header": {
+    "timezone": "CET",
+    "cetLabel": "время CET",
+    "cetPlace": "Испания",
+    "mskLabel": "МСК",
+    "you": "Вы",
+    "roleStudent": "ученик",
+    "coverage50": "50 · 98%",
+    "coverage100": "100 · 100%"
+  },
+  "schedule": {
+    "month": "Месяц",
+    "limit": "Лимит",
+    "kind": "Вид",
+    "search": "Метка",
+    "searchAll": "все",
+    "heatmapHint": "Как вклад на GitHub · клик — метка YO",
+    "hint": "30 мин · клик — метка YO",
+    "capacity": "ёмкость {{count}}",
+    "empty": "пусто",
+    "who": "кто",
+    "seat": "{{n}} место",
+    "seatEmpty": "пусто",
+    "tables": "{{count}} ст.",
+    "tablesLabel": "Столов",
+    "hoursLabel": "Часов в месяц",
+    "markSettings": "Настройка метки",
+    "markHint": "Буквы и цвет метки задаёт профиль. Здесь — столы и часы.",
+    "ok": "OK",
+    "clearPast": "Снять затемнение прошлого",
+    "players": "Игроки",
+    "playersTitle": "Кто в этом расписании",
+    "playersHint": "Часы = метки ÷ 2. Осталось — только слоты, которые ещё не прошли по CET.",
+    "analytics": "Аналитика",
+    "analyticsTitle": "Заполнение поля",
+    "analyticsHint": "Сейчас открыт лимит {{limit}}. Считаем только его.",
+    "fillAll": "Весь месяц",
+    "fillLeft": "Ещё не прошло",
+    "colMark": "метка",
+    "colDiscord": "Discord",
+    "colRoom": "рум",
+    "colHours": "в сетке, ч",
+    "colLeft": "осталось, ч"
+  },
+  "cabinet": {
+    "title": "Кабинет",
+    "lead": "Карточка участника. Поля ещё согласуем — сейчас только каркас.",
+    "tag": "Метка",
+    "status": "Статус",
+    "discord": "Discord",
+    "discordValue": "Ник на сервере обновляется при входе",
+    "playerRoom": "Игрок / рум",
+    "playerRoomValue": "Ник на руме 1",
+    "tz": "Пояс в шапке",
+    "tzValue": "UTC+3 · сетка всегда CET",
+    "statusStudent": "ученик"
+  },
+  "admin": {
+    "title": "Админка",
+    "lead": "Список участников — плотная таблица. Сетка месяца строится отдельно.",
+    "colId": "id",
+    "colTag": "метка",
+    "colRequest": "заявка",
+    "colStatus": "статус",
+    "request": {
+      "pending": "ждёт апрув",
+      "active": "активен",
+      "blocked": "блок"
+    },
+    "status": {
+      "school": "школа",
+      "club": "клуб"
+    }
+  }
+}

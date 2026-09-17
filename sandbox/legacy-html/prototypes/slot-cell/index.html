@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>02 — Клетка слота</title>
+    <link rel="stylesheet" href="../../assets/sandbox.css" />
+    <style>
+      .grid {
+        display: grid;
+        grid-template-columns: 72px repeat(4, 88px);
+        gap: 6px;
+        margin: 32px 0;
+        align-items: stretch;
+      }
+      .head, .time {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+      }
+      .cell {
+        min-height: 44px;
+        background: var(--bg-raise);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        cursor: pointer;
+      }
+      .cell.is-full { outline: 1px solid var(--danger); }
+      .tag {
+        min-width: 32px;
+        height: 26px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .hint { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="kicker"><a href="../../index.html">← песочница</a></p>
+      <h1>Клетка слота</h1>
+      <p class="lead">
+        Клик добавляет вторую метку, если ёмкость 2. Это не боевые данные — только вид.
+      </p>
+
+      <div class="grid" id="grid"></div>
+      <p class="hint">Ёмкость в этом черновике: 14:00 = 1 человек, 14:30 = 2. Жёстче правило победит и в базе.</p>
+    </div>
+    <script>
+      const marks = [
+        { t: "PL", bg: "#ffd966", fg: "#1a2118" },
+        { t: "SV", bg: "#ea9999", fg: "#1a2118" },
+      ];
+
+      const slots = [
+        { time: "14:00", cap: 1, who: [marks[0]] },
+        { time: "14:30", cap: 2, who: [marks[0]] },
+        { time: "15:00", cap: 1, who: [] },
+        { time: "15:30", cap: 2, who: [marks[0], marks[1]] },
+      ];
+
+      function tag(m) {
+        const el = document.createElement("span");
+        el.className = "tag";
+        el.textContent = m.t;
+        el.style.background = m.bg;
+        el.style.color = m.fg;
+        return el;
+      }
+
+      const grid = document.getElementById("grid");
+
+      function paint() {
+        grid.replaceChildren();
+
+        const timeH = document.createElement("div");
+        timeH.className = "head";
+        timeH.textContent = "CET";
+        grid.appendChild(timeH);
+        slots.forEach((s) => {
+          const h = document.createElement("div");
+          h.className = "head";
+          h.textContent = s.time;
+          grid.appendChild(h);
+        });
+
+        const lab = document.createElement("div");
+        lab.className = "time";
+        lab.textContent = "вид";
+        grid.appendChild(lab);
+
+        slots.forEach((s) => {
+          const cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "cell";
+          if (s.who.length >= s.cap) cell.classList.add("is-full");
+          s.who.forEach((m) => cell.appendChild(tag(m)));
+          cell.title = "ёмкость " + s.cap;
+          cell.addEventListener("click", () => {
+            if (s.who.length >= s.cap) s.who = [];
+            else s.who = s.who.concat(marks[s.who.length % marks.length]);
+            paint();
+          });
+          grid.appendChild(cell);
+        });
+      }
+
+      paint();
+    </script>
+  </body>
+</html>

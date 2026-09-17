@@ -1,0 +1,89 @@
+{
+  "brand": { "name": "schedule", "sandbox": "sandbox" },
+  "nav": {
+    "schedule": "Schedule",
+    "heatmap": "Heatmap",
+    "cabinet": "Profile",
+    "admin": "Admin",
+    "distance": "Distance · soon",
+    "charts": "Charts · soon",
+    "dashboards": "Dashboards · soon",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "header": {
+    "timezone": "CET",
+    "cetLabel": "CET time",
+    "cetPlace": "Spain",
+    "mskLabel": "MSK",
+    "you": "You",
+    "roleStudent": "student",
+    "coverage50": "50 · 98%",
+    "coverage100": "100 · 100%"
+  },
+  "schedule": {
+    "month": "Month",
+    "limit": "Limit",
+    "kind": "Kind",
+    "search": "Mark",
+    "searchAll": "all",
+    "heatmapHint": "GitHub-style grid · click to set YO",
+    "hint": "30 min · click to set YO",
+    "capacity": "capacity {{count}}",
+    "empty": "empty",
+    "who": "who",
+    "seat": "Seat {{n}}",
+    "seatEmpty": "empty",
+    "tables": "{{count}} tbl",
+    "tablesLabel": "Tables",
+    "hoursLabel": "Hours this month",
+    "markSettings": "Mark settings",
+    "markHint": "Letters and color come from the profile. Here you set tables and hours.",
+    "ok": "OK",
+    "clearPast": "Clear past shade",
+    "players": "Players",
+    "playersTitle": "Who is on this schedule",
+    "playersHint": "Hours = marks ÷ 2. Remaining counts only slots that have not passed in CET.",
+    "analytics": "Analytics",
+    "analyticsTitle": "Field fill",
+    "analyticsHint": "Limit {{limit}} is open. Only this field is counted.",
+    "fillAll": "Whole month",
+    "fillLeft": "Still ahead",
+    "colMark": "mark",
+    "colDiscord": "Discord",
+    "colRoom": "room",
+    "colHours": "on grid, h",
+    "colLeft": "left, h"
+  },
+  "cabinet": {
+    "title": "Profile",
+    "lead": "Member card. Fields are still being agreed — this is a layout.",
+    "tag": "Tag",
+    "status": "Status",
+    "discord": "Discord",
+    "discordValue": "Server nick updates on login",
+    "playerRoom": "Player / room",
+    "playerRoomValue": "Nickname on room 1",
+    "tz": "Header timezone",
+    "tzValue": "UTC+3 · grid is always CET",
+    "statusStudent": "student"
+  },
+  "admin": {
+    "title": "Admin",
+    "lead": "Member list — compact table. The month grid is a separate component.",
+    "colId": "id",
+    "colTag": "tag",
+    "colRequest": "access",
+    "colStatus": "status",
+    "request": {
+      "pending": "pending",
+      "active": "active",
+      "blocked": "blocked"
+    },
+    "status": {
+      "school": "school",
+      "club": "club"
+    }
+  }
+}
