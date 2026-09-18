@@ -8,7 +8,8 @@
 4. [Структура репозитория](repo-structure.md)
 5. [MVP](mvp.md) — что в первом релизе, что нет
 6. [Песочница](sandbox.md) — что уже кликается локально
-7. [Расписание: UX](schedule-ux.md) — канон **next** (поле, календарь, ёмкость) и классика
-8. [UI-кит](ui-kits.md) — Tailwind + shadcn, светлая тема
+7. [Сейчас в расписании](schedule-now.md) — что доделали в next, чем это ещё не MVP
+8. [Расписание: UX](schedule-ux.md) — канон **next** (поле, календарь, ёмкость) и классика
+9. [UI-кит](ui-kits.md) — Tailwind + shadcn, светлая тема
 
 Старые таблицы кладём в [`../references`](../references/README.md) — на GitHub они не уезжают.
