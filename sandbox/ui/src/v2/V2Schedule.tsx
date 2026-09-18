@@ -9,6 +9,7 @@ import { fieldFill, pctLabel } from "../schedule/analytics";
 import { V2Field } from "./V2Field";
 import { V2Float } from "./V2Float";
 import { V2MyCalendar } from "./V2MyCalendar";
+import { V2Settings } from "./V2Settings";
 import { gridsForCalendar } from "./myShifts";
 import { R } from "./tokens";
 
@@ -32,11 +33,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
   const monthIndex = cursor.getMonth();
   const [grids, setGrids] = useState<Record<string, Occupancy>>(() => ({ 50: planMonth(year, monthIndex, "50") }));
   const [showMine, setShowMine] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [me, setMe] = useState<Mark>({ ...ME });
   const [hideTables, setHideTables] = useState(false);
   const [dimPast, setDimPast] = useState(true);
   const [showTip, setShowTip] = useState(true);
-  const [view, setView] = useState<"levels" | "slots">("levels");
   const [limits, setLimits] = useState<string[]>(["50"]);
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [kind, setKind] = useState("nitro");
@@ -192,70 +193,55 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
             ))}
           </datalist>
         </form>
-        <button
-          type="button"
-          className="v2-ctrl px-2.5"
-          style={{ color: R.soft }}
-          onClick={() => setDimPast((v) => !v)}
-        >
-          <i className="fa-solid fa-circle-half-stroke mr-2" style={{ color: R.cyan }} />
-          Прошлое: {dimPast ? "приглушить" : "как есть"}
-        </button>
-        <button type="button" className="v2-ctrl px-2.5" onClick={() => setHideTables((v) => !v)}>
-          <i className={`fa-solid ${hideTables ? "fa-toggle-off" : "fa-toggle-on"} mr-2`} style={{ color: hideTables ? R.faint : R.cyan }} />
-          Столы
-        </button>
-        <button type="button" className="v2-ctrl px-2.5" onClick={() => setShowTip((v) => !v)}>
-          <i className={`fa-solid ${showTip ? "fa-check-square" : "fa-square"} mr-2`} style={{ color: showTip ? R.cyan : R.faint }} />
-          {t("schedule.showTip")}
-        </button>
-        <div className="flex h-8 overflow-hidden rounded border" style={{ borderColor: R.line }}>
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            className="flex items-center border-0 px-3"
-            style={{ background: view === "levels" ? R.cyan : "transparent", color: view === "levels" ? R.cyanInk : R.muted, fontWeight: view === "levels" ? 600 : 400 }}
-            onClick={() => setView("levels")}
+            className="v2-ctrl w-8"
+            title={t("schedule.myCalendar")}
+            onClick={() => {
+              setShowMine(true);
+              setShowSettings(false);
+            }}
           >
-            Уровни
+            <i className="fa-regular fa-calendar" />
           </button>
           <button
             type="button"
-            className="flex items-center border-0 px-3"
-            style={{ background: view === "slots" ? R.cyan : "transparent", color: view === "slots" ? R.cyanInk : R.muted, fontWeight: view === "slots" ? 600 : 400 }}
-            onClick={() => setView("slots")}
+            className="v2-ctrl w-8"
+            title={t("schedule.analytics")}
+            onClick={() => {
+              setShowAnalytics((open) => !open);
+              setFront("fill");
+            }}
           >
-            Слоты
+            <i className="fa-solid fa-chart-column" />
+          </button>
+          <button
+            type="button"
+            className="v2-ctrl w-8"
+            title={t("schedule.players")}
+            onClick={() => {
+              setShowPeople((open) => !open);
+              setFront("people");
+            }}
+          >
+            <i className="fa-solid fa-users" />
+          </button>
+          <button
+            type="button"
+            className="v2-ctrl w-8"
+            title={t("schedule.settings")}
+            onClick={() => {
+              setShowSettings(true);
+              setShowMine(false);
+            }}
+          >
+            <i className="fa-solid fa-gear" />
           </button>
         </div>
-        <button type="button" className="v2-ctrl px-2.5" onClick={() => setShowMine(true)}>
-          <i className="fa-regular fa-calendar-check mr-2" style={{ color: R.cyan }} />
-          {t("schedule.myCalendar")}
-        </button>
         <button
           type="button"
-          className="v2-ctrl w-8"
-          title={t("schedule.analytics")}
-          onClick={() => {
-            setShowAnalytics((open) => !open);
-            setFront("fill");
-          }}
-        >
-          <i className="fa-solid fa-chart-column" />
-        </button>
-        <button
-          type="button"
-          className="v2-ctrl w-8"
-          title={t("schedule.players")}
-          onClick={() => {
-            setShowPeople((open) => !open);
-            setFront("people");
-          }}
-        >
-          <i className="fa-solid fa-users" />
-        </button>
-        <button
-          type="button"
-          className="v2-mark-setup ml-auto"
+          className="v2-mark-setup"
           style={{ background: me.bg, color: me.fg }}
           title={t("v2.tip.markTables")}
           onClick={() => setMe((prev) => ({ ...prev, tables: Math.min(30, prev.tables + 1) }))}
@@ -265,6 +251,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
           }}
         >
           <span className="v2-mark-setup-tag">{me.t}</span>
+          <span className="v2-mark-setup-dot" aria-hidden>
+            ·
+          </span>
           <span className="v2-mark-setup-n">{me.tables}</span>
         </button>
       </section>
@@ -278,7 +267,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
           dimPast={dimPast}
           showTip={showTip}
           focus={focus}
-          levels={view === "levels"}
           limits={limits}
           capacity={capacity}
           grids={grids}
@@ -338,6 +326,17 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
               ))}
             </div>
           </V2Float>
+        )}
+        {showSettings && (
+          <V2Settings
+            dimPast={dimPast}
+            showTables={!hideTables}
+            showTip={showTip}
+            onDimPast={setDimPast}
+            onShowTables={(value) => setHideTables(!value)}
+            onShowTip={setShowTip}
+            onClose={() => setShowSettings(false)}
+          />
         )}
         {showMine && (
           <V2MyCalendar

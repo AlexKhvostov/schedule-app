@@ -25,6 +25,7 @@ type Props = {
 const SLOT_H = 16;
 const LEVEL_GAP = 4;
 const ROW_PAD = 5;
+const LANE_PAD = 3;
 const SLOT_COUNT = 48;
 const GAP_HALF = 0;
 const GAP_HOUR = 0;
@@ -39,7 +40,7 @@ function blockHeight(limits: string[], capacity: CapacityMap, showLevels: boolea
     (sum, limit) => sum + (showLevels ? lanesForDay(capacity, limit, day, year, monthIndex) : 1),
     0,
   );
-  return ROW_PAD * 2 + lanes * SLOT_H + Math.max(0, lanes - 1) * LEVEL_GAP;
+  return ROW_PAD * 2 + LANE_PAD * 2 + lanes * SLOT_H + Math.max(0, lanes - 1) * LEVEL_GAP;
 }
 
 function runBox(start: number, len: number) {
@@ -74,6 +75,12 @@ function nowLineLeft(half: number, progress: number) {
   return `calc(36px + (100% - 56px - ${GAP_TOTAL}px) * ${t} / ${SLOT_COUNT} + ${padStart}px)`;
 }
 
+function nowTrackWidth(half: number, progress: number) {
+  const padStart = Math.ceil(half / 2) * GAP_HALF + Math.floor(half / 2) * GAP_HOUR;
+  const t = half + Math.min(1, Math.max(0, progress));
+  return `calc((100% - ${GAP_TOTAL}px) * ${t} / ${SLOT_COUNT} + ${padStart}px)`;
+}
+
 type Hover = { dayIdx: number; half: number; level: number; limit: string; x: number; y: number };
 
 type Run = { start: number; len: number; mark: Mark };
@@ -92,6 +99,12 @@ function tipDate(year: number, monthIndex: number, day: number, lang: string) {
   const weekday = date.toLocaleDateString(loc, { weekday: "long" });
   const rest = date.toLocaleDateString(loc, { day: "numeric", month: "long" });
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`;
+}
+
+function chipHours(len: number, lang: string) {
+  const hours = len / 2;
+  const n = Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace(".", lang.startsWith("en") ? "." : ",");
+  return lang.startsWith("en") ? `${n}h` : `${n}ч`;
 }
 
 function tablesLabel(count: number, lang: string) {
@@ -271,7 +284,6 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden border-b" style={{ borderColor: R.line, background: R.header }} onMouseLeave={() => setHover(null)}>
       <div ref={daysRef} className="v2-days min-h-0 flex-1 overflow-auto">
       <div className="v2-days-inner">
-      <SixthLines className="v2-sixths" />
       <div className="v2-hours sticky top-0 z-20 flex h-11 border-b" style={{ borderColor: R.line2, background: R.header }}>
         <div className="v2-day flex items-center text-[10px] tracking-wider uppercase" style={{ color: R.faint }}>
           День
@@ -345,7 +357,7 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
               >
                 {String(day.d).padStart(2, "0")} {day.wd}
               </div>
-              <div className="v2-day-lanes" style={{ padding: `${ROW_PAD}px 0` }}>
+              <div className="v2-day-lanes">
                 {today && (
                   <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress) }} aria-hidden />
                 )}
@@ -373,11 +385,14 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
                               const locked = !levelAllowed(half, level, limitHours);
                               const past = isPastSlot(year, monthIndex, day.d, half, cet);
                               const empty = !locked && !seatsOf(row[half], level + 1)[level];
+                              const sixthStart = empty && half % 12 === 0;
+                              const sixthEnd = empty && half === SLOT_COUNT - 1;
+                              const lit = !locked && (!dimPast || today || !past);
                               return (
                                 <button
                                   key={half}
                                   type="button"
-                                  className={`v2-slot${locked ? " v2-slot-locked-hit" : ""}${!locked && (!past || !dimPast) ? " v2-slot-future" : ""}${empty ? " v2-slot-empty" : ""}`}
+                                  className={`v2-slot${locked ? " v2-slot-locked-hit" : ""}${lit ? " v2-slot-future" : ""}${empty ? " v2-slot-empty" : ""}${sixthStart ? " v2-slot-sixth" : ""}${sixthEnd ? " v2-slot-sixth-end" : ""}`}
                                   style={{
                                     gridColumn: `${slotColumn(half)} / span 1`,
                                     cursor: past || locked ? "not-allowed" : "pointer",
@@ -392,21 +407,27 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
                               return (
                                 <span
                                   key={`lock-${run.start}`}
-                                  className={`v2-lock-run${run.past && dimPast ? "" : " v2-lock-run-future"}`}
+                                  className={`v2-lock-run${run.past && dimPast && !today ? "" : " v2-lock-run-future"}`}
                                   style={{ left: box.left, width: box.width }}
                                 />
                               );
                             })}
+                            {today && dimPast && (
+                              <span className="v2-past-cut" style={{ width: nowTrackWidth(cet.half, cet.slotProgress) }} aria-hidden />
+                            )}
                             {runsOf(row, level).map((run) => {
-                              const past = isPastSlot(year, monthIndex, day.d, run.start, cet);
+                              const past = today
+                                ? run.start + run.len <= cet.half
+                                : isPastSlot(year, monthIndex, day.d, run.start, cet);
                               const muted = markMuted(run.mark, focus);
                               const hit = markHit(run.mark, focus);
                               const box = runBox(run.start, run.len);
                               const single = run.len === 1;
+                              const hours = run.len >= 4 ? chipHours(run.len, i18n.language) : null;
                               return (
                                 <span
                                   key={`${run.start}-${run.mark.t}`}
-                                  className={`v2-chip${single ? " v2-chip-one" : ""}${dimPast && past && !hit ? " v2-chip-past" : ""}${hit ? " v2-chip-hit" : ""}`}
+                                  className={`v2-chip${single ? " v2-chip-one" : ""}${hours ? " v2-chip-long" : ""}${dimPast && past && !hit ? " v2-chip-past" : ""}${hit ? " v2-chip-hit" : ""}`}
                                   style={{
                                     left: box.left,
                                     width: box.width,
@@ -425,6 +446,7 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
                                   ) : (
                                     run.mark.t
                                   )}
+                                  {hours && <span className="v2-chip-h">{hours}</span>}
                                 </span>
                               );
                             })}
