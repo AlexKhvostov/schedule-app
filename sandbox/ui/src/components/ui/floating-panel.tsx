@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Props = {
   title: string;
@@ -9,9 +10,10 @@ type Props = {
   onClose: () => void;
   children: ReactNode;
   width?: number;
+  className?: string;
 };
 
-export function FloatingPanel({ title, x, y, onMove, onClose, children, width = 300 }: Props) {
+export function FloatingPanel({ title, x, y, onMove, onClose, children, width = 300, className }: Props) {
   const drag = useRef<{ ox: number; oy: number } | null>(null);
 
   useEffect(() => {
@@ -32,7 +34,10 @@ export function FloatingPanel({ title, x, y, onMove, onClose, children, width = 
 
   return (
     <div
-      className="fixed z-[55] flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl"
+      className={cn(
+        "fixed z-[55] flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl",
+        className,
+      )}
       style={{ left: x, top: y, width }}
     >
       <div

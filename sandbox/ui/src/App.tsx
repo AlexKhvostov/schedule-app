@@ -10,6 +10,7 @@ import { AdminPage } from "./screens/AdminPage";
 import { CabinetPage } from "./screens/CabinetPage";
 import { SchedulePage } from "./screens/SchedulePage";
 import { ScheduleHeatmapPage } from "./screens/ScheduleHeatmapPage";
+import { V2Shell } from "./v2/V2Shell";
 
 function MenuIcon({ open }: { open: boolean }) {
   return (
@@ -39,6 +40,7 @@ function MenuIcon({ open }: { open: boolean }) {
 export function App() {
   const { t, i18n } = useTranslation();
   const [page, setPage] = useState("schedule");
+  const [edition, setEdition] = useState<"classic" | "next">("next");
   const [cursor, setCursor] = useState(() => new Date());
   const [menuOpen, setMenuOpen] = useState(false);
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
@@ -65,6 +67,10 @@ export function App() {
     setPage(key);
     setMenuOpen(false);
   };
+
+  if (edition === "next") {
+    return <V2Shell cursor={cursor} onCursorChange={setCursor} onBack={() => setEdition("classic")} />;
+  }
 
   return (
     <div className="flex h-full min-h-0 justify-center">
@@ -107,6 +113,14 @@ export function App() {
             <CetClock layout="inline" className="px-2.5 py-1" />
           </div>
           <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2.5 text-white hover:bg-white/10 hover:text-white"
+              onClick={() => setEdition("next")}
+            >
+              {t("nav.nextDesign")}
+            </Button>
             <div className="flex rounded-md border border-white/20 p-0.5">
               {(["ru", "en"] as const).map((code) => (
                 <Button

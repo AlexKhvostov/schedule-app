@@ -1,6 +1,6 @@
-import { capFor } from "./plan";
+import { type HourCaps } from "./capacity";
+import { capFor, occupiedCount, type Occupancy } from "./plan";
 import { isPastSlot, type CetStamp } from "./cet";
-import type { Mark } from "./marks";
 
 export type FieldFill = {
   limit: string;
@@ -12,15 +12,22 @@ export type FieldFill = {
   futurePct: number;
 };
 
-export function fieldFill(grid: Mark[][][], year: number, monthIndex: number, cet: CetStamp, limit: string): FieldFill {
+export function fieldFill(
+  grid: Occupancy,
+  year: number,
+  monthIndex: number,
+  cet: CetStamp,
+  limit: string,
+  hours?: HourCaps,
+): FieldFill {
   let seats = 0;
   let taken = 0;
   let futureSeats = 0;
   let futureTaken = 0;
   grid.forEach((row, dayIdx) => {
     row.forEach((cell, half) => {
-      const cap = capFor(half);
-      const used = Math.min(cell.length, cap);
+      const cap = capFor(half, hours);
+      const used = Math.min(occupiedCount(cell), cap);
       const past = isPastSlot(year, monthIndex, dayIdx + 1, half, cet);
       seats += cap;
       taken += used;

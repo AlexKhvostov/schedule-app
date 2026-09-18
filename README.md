@@ -13,7 +13,7 @@
 
 Корень репозитория специально почти пустой: рабочие вещи живут в своих папках.
 
-Документация продукта: [`docs/README.md`](docs/README.md) (читать по порядку). UX сетки: [`docs/schedule-ux.md`](docs/schedule-ux.md).
+Документация продукта: [`docs/README.md`](docs/README.md) (читать по порядку). UX сетки (канон **next** и классика): [`docs/schedule-ux.md`](docs/schedule-ux.md).
 
 Песочницу UI локально:
 
