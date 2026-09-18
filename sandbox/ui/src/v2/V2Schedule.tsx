@@ -138,6 +138,7 @@ function MarkPlanDock({
           );
         })}
       </ul>
+      <p className="v2-mark-plan-note">{t("schedule.planTableHint")}</p>
       <div className="v2-mark-plan-scroll">
         <table className="v2-mark-plan">
           <thead>
@@ -146,7 +147,7 @@ function MarkPlanDock({
               {LIMIT_OPTIONS.map((limit) => (
                 <th key={limit}>{limit}</th>
               ))}
-              <th>Σ</th>
+              <th className="is-sum">Σ</th>
             </tr>
           </thead>
           <tbody>
@@ -158,7 +159,7 @@ function MarkPlanDock({
                     {row[limit] || ""}
                   </td>
                 ))}
-                <td className={matrix.dayTotals[dayIdx] ? "is-on" : ""}>{matrix.dayTotals[dayIdx] || ""}</td>
+                <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`}>{matrix.dayTotals[dayIdx] || ""}</td>
               </tr>
             ))}
           </tbody>
@@ -170,7 +171,7 @@ function MarkPlanDock({
                   {matrix.totals[limit] || ""}
                 </td>
               ))}
-              <td className="is-on">{matrix.grand || ""}</td>
+              <td className={`is-sum${matrix.grand ? " is-on" : ""}`}>{matrix.grand || ""}</td>
             </tr>
           </tfoot>
         </table>
@@ -180,7 +181,7 @@ function MarkPlanDock({
   );
 }
 
-export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "classic" }: Props) {
+export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme" }: Props) {
   const { t, i18n } = useTranslation();
   const isKit = skin === "theme";
   const year = cursor.getFullYear();

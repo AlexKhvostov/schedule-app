@@ -24,6 +24,7 @@
   },
   "nav": {
     "schedule": "Schedule",
+    "archive": "Archive",
     "grid": "Grid",
     "priorities": "Priorities",
     "heatmap": "Heatmap",
@@ -115,6 +116,7 @@
     "planHours": "Hours this month",
     "planMarks": "{{n}} m",
     "planDay": "Day",
+    "planTableHint": "Your mark hours this month: row is the day, column is the limit. One mark = 0.5 h. Σ is the total.",
     "slotLookKicker": "sandbox",
     "slotLookTitle": "Slot look",
     "slotLookHint": "Tweak colors on the live grid. When you like it, copy the code and send it over.",

@@ -94,7 +94,6 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const nav = canGrid
     ? [
         { key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" },
-        { key: "grid", label: t("nav.grid"), icon: "fa-table-cells" },
         { key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" },
       ]
     : [
@@ -196,6 +195,12 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                       {t("nav.cabinet")}
                     </button>
                     {canGrid ? (
+                      <button type="button" onClick={() => goPage("archive")}>
+                        <i className="fa-solid fa-box-archive" />
+                        {t("nav.archive")}
+                      </button>
+                    ) : null}
+                    {canGrid ? (
                       <button type="button" onClick={() => goPage("uikit")}>
                         <i className="fa-solid fa-swatchbook" />
                         {t("nav.uikit")}
@@ -231,11 +236,17 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
             </div>
           )}
           {canGrid && page === "schedule" && (
-            <V2Schedule cursor={cursor} onCursorChange={onCursorChange} capacity={capacity} hourLoad={hourLoad} />
-          )}
-          {canGrid && page === "grid" && (
             <V2Schedule
               skin="theme"
+              cursor={cursor}
+              onCursorChange={onCursorChange}
+              capacity={capacity}
+              hourLoad={hourLoad}
+            />
+          )}
+          {canGrid && page === "archive" && (
+            <V2Schedule
+              skin="classic"
               cursor={cursor}
               onCursorChange={onCursorChange}
               capacity={capacity}
