@@ -18,15 +18,19 @@ type Props = {
   hidePastDays?: boolean;
   showTip: boolean;
   canEdit: boolean;
+  quietEdit?: boolean;
   focus: string;
   limits: string[];
   capacity: CapacityMap;
   grids: Record<string, Occupancy>;
   hourLoad?: HourLoadMap;
   onGridChange: (limit: string, next: Occupancy) => void;
+  skin?: "classic" | "theme";
+  busy?: (string | null)[][];
 };
 
 type SlotHit = {
+  cell: HTMLElement;
   dayIdx: number;
   day: number;
   half: number;
@@ -34,9 +38,21 @@ type SlotHit = {
   level: number;
   limit: string;
   lane: string;
+  busyLimit?: string;
   x: number;
   y: number;
 };
+
+type NavMem = {
+  block: Element | null;
+  hour: HTMLElement | null;
+  lane: Element | null;
+  hours: Element | null;
+  frame: HTMLDivElement | null;
+  col: string;
+};
+
+const navMem = new WeakMap<HTMLElement, NavMem>();
 
 const SLOT_COUNT = 48;
 const CLICK_WAIT = 220;
@@ -92,16 +108,21 @@ function lanesOf(capacity: CapacityMap, limit: string, day: number, year: number
   return Array.from({ length: lanesForDay(capacity, limit, day, year, monthIndex) }, (_, i) => i);
 }
 
-function hitFromEvent(target: EventTarget | null, root: HTMLElement | null): SlotHit | null {
+function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, withPos = false): SlotHit | null {
   if (!root || !(target instanceof Element)) return null;
   const el = target.closest("[data-slot]");
   if (!el || !root.contains(el) || !(el instanceof HTMLElement)) return null;
-  const box = el.getBoundingClientRect();
-  let x = box.right + 8;
-  let y = box.top;
-  if (x + 200 > window.innerWidth - 8) x = Math.max(8, box.left - 208);
-  if (y + 100 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 108);
+  let x = 0;
+  let y = 0;
+  if (withPos) {
+    const box = el.getBoundingClientRect();
+    x = box.right + 8;
+    y = box.top;
+    if (x + 200 > window.innerWidth - 8) x = Math.max(8, box.left - 208);
+    if (y + 100 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 108);
+  }
   return {
+    cell: el,
     dayIdx: Number(el.dataset.day),
     day: Number(el.dataset.d),
     half: Number(el.dataset.half),
@@ -109,24 +130,87 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null): Slo
     level: Number(el.dataset.level),
     limit: el.dataset.limit ?? "",
     lane: el.dataset.lane ?? "",
+    busyLimit: el.dataset.busy || undefined,
     x,
     y,
   };
 }
 
+function navOf(root: HTMLElement): NavMem {
+  let mem = navMem.get(root);
+  if (!mem) {
+    mem = { block: null, hour: null, lane: null, hours: null, frame: null, col: "" };
+    navMem.set(root, mem);
+  }
+  return mem;
+}
+
+function frameOf(root: HTMLElement, mem: NavMem) {
+  if (mem.frame?.isConnected) return mem.frame;
+  mem.frame = root.querySelector(".v2-opt-frame");
+  return mem.frame;
+}
+
+function hideFrame(mem: NavMem) {
+  if (!mem.frame) return;
+  mem.frame.hidden = true;
+  mem.col = "";
+}
+
+function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string) {
+  const frame = frameOf(root, mem);
+  if (!frame) return;
+  const host = frame.parentElement;
+  if (!host) return;
+  const kit = root.classList.contains("is-kit");
+  const scope =
+    (kit ? hit.cell.closest(".v2-opt-limit") : null) ?? hit.cell.closest(".v2-opt-lanes");
+  if (!scope) return;
+  const cells = scope.querySelectorAll<HTMLElement>(`[data-slot][data-h="${hit.hour}"]`);
+  if (!cells.length) return;
+  const hostBox = host.getBoundingClientRect();
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const cell of cells) {
+    const box = cell.getBoundingClientRect();
+    left = Math.min(left, box.left);
+    top = Math.min(top, box.top);
+    right = Math.max(right, box.right);
+    bottom = Math.max(bottom, box.bottom);
+  }
+  const pad = kit ? 2 : 3;
+  const cap = 11;
+  const col = String(hit.hour);
+  frame.style.left = `${left - hostBox.left - pad}px`;
+  frame.style.top = `${top - hostBox.top - pad - cap}px`;
+  frame.style.width = `${right - left + pad * 2}px`;
+  frame.style.height = `${bottom - top + pad * 2 + cap}px`;
+  frame.style.bottom = "auto";
+  if (mem.col !== col) {
+    frame.textContent = label;
+    mem.col = col;
+  }
+  frame.hidden = false;
+}
+
 function applyNav(root: HTMLElement, hit: SlotHit | null) {
+  const kit = root.classList.contains("is-kit");
+  const editing = root.classList.contains("is-edit");
+  const mem = navOf(root);
   if (!hit) {
-    if (!root.dataset.col && !root.dataset.lane) return;
-    root.querySelector(".v2-opt-block.is-hot")?.classList.remove("is-hot");
-    root.querySelector(".v2-opt-lane.is-hot")?.classList.remove("is-hot");
-    root.querySelector(".v2-opt-hour.is-hot")?.classList.remove("is-hot", "is-early", "is-late");
-    delete root.dataset.col;
+    if (!root.dataset.row && !mem.block && !mem.hour) return;
+    mem.block?.classList.remove("is-hot");
+    mem.lane?.classList.remove("is-hot");
+    mem.hour?.classList.remove("is-hot", "is-early", "is-late");
+    mem.block = null;
+    mem.lane = null;
+    mem.hour = null;
     delete root.dataset.row;
     delete root.dataset.lane;
     delete root.dataset.half;
-    root.style.removeProperty("--opt-col");
-    root.style.removeProperty("--opt-slot");
-    root.style.removeProperty("--opt-hour-label");
+    hideFrame(mem);
     return;
   }
   const col = String(hit.hour);
@@ -134,36 +218,49 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const row = String(hit.dayIdx);
   const lane = hit.lane;
   const late = hit.half % 2 === 1;
-  if (root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) return;
-  const prevBlock = root.querySelector(".v2-opt-block.is-hot");
-  const nextBlock = root.querySelector(`[data-row="${row}"]`);
-  if (prevBlock !== nextBlock) {
-    prevBlock?.classList.remove("is-hot");
+  if (kit && root.dataset.row === row && mem.hour?.dataset.h === col && root.dataset.lane === lane) {
+    if (!editing || (!mem.frame?.hidden && mem.col === col)) return;
+  } else if (!kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
+    return;
+  }
+  const nextBlock = hit.cell.closest(".v2-opt-block");
+  if (mem.block !== nextBlock) {
+    mem.block?.classList.remove("is-hot");
     nextBlock?.classList.add("is-hot");
+    mem.block = nextBlock;
   }
-  const prevLane = root.querySelector(".v2-opt-lane.is-hot");
-  const nextLane = root.querySelector(`.v2-opt-lane[data-lane="${lane}"]`);
-  if (prevLane !== nextLane) {
-    prevLane?.classList.remove("is-hot");
-    nextLane?.classList.add("is-hot");
+  if (!kit) {
+    const nextLane = nextBlock?.querySelector(`[data-lane="${lane}"]`) ?? null;
+    if (mem.lane !== nextLane) {
+      mem.lane?.classList.remove("is-hot");
+      nextLane?.classList.add("is-hot");
+      mem.lane = nextLane;
+    }
+  } else if (mem.lane) {
+    mem.lane.classList.remove("is-hot");
+    mem.lane = null;
   }
-  const prevHour = root.querySelector(".v2-opt-hour.is-hot");
-  const nextHour = root.querySelector(`.v2-opt-hour[data-h="${col}"]`);
-  if (prevHour && prevHour !== nextHour) {
-    prevHour.classList.remove("is-hot", "is-early", "is-late");
-  }
-  if (nextHour) {
-    nextHour.classList.add("is-hot");
-    nextHour.classList.toggle("is-late", late);
-    nextHour.classList.toggle("is-early", !late);
+  if (!mem.hours) mem.hours = root.querySelector(".v2-opt-hours");
+  const nextHour = (mem.hours?.querySelector(`[data-h="${col}"]`) as HTMLElement | null) ?? null;
+  if (mem.hour !== nextHour) {
+    mem.hour?.classList.remove("is-hot", "is-early", "is-late");
+    if (nextHour) {
+      nextHour.classList.add("is-hot");
+      if (!kit) {
+        nextHour.classList.toggle("is-late", late);
+        nextHour.classList.toggle("is-early", !late);
+      }
+    }
+    mem.hour = nextHour;
+  } else if (mem.hour && !kit) {
+    mem.hour.classList.toggle("is-late", late);
+    mem.hour.classList.toggle("is-early", !late);
   }
   root.dataset.row = row;
   root.dataset.lane = lane;
-  root.dataset.col = col;
   root.dataset.half = slot;
-  root.style.setProperty("--opt-col", col);
-  root.style.setProperty("--opt-slot", slot);
-  root.style.setProperty("--opt-hour-label", `"${hit.hour}–${hit.hour + 1}"`);
+  if (editing) placeFrame(root, mem, hit, `${hit.hour}–${hit.hour + 1}`);
+  else hideFrame(mem);
 }
 
 function OptFace({ tag, tables, showTables }: { tag?: string; tables?: number; showTables: boolean }) {
@@ -193,6 +290,7 @@ const OptCell = memo(function OptCell({
   muted,
   hit,
   nowPct,
+  busyLimit,
 }: {
   dayIdx: number;
   day: number;
@@ -210,6 +308,7 @@ const OptCell = memo(function OptCell({
   muted: boolean;
   hit: boolean;
   nowPct?: number;
+  busyLimit?: string;
 }) {
   return (
     <div
@@ -222,6 +321,7 @@ const OptCell = memo(function OptCell({
       data-level={level}
       data-limit={limit}
       data-lane={lane}
+      data-busy={busyLimit || undefined}
       className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${tag ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}`}
       style={
         {
@@ -262,12 +362,15 @@ const OptBody = memo(function OptBody({
   days,
   cet,
   todayRef,
+  skin,
+  busy,
 }: {
   year: number;
   monthIndex: number;
   showTables: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
+  skin?: "classic" | "theme";
   focus: string;
   limits: string[];
   capacity: CapacityMap;
@@ -275,6 +378,7 @@ const OptBody = memo(function OptBody({
   days: { d: number; wd: string; weekend: boolean }[];
   cet: CetStamp;
   todayRef: RefObject<HTMLDivElement | null>;
+  busy?: (string | null)[][];
 }) {
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
   const q = markQuery(focus);
@@ -302,7 +406,7 @@ const OptBody = memo(function OptBody({
                 const row = grids[limit]?.[dayIdx] ?? [];
                 const limitHours = hoursOf(capacity, limit, day.d, weekdayOf(year, monthIndex, day.d));
                 const levels = lanesOf(capacity, limit, day.d, year, monthIndex);
-                return levels.map((level) => {
+                const lanes = levels.map((level) => {
                   const lane = `${dayIdx}-${limit}-${level}`;
                   return (
                     <div key={lane} data-lane={lane} className="v2-opt-lane">
@@ -316,12 +420,15 @@ const OptBody = memo(function OptBody({
                         {Array.from({ length: SLOT_COUNT }, (_, half) => {
                           const locked = !levelAllowed(half, level, limitHours);
                           const mark = seatsOf(row[half], level + 1)[level];
+                          const useMat = skin === "theme";
                           const past = dimPast && isPastSlot(year, monthIndex, day.d, half, cet);
                           const nowPct =
-                            dimPast && today && half === cet.half
+                            !useMat && dimPast && today && half === cet.half
                               ? Math.min(100, Math.max(0, cet.slotProgress * 100))
                               : undefined;
                           const focused = Boolean(q && mark && mark.t.toUpperCase() === q);
+                          const other = busy?.[dayIdx]?.[half];
+                          const busyLimit = other && other !== limit ? other : undefined;
                           return (
                             <OptCell
                               key={half}
@@ -341,6 +448,7 @@ const OptBody = memo(function OptBody({
                               muted={Boolean(q && mark && !focused)}
                               hit={focused}
                               nowPct={nowPct}
+                              busyLimit={busyLimit}
                             />
                           );
                         })}
@@ -348,6 +456,26 @@ const OptBody = memo(function OptBody({
                     </div>
                   );
                 });
+                if (skin !== "theme") return lanes;
+                return (
+                  <div key={limit} className="v2-opt-limit">
+                    {busy
+                      ? Array.from({ length: SLOT_COUNT }, (_, half) => {
+                          const other = busy[dayIdx]?.[half];
+                          if (!other || other === limit) return null;
+                          return (
+                            <span
+                              key={half}
+                              className="v2-opt-busy"
+                              style={{ ["--busy-half" as string]: half } as CSSProperties}
+                              aria-hidden
+                            />
+                          );
+                        })
+                      : null}
+                    {lanes}
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -421,6 +549,7 @@ function OptTip({
   capacity,
   showTip,
   waitRef,
+  skin,
 }: {
   year: number;
   monthIndex: number;
@@ -431,6 +560,7 @@ function OptTip({
     show: (hit: SlotHit) => void;
     hide: () => void;
   }>;
+  skin?: "classic" | "theme";
 }) {
   const { t, i18n } = useTranslation();
   const [hover, setHover] = useState<SlotHit | null>(null);
@@ -440,7 +570,7 @@ function OptTip({
     waitRef.current = {
       hide: () => setHover(null),
       show: (hit) => {
-        if (!showTip) {
+        if (!showTip && !hit.busyLimit) {
           setHover(null);
           return;
         }
@@ -456,7 +586,7 @@ function OptTip({
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
 
   return createPortal(
-    <div className="v2-opt-tip" style={{ left: hover.x, top: hover.y }}>
+    <div className={`v2-opt-tip${skin === "theme" ? " is-kit" : ""}`} style={{ left: hover.x, top: hover.y }}>
       <div className="v2-opt-tip-when">
         <b>{tipDate(year, monthIndex, hover.day, i18n.language)}</b>
         <span>{slotSpan(hover.half)}</span>
@@ -464,7 +594,12 @@ function OptTip({
           {t("v2.tip.msk")} {slotSpan(hover.half, mskOffset)}
         </small>
       </div>
-      {locked ? (
+      {hover.busyLimit && hover.busyLimit !== hover.limit ? (
+        <div className="v2-opt-tip-note">
+          <strong>{t("v2.tip.busy", { limit: hover.busyLimit })}</strong>
+          <p>{t("v2.tip.busyHint")}</p>
+        </div>
+      ) : locked ? (
         <div className="v2-opt-tip-note">
           <strong>{t("v2.tip.locked", { n: hover.level + 1 })}</strong>
           <p>{t("v2.tip.lockedHint", { cap, need: hover.level + 1 })}</p>
@@ -506,17 +641,20 @@ export function OptField({
   hidePastDays,
   showTip,
   canEdit,
+  quietEdit,
   focus,
   limits,
   capacity,
   grids,
   hourLoad,
   onGridChange,
+  skin = "classic",
+  busy,
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
-  const propsRef = useRef({ year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit });
-  propsRef.current = { year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit };
+  const propsRef = useRef({ year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin });
+  propsRef.current = { year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin };
   const tipApi = useRef({ show: (_hit: SlotHit) => {}, hide: () => {} });
   const clickTimer = useRef(0);
   const [cet, setCet] = useState<CetStamp>(() => readCet());
@@ -554,15 +692,30 @@ export function OptField({
     };
   }, []);
 
-  useEffect(() => () => window.clearTimeout(clickTimer.current), []);
+  useEffect(() => {
+    const host = daysRef.current?.querySelector(".v2-opt-frame-host");
+    if (!host) return;
+    const frame = document.createElement("div");
+    frame.className = "v2-opt-frame";
+    frame.hidden = true;
+    frame.setAttribute("aria-hidden", "true");
+    host.appendChild(frame);
+    return () => {
+      frame.remove();
+      const root = rootRef.current;
+      if (!root) return;
+      const mem = navMem.get(root);
+      if (mem) mem.frame = null;
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const now = readCet();
     if (now.year !== year || now.monthIndex !== monthIndex) return;
     const pinToday = () => {
       const scroller = daysRef.current;
+      const header = rootRef.current?.querySelector(".v2-opt-hours") as HTMLElement | null;
       const row = todayRef.current;
-      const header = scroller?.querySelector(".v2-opt-hours") as HTMLElement | null;
       if (!scroller || !row || !header) return;
       const blocks = [...scroller.querySelectorAll<HTMLElement>(".v2-opt-block")];
       const idx = blocks.indexOf(row);
@@ -597,6 +750,7 @@ export function OptField({
     const seats = seatsOf(cell, hit.level + 1);
     const mine = seats.findIndex((seat) => seat?.t === p.me.t);
     if (mode === "place") {
+      if (hit.busyLimit && hit.busyLimit !== hit.limit) return;
       if (seats[hit.level] || mine >= 0) return;
     } else if (mine !== hit.level) return;
     p.onGridChange(
@@ -613,8 +767,12 @@ export function OptField({
     if (event.button !== 0) return;
     tipApi.current.hide();
     const root = rootRef.current;
-    const hit = hitFromEvent(event.target, root);
+    const hit = hitFromEvent(event.target, root, true);
     if (!hit) return;
+    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
+      tipApi.current.show(hit);
+      return;
+    }
     if (event.detail > 1) return;
     window.clearTimeout(clickTimer.current);
     clickTimer.current = window.setTimeout(() => applySeat(hit, "place"), CLICK_WAIT);
@@ -629,7 +787,7 @@ export function OptField({
 
   const onContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    const hit = hitFromEvent(event.target, rootRef.current);
+    const hit = hitFromEvent(event.target, rootRef.current, true);
     if (!hit) {
       tipApi.current.hide();
       return;
@@ -637,7 +795,7 @@ export function OptField({
     tipApi.current.show(hit);
   }, []);
 
-  const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
+  const onPointerOver = useCallback((event: PointerEvent<HTMLElement>) => {
     const root = rootRef.current;
     if (!root) return;
     const hit = hitFromEvent(event.target, root);
@@ -647,11 +805,23 @@ export function OptField({
       return;
     }
     applyNav(root, hit);
+    if (
+      root.classList.contains("is-kit") &&
+      root.classList.contains("is-edit") &&
+      hit.busyLimit &&
+      hit.busyLimit !== hit.limit
+    ) {
+      const located = hitFromEvent(event.target, root, true);
+      if (located) tipApi.current.show(located);
+    } else if (root.classList.contains("is-kit") && root.classList.contains("is-edit")) {
+      tipApi.current.hide();
+    }
   }, []);
 
   const onPointerLeave = useCallback(() => {
     const root = rootRef.current;
     if (root) applyNav(root, null);
+    if (root?.classList.contains("is-kit") && root.classList.contains("is-edit")) tipApi.current.hide();
   }, []);
 
   const loadWash = loadGradient(hourLoad?.[limits[0] ?? "50"]);
@@ -659,54 +829,64 @@ export function OptField({
   return (
     <section
       ref={rootRef}
-      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}`}
-      style={{ ["--opt-load" as string]: loadWash, ...lookToVars(slotLook) } as CSSProperties}
+      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}${quietEdit ? " is-quiet" : ""}${skin === "theme" ? " is-kit" : ""}`}
+      style={
+        {
+          ["--opt-load" as string]: loadWash,
+          ...(skin === "theme" ? {} : lookToVars(slotLook)),
+        } as CSSProperties
+      }
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
-      onPointerMove={onPointerMove}
+      onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
     >
-      <div ref={daysRef} className="v2-days min-h-0 flex-1 overflow-auto">
-        <div className="v2-days-inner">
-          <div className="v2-opt-hours sticky top-0 z-20">
-            <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
-            <div className="v2-opt-nl v2-opt-lab">NL</div>
-            <div className="v2-opt-track v2-opt-head v2-mono relative">
-              {hours.map((h) => {
-                const msk = (h + mskOffset) % 24;
-                return (
-                  <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
-                    <b>
-                      {h}–{h + 1}
-                    </b>
-                    <small title="MSK">
-                      {msk}–{msk + 1 > 24 ? 24 : msk + 1}
-                    </small>
-                  </span>
-                );
-              })}
-              <OptHeadNow cet={cet} />
-            </div>
+      <div className="v2-opt-sheet">
+        <div className="v2-opt-hours">
+          <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
+          <div className="v2-opt-nl v2-opt-lab">NL</div>
+          <div className="v2-opt-track v2-opt-head v2-mono relative">
+            {hours.map((h) => {
+              const msk = (h + mskOffset) % 24;
+              return (
+                <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
+                  <b>
+                    {h}–{h + 1}
+                  </b>
+                  <small title="MSK">
+                    {msk}–{msk + 1 > 24 ? 24 : msk + 1}
+                  </small>
+                </span>
+              );
+            })}
+            <OptHeadNow cet={cet} />
           </div>
-          <OptBody
-            year={year}
-            monthIndex={monthIndex}
-            showTables={showTables}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            focus={focus}
-            limits={limits}
-            capacity={capacity}
-            grids={grids}
-            days={days}
-            cet={cet}
-            todayRef={todayRef}
-          />
-          {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
-            <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>
-          )}
-          <OptFoot cols={fillCols} />
+        </div>
+        <div ref={daysRef} className="v2-days min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="v2-days-inner">
+            <OptBody
+              year={year}
+              monthIndex={monthIndex}
+              showTables={showTables}
+              dimPast={dimPast}
+              hidePastDays={hidePastDays}
+              focus={focus}
+              limits={limits}
+              capacity={capacity}
+              grids={grids}
+              days={days}
+              cet={cet}
+              todayRef={todayRef}
+              skin={skin}
+              busy={busy}
+            />
+            {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
+              <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>
+            )}
+            <OptFoot cols={fillCols} />
+            <div className="v2-opt-frame-host" aria-hidden />
+          </div>
         </div>
       </div>
       <OptTip
@@ -716,6 +896,7 @@ export function OptField({
         capacity={capacity}
         showTip={showTip}
         waitRef={tipApi}
+        skin={skin}
       />
     </section>
   );

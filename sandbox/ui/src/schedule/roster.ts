@@ -38,3 +38,26 @@ export function rosterFromGrid(grid: Occupancy, year: number, monthIndex: number
       left: hoursFromSlots(row.left),
     }));
 }
+
+export function rosterFromGrids(grids: Occupancy[], year: number, monthIndex: number, cet: CetStamp): RosterRow[] {
+  const map = new Map<string, { mark: Mark; hours: number; left: number }>();
+  for (const grid of grids) {
+    for (const row of rosterFromGrid(grid, year, monthIndex, cet)) {
+      const cur = map.get(row.mark.t);
+      if (!cur) {
+        map.set(row.mark.t, { mark: row.mark, hours: row.hours, left: row.left });
+        continue;
+      }
+      cur.hours += row.hours;
+      cur.left += row.left;
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => a.mark.discord.localeCompare(b.mark.discord))
+    .map((row, i) => ({
+      n: i + 1,
+      mark: row.mark,
+      hours: Math.round(row.hours * 10) / 10,
+      left: Math.round(row.left * 10) / 10,
+    }));
+}

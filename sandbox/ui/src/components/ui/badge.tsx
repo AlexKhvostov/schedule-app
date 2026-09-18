@@ -6,10 +6,10 @@ const badgeVariants = cva("inline-flex items-center rounded-md px-1.5 py-0.5 tex
   variants: {
     variant: {
       default: "bg-secondary text-secondary-foreground",
-      success: "bg-emerald-400 text-emerald-950",
-      info: "bg-sky-400 text-sky-950",
-      warning: "bg-amber-400 text-amber-950",
-      danger: "bg-rose-400 text-rose-950",
+      success: "bg-success/15 text-success",
+      info: "bg-primary/15 text-primary",
+      warning: "bg-warning/15 text-warning",
+      danger: "bg-destructive/15 text-destructive",
     },
   },
   defaultVariants: { variant: "default" },

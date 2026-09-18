@@ -216,13 +216,25 @@ export function capAt(hours: HourCaps, halfIndex: number) {
   return hours[Math.floor(halfIndex / 2)] ?? 1;
 }
 
+const LIMIT_PAINT: Record<string, string> = {
+  "25": "#9CA3AF",
+  "50": "#22D3EE",
+  "100": "#FBBF24",
+  "250": "#A78BFA",
+  "500": "#F472B6",
+};
+
 export function limitTone(limit: string) {
-  if (limit === "25") return "#9CA3AF";
-  if (limit === "50") return "#22D3EE";
-  if (limit === "100") return "#FBBF24";
-  if (limit === "250") return "#A78BFA";
-  if (limit === "500") return "#F472B6";
-  return "#C9CDD4";
+  if (limit === "25") return "var(--limit-25)";
+  if (limit === "50") return "var(--limit-50)";
+  if (limit === "100") return "var(--limit-100)";
+  if (limit === "250") return "var(--limit-250)";
+  if (limit === "500") return "var(--limit-500)";
+  return "var(--muted-foreground)";
+}
+
+export function limitTonePaint(limit: string) {
+  return LIMIT_PAINT[limit] ?? "#C9CDD4";
 }
 
 export function loadCapacity(): CapacityMap {

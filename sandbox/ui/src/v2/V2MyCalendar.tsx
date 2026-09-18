@@ -5,8 +5,8 @@ import { playerHourOffset, readCet, isPastDay } from "../schedule/cet";
 import { LIMIT_OPTIONS, limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { downloadCalendarJpeg } from "./calendarJpeg";
+import { loadTheme } from "./theme";
 import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
-import { R } from "./tokens";
 
 type Props = {
   year: number;
@@ -80,6 +80,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   const usedLimits = LIMIT_OPTIONS.filter((limit) => runs.some((run) => run.limit === limit));
   const hours = Array.from({ length: 24 }, (_, hour) => hour);
   const hoverHour = hover ? Math.floor(hover.start / 2) : null;
+  const theme = loadTheme();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -103,8 +104,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   };
 
   return createPortal(
-    <div className="v2-mine-back" onClick={onClose}>
-      <div className="v2-mine" style={{ background: R.header, borderColor: R.line2 }} onClick={(event) => event.stopPropagation()}>
+    <div className={`v2-mine-back is-kit theme-${theme}`} onClick={onClose}>
+      <div className={`v2-mine is-kit theme-${theme}`} onClick={(event) => event.stopPropagation()}>
         <header className="v2-mine-chrome">
           <h2>{t("schedule.myCalendar")}</h2>
           <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
@@ -131,7 +132,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
 
         <div className="v2-mine-sheet">
           <div className="v2-mine-hours">
-            <div className="v2-mine-date" style={{ color: R.faint }}>
+            <div className="v2-mine-date v2-muted">
               {t("v2.day")}
               <small>CET</small>
             </div>
@@ -155,13 +156,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
                 ref={isToday ? todayRef : undefined}
                 className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}`}
               >
-                <div
-                  className="v2-mine-date v2-mono"
-                  style={{
-                    color: hovered || isToday ? R.cyan : undefined,
-                    fontWeight: hovered || isToday ? 600 : 400,
-                  }}
-                >
+                <div className="v2-mine-date v2-mono">
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
                 <div className="v2-mine-track">
@@ -250,7 +245,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
               }).finally(() => setSaving(false));
             }}
           >
-            <i className="fa-solid fa-download mr-2" style={{ color: R.cyan }} />
+            <i className="fa-solid fa-download v2-accent mr-2" />
             {t("schedule.download")}
           </button>
         </footer>
@@ -259,19 +254,17 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
       {hover &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[80] min-w-[220px] rounded-md px-3 py-2.5 text-[12px] shadow-xl"
-            style={{ left: hover.x, top: hover.y, background: "#1A2030", border: `1px solid ${R.line2}` }}
+            className={`v2-tip is-kit theme-${theme} pointer-events-none fixed z-[80] min-w-[220px] rounded-md px-3 py-2.5 text-[12px] shadow-xl`}
+            style={{ left: hover.x, top: hover.y }}
           >
-            <div className="font-semibold" style={{ color: R.text }}>
-              {tipDate(year, monthIndex, hover.day, i18n.language)}
-            </div>
+            <div className="font-semibold">{tipDate(year, monthIndex, hover.day, i18n.language)}</div>
             <div className="v2-mono mt-1.5 grid grid-cols-[36px_1fr] gap-x-2 gap-y-0.5 text-[12px]">
-              <span style={{ color: R.faint }}>{t("v2.tip.cet")}</span>
-              <span style={{ color: R.cyan }}>
+              <span className="v2-muted">{t("v2.tip.cet")}</span>
+              <span className="v2-tip-cet">
                 {clock(hover.start)} – {clock(hover.end)}
               </span>
-              <span style={{ color: R.faint }}>{t("v2.tip.msk")}</span>
-              <span style={{ color: R.soft }}>
+              <span className="v2-muted">{t("v2.tip.msk")}</span>
+              <span>
                 {clock(hover.start, mskOffset)} – {clock(hover.end, mskOffset)}
               </span>
             </div>

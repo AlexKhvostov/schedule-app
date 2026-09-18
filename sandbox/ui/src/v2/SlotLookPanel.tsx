@@ -8,7 +8,6 @@ import {
   saveSlotLook,
   type SlotLook,
 } from "../schedule/slotLook";
-import { R } from "./tokens";
 
 type Props = { onClose: () => void };
 

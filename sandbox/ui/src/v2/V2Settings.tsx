@@ -1,17 +1,18 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { R } from "./tokens";
 
 type Props = {
   dimPast: boolean;
   hidePastDays: boolean;
   showTables: boolean;
   showTip: boolean;
+  editPulse: boolean;
   onDimPast: (value: boolean) => void;
   onHidePastDays: (value: boolean) => void;
   onShowTables: (value: boolean) => void;
   onShowTip: (value: boolean) => void;
+  onEditPulse: (value: boolean) => void;
   onOpenLook: () => void;
   onClose: () => void;
 };
@@ -21,10 +22,12 @@ export function V2Settings({
   hidePastDays,
   showTables,
   showTip,
+  editPulse,
   onDimPast,
   onHidePastDays,
   onShowTables,
   onShowTip,
+  onEditPulse,
   onOpenLook,
   onClose,
 }: Props) {
@@ -71,26 +74,24 @@ export function V2Settings({
       title: t("schedule.showTip"),
       hint: t("schedule.showTipHint"),
     },
+    {
+      key: "pulse",
+      on: editPulse,
+      toggle: () => onEditPulse(!editPulse),
+      icon: "fa-wave-square",
+      title: t("schedule.editPulse"),
+      hint: t("schedule.editPulseHint"),
+    },
   ];
 
   return createPortal(
     <div className="v2-mine-back" onClick={onClose}>
-      <div
-        className="v2-settings"
-        style={{ background: R.header, borderColor: R.line2 }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="v2-settings-top" style={{ borderColor: R.line }}>
+      <div className="v2-settings" onClick={(event) => event.stopPropagation()}>
+        <header className="v2-settings-top">
           <div>
-            <div className="text-[11px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
-              {t("schedule.settings")}
-            </div>
-            <h2 className="mt-1 text-[18px] font-semibold" style={{ color: R.text }}>
-              {t("schedule.settingsTitle")}
-            </h2>
-            <p className="mt-1 text-[12px]" style={{ color: R.muted }}>
-              {t("schedule.settingsHint")}
-            </p>
+            <div className="v2-muted text-[11px] tracking-[0.14em] uppercase">{t("schedule.settings")}</div>
+            <h2 className="mt-1 text-[18px] font-semibold">{t("schedule.settingsTitle")}</h2>
+            <p className="v2-muted mt-1 text-[12px]">{t("schedule.settingsHint")}</p>
           </div>
           <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
             <i className="fa-solid fa-xmark" />
@@ -98,37 +99,26 @@ export function V2Settings({
         </header>
         <div className="v2-settings-list">
           {rows.map((row) => (
-            <button
-              key={row.key}
-              type="button"
-              className={`v2-settings-row${row.on ? " is-on" : ""}`}
-              style={{ borderColor: R.line, background: row.on ? "rgba(34, 211, 238, 0.08)" : R.panel }}
-              onClick={row.toggle}
-            >
-              <span className="v2-settings-ico" style={{ color: row.on ? R.cyan : R.faint }}>
+            <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} onClick={row.toggle}>
+              <span className="v2-settings-ico">
                 <i className={`fa-solid ${row.icon}`} />
               </span>
               <span className="v2-settings-copy">
-                <b style={{ color: R.text }}>{row.title}</b>
-                <small style={{ color: R.muted }}>{row.hint}</small>
+                <b>{row.title}</b>
+                <small>{row.hint}</small>
               </span>
               <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
             </button>
           ))}
-          <button
-            type="button"
-            className="v2-settings-row"
-            style={{ borderColor: R.line, background: R.panel }}
-            onClick={onOpenLook}
-          >
-            <span className="v2-settings-ico" style={{ color: R.cyan }}>
+          <button type="button" className="v2-settings-row" onClick={onOpenLook}>
+            <span className="v2-settings-ico" style={{ color: "var(--primary)" }}>
               <i className="fa-solid fa-palette" />
             </span>
             <span className="v2-settings-copy">
-              <b style={{ color: R.text }}>{t("schedule.slotLookTitle")}</b>
-              <small style={{ color: R.muted }}>{t("schedule.slotLookHint")}</small>
+              <b>{t("schedule.slotLookTitle")}</b>
+              <small>{t("schedule.slotLookHint")}</small>
             </span>
-            <i className="fa-solid fa-chevron-right text-[11px]" style={{ color: R.faint }} />
+            <i className="fa-solid fa-chevron-right v2-muted text-[11px]" />
           </button>
         </div>
       </div>

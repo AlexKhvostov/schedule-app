@@ -1,5 +1,4 @@
-import { limitTone } from "../schedule/capacity";
-import { R } from "./tokens";
+import { limitTonePaint } from "../schedule/capacity";
 import type { ShiftRun } from "./myShifts";
 
 const SLOT_COUNT = 48;
@@ -12,10 +11,28 @@ const CHIP_H = 16;
 const TITLE_H = 50;
 const FOOT_H = 34;
 const DPR = 2;
-const GRID = "#151a24";
-const HEAD = "#222b3c";
-const LINE = "rgba(232, 236, 242, 0.16)";
-const LINE_STRONG = "rgba(232, 236, 242, 0.28)";
+
+function cssVar(name: string, fallback: string) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function themePaint() {
+  const light = document.documentElement.dataset.uiTheme === "light";
+  const border = cssVar("--border", light ? "#d5dbe3" : "#1e2330");
+  return {
+    page: cssVar("--header", light ? "#ffffff" : "#111620"),
+    card: cssVar("--card", light ? "#ffffff" : "#151a24"),
+    hours: cssVar("--muted", light ? "#e8ecf1" : "#1e2330"),
+    text: cssVar("--foreground", light ? "#111620" : "#f4f5f7"),
+    muted: cssVar("--muted-foreground", light ? "#5c6570" : "#9ca3af"),
+    cyan: cssVar("--ring", light ? "#0891b2" : "#22d3ee"),
+    weekend: light ? "#9a5b16" : "#e4c9a4",
+    line: border,
+    lineStrong: border,
+    now: cssVar("--now", "#e11d2e"),
+  };
+}
 
 type Day = { d: number; wd: string; weekend: boolean };
 
@@ -37,7 +54,7 @@ type Opts = {
 
 function mineTone(limit: string) {
   if (limit === "25") return "#4ADE80";
-  return limitTone(limit);
+  return limitTonePaint(limit);
 }
 
 function limitInk(limit: string) {
@@ -76,24 +93,25 @@ export async function downloadCalendarJpeg(opts: Opts) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.scale(DPR, DPR);
-  ctx.fillStyle = R.header;
+  const paint = themePaint();
+  ctx.fillStyle = paint.page;
   ctx.fillRect(0, 0, WIDTH, height);
 
   ctx.textBaseline = "top";
-  ctx.fillStyle = R.text;
+  ctx.fillStyle = paint.text;
   ctx.font = "650 16px Inter, IBM Plex Sans, sans-serif";
   ctx.fillText(kicker, PAD, PAD);
 
   let infoX = PAD;
-  ctx.fillStyle = R.text;
+  ctx.fillStyle = paint.text;
   ctx.font = "600 13px Inter, IBM Plex Sans, sans-serif";
   ctx.fillText(title, infoX, PAD + 24);
   infoX += ctx.measureText(title).width + 10;
-  ctx.fillStyle = "#22d3ee";
+  ctx.fillStyle = paint.cyan;
   ctx.font = "650 11px JetBrains Mono, IBM Plex Mono, monospace";
   ctx.fillText(tag, infoX, PAD + 26);
   infoX += ctx.measureText(tag).width + 12;
-  ctx.fillStyle = R.muted;
+  ctx.fillStyle = paint.muted;
   ctx.font = "12px Inter, IBM Plex Sans, sans-serif";
   ctx.fillText(meta.replace(`${tag} · `, ""), infoX, PAD + 25);
 
@@ -105,15 +123,15 @@ export async function downloadCalendarJpeg(opts: Opts) {
   const trackW = sheetW - DATE_W;
 
   roundRect(ctx, sheetX, sheetY, sheetW, sheetH, 8);
-  ctx.fillStyle = GRID;
+  ctx.fillStyle = paint.card;
   ctx.fill();
-  ctx.strokeStyle = LINE_STRONG;
+  ctx.strokeStyle = paint.lineStrong;
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.fillStyle = HEAD;
+  ctx.fillStyle = paint.hours;
   ctx.fillRect(sheetX, sheetY, sheetW, HOUR_H);
-  ctx.strokeStyle = LINE_STRONG;
+  ctx.strokeStyle = paint.lineStrong;
   ctx.beginPath();
   ctx.moveTo(sheetX, sheetY + HOUR_H + 0.5);
   ctx.lineTo(sheetX + sheetW, sheetY + HOUR_H + 0.5);
@@ -123,7 +141,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
   ctx.lineTo(trackX + 0.5, sheetY + sheetH);
   ctx.stroke();
 
-  ctx.fillStyle = R.faint;
+  ctx.fillStyle = paint.muted;
   ctx.font = "600 10px Inter, IBM Plex Sans, sans-serif";
   ctx.fillText(dayLabel.toUpperCase(), sheetX + 8, sheetY + 6);
   ctx.font = "600 9px JetBrains Mono, IBM Plex Mono, monospace";
@@ -132,14 +150,14 @@ export async function downloadCalendarJpeg(opts: Opts) {
   for (let h = 0; h < 24; h += 1) {
     const x = trackX + slotX(trackW, h * 2);
     const w = slotX(trackW, 2);
-    ctx.strokeStyle = h === 5 || h === 11 || h === 17 ? LINE_STRONG : LINE;
+    ctx.strokeStyle = h === 5 || h === 11 || h === 17 ? paint.lineStrong : paint.line;
     ctx.beginPath();
     ctx.moveTo(x + w + 0.5, sheetY);
     ctx.lineTo(x + w + 0.5, sheetY + sheetH);
     ctx.stroke();
     ctx.textAlign = "center";
     ctx.font = "650 9px JetBrains Mono, IBM Plex Mono, monospace";
-    ctx.fillStyle = "#d5deec";
+    ctx.fillStyle = paint.muted;
     ctx.fillText(String(h), x + w / 2, sheetY + 10);
     ctx.textAlign = "left";
   }
@@ -153,7 +171,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
 
   days.forEach((day, idx) => {
     const y = sheetY + HOUR_H + idx * ROW_H;
-    ctx.strokeStyle = LINE;
+    ctx.strokeStyle = paint.line;
     ctx.beginPath();
     ctx.moveTo(sheetX, y + 0.5);
     ctx.lineTo(sheetX + sheetW, y + 0.5);
@@ -161,10 +179,10 @@ export async function downloadCalendarJpeg(opts: Opts) {
 
     const isToday = today === day.d;
     ctx.font = `${isToday ? 600 : 400} 12px JetBrains Mono, IBM Plex Mono, monospace`;
-    ctx.fillStyle = isToday ? R.cyan : day.weekend ? "#e4c9a4" : "#e8edf4";
+    ctx.fillStyle = isToday ? paint.cyan : day.weekend ? paint.weekend : paint.text;
     ctx.fillText(`${String(day.d).padStart(2, "0")} ${day.wd}`, sheetX + 8, y + 5);
     if (isToday) {
-      ctx.strokeStyle = R.cyan;
+      ctx.strokeStyle = paint.cyan;
       ctx.lineWidth = 1.5;
       roundRect(ctx, sheetX + 3, y + 2, DATE_W - 7, ROW_H - 4, 2);
       ctx.stroke();
@@ -222,7 +240,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     if (todayIdx >= 0) {
       const x = trackX + slotX(trackW, nowAt);
       const y = sheetY + HOUR_H + todayIdx * ROW_H;
-      ctx.fillStyle = "#ff2d2d";
+      ctx.fillStyle = paint.now;
       ctx.fillRect(x - 1.5, y, 3, ROW_H);
     }
   }
@@ -235,7 +253,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.beginPath();
     ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = R.muted;
+    ctx.fillStyle = paint.muted;
     ctx.fillText(`NL ${limit}`, legendX + 14, footY);
     legendX += ctx.measureText(`NL ${limit}`).width + 28;
   }

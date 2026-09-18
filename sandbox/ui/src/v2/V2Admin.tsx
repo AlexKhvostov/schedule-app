@@ -19,7 +19,8 @@ import {
 } from "../schedule/capacity";
 import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
 import { MembersAdmin } from "./MembersAdmin";
-import { R } from "./tokens";
+import { V2Root } from "./V2Root";
+import { V2SaveButton } from "./V2SaveButton";
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -48,6 +49,7 @@ function inCapRange(ri: number, hour: number, range: CapRange | null) {
 type Props = {
   capacity: CapacityMap;
   hourLoad: HourLoadMap;
+  isRoot?: boolean;
   onCapacityChange: (next: CapacityMap) => void;
   onHourLoadChange: (next: HourLoadMap) => void;
 };
@@ -91,17 +93,11 @@ function FoldHead({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-4 px-5 py-4" style={{ borderBottom: open ? `1px solid ${R.line}` : "0" }}>
+    <div className={`v2-fold-head flex items-center gap-4 px-5 py-4${open ? " is-open" : ""}`}>
       <div className="min-w-0 flex-1">
-        <span className="block text-[11px] tracking-[0.16em] uppercase" style={{ color: R.faint }}>
-          {kicker}
-        </span>
+        <span className="v2-admin-kicker block text-[11px] tracking-[0.16em] uppercase">{kicker}</span>
         <h2 className="mt-1 text-[18px] font-semibold">{title}</h2>
-        {open && lead && (
-          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed" style={{ color: R.muted }}>
-            {lead}
-          </p>
-        )}
+        {open && lead && <p className="v2-muted mt-2 max-w-3xl text-[13px] leading-relaxed">{lead}</p>}
       </div>
       <button type="button" className="v2-ctrl shrink-0 px-4" onClick={onToggle}>
         {open ? t("admin.fold.close") : t("admin.fold.open")}
@@ -110,7 +106,7 @@ function FoldHead({
   );
 }
 
-export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange }: Props) {
+export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLoadChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
@@ -118,6 +114,7 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
   const [open, setOpen] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(true);
+  const [rootOpen, setRootOpen] = useState(false);
   const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
   const [loadSaved, setLoadSaved] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -268,10 +265,22 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
   };
 
   return (
-    <div className="mx-auto w-full px-6 py-8" style={{ color: R.text }}>
+    <div className="v2-ink mx-auto w-full px-6 py-8">
       <h1 className="mb-8 text-2xl font-semibold tracking-tight">{t("admin.title")}</h1>
 
-      <section className="overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
+      {isRoot ? (
+        <section className="v2-admin-card mb-6">
+          <FoldHead
+            kicker={t("admin.root.kicker")}
+            title={t("admin.root.title")}
+            lead={t("admin.root.lead")}
+            open={rootOpen}
+            onToggle={() => setRootOpen((value) => !value)}
+          />
+          {rootOpen && <V2Root />}
+        </section>
+      ) : null}
+      <section className="v2-admin-card">
         <FoldHead
           kicker={t("admin.capacity.kicker")}
           title={t("admin.capacity.title")}
@@ -282,19 +291,13 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
 
         <div className="flex" hidden={!open}>
           <aside className="v2-cap-limits">
-            <div className="mb-2 px-1 text-[10px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
-              {t("admin.capacity.limit")}
-            </div>
+            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
             {LIMIT_OPTIONS.map((value) => (
               <button
                 key={value}
                 type="button"
-                className="v2-cap-limit"
-                style={{
-                  background: limit === value ? "rgba(34, 211, 238, 0.14)" : "transparent",
-                  color: limit === value ? R.cyan : limitTone(value),
-                  boxShadow: limit === value ? `inset 0 0 0 1px rgba(34, 211, 238, 0.45)` : undefined,
-                }}
+                className={`v2-cap-limit${limit === value ? " is-on" : ""}`}
+                style={limit === value ? undefined : { color: limitTone(value) }}
                 onClick={() => {
                   setLimit(value);
                   setSaved(false);
@@ -306,36 +309,16 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
             <button type="button" className="v2-ctrl mt-4 w-full px-2 text-[11px]" onClick={reset}>
               {t("admin.capacity.resetLimit")}
             </button>
-            <p className="mt-2 px-1 text-[10px] leading-relaxed" style={{ color: R.faint }}>
-              {t("admin.capacity.resetLimitHint")}
-            </p>
+            <p className="v2-muted mt-2 px-1 text-[10px] leading-relaxed">{t("admin.capacity.resetLimitHint")}</p>
           </aside>
 
           <div className="min-w-0 flex-1 px-5 py-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex overflow-hidden rounded border" style={{ borderColor: R.line }}>
-                <button
-                  type="button"
-                  className="border-0 px-3 py-1.5 text-[12px]"
-                  style={{
-                    background: tab === "week" ? R.cyan : "transparent",
-                    color: tab === "week" ? R.cyanInk : R.muted,
-                    fontWeight: tab === "week" ? 600 : 400,
-                  }}
-                  onClick={() => setTab("week")}
-                >
+              <div className="v2-seg">
+                <button type="button" className={tab === "week" ? "is-on" : ""} onClick={() => setTab("week")}>
                   {t("admin.capacity.tabWeek")}
                 </button>
-                <button
-                  type="button"
-                  className="border-0 px-3 py-1.5 text-[12px]"
-                  style={{
-                    background: tab === "month" ? R.cyan : "transparent",
-                    color: tab === "month" ? R.cyanInk : R.muted,
-                    fontWeight: tab === "month" ? 600 : 400,
-                  }}
-                  onClick={() => setTab("month")}
-                >
+                <button type="button" className={tab === "month" ? "is-on" : ""} onClick={() => setTab("month")}>
                   {t("admin.capacity.tabMonth")}
                 </button>
               </div>
@@ -466,9 +449,7 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
               </div>
             )}
 
-            <p className="mt-2 text-[11px]" style={{ color: R.faint }}>
-              {t("admin.capacity.matrixHint")}
-            </p>
+            <p className="v2-muted mt-2 text-[11px]">{t("admin.capacity.matrixHint")}</p>
             <div className="mt-4 flex flex-col gap-2">
               <label className="flex cursor-pointer items-center gap-2 text-[13px]">
                 <input
@@ -493,25 +474,17 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
                 <span>{t("admin.capacity.useMonth")}</span>
               </label>
               {weekOn && monthOn ? (
-                <p className="max-w-2xl text-[12px]" style={{ color: R.soft }}>
-                  {t("admin.capacity.conflictHint")}
-                </p>
+                <p className="v2-muted max-w-2xl text-[12px]">{t("admin.capacity.conflictHint")}</p>
               ) : null}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="v2-ctrl px-5"
-                style={{
-                  background: dirty ? R.cyan : R.panel,
-                  color: dirty ? R.cyanInk : R.faint,
-                  fontWeight: 600,
-                }}
-                disabled={!dirty}
+              <V2SaveButton
+                dirty={dirty}
+                saved={saved}
+                label={t("admin.save")}
+                doneLabel={t("admin.saved")}
                 onClick={save}
-              >
-                {saved ? t("admin.capacity.applied") : t("admin.capacity.apply")}
-              </button>
+              />
               <button type="button" className="v2-ctrl px-4" onClick={resetMatrix}>
                 {t("admin.capacity.matrixReset")}
               </button>
@@ -528,7 +501,7 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
         </div>
       </section>
 
-      <section className="mt-6 overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
+      <section className="v2-admin-card mt-6">
         <FoldHead
           kicker={t("admin.load.kicker")}
           title={t("admin.load.title")}
@@ -539,19 +512,13 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
         {loadOpen && (
         <div className="flex">
           <aside className="v2-cap-limits">
-            <div className="mb-2 px-1 text-[10px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
-              {t("admin.capacity.limit")}
-            </div>
+            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
             {LIMIT_OPTIONS.map((value) => (
               <button
                 key={`load-${value}`}
                 type="button"
-                className="v2-cap-limit"
-                style={{
-                  background: limit === value ? "rgba(34, 211, 238, 0.14)" : "transparent",
-                  color: limit === value ? R.cyan : limitTone(value),
-                  boxShadow: limit === value ? `inset 0 0 0 1px rgba(34, 211, 238, 0.45)` : undefined,
-                }}
+                className={`v2-cap-limit${limit === value ? " is-on" : ""}`}
+                style={limit === value ? undefined : { color: limitTone(value) }}
                 onClick={() => setLimit(value)}
               >
                 <b>NL {value}</b>
@@ -559,8 +526,8 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
             ))}
           </aside>
           <div className="min-w-0 flex-1 px-5 py-5">
-            <div className="v2-load-legend" style={{ color: R.muted }}>
-              <span style={{ color: R.faint }}>{t("admin.load.legend")}</span>
+            <div className="v2-load-legend v2-muted">
+              <span>{t("admin.load.legend")}</span>
               {LOAD_PASTELS.filter((tone) => tone.color).map((tone) => (
                 <span key={tone.id} className="v2-load-chip">
                   <i style={{ background: tone.swatch }} />
@@ -605,19 +572,13 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="v2-ctrl px-5"
-                style={{
-                  background: loadDirty ? R.cyan : R.panel,
-                  color: loadDirty ? R.cyanInk : R.faint,
-                  fontWeight: 600,
-                }}
-                disabled={!loadDirty}
+              <V2SaveButton
+                dirty={loadDirty}
+                saved={loadSaved}
+                label={t("admin.save")}
+                doneLabel={t("admin.saved")}
                 onClick={saveLoad}
-              >
-                {loadSaved ? t("admin.capacity.applied") : t("admin.capacity.apply")}
-              </button>
+              />
               <button type="button" className="v2-ctrl px-4" onClick={resetLoad}>
                 {t("admin.load.reset")}
               </button>
@@ -630,7 +591,7 @@ export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange
         )}
       </section>
 
-      <section className="mt-6 overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
+      <section className="v2-admin-card mt-6">
         <FoldHead
           kicker={t("admin.people.kicker")}
           title={t("admin.people.title")}

@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, hoursOf, type CapacityMap } from "../schedule/capacity";
 import { ME, type Mark } from "../schedule/marks";
 import { planMonth, type Occupancy } from "../schedule/plan";
 import { readCet } from "../schedule/cet";
-import { rosterFromGrid } from "../schedule/roster";
+import { rosterFromGrids } from "../schedule/roster";
 import { fieldFill, pctLabel } from "../schedule/analytics";
-import { GitMinimalField } from "./GitMinimalField";
-import { GRID_SKINS, type GridSkinId } from "./gridSkins";
 import { OptField } from "./OptField";
-import { TableField } from "./TableField";
-import { V2Field } from "./V2Field";
 import { V2Float } from "./V2Float";
 import { V2MyCalendar } from "./V2MyCalendar";
 import { V2Settings } from "./V2Settings";
 import { SlotLookPanel } from "./SlotLookPanel";
-import { gridsForCalendar } from "./myShifts";
+import { gridsForCalendar, myHoursMatrix, myPlayStats, myTimeline } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
-import { R } from "./tokens";
+import { loadPrefs, savePrefs } from "./prefs";
 
 type Props = {
   cursor: Date;
   onCursorChange: (value: Date) => void;
   capacity: CapacityMap;
   hourLoad?: HourLoadMap;
+  skin?: "classic" | "theme";
 };
 
 function monthTitle(date: Date, lang: string) {
@@ -34,11 +32,163 @@ function monthTitle(date: Date, lang: string) {
   return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/\sг\.?$/i, "");
 }
 
-export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props) {
+function monthShort(index: number, lang: string) {
+  const raw = new Date(2026, index, 1).toLocaleDateString(lang.startsWith("en") ? "en-US" : "ru-RU", {
+    month: "short",
+  });
+  return raw.replace(/\./g, "").replace(/\sг\.?$/i, "");
+}
+
+function MarkPlanDock({
+  me,
+  tables,
+  matrix,
+  x,
+  y,
+  onMove,
+  onBump,
+  onDraft,
+}: {
+  me: Mark;
+  tables: string;
+  matrix: ReturnType<typeof myHoursMatrix>;
+  x: number;
+  y: number;
+  onMove: (x: number, y: number) => void;
+  onBump: (delta: number) => void;
+  onDraft: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const drag = useRef<{ ox: number; oy: number } | null>(null);
+  const n = Number(tables) || me.tables;
+
+  useEffect(() => {
+    const move = (event: MouseEvent) => {
+      if (!drag.current) return;
+      onMove(
+        Math.min(window.innerWidth - 72, Math.max(8, event.clientX - drag.current.ox)),
+        Math.min(window.innerHeight - 48, Math.max(8, event.clientY - drag.current.oy)),
+      );
+    };
+    const up = () => {
+      drag.current = null;
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [onMove]);
+
+  return createPortal(
+    <div className="v2-mark-dock" style={{ left: x, top: y }} role="dialog" aria-label={t("schedule.editDockTitle")}>
+      <header
+        className="v2-mark-dock-head"
+        onMouseDown={(event) => {
+          if ((event.target as HTMLElement).closest("input, button")) return;
+          drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+        }}
+      >
+        <div className="v2-mark-dock-title">
+          <b>{t("schedule.editDockTitle")}</b>
+          <i className="fa-solid fa-grip-vertical" aria-hidden />
+        </div>
+        <div className="v2-mark-dock-tools">
+          <span className="v2-mark-sample">
+            <span
+              className="v2-opt-cell is-on v2-mark-setup"
+              style={{ ["--mark" as string]: me.bg, ["--mark-ink" as string]: me.fg } as CSSProperties}
+            >
+              <span className="v2-opt-face has-n">
+                <b>{me.t}</b>
+                <i>{n}</i>
+              </span>
+            </span>
+          </span>
+          <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
+            <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
+              <i className="fa-solid fa-minus" />
+            </button>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={30}
+              value={tables}
+              onChange={(event) => onDraft(event.target.value)}
+            />
+            <button type="button" aria-label="+1" onClick={() => onBump(1)}>
+              <i className="fa-solid fa-plus" />
+            </button>
+          </div>
+          <em>{t("schedule.meHours", { n: matrix.grand })}</em>
+        </div>
+      </header>
+      <ul className="v2-mark-dock-stat">
+        {LIMIT_OPTIONS.map((limit) => {
+          const marks = matrix.counts[limit] || 0;
+          const hours = matrix.totals[limit] || 0;
+          return (
+            <li key={limit} className={marks ? "is-on" : ""}>
+              <b>NL {limit}</b>
+              <em>{t("schedule.planMarks", { n: marks })}</em>
+              <i>{t("schedule.meHours", { n: hours })}</i>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="v2-mark-plan-scroll">
+        <table className="v2-mark-plan">
+          <thead>
+            <tr>
+              <th>{t("schedule.planDay")}</th>
+              {LIMIT_OPTIONS.map((limit) => (
+                <th key={limit}>{limit}</th>
+              ))}
+              <th>Σ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.hours.map((row, dayIdx) => (
+              <tr key={dayIdx}>
+                <th>{String(dayIdx + 1).padStart(2, "0")}</th>
+                {LIMIT_OPTIONS.map((limit) => (
+                  <td key={limit} className={row[limit] ? "is-on" : ""}>
+                    {row[limit] || ""}
+                  </td>
+                ))}
+                <td className={matrix.dayTotals[dayIdx] ? "is-on" : ""}>{matrix.dayTotals[dayIdx] || ""}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Σ</th>
+              {LIMIT_OPTIONS.map((limit) => (
+                <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
+                  {matrix.totals[limit] || ""}
+                </td>
+              ))}
+              <td className="is-on">{matrix.grand || ""}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "classic" }: Props) {
   const { t, i18n } = useTranslation();
+  const isKit = skin === "theme";
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
-  const [grids, setGrids] = useState<Record<string, Occupancy>>(() => ({ 50: planMonth(year, monthIndex, "50") }));
+  const boot = loadPrefs();
+  const [grids, setGrids] = useState<Record<string, Occupancy>>(() =>
+    Object.fromEntries(boot.limits.map((limit) => [limit, planMonth(year, monthIndex, limit)])),
+  );
   const [showMine, setShowMine] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showLook, setShowLook] = useState(false);
@@ -48,20 +198,29 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
   const [hidePastDays, setHidePastDays] = useState(false);
   const [showTip, setShowTip] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
+  const [editPulse, setEditPulse] = useState(boot.editPulse);
   const [markOpen, setMarkOpen] = useState(false);
   const [tablesDraft, setTablesDraft] = useState("11");
-  const [limits, setLimits] = useState<string[]>(["50"]);
+  const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
-  const [kind, setKind] = useState("nitro");
+  const [kind, setKind] = useState(boot.kind);
+  const [kindOpen, setKindOpen] = useState(false);
+  const [monthOpen, setMonthOpen] = useState(false);
+  const [pickYear, setPickYear] = useState(year);
   const [focus, setFocus] = useState("");
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [gridSkin, setGridSkin] = useState<GridSkinId>("opt");
   const [showPeople, setShowPeople] = useState(false);
   const [analyticsPos, setAnalyticsPos] = useState({ x: 760, y: 120 });
   const [peoplePos, setPeoplePos] = useState({ x: 1080, y: 160 });
+  const [markPos, setMarkPos] = useState(() => ({
+    x: typeof window === "undefined" ? 860 : Math.max(8, window.innerWidth - 408),
+    y: 72,
+  }));
   const [front, setFront] = useState<"fill" | "people">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
   const limitsRef = useRef<HTMLDivElement>(null);
+  const kindRef = useRef<HTMLDivElement>(null);
+  const monthRef = useRef<HTMLDivElement>(null);
   const editPackRef = useRef<HTMLDivElement>(null);
   const tablesInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,13 +234,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
   }, []);
 
   useEffect(() => {
-    if (!limitsOpen) return;
+    if (!limitsOpen && !kindOpen && !monthOpen) return;
     const close = (event: MouseEvent) => {
-      if (!limitsRef.current?.contains(event.target as Node)) setLimitsOpen(false);
+      const node = event.target as Node;
+      if (!limitsRef.current?.contains(node)) setLimitsOpen(false);
+      if (!kindRef.current?.contains(node)) setKindOpen(false);
+      if (!monthRef.current?.contains(node)) setMonthOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLimitsOpen(false);
+        setKindOpen(false);
+        setMonthOpen(false);
+      }
     };
     window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [limitsOpen]);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [limitsOpen, kindOpen, monthOpen]);
 
   useEffect(() => {
     if (!canEdit) setMarkOpen(false);
@@ -91,6 +264,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
     if (!markOpen) return;
     setTablesDraft(String(me.tables));
     const id = window.setTimeout(() => tablesInputRef.current?.focus(), 0);
+    if (isKit) return () => window.clearTimeout(id);
     const close = (event: MouseEvent) => {
       if (!editPackRef.current?.contains(event.target as Node)) setMarkOpen(false);
     };
@@ -99,17 +273,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
       window.clearTimeout(id);
       window.removeEventListener("mousedown", close);
     };
-  }, [markOpen]);
+  }, [markOpen, isKit]);
 
   const visibleGrids = useMemo(() => limits.map((limit) => grids[limit]).filter(Boolean), [grids, limits]);
-  const roster = useMemo(
-    () =>
-      visibleGrids.flatMap((grid) => rosterFromGrid(grid, year, monthIndex, cetTick)).reduce((list, row) => {
-        if (!list.some((item) => item.mark.t === row.mark.t)) list.push(row);
-        return list;
-      }, [] as ReturnType<typeof rosterFromGrid>),
-    [visibleGrids, year, monthIndex, cetTick],
-  );
   const fieldMarks = useMemo(() => {
     const seen = new Map<string, Mark>();
     for (const grid of visibleGrids) {
@@ -123,17 +289,43 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
     }
     return [...seen.values()].sort((a, b) => a.t.localeCompare(b.t));
   }, [visibleGrids]);
-  const fill = useMemo(
-    () =>
-      fieldFill(
-        visibleGrids[0] ?? planMonth(year, monthIndex, limits[0] ?? "50"),
+  const roster = useMemo(
+    () => rosterFromGrids(visibleGrids, year, monthIndex, cetTick),
+    [visibleGrids, year, monthIndex, cetTick],
+  );
+  const fill = useMemo(() => {
+    const empty = { pct: 0, taken: 0, seats: 0, futurePct: 0, futureTaken: 0, futureSeats: 0 };
+    return visibleGrids.reduce((acc, grid, index) => {
+      const row = fieldFill(
+        grid,
         year,
         monthIndex,
         cetTick,
-        limits.join(" · "),
-        hoursOf(capacity, limits[0] ?? "50"),
-      ),
-    [visibleGrids, year, monthIndex, cetTick, limits, capacity],
+        limits[index] ?? "",
+        hoursOf(capacity, limits[index] ?? "50"),
+      );
+      acc.taken += row.taken;
+      acc.seats += row.seats;
+      acc.futureTaken += row.futureTaken;
+      acc.futureSeats += row.futureSeats;
+      acc.pct = acc.seats ? acc.taken / acc.seats : 0;
+      acc.futurePct = acc.futureSeats ? acc.futureTaken / acc.futureSeats : 0;
+      return acc;
+    }, empty);
+  }, [visibleGrids, year, monthIndex, cetTick, limits, capacity]);
+  const mineByLimit = useMemo(
+    () =>
+      limits.map((limit) => ({
+        limit,
+        ...myPlayStats(grids[limit] ? { [limit]: grids[limit] } : {}, me.t, year, monthIndex, cetTick),
+      })),
+    [grids, limits, me.t, year, monthIndex, cetTick],
+  );
+  const allGrids = useMemo(() => gridsForCalendar(grids, year, monthIndex), [grids, year, monthIndex]);
+  const planMatrix = useMemo(() => (isKit ? myHoursMatrix(allGrids, me.t) : null), [isKit, allGrids, me.t]);
+  const busyMap = useMemo(
+    () => (isKit && canEdit ? myTimeline(allGrids, me.t) : undefined),
+    [isKit, canEdit, allGrids, me.t],
   );
 
   const toggleLimit = (value: string) => {
@@ -150,7 +342,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
     setTablesDraft((prev) => {
       const n = Number(prev);
       const cur = Number.isFinite(n) ? n : me.tables;
-      return String(Math.min(30, Math.max(1, Math.round(cur) + delta)));
+      const next = Math.min(30, Math.max(1, Math.round(cur) + delta));
+      if (isKit) setMe((mark) => ({ ...mark, tables: next }));
+      return String(next);
     });
   };
 
@@ -165,50 +359,88 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <section
-        className={`v2-sched-bar flex h-14 shrink-0 items-center gap-2 border-b px-4${canEdit ? " is-edit" : ""}`}
-        style={{ borderColor: canEdit ? "transparent" : R.line, background: canEdit ? undefined : R.header }}
+        className={`v2-sched-bar flex h-10 shrink-0 items-center gap-2 border-b px-4${canEdit ? " is-edit" : ""}${editPulse ? "" : " is-quiet"}`}
+        style={{ borderColor: canEdit ? "transparent" : undefined }}
       >
         <button type="button" className="v2-ctrl w-8" onClick={() => shiftMonth(-1)} aria-label="prev">
           <i className="fa-solid fa-chevron-left" />
         </button>
-        <label className="relative">
-          <span className="v2-ctrl flex min-w-[142px] items-center justify-between px-3 font-semibold">
-            {monthTitle(cursor, i18n.language)}
-            <i className="fa-regular fa-calendar" style={{ color: R.faint }} />
-          </span>
-          <input
-            type="month"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            value={`${year}-${String(monthIndex + 1).padStart(2, "0")}`}
-            onChange={(event) => {
-              const [nextYear, month] = event.target.value.split("-").map(Number);
-              if (nextYear && month) onCursorChange(new Date(nextYear, month - 1, 1));
+        <div className="relative" ref={monthRef}>
+          <button
+            type="button"
+            className="v2-ctrl min-w-[142px] justify-between px-3 font-semibold"
+            aria-expanded={monthOpen}
+            aria-haspopup="dialog"
+            aria-label={t("schedule.pickMonth")}
+            onClick={() => {
+              setMonthOpen((open) => {
+                const next = !open;
+                if (next) setPickYear(year);
+                return next;
+              });
+              setLimitsOpen(false);
+              setKindOpen(false);
             }}
-          />
-        </label>
+          >
+            {monthTitle(cursor, i18n.language)}
+            <i className="fa-regular fa-calendar v2-muted ml-2" />
+          </button>
+          {monthOpen && (
+            <div className="v2-month-pop" role="dialog" aria-label={t("schedule.pickMonth")}>
+              <div className="v2-month-pop-year">
+                <button type="button" aria-label={t("schedule.prevYear")} onClick={() => setPickYear((value) => value - 1)}>
+                  <i className="fa-solid fa-chevron-left" />
+                </button>
+                <b>{pickYear}</b>
+                <button type="button" aria-label={t("schedule.nextYear")} onClick={() => setPickYear((value) => value + 1)}>
+                  <i className="fa-solid fa-chevron-right" />
+                </button>
+              </div>
+              <div className="v2-month-pop-grid">
+                {Array.from({ length: 12 }, (_, index) => {
+                  const on = pickYear === year && index === monthIndex;
+                  const now = new Date();
+                  const isNow = pickYear === now.getFullYear() && index === now.getMonth();
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      className={`${on ? "is-on" : ""}${isNow ? " is-now" : ""}`}
+                      onClick={() => {
+                        onCursorChange(new Date(pickYear, index, 1));
+                        setMonthOpen(false);
+                      }}
+                    >
+                      {monthShort(index, i18n.language)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" className="v2-ctrl w-8" onClick={() => shiftMonth(1)} aria-label="next">
           <i className="fa-solid fa-chevron-right" />
         </button>
         <div className="relative" ref={limitsRef}>
-          <button type="button" className="v2-ctrl px-3" onClick={() => setLimitsOpen((open) => !open)}>
+          <button
+            type="button"
+            className="v2-ctrl px-3"
+            onClick={() => {
+              setLimitsOpen((open) => !open);
+              setKindOpen(false);
+              setMonthOpen(false);
+            }}
+          >
             Лимит: <span className="v2-mono ml-1">{limits.join(" · ")}</span>
-            <i className="fa-solid fa-angle-down ml-2" style={{ color: R.faint }} />
+            <i className="fa-solid fa-angle-down v2-muted ml-2" />
           </button>
           {limitsOpen && (
-            <div
-              className="absolute z-40 mt-1 w-full overflow-hidden rounded border p-1"
-              style={{ background: R.panel, borderColor: R.line }}
-            >
+            <div className="v2-bar-menu">
               {LIMIT_OPTIONS.map((value) => {
                 const on = limits.includes(value);
                 return (
-                  <button
-                    key={value}
-                    type="button"
-                    className="flex w-full items-center gap-2 border-0 px-2 py-1.5 text-left text-[12px]"
-                    style={{ background: on ? "rgba(34, 211, 238, 0.12)" : "transparent", color: on ? R.cyan : R.text }}
-                    onClick={() => toggleLimit(value)}
-                  >
+                  <button key={value} type="button" className={on ? "is-on" : ""} onClick={() => toggleLimit(value)}>
                     <i className={`fa-solid ${on ? "fa-check-square" : "fa-square"}`} />
                     <span className="v2-mono">{value}</span>
                   </button>
@@ -217,35 +449,44 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
             </div>
           )}
         </div>
-        <label className="relative">
-          <span className="v2-ctrl flex items-center px-3">
-            {kind === "nitro" ? "Nitro" : "Regular"}
-            <i className="fa-solid fa-angle-down ml-2" style={{ color: R.faint }} />
-          </span>
-          <select className="absolute inset-0 cursor-pointer opacity-0" value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="nitro">Nitro</option>
-            <option value="regular">Regular</option>
-          </select>
-        </label>
-        <label className="relative">
-          <span className="v2-ctrl flex items-center px-3">
-            {t("v2.skin.label")}: {t(GRID_SKINS.find((skin) => skin.id === gridSkin)?.labelKey ?? "v2.skin.next")}
-            <i className="fa-solid fa-angle-down ml-2" style={{ color: R.faint }} />
-          </span>
-          <select
-            className="absolute inset-0 cursor-pointer opacity-0"
-            value={gridSkin}
-            onChange={(e) => setGridSkin(e.target.value as GridSkinId)}
+        <div className="relative" ref={kindRef}>
+          <button
+            type="button"
+            className="v2-ctrl px-3"
+            onClick={() => {
+              setKindOpen((open) => !open);
+              setLimitsOpen(false);
+              setMonthOpen(false);
+            }}
           >
-            {GRID_SKINS.map((skin) => (
-              <option key={skin.id} value={skin.id}>
-                {t(skin.labelKey)}
-              </option>
-            ))}
-          </select>
-        </label>
+            {kind === "nitro" ? "Nitro" : "Regular"}
+            <i className="fa-solid fa-angle-down v2-muted ml-2" />
+          </button>
+          {kindOpen && (
+            <div className="v2-bar-menu">
+              {(
+                [
+                  ["nitro", "Nitro"],
+                  ["regular", "Regular"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={kind === value ? "is-on" : ""}
+                  onClick={() => {
+                    setKind(value);
+                    setKindOpen(false);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <form className="v2-mark-find relative shrink-0" onSubmit={(e) => e.preventDefault()}>
-          <i className="fa-solid fa-magnifying-glass pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-[10px]" style={{ color: R.faint }} />
+          <i className="fa-solid fa-magnifying-glass v2-muted pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-[10px]" />
           <input
             className={`v2-ctrl v2-mark-find-input${focus.trim() ? " has-q" : ""}`}
             list="v2-marks"
@@ -259,8 +500,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
           {focus.trim() ? (
             <button
               type="button"
-              className="absolute top-1/2 right-0.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[10px] hover:text-white"
-              style={{ color: R.faint }}
+              className="v2-muted absolute top-1/2 right-0.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[10px] hover:text-[var(--foreground)]"
               title={t("v2.search.clear")}
               aria-label={t("v2.search.clear")}
               onClick={() => setFocus("")}
@@ -274,16 +514,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
             ))}
           </datalist>
         </form>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            className="v2-ctrl w-8"
-            title={t("schedule.myCalendar")}
-            onClick={() => {
-              setShowMine(true);
-              setShowSettings(false);
-            }}
-          >
+        <div className="v2-bar-groups ml-auto">
+        <div className="v2-bar-pack v2-tools-pack">
+          <button type="button" className="v2-ctrl w-8" title={t("schedule.myCalendar")} onClick={() => { setShowMine(true); setShowSettings(false); }}>
             <i className="fa-regular fa-calendar" />
           </button>
           <button
@@ -320,30 +553,40 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
             <i className="fa-solid fa-gear" />
           </button>
         </div>
-        <div className={`v2-edit-pack${canEdit ? " is-on" : ""}`} ref={editPackRef}>
+        <div className={`v2-bar-pack v2-edit-pack${canEdit ? " is-on" : ""}${editPulse ? "" : " is-quiet"}`} ref={editPackRef}>
           <label className="v2-edit-toggle" title={t("schedule.editModeHint")}>
-            <input type="checkbox" checked={canEdit} onChange={(event) => setCanEdit(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={canEdit}
+              onChange={(event) => {
+                const on = event.target.checked;
+                setCanEdit(on);
+                if (isKit) setMarkOpen(on);
+              }}
+            />
             <span>{t("schedule.editMode")}</span>
           </label>
+          {isKit ? null : (
+            <>
           <div className="v2-mark-sample">
-            <button
-              type="button"
-              className={`v2-opt-cell is-on v2-mark-setup${canEdit ? "" : " is-past"}`}
-              style={{ ["--mark" as string]: me.bg, ["--mark-ink" as string]: me.fg } as CSSProperties}
-              title={canEdit ? t("schedule.markCardTables") : t("schedule.editModeHint")}
-              aria-label={`${me.t} ${me.tables}`}
-              aria-expanded={markOpen}
-              onClick={() => {
-                if (!canEdit) return;
-                setMarkOpen((open) => !open);
-              }}
-              onContextMenu={(event) => event.preventDefault()}
-            >
-              <span className="v2-opt-face has-n">
-                <b>{me.t}</b>
-                <i>{me.tables}</i>
-              </span>
-            </button>
+              <button
+                type="button"
+                className="v2-opt-cell is-on v2-mark-setup"
+                style={{ ["--mark" as string]: me.bg, ["--mark-ink" as string]: me.fg } as CSSProperties}
+                title={canEdit ? t("schedule.markCardTables") : t("schedule.editModeHint")}
+                aria-label={`${me.t} ${me.tables}`}
+                aria-expanded={markOpen}
+                onClick={() => {
+                  if (!canEdit) return;
+                  setMarkOpen((open) => !open);
+                }}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                <span className="v2-opt-face has-n">
+                  <b>{me.t}</b>
+                  <i>{me.tables}</i>
+                </span>
+              </button>
           </div>
           {markOpen && (
             <div className="v2-mark-card" role="dialog" aria-label={t("schedule.markCardName")}>
@@ -385,82 +628,47 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
                   <i className="fa-solid fa-plus" />
                 </button>
               </div>
-              <button type="button" className="v2-mark-card-ok" onClick={commitTables}>
-                {t("schedule.markCardOk")}
-              </button>
+                <button type="button" className="v2-mark-card-ok" onClick={commitTables}>
+                  {t("schedule.markCardOk")}
+                </button>
             </div>
           )}
+            </>
+          )}
+        </div>
+        <div className="v2-bar-pack v2-me-stat" title={t("schedule.meStatHint")}>
+          {mineByLimit.map((row) => (
+            <span key={row.limit}>
+              <b>NL {row.limit}</b>
+              <em>{t("schedule.meHours", { n: row.hours })}</em>
+              <i>{t("schedule.meLeft", { n: row.left })}</i>
+            </span>
+          ))}
+        </div>
         </div>
       </section>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {gridSkin === "git" ? (
-          <GitMinimalField
-            year={year}
-            monthIndex={monthIndex}
-            me={me}
-            showTables={!hideTables}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            showTip={showTip}
-            canEdit={canEdit}
-            focus={focus}
-            limits={limits}
-            capacity={capacity}
-            grids={grids}
-            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
-          />
-        ) : gridSkin === "opt" ? (
-          <OptField
-            year={year}
-            monthIndex={monthIndex}
-            me={me}
-            showTables={!hideTables}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            showTip={showTip}
-            canEdit={canEdit}
-            focus={focus}
-            limits={limits}
-            capacity={capacity}
-            grids={grids}
-            hourLoad={hourLoad}
-            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
-          />
-        ) : gridSkin === "table" ? (
-          <TableField
-            year={year}
-            monthIndex={monthIndex}
-            me={me}
-            showTables={!hideTables}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            showTip={showTip}
-            canEdit={canEdit}
-            focus={focus}
-            limits={limits}
-            capacity={capacity}
-            grids={grids}
-            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
-          />
-        ) : (
-          <V2Field
-            year={year}
-            monthIndex={monthIndex}
-            me={me}
-            showTables={!hideTables}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            showTip={showTip}
-            canEdit={canEdit}
-            focus={focus}
-            limits={limits}
-            capacity={capacity}
-            grids={grids}
-            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
-          />
-        )}
-        <section className="flex h-12 shrink-0 items-center gap-5 px-4 text-[11px]" style={{ color: R.muted }}>
+        <OptField
+          year={year}
+          monthIndex={monthIndex}
+          me={me}
+          showTables={!hideTables}
+          dimPast={dimPast}
+          hidePastDays={hidePastDays}
+          showTip={showTip}
+          canEdit={canEdit}
+          quietEdit={!editPulse}
+          focus={focus}
+          limits={limits}
+          capacity={capacity}
+          grids={grids}
+          hourLoad={hourLoad}
+          onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
+          skin={skin}
+          busy={busyMap}
+        />
+        <section className="v2-muted flex h-9 shrink-0 items-center gap-5 px-4 text-[11px]">
           <div className="flex items-center gap-3">
             <span>
               <i className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: me.bg }} />
@@ -478,14 +686,68 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
               <i className="mr-1.5 inline-block h-3 w-1 rounded-sm" style={{ background: "#ff2d2d", boxShadow: "0 0 8px rgba(255, 45, 45, 0.85)" }} />
               Сейчас
             </span>
+            {isKit && canEdit ? (
+              <span>
+                <i
+                  className="mr-1 inline-block h-2 w-3 rounded-sm"
+                  style={{ background: "color-mix(in srgb, var(--now, #e11d2e) 35%, var(--muted))", boxShadow: "inset 0 0 0 1px var(--now, #e11d2e)" }}
+                />
+                {t("v2.tip.busyLegend")}
+              </span>
+            ) : null}
           </div>
-          <p className="ml-auto" style={{ color: R.soft }}>
-            {gridSkin === "opt"
-              ? t("v2.skin.optHint")
-              : "Пользователь смотрит месяц. Видит: где плотно, где ночь даёт 2 места, где прошлое"}
-          </p>
+          <p className="ml-auto">{t("v2.skin.optHint")}</p>
         </section>
-
+        {showMine && (
+          <V2MyCalendar
+            year={year}
+            monthIndex={monthIndex}
+            title={monthTitle(cursor, i18n.language)}
+            tag={me.t}
+            grids={gridsForCalendar(grids, year, monthIndex)}
+            today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
+            onClose={() => setShowMine(false)}
+          />
+        )}
+        {showSettings && (
+          <V2Settings
+            dimPast={dimPast}
+            hidePastDays={hidePastDays}
+            showTables={!hideTables}
+            showTip={showTip}
+            editPulse={editPulse}
+            onDimPast={setDimPast}
+            onHidePastDays={setHidePastDays}
+            onShowTables={(value) => setHideTables(!value)}
+            onShowTip={setShowTip}
+            onEditPulse={(value) => {
+              setEditPulse(value);
+              savePrefs({ ...loadPrefs(), editPulse: value });
+            }}
+            onOpenLook={() => {
+              setShowSettings(false);
+              setShowLook(true);
+            }}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+        {showLook && <SlotLookPanel onClose={() => setShowLook(false)} />}
+        {isKit && markOpen && planMatrix ? (
+          <MarkPlanDock
+            me={me}
+            tables={tablesDraft}
+            matrix={planMatrix}
+            x={markPos.x}
+            y={markPos.y}
+            onMove={(x, y) => setMarkPos({ x, y })}
+            onBump={bumpTables}
+            onDraft={(value) => {
+              setTablesDraft(value);
+              const n = Number(value);
+              if (Number.isFinite(n)) setMe((mark) => ({ ...mark, tables: Math.min(30, Math.max(1, Math.round(n))) }));
+            }}
+          />
+        ) : null}
         {showAnalytics && (
           <V2Float
             title={t("schedule.analyticsTitle")}
@@ -502,49 +764,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
                 { label: t("schedule.fillLeft"), pct: fill.futurePct, a: fill.futureTaken, b: fill.futureSeats },
               ].map((row) => (
                 <div key={row.label}>
-                  <div className="mb-1 flex justify-between text-[12px]" style={{ color: R.soft }}>
+                  <div className="mb-1 flex justify-between text-[12px]">
                     <span>{row.label}</span>
-                    <span className="v2-mono" style={{ color: R.cyan }}>{pctLabel(row.pct)}</span>
+                    <span className="v2-mono v2-accent">{pctLabel(row.pct)}</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full" style={{ background: R.panel }}>
-                    <div className="h-full" style={{ width: pctLabel(row.pct), background: R.cyan }} />
+                  <div className="v2-fill h-1.5 overflow-hidden rounded-full">
+                    <div className="v2-fill-bar h-full" style={{ width: pctLabel(row.pct) }} />
                   </div>
-                  <div className="mt-1 v2-mono text-[11px]" style={{ color: R.muted }}>
+                  <div className="v2-muted mt-1 v2-mono text-[11px]">
                     {row.a} / {row.b}
                   </div>
                 </div>
               ))}
             </div>
           </V2Float>
-        )}
-        {showSettings && (
-          <V2Settings
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            showTables={!hideTables}
-            showTip={showTip}
-            onDimPast={setDimPast}
-            onHidePastDays={setHidePastDays}
-            onShowTables={(value) => setHideTables(!value)}
-            onShowTip={setShowTip}
-            onOpenLook={() => {
-              setShowSettings(false);
-              setShowLook(true);
-            }}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-        {showLook && <SlotLookPanel onClose={() => setShowLook(false)} />}
-        {showMine && (
-          <V2MyCalendar
-            year={year}
-            monthIndex={monthIndex}
-            title={monthTitle(cursor, i18n.language)}
-            tag={me.t}
-            grids={gridsForCalendar(grids, year, monthIndex)}
-            today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
-            onClose={() => setShowMine(false)}
-          />
         )}
         {showPeople && (
           <V2Float
@@ -564,8 +797,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props
                 >
                   {row.mark.t}
                 </span>
-                <span className="min-w-0 flex-1 truncate" style={{ color: R.text }}>{row.mark.discord}</span>
-                <span className="v2-mono text-[11px]" style={{ color: R.muted }}>{row.hours}</span>
+                <span className="min-w-0 flex-1 truncate">{row.mark.discord}</span>
+                <span className="v2-mono v2-muted text-[11px]">
+                  {row.hours}
+                  <span> / {row.left}</span>
+                </span>
               </div>
             ))}
           </V2Float>

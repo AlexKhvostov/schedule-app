@@ -27,6 +27,18 @@ export function tzHour(now: Date, timeZone: string) {
   );
 }
 
+export function tzFromUtcOffset(offset: number) {
+  const sign = offset <= 0 ? "+" : "-";
+  return `Etc/GMT${sign}${Math.abs(offset)}`;
+}
+
+export const UTC_OFFSETS = Array.from({ length: 27 }, (_, i) => i - 12);
+
+export function utcLabel(offset: number) {
+  if (offset === 0) return "UTC±0";
+  return `UTC${offset > 0 ? "+" : ""}${offset}`;
+}
+
 export function formatClock(now: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone,

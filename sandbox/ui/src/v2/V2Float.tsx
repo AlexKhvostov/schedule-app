@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { R } from "./tokens";
 
 type Props = {
   title: string;
@@ -37,24 +36,20 @@ export function V2Float({ title, x, y, width = 300, z = 40, onMove, onFocus, onC
 
   return createPortal(
     <div
-      className="fixed flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-md shadow-2xl"
-      style={{ left: x, top: y, width, zIndex: z, background: R.header, border: `1px solid ${R.line2}` }}
+      className="v2-float fixed flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-md shadow-2xl"
+      style={{ left: x, top: y, width, zIndex: z }}
       onMouseDown={onFocus}
     >
       <div
-        className="flex h-10 shrink-0 cursor-grab items-center justify-between px-3 active:cursor-grabbing"
-        style={{ background: R.panel, borderBottom: `1px solid ${R.line}` }}
+        className="v2-float-head flex h-10 shrink-0 cursor-grab items-center justify-between px-3 active:cursor-grabbing"
         onMouseDown={(event) => {
           drag.current = { ox: event.clientX - x, oy: event.clientY - y };
         }}
       >
-        <h2 className="text-[12px] font-semibold tracking-wide" style={{ color: R.text }}>
-          {title}
-        </h2>
+        <h2 className="text-[12px] font-semibold tracking-wide">{title}</h2>
         <button
           type="button"
-          className="grid h-6 w-6 place-items-center border-0 bg-transparent text-[12px]"
-          style={{ color: R.muted }}
+          className="v2-muted grid h-6 w-6 place-items-center border-0 bg-transparent text-[12px]"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={onClose}
           aria-label="close"
