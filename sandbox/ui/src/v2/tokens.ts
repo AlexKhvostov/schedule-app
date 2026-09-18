@@ -1,5 +1,5 @@
 export const LAYOUT = {
-  app: 1440,
+  app: 1240,
   day: 80,
   slots: 48,
   gap: 1,

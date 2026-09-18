@@ -5,15 +5,29 @@ import { R } from "./tokens";
 
 type Props = {
   dimPast: boolean;
+  hidePastDays: boolean;
   showTables: boolean;
   showTip: boolean;
   onDimPast: (value: boolean) => void;
+  onHidePastDays: (value: boolean) => void;
   onShowTables: (value: boolean) => void;
   onShowTip: (value: boolean) => void;
+  onOpenLook: () => void;
   onClose: () => void;
 };
 
-export function V2Settings({ dimPast, showTables, showTip, onDimPast, onShowTables, onShowTip, onClose }: Props) {
+export function V2Settings({
+  dimPast,
+  hidePastDays,
+  showTables,
+  showTip,
+  onDimPast,
+  onHidePastDays,
+  onShowTables,
+  onShowTip,
+  onOpenLook,
+  onClose,
+}: Props) {
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -32,6 +46,14 @@ export function V2Settings({ dimPast, showTables, showTip, onDimPast, onShowTabl
       icon: "fa-circle-half-stroke",
       title: t("schedule.dimPast"),
       hint: t("schedule.dimPastHint"),
+    },
+    {
+      key: "hidePast",
+      on: hidePastDays,
+      toggle: () => onHidePastDays(!hidePastDays),
+      icon: "fa-eye-slash",
+      title: t("schedule.hidePastDays"),
+      hint: t("schedule.hidePastDaysHint"),
     },
     {
       key: "tables",
@@ -93,6 +115,21 @@ export function V2Settings({ dimPast, showTables, showTip, onDimPast, onShowTabl
               <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
             </button>
           ))}
+          <button
+            type="button"
+            className="v2-settings-row"
+            style={{ borderColor: R.line, background: R.panel }}
+            onClick={onOpenLook}
+          >
+            <span className="v2-settings-ico" style={{ color: R.cyan }}>
+              <i className="fa-solid fa-palette" />
+            </span>
+            <span className="v2-settings-copy">
+              <b style={{ color: R.text }}>{t("schedule.slotLookTitle")}</b>
+              <small style={{ color: R.muted }}>{t("schedule.slotLookHint")}</small>
+            </span>
+            <i className="fa-solid fa-chevron-right text-[11px]" style={{ color: R.faint }} />
+          </button>
         </div>
       </div>
     </div>,

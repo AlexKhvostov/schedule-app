@@ -7,6 +7,8 @@ export type LimitProfile = {
   days: Record<string, HourCaps>;
   weekdays: Record<string, HourCaps>;
   equalize: boolean;
+  weekOn: boolean;
+  monthOn: boolean;
 };
 export type CapacityMap = Record<string, LimitProfile>;
 
@@ -20,7 +22,17 @@ export function onesHourCaps(): HourCaps {
 
 export function resetLimit(capacity: CapacityMap, limit: string): CapacityMap {
   const profile = profileOf(capacity, limit);
-  return { ...capacity, [limit]: { hours: defaultHourCaps(), days: {}, weekdays: {}, equalize: profile.equalize } };
+  return {
+    ...capacity,
+    [limit]: {
+      hours: defaultHourCaps(),
+      days: {},
+      weekdays: {},
+      equalize: profile.equalize,
+      weekOn: true,
+      monthOn: true,
+    },
+  };
 }
 
 export function hourRanges(hours: HourCaps) {
@@ -36,7 +48,7 @@ export function hourRanges(hours: HourCaps) {
 }
 
 export function emptyProfile(): LimitProfile {
-  return { hours: defaultHourCaps(), days: {}, weekdays: {}, equalize: false };
+  return { hours: defaultHourCaps(), days: {}, weekdays: {}, equalize: false, weekOn: true, monthOn: true };
 }
 
 export function defaultCapacity(): CapacityMap {
@@ -71,12 +83,16 @@ export function normalizeProfile(raw: unknown): LimitProfile {
     days?: Record<string, number[]>;
     weekdays?: Record<string, number[]>;
     equalize?: boolean;
+    weekOn?: boolean;
+    monthOn?: boolean;
   };
   return {
     hours: normalizeHours(obj.hours),
     days: normalizeMap(obj.days, 1, 31),
     weekdays: normalizeMap(obj.weekdays, 0, 6),
     equalize: Boolean(obj.equalize),
+    weekOn: obj.weekOn !== false,
+    monthOn: obj.monthOn !== false,
   };
 }
 
@@ -94,8 +110,8 @@ function minHours(a: HourCaps, b: HourCaps): HourCaps {
 
 export function hoursOf(capacity: CapacityMap, limit: string, day?: number, weekday?: number): HourCaps {
   const profile = profileOf(capacity, limit);
-  const byDay = day ? profile.days[String(day)] : undefined;
-  const byWeek = weekday !== undefined ? profile.weekdays[String(weekday)] : undefined;
+  const byDay = profile.monthOn && day ? profile.days[String(day)] : undefined;
+  const byWeek = profile.weekOn && weekday !== undefined ? profile.weekdays[String(weekday)] : undefined;
   if (byDay && byWeek) return minHours(byDay, byWeek);
   if (byDay) return byDay;
   if (byWeek) return byWeek;
@@ -162,6 +178,15 @@ export function applyMatrix(
 export function setEqualize(capacity: CapacityMap, limit: string, equalize: boolean): CapacityMap {
   const profile = profileOf(capacity, limit);
   return { ...capacity, [limit]: { ...profile, equalize } };
+}
+
+export function setRuleFlags(
+  capacity: CapacityMap,
+  limit: string,
+  flags: { weekOn: boolean; monthOn: boolean },
+): CapacityMap {
+  const profile = profileOf(capacity, limit);
+  return { ...capacity, [limit]: { ...profile, weekOn: flags.weekOn, monthOn: flags.monthOn } };
 }
 
 export function maxLevels(hours: HourCaps) {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CET, formatClock } from "../schedule/cet";
+import { CET, PLAYER_TZ, formatClock } from "../schedule/cet";
 import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
+import { defaultHourLoad, loadHourLoad, saveHourLoad, type HourLoadMap } from "../schedule/hourLoad";
 import { setAppLanguage } from "../i18n";
 import { ME } from "../schedule/marks";
 import { HeatmapGrid } from "../schedule/HeatmapGrid";
@@ -22,22 +23,10 @@ export function V2Shell({ cursor, onCursorChange, onBack }: Props) {
   const { t, i18n } = useTranslation();
   const [page, setPage] = useState("schedule");
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
+  const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
   const [now, setNow] = useState(() => new Date());
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const [heatGrid, setHeatGrid] = useState(() => planMonth(cursor.getFullYear(), cursor.getMonth()));
-
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtml = html.style.background;
-    const prevBody = body.style.background;
-    html.style.background = R.bg;
-    body.style.background = R.bg;
-    return () => {
-      html.style.background = prevHtml;
-      body.style.background = prevBody;
-    };
-  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
@@ -55,41 +44,54 @@ export function V2Shell({ cursor, onCursorChange, onBack }: Props) {
   ];
 
   return (
+    <div className="v2-stage">
     <div className="v2-root flex min-h-0 flex-col overflow-hidden">
       <header
-        className="z-30 flex h-12 w-full shrink-0 items-center gap-6 border-b px-4"
+        className="z-30 flex h-12 w-full shrink-0 items-center border-b px-4"
         style={{ background: R.header, borderColor: R.line }}
       >
-        <div className="flex items-center gap-2 font-semibold">
-          <span
-            className="v2-mono grid h-6 w-6 place-items-center rounded text-[11px]"
-            style={{ background: R.cyan, color: R.cyanInk }}
-          >
-            PR
-          </span>
-          <span>Ротация столов</span>
-        </div>
-        <nav className="flex h-full items-center gap-1">
-          {nav.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className="flex h-full items-center border-0 bg-transparent px-3"
-              style={{
-                color: page === item.key ? "#fff" : R.muted,
-                borderBottom: page === item.key ? `2px solid ${R.cyan}` : "2px solid transparent",
-              }}
-              onClick={() => setPage(item.key)}
+        <div className="flex min-w-0 flex-1 items-center gap-6">
+          <div className="flex items-center gap-2 font-semibold">
+            <span
+              className="v2-mono grid h-6 w-6 place-items-center rounded text-[11px]"
+              style={{ background: R.cyan, color: R.cyanInk }}
             >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="ml-auto flex items-center gap-4">
-          <div className="v2-mono" style={{ color: R.cyan }}>
-            <i className="fa-regular fa-clock mr-2" />
-            {formatClock(now, CET)} CET
+              PR
+            </span>
+            <span>Ротация столов</span>
           </div>
+          <nav className="flex h-full items-center gap-1">
+            {nav.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className="flex h-full items-center border-0 bg-transparent px-3"
+                style={{
+                  color: page === item.key ? "#fff" : R.muted,
+                  borderBottom: page === item.key ? `2px solid ${R.cyan}` : "2px solid transparent",
+                }}
+                onClick={() => setPage(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex shrink-0 items-baseline gap-2 px-3">
+          <span className="v2-mono text-[15px] font-semibold tabular-nums" style={{ color: R.cyan }}>
+            {formatClock(now, CET)}
+          </span>
+          <span className="text-[9px] font-semibold tracking-[0.14em] uppercase" style={{ color: R.cyan }}>
+            CET
+          </span>
+          <span className="ml-2 v2-mono text-[11px] italic tabular-nums" style={{ color: R.faint }}>
+            {formatClock(now, PLAYER_TZ)}
+          </span>
+          <span className="text-[8px] font-medium tracking-[0.12em] uppercase italic" style={{ color: "#6b7280" }}>
+            {t("header.mskLabel")}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
           <div className="flex overflow-hidden rounded border" style={{ borderColor: R.line }}>
             {(["ru", "en"] as const).map((code) => (
               <button
@@ -131,7 +133,9 @@ export function V2Shell({ cursor, onCursorChange, onBack }: Props) {
         </div>
       </header>
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      {page === "schedule" && <V2Schedule cursor={cursor} onCursorChange={onCursorChange} capacity={capacity} />}
+      {page === "schedule" && (
+        <V2Schedule cursor={cursor} onCursorChange={onCursorChange} capacity={capacity} hourLoad={hourLoad} />
+      )}
       {page === "heatmap" && (
         <div className="min-h-0 flex-1 overflow-auto px-4 pb-6">
           <section className="flex h-14 items-center gap-2 border-b" style={{ borderColor: R.line }}>
@@ -173,15 +177,21 @@ export function V2Shell({ cursor, onCursorChange, onBack }: Props) {
         <div className="min-h-0 flex-1 overflow-auto">
           <V2Admin
             capacity={capacity}
+            hourLoad={hourLoad}
             onCapacityChange={(next) => {
               setCapacity(next);
               saveCapacity(next);
+            }}
+            onHourLoadChange={(next) => {
+              setHourLoad(next);
+              saveHourLoad(next);
             }}
           />
         </div>
       )}
       {page === "cabinet" && <div className="min-h-0 flex-1 overflow-auto"><V2Cabinet /></div>}
       </div>
+    </div>
     </div>
   );
 }

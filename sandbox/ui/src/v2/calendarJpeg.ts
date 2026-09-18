@@ -3,18 +3,19 @@ import { R } from "./tokens";
 import type { ShiftRun } from "./myShifts";
 
 const SLOT_COUNT = 48;
-const GAP_HALF = 1;
-const GAP_HOUR = 3;
-const GAP_TOTAL = 24 * GAP_HALF + 23 * GAP_HOUR;
-const WIDTH = 1360;
-const PAD = 20;
-const DATE_W = 80;
-const SLOT_END = 20;
-const HOUR_H = 44;
+const WIDTH = 680;
+const PAD = 12;
+const DATE_W = 54;
+const HOUR_H = 28;
 const ROW_H = 22;
 const CHIP_H = 16;
-const TITLE_H = 70;
+const TITLE_H = 50;
+const FOOT_H = 34;
 const DPR = 2;
+const GRID = "#151a24";
+const HEAD = "#222b3c";
+const LINE = "rgba(232, 236, 242, 0.16)";
+const LINE_STRONG = "rgba(232, 236, 242, 0.28)";
 
 type Day = { d: number; wd: string; weekend: boolean };
 
@@ -27,28 +28,24 @@ type Opts = {
   runs: ShiftRun[];
   usedLimits: string[];
   today: number | null;
-  mskOffset: number;
+  dimPast: boolean;
+  nowAt: number;
   kicker: string;
   meta: string;
   dayLabel: string;
-  tzLabel: string;
 };
 
-function trackBox(trackW: number, start: number, len: number) {
-  const last = start + len - 1;
-  const padStart = Math.ceil(start / 2) * GAP_HALF + Math.floor(start / 2) * GAP_HOUR;
-  const padBetween =
-    (Math.ceil(last / 2) - Math.ceil(start / 2)) * GAP_HALF +
-    (Math.floor(last / 2) - Math.floor(start / 2)) * GAP_HOUR;
-  return {
-    x: ((trackW - GAP_TOTAL) * start) / SLOT_COUNT + padStart,
-    w: ((trackW - GAP_TOTAL) * len) / SLOT_COUNT + padBetween,
-  };
+function mineTone(limit: string) {
+  if (limit === "25") return "#4ADE80";
+  return limitTone(limit);
 }
 
-function hourEdge(trackW: number, hour: number) {
-  const box = trackBox(trackW, hour * 2, 2);
-  return box.x + box.w + GAP_HOUR / 2;
+function limitInk(limit: string) {
+  return limit === "25" ? "#14532d" : "#071014";
+}
+
+function slotX(trackW: number, slot: number) {
+  return (trackW * slot) / SLOT_COUNT;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -62,10 +59,17 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+function runPast(day: number, end: number, today: number | null, nowAt: number) {
+  if (today == null) return false;
+  if (day < today) return true;
+  if (day > today) return false;
+  return end <= nowAt;
+}
+
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { year, monthIndex, title, tag, days, runs, usedLimits, today, mskOffset, kicker, meta, dayLabel, tzLabel } = opts;
-  const height = PAD + TITLE_H + HOUR_H + days.length * ROW_H + PAD;
+  const { title, tag, days, runs, usedLimits, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
+  const height = PAD + TITLE_H + HOUR_H + days.length * ROW_H + FOOT_H + PAD;
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * DPR;
   canvas.height = height * DPR;
@@ -76,59 +80,67 @@ export async function downloadCalendarJpeg(opts: Opts) {
   ctx.fillRect(0, 0, WIDTH, height);
 
   ctx.textBaseline = "top";
-  ctx.fillStyle = R.faint;
-  ctx.font = "600 11px Inter, IBM Plex Sans, sans-serif";
-  ctx.fillText(kicker.toUpperCase(), PAD, PAD);
   ctx.fillStyle = R.text;
-  ctx.font = "600 18px Inter, IBM Plex Sans, sans-serif";
-  ctx.fillText(title, PAD, PAD + 18);
+  ctx.font = "650 16px Inter, IBM Plex Sans, sans-serif";
+  ctx.fillText(kicker, PAD, PAD);
+
+  let infoX = PAD;
+  ctx.fillStyle = R.text;
+  ctx.font = "600 13px Inter, IBM Plex Sans, sans-serif";
+  ctx.fillText(title, infoX, PAD + 24);
+  infoX += ctx.measureText(title).width + 10;
+  ctx.fillStyle = "#22d3ee";
+  ctx.font = "650 11px JetBrains Mono, IBM Plex Mono, monospace";
+  ctx.fillText(tag, infoX, PAD + 26);
+  infoX += ctx.measureText(tag).width + 12;
   ctx.fillStyle = R.muted;
   ctx.font = "12px Inter, IBM Plex Sans, sans-serif";
-  ctx.fillText(meta, PAD, PAD + 42);
+  ctx.fillText(meta.replace(`${tag} · `, ""), infoX, PAD + 25);
 
-  let legendX = WIDTH - PAD;
-  ctx.font = "600 11px JetBrains Mono, IBM Plex Mono, monospace";
-  for (let i = usedLimits.length - 1; i >= 0; i -= 1) {
-    const limit = usedLimits[i];
-    const label = `NL ${limit}`;
-    const tw = ctx.measureText(label).width;
-    legendX -= tw;
-    ctx.fillStyle = R.muted;
-    ctx.fillText(label, legendX, PAD + 8);
-    legendX -= 16;
-    ctx.fillStyle = limitTone(limit);
-    ctx.beginPath();
-    ctx.arc(legendX + 4, PAD + 13, 4, 0, Math.PI * 2);
-    ctx.fill();
-    legendX -= 14;
-  }
+  const sheetX = PAD;
+  const sheetY = PAD + TITLE_H;
+  const sheetW = WIDTH - PAD * 2;
+  const sheetH = HOUR_H + days.length * ROW_H;
+  const trackX = sheetX + DATE_W;
+  const trackW = sheetW - DATE_W;
 
-  const gridTop = PAD + TITLE_H;
-  const trackX = PAD + DATE_W;
-  const trackW = WIDTH - PAD - SLOT_END - trackX;
+  roundRect(ctx, sheetX, sheetY, sheetW, sheetH, 8);
+  ctx.fillStyle = GRID;
+  ctx.fill();
+  ctx.strokeStyle = LINE_STRONG;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = HEAD;
+  ctx.fillRect(sheetX, sheetY, sheetW, HOUR_H);
+  ctx.strokeStyle = LINE_STRONG;
+  ctx.beginPath();
+  ctx.moveTo(sheetX, sheetY + HOUR_H + 0.5);
+  ctx.lineTo(sheetX + sheetW, sheetY + HOUR_H + 0.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(trackX + 0.5, sheetY);
+  ctx.lineTo(trackX + 0.5, sheetY + sheetH);
+  ctx.stroke();
 
   ctx.fillStyle = R.faint;
   ctx.font = "600 10px Inter, IBM Plex Sans, sans-serif";
-  ctx.fillText(dayLabel.toUpperCase(), PAD + 12, gridTop + 10);
+  ctx.fillText(dayLabel.toUpperCase(), sheetX + 8, sheetY + 6);
   ctx.font = "600 9px JetBrains Mono, IBM Plex Mono, monospace";
-  ctx.fillText(tzLabel, PAD + 12, gridTop + 24);
+  ctx.fillText("CET", sheetX + 8, sheetY + 17);
 
   for (let h = 0; h < 24; h += 1) {
-    const box = trackBox(trackW, h * 2, 2);
-    const night = h < 6 || h >= 22;
-    if (night) {
-      ctx.fillStyle = "rgba(245, 158, 11, 0.035)";
-      ctx.fillRect(trackX + box.x, gridTop, box.w + (h < 23 ? GAP_HOUR : 0), HOUR_H + days.length * ROW_H);
-    }
+    const x = trackX + slotX(trackW, h * 2);
+    const w = slotX(trackW, 2);
+    ctx.strokeStyle = h === 5 || h === 11 || h === 17 ? LINE_STRONG : LINE;
+    ctx.beginPath();
+    ctx.moveTo(x + w + 0.5, sheetY);
+    ctx.lineTo(x + w + 0.5, sheetY + sheetH);
+    ctx.stroke();
     ctx.textAlign = "center";
-    ctx.font = "600 10px JetBrains Mono, IBM Plex Mono, monospace";
-    ctx.fillStyle = night ? "#D1D5DB" : R.text;
-    ctx.fillText(`${h}–${h + 1}`, trackX + box.x + box.w / 2, gridTop + 8);
-    ctx.font = "500 9px JetBrains Mono, IBM Plex Mono, monospace";
-    ctx.fillStyle = R.faint;
-    const msk = (h + mskOffset) % 24;
-    const mskNext = msk + 1 > 24 ? 24 : msk + 1;
-    ctx.fillText(`${msk}–${mskNext}`, trackX + box.x + box.w / 2, gridTop + 22);
+    ctx.font = "650 9px JetBrains Mono, IBM Plex Mono, monospace";
+    ctx.fillStyle = "#d5deec";
+    ctx.fillText(String(h), x + w / 2, sheetY + 10);
     ctx.textAlign = "left";
   }
 
@@ -140,66 +152,93 @@ export async function downloadCalendarJpeg(opts: Opts) {
   }
 
   days.forEach((day, idx) => {
-    const y = gridTop + HOUR_H + idx * ROW_H;
-    if (day.weekend) {
-      ctx.fillStyle = R.weekend;
-      ctx.fillRect(PAD, y, WIDTH - PAD * 2, ROW_H);
-    }
-    ctx.strokeStyle = R.line;
-    ctx.lineWidth = 1;
+    const y = sheetY + HOUR_H + idx * ROW_H;
+    ctx.strokeStyle = LINE;
     ctx.beginPath();
-    ctx.moveTo(PAD, y + 0.5);
-    ctx.lineTo(WIDTH - PAD, y + 0.5);
+    ctx.moveTo(sheetX, y + 0.5);
+    ctx.lineTo(sheetX + sheetW, y + 0.5);
     ctx.stroke();
 
     const isToday = today === day.d;
     ctx.font = `${isToday ? 600 : 400} 12px JetBrains Mono, IBM Plex Mono, monospace`;
-    ctx.fillStyle = isToday ? R.cyan : day.weekend ? R.soft : R.text;
-    ctx.fillText(`${String(day.d).padStart(2, "0")} ${day.wd}`, PAD + 12, y + 5);
+    ctx.fillStyle = isToday ? R.cyan : day.weekend ? "#e4c9a4" : "#e8edf4";
+    ctx.fillText(`${String(day.d).padStart(2, "0")} ${day.wd}`, sheetX + 8, y + 5);
     if (isToday) {
       ctx.strokeStyle = R.cyan;
       ctx.lineWidth = 1.5;
-      roundRect(ctx, PAD + 4, y + 2, DATE_W - 8, ROW_H - 4, 2);
+      roundRect(ctx, sheetX + 3, y + 2, DATE_W - 7, ROW_H - 4, 2);
       ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    for (const run of byDay.get(day.d) ?? []) {
+      const len = run.end - run.start;
+      const x = trackX + slotX(trackW, run.start);
+      const w = Math.max(2, slotX(trackW, len));
+      const cy = y + (ROW_H - CHIP_H) / 2;
+      const past = runPast(day.d, run.end, today, nowAt);
+      ctx.save();
+      if (dimPast && past) {
+        ctx.filter = "saturate(0.12) grayscale(0.62)";
+        ctx.globalAlpha = 0.68;
+      }
+      ctx.fillStyle = mineTone(run.limit);
+      roundRect(ctx, x, cy, w, CHIP_H, 2);
+      ctx.fill();
+      if (len > 1) {
+        ctx.beginPath();
+        roundRect(ctx, x, cy, w, CHIP_H, 2);
+        ctx.clip();
+        ctx.strokeStyle = limitInk(run.limit);
+        ctx.lineWidth = 1;
+        for (let i = 1; i < len; i += 1) {
+          const tx = x + (w * i) / len;
+          ctx.globalAlpha = dimPast && past ? 0.45 : (run.start + i) % 2 === 0 ? 0.5 : 0.28;
+          ctx.beginPath();
+          ctx.moveTo(tx + 0.5, cy + 2);
+          ctx.lineTo(tx + 0.5, cy + CHIP_H - 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      ctx.save();
+      if (dimPast && past) {
+        ctx.filter = "saturate(0.12) grayscale(0.62)";
+        ctx.globalAlpha = 0.68;
+      }
+      ctx.fillStyle = limitInk(run.limit);
+      ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(len >= 6 ? `NL ${run.limit}` : run.limit, x + w / 2, y + ROW_H / 2);
+      ctx.restore();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
     }
   });
 
-  ctx.strokeStyle = R.line2;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(PAD, gridTop + HOUR_H + 0.5);
-  ctx.lineTo(WIDTH - PAD, gridTop + HOUR_H + 0.5);
-  ctx.stroke();
-
-  for (let h = 0; h < 23; h += 1) {
-    const x = trackX + hourEdge(trackW, h);
-    ctx.beginPath();
-    ctx.strokeStyle = h === 5 || h === 11 || h === 17 ? "rgba(201, 205, 212, 0.22)" : "rgba(201, 205, 212, 0.12)";
-    ctx.lineWidth = 1;
-    ctx.moveTo(x + 0.5, gridTop);
-    ctx.lineTo(x + 0.5, gridTop + HOUR_H + days.length * ROW_H);
-    ctx.stroke();
+  if (dimPast && today != null) {
+    const todayIdx = days.findIndex((day) => day.d === today);
+    if (todayIdx >= 0) {
+      const x = trackX + slotX(trackW, nowAt);
+      const y = sheetY + HOUR_H + todayIdx * ROW_H;
+      ctx.fillStyle = "#ff2d2d";
+      ctx.fillRect(x - 1.5, y, 3, ROW_H);
+    }
   }
 
-  days.forEach((day, idx) => {
-    const y = gridTop + HOUR_H + idx * ROW_H;
-    for (const run of byDay.get(day.d) ?? []) {
-      const box = trackBox(trackW, run.start, run.end - run.start);
-      const len = run.end - run.start;
-      ctx.fillStyle = limitTone(run.limit);
-      roundRect(ctx, trackX + box.x, y + (ROW_H - CHIP_H) / 2, Math.max(2, box.w), CHIP_H, 2);
-      ctx.fill();
-      if (len >= 3) {
-        ctx.fillStyle = run.limit === "25" ? "#111620" : "#071014";
-        ctx.font = "700 10px JetBrains Mono, IBM Plex Mono, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(len >= 6 ? `NL ${run.limit}` : run.limit, trackX + box.x + box.w / 2, y + ROW_H / 2);
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
-      }
-    }
-  });
+  const footY = sheetY + sheetH + 14;
+  ctx.font = "600 11px JetBrains Mono, IBM Plex Mono, monospace";
+  let legendX = PAD;
+  for (const limit of usedLimits) {
+    ctx.fillStyle = mineTone(limit);
+    ctx.beginPath();
+    ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = R.muted;
+    ctx.fillText(`NL ${limit}`, legendX + 14, footY);
+    legendX += ctx.measureText(`NL ${limit}`).width + 28;
+  }
 
   await new Promise<void>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -210,7 +249,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
       const href = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = href;
-      link.download = `${tag}-${year}-${String(monthIndex + 1).padStart(2, "0")}.jpg`;
+      link.download = `${tag}-${opts.year}-${String(opts.monthIndex + 1).padStart(2, "0")}.jpg`;
       link.click();
       URL.revokeObjectURL(href);
       resolve();

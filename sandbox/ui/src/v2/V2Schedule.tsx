@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, hoursOf, type CapacityMap } from "../schedule/capacity";
 import { ME, type Mark } from "../schedule/marks";
@@ -6,17 +6,24 @@ import { planMonth, type Occupancy } from "../schedule/plan";
 import { readCet } from "../schedule/cet";
 import { rosterFromGrid } from "../schedule/roster";
 import { fieldFill, pctLabel } from "../schedule/analytics";
+import { GitMinimalField } from "./GitMinimalField";
+import { GRID_SKINS, type GridSkinId } from "./gridSkins";
+import { OptField } from "./OptField";
+import { TableField } from "./TableField";
 import { V2Field } from "./V2Field";
 import { V2Float } from "./V2Float";
 import { V2MyCalendar } from "./V2MyCalendar";
 import { V2Settings } from "./V2Settings";
+import { SlotLookPanel } from "./SlotLookPanel";
 import { gridsForCalendar } from "./myShifts";
+import { type HourLoadMap } from "../schedule/hourLoad";
 import { R } from "./tokens";
 
 type Props = {
   cursor: Date;
   onCursorChange: (value: Date) => void;
   capacity: CapacityMap;
+  hourLoad?: HourLoadMap;
 };
 
 function monthTitle(date: Date, lang: string) {
@@ -27,28 +34,36 @@ function monthTitle(date: Date, lang: string) {
   return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/\sг\.?$/i, "");
 }
 
-export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
+export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad }: Props) {
   const { t, i18n } = useTranslation();
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
   const [grids, setGrids] = useState<Record<string, Occupancy>>(() => ({ 50: planMonth(year, monthIndex, "50") }));
   const [showMine, setShowMine] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLook, setShowLook] = useState(false);
   const [me, setMe] = useState<Mark>({ ...ME });
   const [hideTables, setHideTables] = useState(false);
   const [dimPast, setDimPast] = useState(true);
+  const [hidePastDays, setHidePastDays] = useState(false);
   const [showTip, setShowTip] = useState(true);
+  const [canEdit, setCanEdit] = useState(false);
+  const [markOpen, setMarkOpen] = useState(false);
+  const [tablesDraft, setTablesDraft] = useState("11");
   const [limits, setLimits] = useState<string[]>(["50"]);
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [kind, setKind] = useState("nitro");
   const [focus, setFocus] = useState("");
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [gridSkin, setGridSkin] = useState<GridSkinId>("opt");
   const [showPeople, setShowPeople] = useState(false);
   const [analyticsPos, setAnalyticsPos] = useState({ x: 760, y: 120 });
   const [peoplePos, setPeoplePos] = useState({ x: 1080, y: 160 });
   const [front, setFront] = useState<"fill" | "people">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
   const limitsRef = useRef<HTMLDivElement>(null);
+  const editPackRef = useRef<HTMLDivElement>(null);
+  const tablesInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setGrids(Object.fromEntries(limits.map((limit) => [limit, planMonth(year, monthIndex, limit)])));
@@ -67,6 +82,24 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
     window.addEventListener("mousedown", close);
     return () => window.removeEventListener("mousedown", close);
   }, [limitsOpen]);
+
+  useEffect(() => {
+    if (!canEdit) setMarkOpen(false);
+  }, [canEdit]);
+
+  useEffect(() => {
+    if (!markOpen) return;
+    setTablesDraft(String(me.tables));
+    const id = window.setTimeout(() => tablesInputRef.current?.focus(), 0);
+    const close = (event: MouseEvent) => {
+      if (!editPackRef.current?.contains(event.target as Node)) setMarkOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => {
+      window.clearTimeout(id);
+      window.removeEventListener("mousedown", close);
+    };
+  }, [markOpen]);
 
   const visibleGrids = useMemo(() => limits.map((limit) => grids[limit]).filter(Boolean), [grids, limits]);
   const roster = useMemo(
@@ -113,11 +146,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
 
   const shiftMonth = (delta: number) => onCursorChange(new Date(year, monthIndex + delta, 1));
 
+  const bumpTables = (delta: number) => {
+    setTablesDraft((prev) => {
+      const n = Number(prev);
+      const cur = Number.isFinite(n) ? n : me.tables;
+      return String(Math.min(30, Math.max(1, Math.round(cur) + delta)));
+    });
+  };
+
+  const commitTables = () => {
+    const n = Number(tablesDraft);
+    const next = Number.isFinite(n) ? Math.min(30, Math.max(1, Math.round(n))) : me.tables;
+    setMe((prev) => ({ ...prev, tables: next }));
+    setTablesDraft(String(next));
+    setMarkOpen(false);
+  };
+
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <section
-        className="flex h-14 shrink-0 items-center gap-2 border-b px-4"
-        style={{ borderColor: R.line, background: R.header }}
+        className={`v2-sched-bar flex h-14 shrink-0 items-center gap-2 border-b px-4${canEdit ? " is-edit" : ""}`}
+        style={{ borderColor: canEdit ? "transparent" : R.line, background: canEdit ? undefined : R.header }}
       >
         <button type="button" className="v2-ctrl w-8" onClick={() => shiftMonth(-1)} aria-label="prev">
           <i className="fa-solid fa-chevron-left" />
@@ -178,15 +227,47 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
             <option value="regular">Regular</option>
           </select>
         </label>
-        <form className="relative shrink-0" onSubmit={(e) => e.preventDefault()}>
-          <i className="fa-solid fa-magnifying-glass pointer-events-none absolute top-2.5 left-2.5 text-[11px]" style={{ color: R.faint }} />
+        <label className="relative">
+          <span className="v2-ctrl flex items-center px-3">
+            {t("v2.skin.label")}: {t(GRID_SKINS.find((skin) => skin.id === gridSkin)?.labelKey ?? "v2.skin.next")}
+            <i className="fa-solid fa-angle-down ml-2" style={{ color: R.faint }} />
+          </span>
+          <select
+            className="absolute inset-0 cursor-pointer opacity-0"
+            value={gridSkin}
+            onChange={(e) => setGridSkin(e.target.value as GridSkinId)}
+          >
+            {GRID_SKINS.map((skin) => (
+              <option key={skin.id} value={skin.id}>
+                {t(skin.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <form className="v2-mark-find relative shrink-0" onSubmit={(e) => e.preventDefault()}>
+          <i className="fa-solid fa-magnifying-glass pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-[10px]" style={{ color: R.faint }} />
           <input
-            className="v2-ctrl w-40 pl-8 pr-2 outline-none"
+            className={`v2-ctrl v2-mark-find-input${focus.trim() ? " has-q" : ""}`}
             list="v2-marks"
-            placeholder="Найти метку"
+            maxLength={4}
+            placeholder="Aa"
+            title={t("v2.search.hint")}
+            aria-label={t("v2.search.hint")}
             value={focus}
             onChange={(e) => setFocus(e.target.value)}
           />
+          {focus.trim() ? (
+            <button
+              type="button"
+              className="absolute top-1/2 right-0.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[10px] hover:text-white"
+              style={{ color: R.faint }}
+              title={t("v2.search.clear")}
+              aria-label={t("v2.search.clear")}
+              onClick={() => setFocus("")}
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+          ) : null}
           <datalist id="v2-marks">
             {fieldMarks.map((mark) => (
               <option key={mark.t} value={mark.t} />
@@ -239,39 +320,146 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
             <i className="fa-solid fa-gear" />
           </button>
         </div>
-        <button
-          type="button"
-          className="v2-mark-setup"
-          style={{ background: me.bg, color: me.fg }}
-          title={t("v2.tip.markTables")}
-          onClick={() => setMe((prev) => ({ ...prev, tables: Math.min(30, prev.tables + 1) }))}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setMe((prev) => ({ ...prev, tables: Math.max(1, prev.tables - 1) }));
-          }}
-        >
-          <span className="v2-mark-setup-tag">{me.t}</span>
-          <span className="v2-mark-setup-dot" aria-hidden>
-            ·
-          </span>
-          <span className="v2-mark-setup-n">{me.tables}</span>
-        </button>
+        <div className={`v2-edit-pack${canEdit ? " is-on" : ""}`} ref={editPackRef}>
+          <label className="v2-edit-toggle" title={t("schedule.editModeHint")}>
+            <input type="checkbox" checked={canEdit} onChange={(event) => setCanEdit(event.target.checked)} />
+            <span>{t("schedule.editMode")}</span>
+          </label>
+          <div className="v2-mark-sample">
+            <button
+              type="button"
+              className={`v2-opt-cell is-on v2-mark-setup${canEdit ? "" : " is-past"}`}
+              style={{ ["--mark" as string]: me.bg, ["--mark-ink" as string]: me.fg } as CSSProperties}
+              title={canEdit ? t("schedule.markCardTables") : t("schedule.editModeHint")}
+              aria-label={`${me.t} ${me.tables}`}
+              aria-expanded={markOpen}
+              onClick={() => {
+                if (!canEdit) return;
+                setMarkOpen((open) => !open);
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <span className="v2-opt-face has-n">
+                <b>{me.t}</b>
+                <i>{me.tables}</i>
+              </span>
+            </button>
+          </div>
+          {markOpen && (
+            <div className="v2-mark-card" role="dialog" aria-label={t("schedule.markCardName")}>
+              <div className="v2-mark-card-top">
+                <span
+                  className="v2-opt-cell is-on v2-mark-setup"
+                  style={{ ["--mark" as string]: me.bg, ["--mark-ink" as string]: me.fg } as CSSProperties}
+                >
+                  <span className="v2-opt-face has-n">
+                    <b>{me.t}</b>
+                    <i>{Number(tablesDraft) || me.tables}</i>
+                  </span>
+                </span>
+                <div>
+                  <span>{t("schedule.markCardName")}</span>
+                  <strong>{me.t}</strong>
+                </div>
+              </div>
+              <p className="v2-mark-card-label">{t("schedule.markCardTables")}</p>
+              <div className="v2-mark-card-step">
+                <button type="button" className="v2-mark-card-btn" aria-label="−1" onClick={() => bumpTables(-1)}>
+                  <i className="fa-solid fa-minus" />
+                </button>
+                <input
+                  ref={tablesInputRef}
+                  className="v2-mark-card-n"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={30}
+                  value={tablesDraft}
+                  onChange={(event) => setTablesDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") commitTables();
+                    if (event.key === "Escape") setMarkOpen(false);
+                  }}
+                />
+                <button type="button" className="v2-mark-card-btn" aria-label="+1" onClick={() => bumpTables(1)}>
+                  <i className="fa-solid fa-plus" />
+                </button>
+              </div>
+              <button type="button" className="v2-mark-card-ok" onClick={commitTables}>
+                {t("schedule.markCardOk")}
+              </button>
+            </div>
+          )}
+        </div>
       </section>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <V2Field
-          year={year}
-          monthIndex={monthIndex}
-          me={me}
-          showTables={!hideTables}
-          dimPast={dimPast}
-          showTip={showTip}
-          focus={focus}
-          limits={limits}
-          capacity={capacity}
-          grids={grids}
-          onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
-        />
+        {gridSkin === "git" ? (
+          <GitMinimalField
+            year={year}
+            monthIndex={monthIndex}
+            me={me}
+            showTables={!hideTables}
+            dimPast={dimPast}
+            hidePastDays={hidePastDays}
+            showTip={showTip}
+            canEdit={canEdit}
+            focus={focus}
+            limits={limits}
+            capacity={capacity}
+            grids={grids}
+            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
+          />
+        ) : gridSkin === "opt" ? (
+          <OptField
+            year={year}
+            monthIndex={monthIndex}
+            me={me}
+            showTables={!hideTables}
+            dimPast={dimPast}
+            hidePastDays={hidePastDays}
+            showTip={showTip}
+            canEdit={canEdit}
+            focus={focus}
+            limits={limits}
+            capacity={capacity}
+            grids={grids}
+            hourLoad={hourLoad}
+            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
+          />
+        ) : gridSkin === "table" ? (
+          <TableField
+            year={year}
+            monthIndex={monthIndex}
+            me={me}
+            showTables={!hideTables}
+            dimPast={dimPast}
+            hidePastDays={hidePastDays}
+            showTip={showTip}
+            canEdit={canEdit}
+            focus={focus}
+            limits={limits}
+            capacity={capacity}
+            grids={grids}
+            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
+          />
+        ) : (
+          <V2Field
+            year={year}
+            monthIndex={monthIndex}
+            me={me}
+            showTables={!hideTables}
+            dimPast={dimPast}
+            hidePastDays={hidePastDays}
+            showTip={showTip}
+            canEdit={canEdit}
+            focus={focus}
+            limits={limits}
+            capacity={capacity}
+            grids={grids}
+            onGridChange={(limit, next) => setGrids((prev) => ({ ...prev, [limit]: next }))}
+          />
+        )}
         <section className="flex h-12 shrink-0 items-center gap-5 px-4 text-[11px]" style={{ color: R.muted }}>
           <div className="flex items-center gap-3">
             <span>
@@ -292,7 +480,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
             </span>
           </div>
           <p className="ml-auto" style={{ color: R.soft }}>
-            Пользователь смотрит месяц. Видит: где плотно, где ночь даёт 2 места, где прошлое
+            {gridSkin === "opt"
+              ? t("v2.skin.optHint")
+              : "Пользователь смотрит месяц. Видит: где плотно, где ночь даёт 2 места, где прошлое"}
           </p>
         </section>
 
@@ -330,14 +520,21 @@ export function V2Schedule({ cursor, onCursorChange, capacity }: Props) {
         {showSettings && (
           <V2Settings
             dimPast={dimPast}
+            hidePastDays={hidePastDays}
             showTables={!hideTables}
             showTip={showTip}
             onDimPast={setDimPast}
+            onHidePastDays={setHidePastDays}
             onShowTables={(value) => setHideTables(!value)}
             onShowTip={setShowTip}
+            onOpenLook={() => {
+              setShowSettings(false);
+              setShowLook(true);
+            }}
             onClose={() => setShowSettings(false)}
           />
         )}
+        {showLook && <SlotLookPanel onClose={() => setShowLook(false)} />}
         {showMine && (
           <V2MyCalendar
             year={year}

@@ -49,10 +49,31 @@
     "settingsHint": "How to read the grid: the past, tables, and the slot tooltip.",
     "dimPast": "Dim the past",
     "dimPastHint": "Past slots go dark. Turn off to keep them as bright as the future.",
+    "hidePastDays": "Hide past days",
+    "hidePastDaysHint": "Only today and the future stay on the month. Uncheck to bring the days back.",
+    "hidePastEmpty": "Every day in this month has already passed. Uncheck “Hide past days” to see them again.",
     "showTables": "Tables on marks",
     "showTablesHint": "Show the table count on each chip.",
     "showTip": "Slot tooltip",
-    "showTipHint": "A card with the date, time, and who is in the slot.",
+    "showTipHint": "A card with the date, time, and who is in the slot. In Optimized grid it opens with the right click.",
+    "editMode": "Edit mode",
+    "editModeHint": "Marks can be placed or removed only while this is on — fewer accidental clicks.",
+    "markCardName": "Mark",
+    "markCardTables": "Tables",
+    "markCardOk": "OK",
+    "slotLookKicker": "sandbox",
+    "slotLookTitle": "Slot look",
+    "slotLookHint": "Tweak colors on the live grid. When you like it, copy the code and send it over.",
+    "slotFutureBg": "Future fill",
+    "slotFutureBorder": "Future border",
+    "slotFutureBorderW": "Border width",
+    "slotPastBg": "Past fill",
+    "slotPastDim": "Past fade",
+    "slotMarkDim": "Past marks",
+    "slotLookCode": "Settings code",
+    "slotLookCopy": "Copy",
+    "slotLookCopied": "Copied",
+    "slotLookReset": "Reset",
     "view": "Grid view",
     "viewSlots": "Slots",
     "viewLevels": "Levels",
@@ -62,6 +83,7 @@
     "playersTitle": "Who is on this schedule",
     "playersHint": "Hours = marks ÷ 2. Remaining counts only slots that have not passed in CET.",
     "myCalendar": "My calendar",
+    "myDimPast": "Dim past shifts",
     "myShifts": "{{n}} shifts",
     "myHours": "{{n}} h",
     "noShifts": "No shifts of yours on this day",
@@ -100,7 +122,9 @@
       "title": "Capacity by CET hour",
       "lead": "Pick a limit and a matrix: month 31×24 or week 7×24. Click to set depth, then save.",
       "matrixHint": "One hour is 2 slots. The number on the right is the day total. Cell color is depth.",
-      "conflictHint": "If a weekday rule and a month-day rule both apply, the stricter one wins: the lower capacity in each hour.",
+      "conflictHint": "If both limits are on and they overlap, the stricter one wins: the lower capacity in each hour.",
+      "useWeek": "Limit by weekday",
+      "useMonth": "Limit by day of month",
       "previewTitle": "Preview",
       "previewDeep": "Deepest",
       "previewShallow": "Shallowest",
@@ -146,7 +170,7 @@
       "maxLevels": "levels for this limit",
       "maxHint": "This many rows will appear for the limit in one day",
       "hoursOf": "hours at capacity {{n}}",
-      "editHint": "Click to raise capacity, right-click to lower it. Click and drag to paint several hours.",
+      "editHint": "Click to raise capacity, right-click to lower it. Click and drag to select a range of hours.",
       "reset": "Day 1 · night 2",
       "hourTip": "{{start}}–{{end}} · capacity {{cap}}",
       "preview": "How a day will look",
@@ -155,6 +179,108 @@
       "previewSlots": "{{n}} half-hour slots in the day",
       "openHour": "Level {{n}} is open at {{start}}:00",
       "lockedHour": "Level {{n}} is closed at {{start}}:00"
+    },
+    "load": {
+      "kicker": "visual",
+      "title": "Hourly load",
+      "lead": "A pastel rainbow washed over the grid: almost invisible on one hour, readable across the strip. Stored per limit as table hour_load.",
+      "legend": "Rainbow",
+      "tone": {
+        "clear": "None",
+        "rose": "Rose",
+        "peach": "Peach",
+        "lemon": "Lemon",
+        "lime": "Lime",
+        "mint": "Mint",
+        "aqua": "Aqua",
+        "sky": "Sky",
+        "iris": "Iris",
+        "lilac": "Lilac",
+        "pink": "Pink"
+      },
+      "reset": "Discard draft",
+      "clear": "Reset load"
+    },
+    "people": {
+      "kicker": "club",
+      "title": "Members",
+      "foldLead": "Club list: nicks, limits, slot mark and VIP access. Only an admin edits the mark.",
+      "lead": "Active members are the default view. Applications, pause, archive and bans stay in this list. VIP is a unique queue number: 1 is always first, 2 always second.",
+      "colMark": "Mark",
+      "discord": "Discord",
+      "discordId": "Discord ID",
+      "room": "Room nick",
+      "name": "Name",
+      "email": "Email",
+      "limits": "Limits",
+      "limitAll": "All limits",
+      "filterNick": "Nick",
+      "filterNickPh": "Start typing…",
+      "sortLabel": "Sort",
+      "statusAll": "All statuses",
+      "status": {
+        "active": "Member",
+        "pending": "Application",
+        "paused": "Paused",
+        "archived": "Archive",
+        "banned": "Banned"
+      },
+      "empty": "Nobody matches — clear the filter or change status.",
+      "vip": "VIP access",
+      "vipHint": "Empty means no priority. The number is unique: 1 is always first in queue.",
+      "vipDup": "This number is already taken",
+      "vipNone": "None",
+      "vip1": "First",
+      "vip2": "Second",
+      "vip3": "Third",
+      "vip4": "Fourth",
+      "distance": "Distance",
+      "distanceHint": "Computed from distance. Read-only here.",
+      "card": "Profile",
+      "close": "Close",
+      "cancel": "Cancel",
+      "markEdit": "Edit mark",
+      "markHint": "Pick the chip color and the letter color from the palette or paste a #hex, then type the letters. Below is how the mark looks in a slot.",
+      "pickColor": "Color picker",
+      "hexHint": "#hex from old tables",
+      "hexErr": "Use a color like #ffd966",
+      "profileSoon": "Wallets, Telegram and admin notes will land here later. For now: Discord ID, email, limits and VIP access.",
+      "sort": {
+        "color": "By mark color",
+        "discord": "By Discord",
+        "name": "By name",
+        "vip": "By VIP"
+      }
+    },
+    "fold": {
+      "open": "Expand",
+      "close": "Collapse"
+    },
+    "marks": {
+      "kicker": "colors",
+      "title": "Marks",
+      "lead": "200 colors in hue families, without washed-out yellows and oranges. Each swatch only offers high-contrast inks. Letters, Discord nick, and the pair “color family + ink” stay unique. PL is reserved for the club head.",
+      "preview": "In a slot",
+      "tag": "Letters",
+      "nick": "Discord",
+      "nickHint": "Discord (room nick)",
+      "ink": "Letter color",
+      "colNo": "No",
+      "colBg": "Color",
+      "reserved": "Until letters are set, the sample shows PL. Tables on the preview are always 12. Search: Discord nick, room nick in parentheses.",
+      "dupTag": "This mark is already used",
+      "dupNick": "This Discord nick is already on another color",
+      "dupCombo": "A similar color already uses this type color",
+      "inkTone": {
+        "black": "Black",
+        "white": "White",
+        "navy": "Navy",
+        "wine": "Wine",
+        "forest": "Green",
+        "purple": "Purple",
+        "gold": "Gold",
+        "ice": "Ice"
+      }
     },
     "colId": "id",
     "colTag": "tag",
@@ -172,7 +298,19 @@
   },
   "v2": {
     "day": "Day",
-    "kicker": "field",
+    "skin": {
+      "label": "Grid",
+      "next": "Current",
+      "git": "Git minimal",
+      "table": "Table",
+      "opt": "Optimized",
+      "optHint": "With edit mode on: click to set, double-click to clear. Right-click for details.",
+      "levelShort": "lv."
+    },
+    "search": {
+      "clear": "Clear filter",
+      "hint": "Find mark"
+    },
     "draft": "new design draft",
     "back": "Sandbox",
     "tip": {
@@ -184,6 +322,51 @@
       "cet": "CET",
       "msk": "MSK",
       "markTables": "Left click adds tables, right click removes them. The current number is saved on the slot and does not change later."
+    },
+    "foot": {
+      "kicker": "month",
+      "title": "Fill by CET",
+      "lead": "Each bar is the same half-hour as the grid, across every day and level on screen. 100% means no empty slots, 0% means all free.",
+      "axis": "%",
+      "cet": "time axis · CET hours",
+      "more": "Space below is reserved for later month slices: player hours, VIP, limits. For now it just marks the end of the field."
+    },
+    "help": {
+      "kicker": "cheat sheet",
+      "title": "How the schedule works",
+      "lead": "The everyday bits, parked at the bottom so they stay out of the grid.",
+      "edit": {
+        "h": "Edit mode",
+        "p": "Turn on the checkbox at the top right. Without it, marks are not placed or removed — fewer accidental clicks."
+      },
+      "place": {
+        "h": "Place a mark",
+        "p": "Single-click a free slot. It stores your mark and the current table count."
+      },
+      "remove": {
+        "h": "Remove a mark",
+        "p": "Double-click your own mark. Other people’s marks stay put."
+      },
+      "tables": {
+        "h": "Table count",
+        "p": "Click the mark sample next to the checkbox. Plus, minus, or type a number, then OK."
+      },
+      "tip": {
+        "h": "Slot card",
+        "p": "Right-click a slot for who is there, CET, and local time. Settings can turn this off."
+      },
+      "search": {
+        "h": "Find a mark",
+        "p": "Type two letters in the Aa field. Other marks fade; the hit pulses."
+      },
+      "settings": {
+        "h": "Settings",
+        "p": "The gear: dim the past, hide past days, tables on marks, and the slot tooltip."
+      },
+      "cursor": {
+        "h": "Cursor on the grid",
+        "p": "Date and limit light up on the left, hour and half-hour on top. In edit mode a frame wraps the whole hour of that day."
+      }
     }
   }
 }

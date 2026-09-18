@@ -13,20 +13,13 @@ import {
   profileOf,
   resetLimit,
   setEqualize,
+  setRuleFlags,
   type CapacityMap,
   type HourCaps,
 } from "../schedule/capacity";
-import { MARKS, ME } from "../schedule/marks";
+import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
+import { MembersAdmin } from "./MembersAdmin";
 import { R } from "./tokens";
-
-const palette = [...MARKS, ME];
-const members = [
-  { key: "1", id: "PH-014", tag: "NS", request: "pending", status: "school" },
-  { key: "2", id: "PH-002", tag: "SV", request: "active", status: "club" },
-  { key: "3", id: "PH-009", tag: "YO", request: "active", status: "club" },
-  { key: "4", id: "PH-021", tag: "AL", request: "active", status: "school" },
-  { key: "5", id: "PH-007", tag: "OK", request: "blocked", status: "club" },
-];
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -41,10 +34,22 @@ const DEPTH = [
 ];
 
 type MatrixRow = { id: number; label: string; hours: HourCaps };
+type CapRange = { r0: number; h0: number; r1: number; h1: number };
+
+function inCapRange(ri: number, hour: number, range: CapRange | null) {
+  if (!range) return false;
+  const rMin = Math.min(range.r0, range.r1);
+  const rMax = Math.max(range.r0, range.r1);
+  const hMin = Math.min(range.h0, range.h1);
+  const hMax = Math.max(range.h0, range.h1);
+  return ri >= rMin && ri <= rMax && hour >= hMin && hour <= hMax;
+}
 
 type Props = {
   capacity: CapacityMap;
+  hourLoad: HourLoadMap;
   onCapacityChange: (next: CapacityMap) => void;
+  onHourLoadChange: (next: HourLoadMap) => void;
 };
 
 function nextCap(cap: number, down: boolean) {
@@ -71,15 +76,57 @@ function extremesOf(rows: MatrixRow[]) {
   return { deep, shallow };
 }
 
-export function V2Admin({ capacity, onCapacityChange }: Props) {
+function FoldHead({
+  kicker,
+  title,
+  lead,
+  open,
+  onToggle,
+}: {
+  kicker: string;
+  title: string;
+  lead?: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-4 px-5 py-4" style={{ borderBottom: open ? `1px solid ${R.line}` : "0" }}>
+      <div className="min-w-0 flex-1">
+        <span className="block text-[11px] tracking-[0.16em] uppercase" style={{ color: R.faint }}>
+          {kicker}
+        </span>
+        <h2 className="mt-1 text-[18px] font-semibold">{title}</h2>
+        {open && lead && (
+          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed" style={{ color: R.muted }}>
+            {lead}
+          </p>
+        )}
+      </div>
+      <button type="button" className="v2-ctrl shrink-0 px-4" onClick={onToggle}>
+        {open ? t("admin.fold.close") : t("admin.fold.open")}
+      </button>
+    </div>
+  );
+}
+
+export function V2Admin({ capacity, hourLoad, onCapacityChange, onHourLoadChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
   const [draft, setDraft] = useState<MatrixRow[] | null>(null);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(true);
+  const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
+  const [loadSaved, setLoadSaved] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [hoverHour, setHoverHour] = useState<number | null>(null);
-  const paintRef = useRef<number | null>(null);
+  const [hover, setHover] = useState<{ day: number; hour: number } | null>(null);
+  const [range, setRange] = useState<CapRange | null>(null);
+  const [weekOn, setWeekOn] = useState(true);
+  const [monthOn, setMonthOn] = useState(true);
+  const paintRef = useRef<(CapRange & { cap: number }) | null>(null);
+  const baselineRef = useRef<MatrixRow[]>([]);
   const profile = profileOf(capacity, limit);
   const weekLabels = useMemo(() => {
     const loc = i18n.language.startsWith("en") ? "en-US" : "ru-RU";
@@ -91,7 +138,23 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
 
   useEffect(() => {
     const stop = () => {
+      const drag = paintRef.current;
+      if (!drag) return;
       paintRef.current = null;
+      const rMin = Math.min(drag.r0, drag.r1);
+      const rMax = Math.max(drag.r0, drag.r1);
+      const hMin = Math.min(drag.h0, drag.h1);
+      const hMax = Math.max(drag.h0, drag.h1);
+      setDraft((prev) =>
+        (prev ?? baselineRef.current).map((row, ri) => {
+          if (ri < rMin || ri > rMax) return row;
+          const hours = row.hours.slice();
+          for (let hour = hMin; hour <= hMax; hour += 1) hours[hour] = clampCap(drag.cap);
+          return { ...row, hours };
+        }),
+      );
+      setRange(null);
+      setSaved(false);
     };
     window.addEventListener("mouseup", stop);
     return () => window.removeEventListener("mouseup", stop);
@@ -100,7 +163,11 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
   useEffect(() => {
     setDraft(null);
     setSaved(false);
-    setHoverHour(null);
+    setHover(null);
+    setRange(null);
+    const next = profileOf(capacity, limit);
+    setWeekOn(next.weekOn);
+    setMonthOn(next.monthOn);
   }, [limit, tab, weekLabels]);
 
   const baseline = useMemo(() => {
@@ -117,33 +184,29 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
       hours: hoursOf(capacity, limit, day).slice(),
     }));
   }, [capacity, limit, tab, weekLabels]);
+  baselineRef.current = baseline;
 
   const matrix = draft ?? baseline;
-  const dirty = draft != null && !sameMatrix(draft, baseline);
+  const flagsDirty = weekOn !== profile.weekOn || monthOn !== profile.monthOn;
+  const dirty = (draft != null && !sameMatrix(draft, baseline)) || flagsDirty;
   const extremes = useMemo(() => extremesOf(matrix), [matrix]);
   const sameDepth = Boolean(extremes.deep && extremes.shallow && extremes.deep.id === extremes.shallow.id);
 
-  const paint = (rowId: number, hour: number, cap: number) => {
-    setDraft((prev) =>
-      (prev ?? baseline).map((row) => {
-        if (row.id !== rowId) return row;
-        const hours = row.hours.slice();
-        hours[hour] = clampCap(cap);
-        return { ...row, hours };
-      }),
-    );
-    setSaved(false);
-  };
-
   const save = () => {
-    if (!dirty || !draft) return;
-    onCapacityChange(applyMatrix(capacity, limit, tab, draft));
+    if (!dirty) return;
+    let next = capacity;
+    if (draft != null && !sameMatrix(draft, baseline)) next = applyMatrix(next, limit, tab, draft);
+    if (flagsDirty) next = setRuleFlags(next, limit, { weekOn, monthOn });
+    onCapacityChange(next);
+    setDraft(null);
     setSaved(true);
   };
 
   const reset = () => {
     onCapacityChange(resetLimit(capacity, limit));
     setDraft(loadMatrixAfterReset());
+    setWeekOn(true);
+    setMonthOn(true);
     setSaved(false);
   };
 
@@ -169,10 +232,39 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
     setSaved(false);
   };
 
-  const tone = (request: string) => {
-    if (request === "active") return "#34D399";
-    if (request === "pending") return R.cyan;
-    return "#F87171";
+  const loadMatrix = loadDraft ?? hourLoad;
+  const loadDirty = loadDraft != null && !sameHourLoad(loadDraft, hourLoad);
+
+  const paintLoad = (hour: number, color: string | null) => {
+    setLoadDraft((prev) => {
+      const base = cloneHourLoad(prev ?? hourLoad);
+      const row = (base[limit] ?? Array.from({ length: 24 }, () => null)).slice();
+      row[hour] = color;
+      base[limit] = row;
+      return base;
+    });
+    setLoadSaved(false);
+  };
+
+  const saveLoad = () => {
+    if (!loadDirty || !loadDraft) return;
+    onHourLoadChange(loadDraft);
+    setLoadDraft(null);
+    setLoadSaved(true);
+  };
+
+  const resetLoad = () => {
+    setLoadDraft(null);
+    setLoadSaved(false);
+  };
+
+  const clearLoad = () => {
+    setLoadDraft((prev) => {
+      const base = cloneHourLoad(prev ?? hourLoad);
+      base[limit] = emptyLoadRow();
+      return base;
+    });
+    setLoadSaved(false);
   };
 
   return (
@@ -180,31 +272,13 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
       <h1 className="mb-8 text-2xl font-semibold tracking-tight">{t("admin.title")}</h1>
 
       <section className="overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
-        <button
-          type="button"
-          className="v2-cap-fold flex w-full items-start gap-4 border-0 px-5 py-5 text-left"
-          style={{ background: "transparent", borderBottom: open ? `1px solid ${R.line}` : "0", color: R.text }}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] tracking-[0.16em] uppercase" style={{ color: R.faint }}>
-              {t("admin.capacity.kicker")}
-            </span>
-            <h2 className="mt-1 text-[18px] font-semibold">{t("admin.capacity.title")}</h2>
-            {open && (
-              <p className="mt-2 max-w-3xl text-[13px] leading-relaxed" style={{ color: R.muted }}>
-                {t("admin.capacity.lead")}
-              </p>
-            )}
-          </span>
-          <span className="mt-1 flex shrink-0 items-center gap-2">
-            <b className="v2-mono text-[12px] font-semibold" style={{ color: limitTone(limit) }}>
-              NL {limit}
-            </b>
-            <i className={`fa-solid fa-chevron-${open ? "up" : "down"}`} style={{ color: R.faint, fontSize: 12 }} aria-hidden />
-          </span>
-        </button>
+        <FoldHead
+          kicker={t("admin.capacity.kicker")}
+          title={t("admin.capacity.title")}
+          lead={t("admin.capacity.lead")}
+          open={open}
+          onToggle={() => setOpen((value) => !value)}
+        />
 
         <div className="flex" hidden={!open}>
           <aside className="v2-cap-limits">
@@ -274,33 +348,33 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
               </div>
             </div>
 
-            <div className="v2-cap-matrix">
+            <div className="v2-cap-matrix" onMouseLeave={() => setHover(null)}>
               <div className={`v2-cap-mx${tab === "week" ? " is-week" : ""}`}>
                 <div className="v2-cap-mx-head v2-cap-mx-day">CET</div>
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className={`v2-cap-mx-head${hour < 6 || hour >= 22 ? " is-night" : ""}${hoverHour === hour ? " is-col" : ""}`}
-                    onMouseEnter={() => setHoverHour(hour)}
-                    onMouseLeave={() => setHoverHour(null)}
+                    className={`v2-cap-mx-head${hour < 6 || hour >= 22 ? " is-night" : ""}${hover?.hour === hour ? " is-col" : ""}`}
                   >
                     {hour}
                   </div>
                 ))}
                 <div className="v2-cap-mx-head v2-cap-mx-slots">{t("admin.capacity.colSlots")}</div>
 
-                {matrix.map((row) => {
+                {matrix.map((row, ri) => {
                   const slots = slotsOf(row.hours);
                   return (
                     <Fragment key={row.id}>
-                      <div className="v2-cap-mx-day">{row.label}</div>
+                      <div className={`v2-cap-mx-day${hover?.day === row.id ? " is-row" : ""}`}>{row.label}</div>
                       {row.hours.map((cap, hour) => {
                         const depth = DEPTH[Math.min(MAX_CAP, Math.max(1, cap)) - 1];
+                        const selected = inCapRange(ri, hour, range);
+                        const cursor = hover?.day === row.id && hover.hour === hour;
                         return (
                           <button
                             key={`${row.id}-${hour}`}
                             type="button"
-                            className={`v2-cap-mx-cell${hour < 6 || hour >= 22 ? " is-night" : ""}${hoverHour === hour ? " is-col" : ""}`}
+                            className={`v2-cap-mx-cell${hour < 6 || hour >= 22 ? " is-night" : ""}${cursor ? " is-cursor" : ""}${selected ? " is-range" : ""}`}
                             style={{ background: depth.bg, color: depth.fg }}
                             title={t("admin.capacity.cellTip", {
                               day: row.label,
@@ -312,14 +386,19 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
                             onMouseDown={(event) => {
                               event.preventDefault();
                               const next = nextCap(cap, event.button === 2);
-                              paintRef.current = next;
-                              paint(row.id, hour, next);
+                              const box = { r0: ri, h0: hour, r1: ri, h1: hour, cap: next };
+                              paintRef.current = box;
+                              setRange(box);
+                              setHover({ day: row.id, hour });
                             }}
                             onMouseEnter={() => {
-                              setHoverHour(hour);
-                              if (paintRef.current != null) paint(row.id, hour, paintRef.current);
+                              setHover({ day: row.id, hour });
+                              const drag = paintRef.current;
+                              if (!drag) return;
+                              const next = { ...drag, r1: ri, h1: hour };
+                              paintRef.current = next;
+                              setRange(next);
                             }}
-                            onMouseLeave={() => setHoverHour(null)}
                             onContextMenu={(event) => event.preventDefault()}
                           >
                             {cap}
@@ -390,9 +469,35 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
             <p className="mt-2 text-[11px]" style={{ color: R.faint }}>
               {t("admin.capacity.matrixHint")}
             </p>
-            <p className="mt-1 text-[12px]" style={{ color: R.soft }}>
-              {t("admin.capacity.conflictHint")}
-            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={weekOn}
+                  onChange={(event) => {
+                    setWeekOn(event.target.checked);
+                    setSaved(false);
+                  }}
+                />
+                <span>{t("admin.capacity.useWeek")}</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={monthOn}
+                  onChange={(event) => {
+                    setMonthOn(event.target.checked);
+                    setSaved(false);
+                  }}
+                />
+                <span>{t("admin.capacity.useMonth")}</span>
+              </label>
+              {weekOn && monthOn ? (
+                <p className="max-w-2xl text-[12px]" style={{ color: R.soft }}>
+                  {t("admin.capacity.conflictHint")}
+                </p>
+              ) : null}
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 type="button"
@@ -423,45 +528,118 @@ export function V2Admin({ capacity, onCapacityChange }: Props) {
         </div>
       </section>
 
-      <h2 className="mt-10 mb-3 text-[16px] font-semibold">{t("admin.members")}</h2>
-      <div className="overflow-hidden rounded-md" style={{ border: `1px solid ${R.line}`, background: R.header }}>
-        <table className="w-full text-left text-[13px]">
-          <thead>
-            <tr className="text-[10px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
-              <th className="px-4 py-3 font-medium">{t("admin.colId")}</th>
-              <th className="px-4 py-3 font-medium">{t("admin.colTag")}</th>
-              <th className="px-4 py-3 font-medium">{t("admin.colRequest")}</th>
-              <th className="px-4 py-3 font-medium">{t("admin.colStatus")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((row) => {
-              const mark = palette.find((m) => m.t === row.tag) ?? { t: row.tag, bg: "#3a3d44", fg: R.text };
-              return (
-                <tr key={row.key} style={{ borderTop: `1px solid ${R.line}` }}>
-                  <td className="v2-mono px-4 py-3 text-[12px]" style={{ color: R.muted }}>
-                    {row.id}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="v2-mono inline-flex h-6 w-8 items-center justify-center text-[10px] font-bold"
-                      style={{ background: mark.bg, color: mark.fg }}
-                    >
-                      {mark.t}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span style={{ color: tone(row.request) }}>{t(`admin.request.${row.request}`)}</span>
-                  </td>
-                  <td className="px-4 py-3" style={{ color: R.muted }}>
-                    {t(`admin.status.${row.status}`)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <section className="mt-6 overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
+        <FoldHead
+          kicker={t("admin.load.kicker")}
+          title={t("admin.load.title")}
+          lead={t("admin.load.lead")}
+          open={loadOpen}
+          onToggle={() => setLoadOpen((value) => !value)}
+        />
+        {loadOpen && (
+        <div className="flex">
+          <aside className="v2-cap-limits">
+            <div className="mb-2 px-1 text-[10px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
+              {t("admin.capacity.limit")}
+            </div>
+            {LIMIT_OPTIONS.map((value) => (
+              <button
+                key={`load-${value}`}
+                type="button"
+                className="v2-cap-limit"
+                style={{
+                  background: limit === value ? "rgba(34, 211, 238, 0.14)" : "transparent",
+                  color: limit === value ? R.cyan : limitTone(value),
+                  boxShadow: limit === value ? `inset 0 0 0 1px rgba(34, 211, 238, 0.45)` : undefined,
+                }}
+                onClick={() => setLimit(value)}
+              >
+                <b>NL {value}</b>
+              </button>
+            ))}
+          </aside>
+          <div className="min-w-0 flex-1 px-5 py-5">
+            <div className="v2-load-legend" style={{ color: R.muted }}>
+              <span style={{ color: R.faint }}>{t("admin.load.legend")}</span>
+              {LOAD_PASTELS.filter((tone) => tone.color).map((tone) => (
+                <span key={tone.id} className="v2-load-chip">
+                  <i style={{ background: tone.swatch }} />
+                  {t(`admin.load.tone.${tone.id}`)}
+                </span>
+              ))}
+            </div>
+            <div className="v2-load-timeline v2-mono">
+              {HOURS.map((hour) => {
+                const wash = loadMatrix[limit]?.[hour];
+                return (
+                  <span
+                    key={hour}
+                    className="v2-load-tick"
+                    style={wash ? { backgroundImage: `linear-gradient(${wash}, ${wash})` } : undefined}
+                  >
+                    {hour}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="v2-load-hours">
+              {HOURS.map((hour) => (
+                <div key={hour} className="v2-load-col">
+                  <b>{hour}</b>
+                  <div className="v2-load-swatches">
+                    {LOAD_PASTELS.map((tone) => {
+                      const on = (loadMatrix[limit]?.[hour] ?? null) === tone.color;
+                      return (
+                        <button
+                          key={`${hour}-${tone.id}`}
+                          type="button"
+                          className={`v2-load-dot${on ? " is-on" : ""}${tone.id === "clear" ? " is-clear" : ""}`}
+                          style={{ background: tone.swatch }}
+                          title={t(`admin.load.tone.${tone.id}`)}
+                          onClick={() => paintLoad(hour, tone.color)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="v2-ctrl px-5"
+                style={{
+                  background: loadDirty ? R.cyan : R.panel,
+                  color: loadDirty ? R.cyanInk : R.faint,
+                  fontWeight: 600,
+                }}
+                disabled={!loadDirty}
+                onClick={saveLoad}
+              >
+                {loadSaved ? t("admin.capacity.applied") : t("admin.capacity.apply")}
+              </button>
+              <button type="button" className="v2-ctrl px-4" onClick={resetLoad}>
+                {t("admin.load.reset")}
+              </button>
+              <button type="button" className="v2-ctrl px-4" onClick={clearLoad}>
+                {t("admin.load.clear")}
+              </button>
+            </div>
+          </div>
+        </div>
+        )}
+      </section>
+
+      <section className="mt-6 overflow-hidden rounded-lg" style={{ border: `1px solid ${R.line}`, background: R.header }}>
+        <FoldHead
+          kicker={t("admin.people.kicker")}
+          title={t("admin.people.title")}
+          lead={t("admin.people.foldLead")}
+          open={peopleOpen}
+          onToggle={() => setPeopleOpen((value) => !value)}
+        />
+        {peopleOpen && <MembersAdmin />}
+      </section>
     </div>
   );
 }

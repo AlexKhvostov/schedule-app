@@ -37,6 +37,15 @@ export function formatClock(now: Date, timeZone: string) {
   }).format(now);
 }
 
+export function formatHm(now: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+}
+
 export function hourRange(start: number) {
   const end = start + 1;
   return `${start}–${end}`;
@@ -79,6 +88,15 @@ export function readCet(now = new Date()): CetStamp {
     half,
     slotProgress: into / 30,
   };
+}
+
+export function isPastDay(year: number, monthIndex: number, day: number, cet: CetStamp) {
+  if (year !== cet.year || monthIndex !== cet.monthIndex) {
+    if (year < cet.year) return true;
+    if (year > cet.year) return false;
+    return monthIndex < cet.monthIndex;
+  }
+  return day < cet.day;
 }
 
 export function isPastSlot(year: number, monthIndex: number, day: number, half: number, cet: CetStamp) {

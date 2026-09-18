@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { isPastSlot, playerHourOffset, readCet, type CetStamp } from "../schedule/cet";
+import { isPastDay, isPastSlot, playerHourOffset, readCet, type CetStamp } from "../schedule/cet";
 import { type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, limitTone, weekdayOf, type CapacityMap, type HourCaps } from "../schedule/capacity";
 import { daysInMonth, levelAllowed, seatsOf, toggleSeat, type Occupancy, type Seat } from "../schedule/plan";
@@ -13,7 +13,9 @@ type Props = {
   me: Mark;
   showTables: boolean;
   dimPast: boolean;
+  hidePastDays?: boolean;
   showTip: boolean;
+  canEdit: boolean;
   focus: string;
   levels?: boolean;
   limits: string[];
@@ -107,6 +109,24 @@ function chipHours(len: number, lang: string) {
   return lang.startsWith("en") ? `${n}h` : `${n}ч`;
 }
 
+function ChipTicks({ start, len }: { start: number; len: number }) {
+  if (len < 2) return null;
+  return (
+    <span className="v2-chip-ticks" aria-hidden>
+      {Array.from({ length: len - 1 }, (_, i) => {
+        const at = start + i + 1;
+        return (
+          <i
+            key={i}
+            className={at % 2 === 0 ? "is-hour" : undefined}
+            style={{ left: `${((i + 1) / len) * 100}%` }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
 function tablesLabel(count: number, lang: string) {
   if (lang.startsWith("en")) return count === 1 ? "1 table" : `${count} tables`;
   const ten = count % 10;
@@ -171,7 +191,7 @@ function markHit(mark: Mark, focus: string) {
   return Boolean(q) && mark.t.toUpperCase() === q;
 }
 
-export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, focus, levels = true, limits, capacity, grids, onGridChange }: Props) {
+export function V2Field({ year, monthIndex, me, showTables, dimPast, hidePastDays, showTip, canEdit, focus, levels = true, limits, capacity, grids, onGridChange }: Props) {
   const { t, i18n } = useTranslation();
   const days = useMemo(
     () => daysInMonth(year, monthIndex, i18n.language),
@@ -237,6 +257,7 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
   }, [year, monthIndex, days.length, levels, limits, capacity, viewH]);
 
   const toggle = (dayIdx: number, half: number, level: number, limit: string) => {
+    if (!canEdit) return;
     const day = days[dayIdx]?.d ?? dayIdx + 1;
     const hours = hoursOf(capacity, limit, day, weekdayOf(year, monthIndex, day));
     if (isPastSlot(year, monthIndex, day, half, cet)) return;
@@ -334,6 +355,7 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
         {leadH > 0 && <div ref={leadRef} className="v2-today-lead" aria-hidden style={{ height: leadH }} />}
         {days.map((day, dayIdx) => {
           const today = sameMonth && cet.day === day.d;
+          if (hidePastDays && isPastDay(year, monthIndex, day.d, cet)) return null;
           const dayPast = isPastSlot(year, monthIndex, day.d, 47, cet);
           const hovered = hover?.dayIdx === dayIdx;
           return (
@@ -427,15 +449,16 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
                               return (
                                 <span
                                   key={`${run.start}-${run.mark.t}`}
-                                  className={`v2-chip${single ? " v2-chip-one" : ""}${hours ? " v2-chip-long" : ""}${dimPast && past && !hit ? " v2-chip-past" : ""}${hit ? " v2-chip-hit" : ""}`}
+                                  className={`v2-chip${single ? " v2-chip-one" : ""}${hours ? " v2-chip-long" : ""}${dimPast && past && !hit ? " v2-chip-past" : ""}${muted ? " v2-chip-dim" : ""}${hit ? " v2-chip-hit" : ""}`}
                                   style={{
                                     left: box.left,
                                     width: box.width,
                                     background: run.mark.bg,
                                     color: R.cyanInk,
-                                    opacity: muted ? 0.28 : undefined,
                                   }}
                                 >
+                                  <ChipTicks start={run.start} len={run.len} />
+                                  <span className="v2-chip-face">
                                   {single && showTables ? (
                                     <>
                                       <span className="v2-chip-tag">{run.mark.t}</span>
@@ -447,6 +470,7 @@ export function V2Field({ year, monthIndex, me, showTables, dimPast, showTip, fo
                                     run.mark.t
                                   )}
                                   {hours && <span className="v2-chip-h">{hours}</span>}
+                                  </span>
                                 </span>
                               );
                             })}

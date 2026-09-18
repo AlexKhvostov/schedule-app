@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { playerHourOffset, readCet } from "../schedule/cet";
+import { playerHourOffset, readCet, isPastDay } from "../schedule/cet";
 import { LIMIT_OPTIONS, limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { downloadCalendarJpeg } from "./calendarJpeg";
@@ -19,28 +19,19 @@ type Props = {
 };
 
 const SLOT_COUNT = 48;
-const GAP_HALF = 1;
-const GAP_HOUR = 3;
-const GAP_TOTAL = 24 * GAP_HALF + 23 * GAP_HOUR;
 
 type Hover = { day: number; start: number; end: number; limit: string; x: number; y: number };
 
 function runBox(start: number, len: number) {
-  const last = start + len - 1;
-  const padStart = Math.ceil(start / 2) * GAP_HALF + Math.floor(start / 2) * GAP_HOUR;
-  const padBetween =
-    (Math.ceil(last / 2) - Math.ceil(start / 2)) * GAP_HALF +
-    (Math.floor(last / 2) - Math.floor(start / 2)) * GAP_HOUR;
   return {
-    left: `calc((100% - ${GAP_TOTAL}px) * ${start} / ${SLOT_COUNT} + ${padStart}px)`,
-    width: `calc((100% - ${GAP_TOTAL}px) * ${len} / ${SLOT_COUNT} + ${padBetween}px)`,
+    left: `${(start / SLOT_COUNT) * 100}%`,
+    width: `${(len / SLOT_COUNT) * 100}%`,
   };
 }
 
 function nowLineLeft(half: number, progress: number) {
-  const padStart = Math.ceil(half / 2) * GAP_HALF + Math.floor(half / 2) * GAP_HOUR;
   const t = half + Math.min(1, Math.max(0, progress));
-  return `calc((100% - ${GAP_TOTAL}px) * ${t} / ${SLOT_COUNT} + ${padStart}px)`;
+  return `${(t / SLOT_COUNT) * 100}%`;
 }
 
 function clock(half: number, hourShift = 0) {
@@ -56,19 +47,20 @@ function tipDate(year: number, monthIndex: number, day: number, lang: string) {
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`;
 }
 
-function limitInk(limit: string) {
-  return limit === "25" ? "#111620" : "#071014";
+function mineTone(limit: string) {
+  if (limit === "25") return "#4ADE80";
+  return limitTone(limit);
 }
 
-function HourLines() {
+function limitInk(limit: string) {
+  return limit === "25" ? "#14532d" : "#071014";
+}
+
+function HourCells() {
   return (
     <>
-      {Array.from({ length: 23 }, (_, hour) => (
-        <i
-          key={hour}
-          className={`v2-mine-vline${hour === 5 || hour === 11 || hour === 17 ? " is-major" : ""}`}
-          style={{ gridColumn: hour * 4 + 4 }}
-        />
+      {Array.from({ length: 24 }, (_, hour) => (
+        <i key={hour} className={`v2-mine-hcell${hour === 5 || hour === 11 || hour === 17 ? " is-major" : ""}`} />
       ))}
     </>
   );
@@ -79,6 +71,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   const todayRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<Hover | null>(null);
   const [saving, setSaving] = useState(false);
+  const [dimPastShifts, setDimPastShifts] = useState(true);
   const [cet] = useState(() => readCet());
   const mskOffset = playerHourOffset();
   const days = useMemo(() => daysInMonth(year, monthIndex, i18n.language), [year, monthIndex, i18n.language]);
@@ -112,154 +105,155 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   return createPortal(
     <div className="v2-mine-back" onClick={onClose}>
       <div className="v2-mine" style={{ background: R.header, borderColor: R.line2 }} onClick={(event) => event.stopPropagation()}>
-        <header className="v2-mine-top" style={{ borderColor: R.line }}>
-          <div>
-            <div className="text-[11px] tracking-[0.14em] uppercase" style={{ color: R.faint }}>
-              {t("schedule.myCalendar")}
-            </div>
-            <h2 className="mt-1 text-[18px] font-semibold" style={{ color: R.text }}>
-              {title}
-            </h2>
-            <p className="mt-1 text-[12px]" style={{ color: R.muted }}>
-              {tag} · {t("schedule.myShifts", { n: runs.length })} · {t("schedule.myHours", { n: shiftHours(runs) })}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-            {usedLimits.map((limit) => (
-              <span key={limit} className="v2-mine-legend">
-                <i style={{ background: limitTone(limit) }} />
-                NL {limit}
-              </span>
-            ))}
-            <button
-              type="button"
-              className="v2-ctrl px-2.5"
-              title={t("schedule.downloadHint")}
-              disabled={saving}
-              onClick={() => {
-                setSaving(true);
-                void downloadCalendarJpeg({
-                  year,
-                  monthIndex,
-                  title,
-                  tag,
-                  days,
-                  runs,
-                  usedLimits,
-                  today,
-                  mskOffset,
-                  kicker: t("schedule.myCalendar"),
-                  meta: `${tag} · ${t("schedule.myShifts", { n: runs.length })} · ${t("schedule.myHours", { n: shiftHours(runs) })}`,
-                  dayLabel: t("v2.day"),
-                  tzLabel: `CET / ${t("v2.tip.msk")}`,
-                }).finally(() => setSaving(false));
-              }}
-            >
-              <i className="fa-solid fa-download mr-2" style={{ color: R.cyan }} />
-              {t("schedule.download")}
-            </button>
-            <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
-              <i className="fa-solid fa-xmark" />
-            </button>
-          </div>
+        <header className="v2-mine-chrome">
+          <h2>{t("schedule.myCalendar")}</h2>
+          <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
+            <i className="fa-solid fa-xmark" />
+          </button>
         </header>
 
-        <div className="v2-mine-body">
-          <div className="v2-mine-hours" style={{ borderColor: R.line2, background: R.header }}>
+        <div className="v2-mine-meta">
+          <div className="v2-mine-who">
+            <strong>{title}</strong>
+            <span className="v2-mine-tag">{tag}</span>
+            <span className="v2-mine-stat">{t("schedule.myShifts", { n: runs.length })}</span>
+            <span className="v2-mine-stat">{t("schedule.myHours", { n: shiftHours(runs) })}</span>
+          </div>
+          <label className="v2-mine-toggle">
+            <input
+              type="checkbox"
+              checked={dimPastShifts}
+              onChange={(event) => setDimPastShifts(event.target.checked)}
+            />
+            <span>{t("schedule.myDimPast")}</span>
+          </label>
+        </div>
+
+        <div className="v2-mine-sheet">
+          <div className="v2-mine-hours">
             <div className="v2-mine-date" style={{ color: R.faint }}>
               {t("v2.day")}
-              <small>
-                <span style={{ color: R.soft }}>CET</span>
-                <span className="mx-1" style={{ color: R.line2 }}>
-                  /
+              <small>CET</small>
+            </div>
+            <div className="v2-mine-hours-grid">
+              {hours.map((h) => (
+                <span key={h} className={`v2-mine-hour${hoverHour === h ? " is-on" : ""}`}>
+                  {h}
                 </span>
-                <span>{t("v2.tip.msk")}</span>
-              </small>
+              ))}
             </div>
-            <div className="v2-track min-w-0 flex-1">
-              <HourLines />
-              {hours.map((h) => {
-                const night = h < 6 || h >= 22;
-                const next = h + 1;
-                const msk = (h + mskOffset) % 24;
-                const mskNext = msk + 1;
-                const on = hoverHour === h;
-                return (
-                  <span
-                    key={h}
-                    className="v2-mine-hour"
-                    style={{
-                      gridColumn: `${h * 4 + 1} / span 3`,
-                      background: on ? "rgba(34, 211, 238, 0.16)" : night ? R.night : undefined,
-                      boxShadow: on ? `inset 0 -2px 0 ${R.cyan}` : undefined,
-                    }}
-                  >
-                    <b style={{ color: on ? R.cyan : night ? "#D1D5DB" : R.text }}>
-                      {h}–{next}
-                    </b>
-                    <small style={{ color: on ? R.cyan : R.faint }}>
-                      {msk}–{mskNext > 24 ? 24 : mskNext}
-                    </small>
-                  </span>
-                );
-              })}
-            </div>
-            <div className="v2-slot-end" aria-hidden />
           </div>
 
           {days.map((day, dayIdx) => {
             const isToday = today === day.d;
+            const past = isPastDay(year, monthIndex, day.d, cet);
             const dayRuns = runsFromLane(lanes[dayIdx] ?? [], day.d);
             const hovered = hover?.day === day.d;
             return (
               <div
                 key={day.d}
                 ref={isToday ? todayRef : undefined}
-                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}`}
-                style={{
-                  background: day.weekend ? R.weekend : "transparent",
-                  borderColor: R.line,
-                }}
+                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}`}
               >
                 <div
                   className="v2-mine-date v2-mono"
                   style={{
-                    color: hovered || isToday ? R.cyan : day.weekend ? R.soft : R.text,
+                    color: hovered || isToday ? R.cyan : undefined,
                     fontWeight: hovered || isToday ? 600 : 400,
                   }}
                 >
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
-                <div className="v2-mine-track v2-gridlines v2-track">
-                  <HourLines />
-                  {isToday && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress) }} aria-hidden />}
+                <div className="v2-mine-track">
+                  <HourCells />
                   {dayRuns.map((run) => {
                     const len = run.end - run.start;
                     const box = runBox(run.start, len);
+                    const nowAt = cet.half + cet.slotProgress;
+                    const runPast = past || (isToday && run.end <= nowAt);
+                    const liveCut =
+                      isToday && !runPast && run.start < nowAt && run.end > nowAt
+                        ? `${((nowAt - run.start) / len) * 100}%`
+                        : null;
                     return (
                       <button
                         key={`${run.limit}-${run.start}`}
                         type="button"
-                        className="v2-mine-chip"
+                        className={`v2-mine-chip${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
                         style={{
                           left: box.left,
                           width: box.width,
-                          background: limitTone(run.limit),
+                          background: mineTone(run.limit),
                           color: limitInk(run.limit),
                         }}
                         onMouseEnter={(event) => placeTip(event, day.d, run.start, run.end, run.limit)}
                         onMouseLeave={() => setHover(null)}
                       >
-                        {len >= 6 ? `NL ${run.limit}` : len >= 3 ? run.limit : ""}
+                        {liveCut && dimPastShifts && <span className="v2-mine-chip-dim" style={{ width: liveCut }} aria-hidden />}
+                        {len > 1 && (
+                          <span className="v2-chip-ticks" aria-hidden>
+                            {Array.from({ length: len - 1 }, (_, i) => {
+                              const at = run.start + i + 1;
+                              return (
+                                <i
+                                  key={i}
+                                  className={at % 2 === 0 ? "is-hour" : undefined}
+                                  style={{ left: `${((i + 1) / len) * 100}%` }}
+                                />
+                              );
+                            })}
+                          </span>
+                        )}
+                        <span className="v2-chip-face">
+                          {len >= 6 ? `NL ${run.limit}` : run.limit}
+                        </span>
                       </button>
                     );
                   })}
+                  {isToday && dimPastShifts && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress) }} aria-hidden />}
                 </div>
-                <div className="v2-slot-end" aria-hidden />
               </div>
             );
           })}
         </div>
+
+        <footer className="v2-mine-foot">
+          <div className="v2-mine-legends">
+            {usedLimits.map((limit) => (
+              <span key={limit} className="v2-mine-legend">
+                <i style={{ background: mineTone(limit) }} />
+                NL {limit}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="v2-ctrl px-2.5"
+            title={t("schedule.downloadHint")}
+            disabled={saving}
+            onClick={() => {
+              setSaving(true);
+              void downloadCalendarJpeg({
+                year,
+                monthIndex,
+                title,
+                tag,
+                days,
+                runs,
+                usedLimits,
+                today,
+                dimPast: dimPastShifts,
+                nowAt: cet.half + cet.slotProgress,
+                kicker: t("schedule.myCalendar"),
+                meta: `${tag} · ${t("schedule.myShifts", { n: runs.length })} · ${t("schedule.myHours", { n: shiftHours(runs) })}`,
+                dayLabel: t("v2.day"),
+              }).finally(() => setSaving(false));
+            }}
+          >
+            <i className="fa-solid fa-download mr-2" style={{ color: R.cyan }} />
+            {t("schedule.download")}
+          </button>
+        </footer>
       </div>
 
       {hover &&
@@ -281,7 +275,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
                 {clock(hover.start, mskOffset)} – {clock(hover.end, mskOffset)}
               </span>
             </div>
-            <div className="mt-2 text-[12px]" style={{ color: limitTone(hover.limit) }}>
+            <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
               NL {hover.limit}
             </div>
           </div>,
