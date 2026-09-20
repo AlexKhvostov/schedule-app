@@ -7,6 +7,7 @@ import {
   clampCap,
   defaultHourCaps,
   hoursOf,
+  formatLimit,
   limitTone,
   maxLevels,
   slotsOf,
@@ -25,15 +26,6 @@ import { V2SaveButton } from "./V2SaveButton";
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
-const DEPTH = [
-  { bg: "#1c2230", fg: "#8b93a2" },
-  { bg: "#0b4f5c", fg: "#67e8f9" },
-  { bg: "#5b4310", fg: "#fbbf24" },
-  { bg: "#6b2f10", fg: "#fb923c" },
-  { bg: "#6b1d24", fg: "#fb7185" },
-  { bg: "#6b1a45", fg: "#f472b6" },
-];
-
 type MatrixRow = { id: number; label: string; hours: HourCaps };
 type CapRange = { r0: number; h0: number; r1: number; h1: number };
 
@@ -50,6 +42,8 @@ type Props = {
   capacity: CapacityMap;
   hourLoad: HourLoadMap;
   isRoot?: boolean;
+  variant: "nitro" | "regular";
+  onVariantChange: (variant: "nitro" | "regular") => void;
   onCapacityChange: (next: CapacityMap) => void;
   onHourLoadChange: (next: HourLoadMap) => void;
 };
@@ -106,7 +100,7 @@ function FoldHead({
   );
 }
 
-export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLoadChange }: Props) {
+export function V2Admin({ capacity, hourLoad, isRoot, variant, onVariantChange, onCapacityChange, onHourLoadChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
@@ -165,7 +159,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
     const next = profileOf(capacity, limit);
     setWeekOn(next.weekOn);
     setMonthOn(next.monthOn);
-  }, [limit, tab, weekLabels]);
+  }, [limit, tab, variant, weekLabels]);
 
   const baseline = useMemo(() => {
     if (tab === "week") {
@@ -291,7 +285,22 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
 
         <div className="flex" hidden={!open}>
           <aside className="v2-cap-limits">
-            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
+            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.kind")}</div>
+            {(["nitro", "regular"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`v2-cap-limit${variant === value ? " is-on" : ""}`}
+                onClick={() => {
+                  if (value === variant) return;
+                  onVariantChange(value);
+                  setSaved(false);
+                }}
+              >
+                <b>{value === "nitro" ? "Nitro" : "Regular"}</b>
+              </button>
+            ))}
+            <div className="v2-admin-kicker mb-2 mt-5 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
             {LIMIT_OPTIONS.map((value) => (
               <button
                 key={value}
@@ -303,7 +312,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
                   setSaved(false);
                 }}
               >
-                <b>NL {value}</b>
+                <b>{formatLimit(value)}</b>
               </button>
             ))}
             <button type="button" className="v2-ctrl mt-4 w-full px-2 text-[11px]" onClick={reset}>
@@ -323,8 +332,8 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {DEPTH.map((item, i) => (
-                  <span key={item.bg} className="v2-cap-legend" style={{ background: item.bg, color: item.fg }}>
+                {Array.from({ length: MAX_CAP }, (_, i) => (
+                  <span key={i} className={`v2-cap-legend v2-cap-d${i + 1}`}>
                     {i + 1}
                   </span>
                 ))}
@@ -350,15 +359,14 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
                     <Fragment key={row.id}>
                       <div className={`v2-cap-mx-day${hover?.day === row.id ? " is-row" : ""}`}>{row.label}</div>
                       {row.hours.map((cap, hour) => {
-                        const depth = DEPTH[Math.min(MAX_CAP, Math.max(1, cap)) - 1];
+                        const depth = Math.min(MAX_CAP, Math.max(1, cap));
                         const selected = inCapRange(ri, hour, range);
                         const cursor = hover?.day === row.id && hover.hour === hour;
                         return (
                           <button
                             key={`${row.id}-${hour}`}
                             type="button"
-                            className={`v2-cap-mx-cell${hour < 6 || hour >= 22 ? " is-night" : ""}${cursor ? " is-cursor" : ""}${selected ? " is-range" : ""}`}
-                            style={{ background: depth.bg, color: depth.fg }}
+                            className={`v2-cap-mx-cell v2-cap-d${depth}${hour < 6 || hour >= 22 ? " is-night" : ""}${cursor ? " is-cursor" : ""}${selected ? " is-range" : ""}`}
                             title={t("admin.capacity.cellTip", {
                               day: row.label,
                               start: hour,
@@ -521,7 +529,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
                 style={limit === value ? undefined : { color: limitTone(value) }}
                 onClick={() => setLimit(value)}
               >
-                <b>NL {value}</b>
+                <b>{formatLimit(value)}</b>
               </button>
             ))}
           </aside>
@@ -599,7 +607,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, onCapacityChange, onHourLo
           open={peopleOpen}
           onToggle={() => setPeopleOpen((value) => !value)}
         />
-        {peopleOpen && <MembersAdmin />}
+        {peopleOpen && <MembersAdmin isRoot={isRoot} />}
       </section>
     </div>
   );

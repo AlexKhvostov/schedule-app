@@ -58,10 +58,11 @@ export function createInvite(input: { email: string; discord: string }): { invit
     discordId: "",
     room: "",
     email,
-    limits: ["50"],
+    limits: [],
     status: "pending",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 0,
     mark: { colorId: -1, fg: "#111827", t: "", bg: "#6b7280" },
   };

@@ -8,7 +8,10 @@ export type SchedulePrefs = {
   month: "now" | "pin";
   pin: string;
   editPulse: boolean;
+  showExtraTz: boolean;
 };
+
+export const PREFS_EVENT = "v2-schedule-prefs";
 
 export const DEFAULT_PREFS: SchedulePrefs = {
   limits: ["50"],
@@ -16,6 +19,7 @@ export const DEFAULT_PREFS: SchedulePrefs = {
   month: "now",
   pin: "",
   editPulse: true,
+  showExtraTz: true,
 };
 
 function ym(date: Date) {
@@ -34,6 +38,7 @@ export function loadPrefs(): SchedulePrefs {
       month: "now",
       pin: "",
       editPulse: parsed.editPulse !== false,
+      showExtraTz: parsed.showExtraTz !== false,
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -46,6 +51,7 @@ export function savePrefs(next: SchedulePrefs) {
   } catch {
     /* quota */
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PREFS_EVENT));
 }
 
 export function cursorFromPrefs(_prefs?: SchedulePrefs, now = new Date()) {

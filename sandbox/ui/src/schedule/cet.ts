@@ -39,6 +39,43 @@ export function utcLabel(offset: number) {
   return `UTC${offset > 0 ? "+" : ""}${offset}`;
 }
 
+const PLAYER_UTC_KEY = "v2-player-utc";
+export const PLAYER_UTC_EVENT = "v2-player-utc";
+
+export function clampUtcOffset(value: number) {
+  if (!Number.isFinite(value)) return 3;
+  return Math.min(14, Math.max(-12, Math.round(value)));
+}
+
+export function loadPlayerUtc() {
+  if (typeof window === "undefined") return 3;
+  try {
+    const n = Number(window.localStorage.getItem(PLAYER_UTC_KEY));
+    if (Number.isFinite(n)) return clampUtcOffset(n);
+  } catch {
+    /* quota */
+  }
+  return 3;
+}
+
+export function savePlayerUtc(offset: number) {
+  const next = clampUtcOffset(offset);
+  if (typeof window === "undefined") return next;
+  try {
+    window.localStorage.setItem(PLAYER_UTC_KEY, String(next));
+  } catch {
+    /* quota */
+  }
+  window.dispatchEvent(new Event(PLAYER_UTC_EVENT));
+  return next;
+}
+
+export function hourOffsetFromUtc(offset: number, now = new Date()) {
+  const cet = tzHour(now, CET);
+  const local = tzHour(now, tzFromUtcOffset(offset));
+  return (local - cet + 24) % 24;
+}
+
 export function formatClock(now: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone,
@@ -63,11 +100,9 @@ export function hourRange(start: number) {
   return `${start}–${end}`;
 }
 
-/** Сдвиг часов игрока относительно CET (в сентябре к CEST обычно +1). */
-export function playerHourOffset(now = new Date()) {
-  const cet = tzHour(now, CET);
-  const local = tzHour(now, PLAYER_TZ);
-  return (local - cet + 24) % 24;
+/** Сдвиг часов игрока относительно CET. Пояс берём из профиля, не жёстко Москву. */
+export function playerHourOffset(now = new Date(), utc = loadPlayerUtc()) {
+  return hourOffsetFromUtc(utc, now);
 }
 
 export function playerHourRange(cetHour: number, offset: number) {

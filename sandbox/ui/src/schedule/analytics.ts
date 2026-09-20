@@ -19,14 +19,18 @@ export function fieldFill(
   cet: CetStamp,
   limit: string,
   hours?: HourCaps,
+  capacity?: CapacityMap,
 ): FieldFill {
   let seats = 0;
   let taken = 0;
   let futureSeats = 0;
   let futureTaken = 0;
   grid.forEach((row, dayIdx) => {
+    const dayHours = capacity
+      ? hoursOf(capacity, limit, dayIdx + 1, weekdayOf(year, monthIndex, dayIdx + 1))
+      : hours;
     row.forEach((cell, half) => {
-      const cap = capFor(half, hours);
+      const cap = capFor(half, dayHours);
       const used = Math.min(occupiedCount(cell), cap);
       const past = isPastSlot(year, monthIndex, dayIdx + 1, half, cet);
       seats += cap;

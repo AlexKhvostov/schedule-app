@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0e1118;
+  --card: #151a24;
+  --ink: #f4f5f7;
+  --mute: #8b93a2;
+  --line: #2a3140;
+  --accent: #22d3ee;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, "IBM Plex Sans", system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+}

@@ -5,7 +5,39 @@ export type Mark = {
   bg: string;
   fg: string;
   tables: number;
+  memberId?: string;
+  avatarUrl?: string;
+  username?: string;
+  globalName?: string;
+  priority?: number | null;
+  vipNitro?: number | null;
+  vipRegular?: number | null;
 };
+
+export function asVip(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.min(999, Math.round(n)) : 0;
+}
+
+export function vipOf(mark: Pick<Mark, "vipNitro" | "vipRegular">, variant: "nitro" | "regular") {
+  return asVip(variant === "nitro" ? mark.vipNitro : mark.vipRegular);
+}
+
+export function markLabel(tag?: string | null) {
+  const letters = tag?.trim() ?? "";
+  return letters || "—";
+}
+
+export function markKey(mark: Mark) {
+  return mark.t.trim() || `~${mark.discord}|${mark.room}`;
+}
+
+export function isOwnMark(seat: Mark | null | undefined, me: Mark) {
+  if (!seat) return false;
+  const tag = me.t.trim();
+  if (tag) return seat.t.trim() === tag;
+  return seat.discord === me.discord;
+}
 
 /** Цвета как в старой таблице: светлая плашка, тёмные буквы */
 export const MARKS: Mark[] = [

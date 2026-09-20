@@ -1,13 +1,17 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type MutableRefObject, type PointerEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { isPastDay, isPastSlot, playerHourOffset, readCet, type CetStamp } from "../schedule/cet";
-import { type Mark } from "../schedule/marks";
-import { hoursOf, lanesForDay, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
-import { daysInMonth, levelAllowed, seatsOf, toggleSeat, type Occupancy } from "../schedule/plan";
+import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
+import { isOwnMark, type Mark } from "../schedule/marks";
+import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
+import { daysInMonth, levelAllowed, seatsOf, stampSeat, type Occupancy } from "../schedule/plan";
 import { columnFill, pctLabel } from "../schedule/analytics";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
+import { loadTheme, type UiTheme } from "./theme";
+import { usePlayerClock } from "./usePlayerClock";
+import { MarkFace } from "./ScheduleSlot";
+import { OptLevelLane } from "./OptLevelLane";
 
 type Props = {
   year: number;
@@ -55,7 +59,13 @@ type NavMem = {
 const navMem = new WeakMap<HTMLElement, NavMem>();
 
 const SLOT_COUNT = 48;
-const CLICK_WAIT = 220;
+const TIP_SLACK = 12;
+
+type TipPoint = { x: number; y: number };
+type TipApi = {
+  show: (hit: SlotHit, rest?: TipPoint) => void;
+  hide: () => void;
+};
 
 function slotSpan(half: number, hourShift = 0) {
   const start = (Math.floor(half / 2) * 60 + (half % 2 ? 30 : 0) + hourShift * 60 + 24 * 60) % (24 * 60);
@@ -80,6 +90,16 @@ function tablesLabel(count: number, lang: string) {
   if (ten === 1 && hundred !== 11) return `${count} стол`;
   if (ten >= 2 && ten <= 4 && (hundred < 12 || hundred > 14)) return `${count} стола`;
   return `${count} столов`;
+}
+
+function isClubCode(value?: string | null) {
+  return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
+}
+
+function displayNick(value?: string | null) {
+  const text = value?.trim() ?? "";
+  if (!text || isClubCode(text)) return "—";
+  return text;
 }
 
 function markQuery(focus: string) {
@@ -118,8 +138,8 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     const box = el.getBoundingClientRect();
     x = box.right + 8;
     y = box.top;
-    if (x + 200 > window.innerWidth - 8) x = Math.max(8, box.left - 208);
-    if (y + 100 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 108);
+    if (x + 252 > window.innerWidth - 8) x = Math.max(8, box.left - 260);
+    if (y + 156 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 164);
   }
   return {
     cell: el,
@@ -134,6 +154,76 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     x,
     y,
   };
+}
+
+function laneCells(origin: SlotHit) {
+  const track = origin.cell.closest(".v2-opt-track");
+  if (!track) return [] as HTMLElement[];
+  return [...track.querySelectorAll<HTMLElement>("[data-slot]")];
+}
+
+function halfOnLane(origin: SlotHit, clientX: number) {
+  const cells = laneCells(origin);
+  if (!cells.length) return origin.half;
+  let best = origin.half;
+  let bestDist = Infinity;
+  for (const el of cells) {
+    const box = el.getBoundingClientRect();
+    if (clientX >= box.left && clientX <= box.right) return Number(el.dataset.half);
+    const mid = (box.left + box.right) / 2;
+    const dist = Math.abs(clientX - mid);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = Number(el.dataset.half);
+    }
+  }
+  return best;
+}
+
+function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode: "place" | "remove") {
+  const track = origin.cell.closest(".v2-opt-track");
+  if (!(track instanceof HTMLElement)) return;
+  let pick = track.querySelector<HTMLElement>(".v2-opt-pick");
+  if (!pick) {
+    pick = document.createElement("div");
+    pick.className = "v2-opt-pick";
+    pick.setAttribute("aria-hidden", "true");
+    track.appendChild(pick);
+  }
+  const a = Math.min(fromHalf, toHalf);
+  const b = Math.max(fromHalf, toHalf);
+  const cells = laneCells(origin).filter((el) => {
+    const half = Number(el.dataset.half);
+    return half >= a && half <= b;
+  });
+  if (!cells.length) {
+    pick.hidden = true;
+    return;
+  }
+  const trackBox = track.getBoundingClientRect();
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const cell of cells) {
+    const box = cell.getBoundingClientRect();
+    left = Math.min(left, box.left);
+    top = Math.min(top, box.top);
+    right = Math.max(right, box.right);
+    bottom = Math.max(bottom, box.bottom);
+  }
+  const pad = 2;
+  pick.style.left = `${left - trackBox.left - pad}px`;
+  pick.style.top = `${top - trackBox.top - pad}px`;
+  pick.style.width = `${right - left + pad * 2}px`;
+  pick.style.height = `${bottom - top + pad * 2}px`;
+  pick.classList.toggle("is-off", mode === "remove");
+  pick.hidden = false;
+}
+
+function hidePick(root?: HTMLElement | null) {
+  const scope = root ?? document;
+  scope.querySelectorAll(".v2-opt-pick").forEach((el) => el.remove());
 }
 
 function navOf(root: HTMLElement): NavMem {
@@ -263,14 +353,9 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   else hideFrame(mem);
 }
 
-function OptFace({ tag, tables, showTables }: { tag?: string; tables?: number; showTables: boolean }) {
-  if (!tag) return null;
-  return (
-    <span className={`v2-opt-face${showTables && tables != null ? " has-n" : ""}`}>
-      <b>{tag}</b>
-      {showTables && tables != null && <i>{tables}</i>}
-    </span>
-  );
+function OptFace({ tag, tables, showTables, on }: { tag?: string; tables?: number; showTables: boolean; on?: boolean }) {
+  if (!on) return null;
+  return <MarkFace letters={tag?.trim() || "—"} tables={tables} showTables={showTables} />;
 }
 
 const OptCell = memo(function OptCell({
@@ -310,6 +395,7 @@ const OptCell = memo(function OptCell({
   nowPct?: number;
   busyLimit?: string;
 }) {
+  const on = Boolean(bg);
   return (
     <div
       role="gridcell"
@@ -322,7 +408,7 @@ const OptCell = memo(function OptCell({
       data-limit={limit}
       data-lane={lane}
       data-busy={busyLimit || undefined}
-      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${tag ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}`}
+      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}`}
       style={
         {
           "--mark": bg,
@@ -331,10 +417,10 @@ const OptCell = memo(function OptCell({
         } as CSSProperties
       }
     >
-      <OptFace tag={tag} tables={tables} showTables={showTables} />
+      <OptFace tag={tag} tables={tables} showTables={showTables} on={on} />
       {nowPct != null && (
         <span className="v2-opt-now-dim" aria-hidden>
-          <OptFace tag={tag} tables={tables} showTables={showTables} />
+          <OptFace tag={tag} tables={tables} showTables={showTables} on={on} />
         </span>
       )}
     </div>
@@ -409,14 +495,12 @@ const OptBody = memo(function OptBody({
                 const lanes = levels.map((level) => {
                   const lane = `${dayIdx}-${limit}-${level}`;
                   return (
-                    <div key={lane} data-lane={lane} className="v2-opt-lane">
-                      <div className="v2-opt-nl">
-                        <span className="v2-limit-chip" style={{ color: limitTone(limit) }}>
-                          {limit}
-                          {levels.length > 1 ? `·${level + 1}` : ""}
-                        </span>
-                      </div>
-                      <div className="v2-opt-track">
+                    <OptLevelLane
+                      key={lane}
+                      laneKey={lane}
+                      tone={limitTone(limit)}
+                      label={`${limit}${levels.length > 1 ? `·${level + 1}` : ""}`}
+                    >
                         {Array.from({ length: SLOT_COUNT }, (_, half) => {
                           const locked = !levelAllowed(half, level, limitHours);
                           const mark = seatsOf(row[half], level + 1)[level];
@@ -452,8 +536,7 @@ const OptBody = memo(function OptBody({
                             />
                           );
                         })}
-                      </div>
-                    </div>
+                    </OptLevelLane>
                   );
                 });
                 if (skin !== "theme") return lanes;
@@ -556,28 +639,95 @@ function OptTip({
   grids: Record<string, Occupancy>;
   capacity: CapacityMap;
   showTip: boolean;
-  waitRef: MutableRefObject<{
-    show: (hit: SlotHit) => void;
-    hide: () => void;
-  }>;
+  waitRef: MutableRefObject<TipApi>;
   skin?: "classic" | "theme";
 }) {
   const { t, i18n } = useTranslation();
   const [hover, setHover] = useState<SlotHit | null>(null);
-  const mskOffset = playerHourOffset();
+  const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const restRef = useRef<TipPoint | null>(null);
+  const clock = usePlayerClock();
+
+  useEffect(() => {
+    const sync = () => setTheme(loadTheme());
+    window.addEventListener("v2-theme", sync);
+    return () => window.removeEventListener("v2-theme", sync);
+  }, []);
 
   useEffect(() => {
     waitRef.current = {
-      hide: () => setHover(null),
-      show: (hit) => {
+      hide: () => {
+        restRef.current = null;
+        setHover(null);
+      },
+      show: (hit, rest) => {
         if (!showTip && !hit.busyLimit) {
+          restRef.current = null;
           setHover(null);
           return;
         }
+        if (!rest && restRef.current) return;
+        restRef.current = rest ?? null;
         setHover(hit);
       },
     };
   }, [showTip, waitRef]);
+
+  useEffect(() => {
+    if (!hover) return;
+    const hide = () => {
+      restRef.current = null;
+      setHover(null);
+    };
+    let armed = false;
+    const arm = window.requestAnimationFrame(() => {
+      armed = true;
+    });
+    const onMove = (event: globalThis.PointerEvent) => {
+      if (!armed) return;
+      const rest = restRef.current;
+      if (!rest) return;
+      const dx = event.clientX - rest.x;
+      const dy = event.clientY - rest.y;
+      if (dx * dx + dy * dy >= TIP_SLACK * TIP_SLACK) hide();
+    };
+    const capture = { capture: true } as const;
+    const quiet = { capture: true, passive: true } as const;
+    window.addEventListener("pointermove", onMove, quiet);
+    window.addEventListener("pointerdown", hide, capture);
+    window.addEventListener("wheel", hide, quiet);
+    window.addEventListener("keydown", hide, capture);
+    window.addEventListener("blur", hide);
+    document.addEventListener("scroll", hide, quiet);
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      window.cancelAnimationFrame(arm);
+      window.removeEventListener("pointermove", onMove, quiet);
+      window.removeEventListener("pointerdown", hide, capture);
+      window.removeEventListener("wheel", hide, quiet);
+      window.removeEventListener("keydown", hide, capture);
+      window.removeEventListener("blur", hide);
+      document.removeEventListener("scroll", hide, quiet);
+      document.removeEventListener("visibilitychange", hide);
+    };
+  }, [hover]);
+
+  useLayoutEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return;
+    const pad = 8;
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
+    let left = Number.parseFloat(node.style.left) || 0;
+    let top = Number.parseFloat(node.style.top) || 0;
+    if (left + width > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - width - pad);
+    if (top + height > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - height - pad);
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    node.style.left = `${Math.round(left)}px`;
+    node.style.top = `${Math.round(top)}px`;
+  }, [hover]);
 
   if (!hover) return null;
   const hoursCaps = hoursOf(capacity, hover.limit, hover.day, weekdayOf(year, monthIndex, hover.day));
@@ -586,41 +736,53 @@ function OptTip({
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
 
   return createPortal(
-    <div className={`v2-opt-tip${skin === "theme" ? " is-kit" : ""}`} style={{ left: hover.x, top: hover.y }}>
+    <div
+      ref={nodeRef}
+      className={`v2-opt-tip theme-${theme}${skin === "theme" ? " is-kit" : ""}`}
+      style={{ left: hover.x, top: hover.y }}
+    >
       <div className="v2-opt-tip-when">
         <b>{tipDate(year, monthIndex, hover.day, i18n.language)}</b>
-        <span>{slotSpan(hover.half)}</span>
-        <small>
-          {t("v2.tip.msk")} {slotSpan(hover.half, mskOffset)}
-        </small>
+        <span>
+          {slotSpan(hover.half)}{" "}
+          <i>{t("v2.tip.cet")}</i>
+        </span>
+        {clock.showLocal ? (
+          <small>
+            {slotSpan(hover.half, clock.offset)}{" "}
+            <i>{clock.label}</i>
+          </small>
+        ) : null}
       </div>
       {hover.busyLimit && hover.busyLimit !== hover.limit ? (
         <div className="v2-opt-tip-note">
-          <strong>{t("v2.tip.busy", { limit: hover.busyLimit })}</strong>
+          <strong>{t("v2.tip.busy", { limit: formatLimit(hover.busyLimit) })}</strong>
           <p>{t("v2.tip.busyHint")}</p>
+        </div>
+      ) : mark ? (
+        <div className="v2-opt-tip-who">
+          <span className="v2-opt-tip-mark" style={{ ["--mark" as string]: mark.bg, ["--mark-ink" as string]: mark.fg }}>
+            {mark.t.trim() || "—"}
+          </span>
+          <dl className="v2-opt-tip-facts">
+            <div>
+              <dt>{t("v2.tip.discord")}</dt>
+              <dd>{displayNick(mark.discord)}</dd>
+            </div>
+            <div>
+              <dt>{t("v2.tip.winamax")}</dt>
+              <dd>{displayNick(mark.room)}</dd>
+            </div>
+            <div>
+              <dt>{t("v2.tip.tables")}</dt>
+              <dd>{tablesLabel(mark.tables, i18n.language)}</dd>
+            </div>
+          </dl>
         </div>
       ) : locked ? (
         <div className="v2-opt-tip-note">
           <strong>{t("v2.tip.locked", { n: hover.level + 1 })}</strong>
           <p>{t("v2.tip.lockedHint", { cap, need: hover.level + 1 })}</p>
-        </div>
-      ) : mark ? (
-        <div className="v2-opt-tip-who">
-          <span className="v2-opt-cell is-on" style={{ ["--mark" as string]: mark.bg, ["--mark-ink" as string]: mark.fg }}>
-            <span className="v2-opt-face has-n">
-              <b>{mark.t}</b>
-              <i>{mark.tables}</i>
-            </span>
-          </span>
-          <div>
-            <strong>{mark.discord}</strong>
-            <em>{tablesLabel(mark.tables, i18n.language)}</em>
-            <small>
-              {mark.room}
-              <span> · </span>
-              NL {hover.limit}
-            </small>
-          </div>
         </div>
       ) : (
         <div className="v2-opt-tip-note">
@@ -632,7 +794,7 @@ function OptTip({
   );
 }
 
-export function OptField({
+export const OptField = memo(function OptField({
   year,
   monthIndex,
   me,
@@ -653,10 +815,15 @@ export function OptField({
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
-  const propsRef = useRef({ year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin });
-  propsRef.current = { year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin };
-  const tipApi = useRef({ show: (_hit: SlotHit) => {}, hide: () => {} });
-  const clickTimer = useRef(0);
+  const propsRef = useRef({ year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin, busy });
+  propsRef.current = { year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin, busy };
+  const dragRef = useRef<{
+    pointerId: number;
+    mode: "place" | "remove" | "look";
+    origin: SlotHit;
+    endHalf: number;
+  } | null>(null);
+  const tipApi = useRef<TipApi>({ show: () => {}, hide: () => {} });
   const [cet, setCet] = useState<CetStamp>(() => readCet());
   const daysRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
@@ -665,7 +832,7 @@ export function OptField({
     [year, monthIndex, i18n.language],
   );
   const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
-  const mskOffset = playerHourOffset();
+  const clock = usePlayerClock();
   const [slotLook, setSlotLook] = useState(() => loadSlotLook());
   const fillCols = useMemo(
     () => columnFill(grids, limits, capacity, year, monthIndex),
@@ -737,52 +904,106 @@ export function OptField({
     };
   }, [year, monthIndex, days.length, limits, capacity, hidePastDays]);
 
-  const applySeat = (hit: SlotHit, mode: "place" | "remove") => {
+  const applyRange = (origin: SlotHit, endHalf: number, mode: "place" | "remove") => {
     const p = propsRef.current;
     if (!p.canEdit) return;
     const now = readCet();
-    if (isPastSlot(p.year, p.monthIndex, hit.day, hit.half, now)) return;
-    const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
-    if (!levelAllowed(hit.half, hit.level, hoursCaps)) return;
-    const grid = p.grids[hit.limit];
+    const grid = p.grids[origin.limit];
     if (!grid) return;
-    const cell = grid[hit.dayIdx]?.[hit.half];
-    const seats = seatsOf(cell, hit.level + 1);
-    const mine = seats.findIndex((seat) => seat?.t === p.me.t);
-    if (mode === "place") {
-      if (hit.busyLimit && hit.busyLimit !== hit.limit) return;
-      if (seats[hit.level] || mine >= 0) return;
-    } else if (mine !== hit.level) return;
-    p.onGridChange(
-      hit.limit,
-      grid.map((row, r) =>
-        row.map((item, c) =>
-          r === hit.dayIdx && c === hit.half ? toggleSeat(item, p.me, hit.half, hit.level, hoursCaps) : item,
-        ),
-      ),
-    );
+    const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
+    const from = Math.min(origin.half, endHalf);
+    const to = Math.max(origin.half, endHalf);
+    let changed = false;
+    const next = grid.map((row, r) => {
+      if (r !== origin.dayIdx) return row;
+      return row.map((item, half) => {
+        if (half < from || half > to) return item;
+        if (isPastSlot(p.year, p.monthIndex, origin.day, half, now)) return item;
+        if (mode === "place") {
+          const other = p.busy?.[origin.dayIdx]?.[half];
+          if (other && other !== origin.limit) return item;
+        }
+        const stamped = stampSeat(item, p.me, half, origin.level, mode, hoursCaps);
+        const before = seatsOf(item, origin.level + 1)[origin.level];
+        if ((before?.t ?? "") !== (stamped[origin.level]?.t ?? "")) changed = true;
+        return stamped;
+      });
+    });
+    if (!changed) return;
+    p.onGridChange(origin.limit, next);
   };
 
-  const onClick = useCallback((event: MouseEvent<HTMLElement>) => {
+  const inspectHit = (hit: SlotHit, rest: TipPoint) => {
+    const p = propsRef.current;
+    const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
+    const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
+    const mark = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1)[hit.level];
+    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
+      tipApi.current.show(hit, rest);
+      return;
+    }
+    if (mark || locked) tipApi.current.show(hit, rest);
+  };
+
+  const endDrag = (event: PointerEvent<HTMLElement>, apply: boolean) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    hidePick(rootRef.current);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!apply) return;
+    if (drag.mode === "look") {
+      inspectHit(drag.origin, { x: event.clientX, y: event.clientY });
+      return;
+    }
+    applyRange(drag.origin, drag.endHalf, drag.mode);
+  };
+
+  const onPointerDown = useCallback((event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
-    tipApi.current.hide();
     const root = rootRef.current;
     const hit = hitFromEvent(event.target, root, true);
     if (!hit) return;
-    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
-      tipApi.current.show(hit);
-      return;
+    event.preventDefault();
+    tipApi.current.hide();
+    const p = propsRef.current;
+    const now = readCet();
+    const past = isPastSlot(p.year, p.monthIndex, hit.day, hit.half, now);
+    const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
+    const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
+    const seats = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1);
+    const mark = seats[hit.level];
+    const own = isOwnMark(mark, p.me);
+    const busy = Boolean(hit.busyLimit && hit.busyLimit !== hit.limit);
+    let mode: "place" | "remove" | "look" = "look";
+    if (p.canEdit && !past) {
+      if (own) mode = "remove";
+      else if (!mark && !locked && !busy) mode = "place";
     }
-    if (event.detail > 1) return;
-    window.clearTimeout(clickTimer.current);
-    clickTimer.current = window.setTimeout(() => applySeat(hit, "place"), CLICK_WAIT);
+    dragRef.current = { pointerId: event.pointerId, mode, origin: hit, endHalf: hit.half };
+    if (mode !== "look") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      showPick(hit, hit.half, hit.half, mode);
+    }
   }, []);
 
-  const onDoubleClick = useCallback((event: MouseEvent<HTMLElement>) => {
-    window.clearTimeout(clickTimer.current);
-    const hit = hitFromEvent(event.target, rootRef.current);
-    if (!hit) return;
-    applySeat(hit, "remove");
+  const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.mode === "look") return;
+    const endHalf = halfOnLane(drag.origin, event.clientX);
+    if (endHalf === drag.endHalf) return;
+    drag.endHalf = endHalf;
+    showPick(drag.origin, drag.origin.half, endHalf, drag.mode);
+  }, []);
+
+  const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
+    endDrag(event, true);
+  }, []);
+
+  const onPointerCancel = useCallback((event: PointerEvent<HTMLElement>) => {
+    endDrag(event, false);
   }, []);
 
   const onContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
@@ -792,10 +1013,11 @@ export function OptField({
       tipApi.current.hide();
       return;
     }
-    tipApi.current.show(hit);
+    tipApi.current.show(hit, { x: event.clientX, y: event.clientY });
   }, []);
 
   const onPointerOver = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (dragRef.current && dragRef.current.mode !== "look") return;
     const root = rootRef.current;
     if (!root) return;
     const hit = hitFromEvent(event.target, root);
@@ -805,23 +1027,17 @@ export function OptField({
       return;
     }
     applyNav(root, hit);
-    if (
-      root.classList.contains("is-kit") &&
-      root.classList.contains("is-edit") &&
-      hit.busyLimit &&
-      hit.busyLimit !== hit.limit
-    ) {
+    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
       const located = hitFromEvent(event.target, root, true);
       if (located) tipApi.current.show(located);
-    } else if (root.classList.contains("is-kit") && root.classList.contains("is-edit")) {
-      tipApi.current.hide();
     }
   }, []);
 
   const onPointerLeave = useCallback(() => {
+    if (dragRef.current && dragRef.current.mode !== "look") return;
     const root = rootRef.current;
     if (root) applyNav(root, null);
-    if (root?.classList.contains("is-kit") && root.classList.contains("is-edit")) tipApi.current.hide();
+    tipApi.current.hide();
   }, []);
 
   const loadWash = loadGradient(hourLoad?.[limits[0] ?? "50"]);
@@ -836,8 +1052,10 @@ export function OptField({
           ...(skin === "theme" ? {} : lookToVars(slotLook)),
         } as CSSProperties
       }
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onContextMenu={onContextMenu}
       onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
@@ -848,15 +1066,17 @@ export function OptField({
           <div className="v2-opt-nl v2-opt-lab">NL</div>
           <div className="v2-opt-track v2-opt-head v2-mono relative">
             {hours.map((h) => {
-              const msk = (h + mskOffset) % 24;
+              const local = (h + clock.offset) % 24;
               return (
                 <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
                   <b>
                     {h}–{h + 1}
                   </b>
-                  <small title="MSK">
-                    {msk}–{msk + 1 > 24 ? 24 : msk + 1}
-                  </small>
+                  {clock.showLocal ? (
+                    <small title={clock.label}>
+                      {local}–{local + 1 > 24 ? 24 : local + 1}
+                    </small>
+                  ) : null}
                 </span>
               );
             })}
@@ -900,4 +1120,4 @@ export function OptField({
       />
     </section>
   );
-}
+});

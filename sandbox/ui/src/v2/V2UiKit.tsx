@@ -323,6 +323,29 @@ export function V2UiKit() {
           </div>
         </section>
 
+        <section className="rp-kit-sec">
+          <h2>{t("kit.rails")}</h2>
+          <p>{t("kit.railsLead")}</p>
+          <div className="rp-kit-rails">
+            <article className="rp-kit-rail is-staff">
+              <b className="rp-kit-rail-tag">{t("kit.railStaff")}</b>
+              <span>{t("kit.railStaffHint")}</span>
+            </article>
+            <article className="rp-kit-rail is-club">
+              <b>{t("kit.railClub")}</b>
+              <span>Red Party</span>
+            </article>
+            <article className="rp-kit-rail is-discord">
+              <b>{t("kit.railDiscord")}</b>
+              <span>@username</span>
+            </article>
+            <article className="rp-kit-rail is-mail">
+              <b>{t("kit.railMail")}</b>
+              <span>name@mail.com</span>
+            </article>
+          </div>
+        </section>
+
         <section className="rp-kit-sec rp-kit-card-demo is-club">
           <div className="rp-kit-head">{t("kit.card")}</div>
           <div className="rp-kit-row">

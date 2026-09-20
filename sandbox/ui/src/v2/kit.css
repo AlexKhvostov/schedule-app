@@ -508,6 +508,60 @@
   box-shadow: 3px 0 0 var(--yellow) inset, inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
+.rp-kit-rails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rp-kit-rail {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--lift-2);
+}
+
+.rp-kit-rail b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rp-kit-rail span {
+  color: var(--mute);
+  font-size: 11px;
+}
+
+.rp-kit-rail-tag {
+  display: inline-flex;
+  width: max-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.rp-kit-rail.is-staff {
+  box-shadow: 3px 0 0 #00ff99 inset;
+}
+
+.rp-kit-rail.is-club {
+  box-shadow: 3px 0 0 #e11d2e inset;
+}
+
+.rp-kit-rail.is-discord {
+  box-shadow: 3px 0 0 #5865f2 inset;
+}
+
+.rp-kit-rail.is-mail {
+  box-shadow: 3px 0 0 #22d3ee inset;
+}
+
 .rp-kit table thead {
   background: var(--header);
   color: var(--header-foreground);
@@ -541,5 +595,9 @@
   .rp-kit-boards,
   .rp-kit-ramp {
     grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+
+  .rp-kit-rails {
+    grid-template-columns: 1fr;
   }
 }

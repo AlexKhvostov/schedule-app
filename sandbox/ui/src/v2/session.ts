@@ -12,6 +12,9 @@ export type Session = {
   via: AuthVia;
   role: AppRole;
   memberId?: string;
+  markTag?: string | null;
+  markBg?: string;
+  markFg?: string;
 };
 
 export function roleFor(nick: string, memberId?: string): AppRole {
@@ -36,6 +39,9 @@ export function readSession(): Session | null {
       via: parsed.via ?? "email",
       role: parsed.role === "root" || parsed.role === "admin" || parsed.role === "member" ? parsed.role : roleFor(nick, parsed.memberId),
       memberId: parsed.memberId,
+      markTag: parsed.markTag ?? null,
+      markBg: parsed.markBg,
+      markFg: parsed.markFg,
     };
   } catch {
     return null;

@@ -1,5 +1,5 @@
 import { capAt, defaultHourCaps, type HourCaps } from "./capacity";
-import { MARKS, ME, type Mark } from "./marks";
+import { isOwnMark, type Mark } from "./marks";
 
 export type Seat = Mark | null;
 export type Occupancy = Seat[][][];
@@ -55,10 +55,16 @@ export function toggleSeat(
   const cap = capFor(half, hours);
   const size = Math.max(cap, level !== undefined ? level + 1 : 0, cell?.length ?? 0, 2);
   const seats = seatsOf(cell, size);
-  const mine = seats.findIndex((s) => s?.t === me.t);
+  const mine = seats.findIndex((s) => isOwnMark(s, me));
 
   if (level !== undefined) {
-    if (!levelAllowed(half, level, hours)) return seats;
+    if (!levelAllowed(half, level, hours)) {
+      if (mine === level) {
+        seats[level] = null;
+        return seats;
+      }
+      return seats;
+    }
     if (mine === level) {
       seats[level] = null;
       return seats;
@@ -78,40 +84,40 @@ export function toggleSeat(
   return seats;
 }
 
-function paint(occupied: Seat[][], start: number, len: number, mark: Mark) {
-  for (let j = 0; j < len; j += 1) {
-    const i = start + j;
-    if (i >= 0 && i < 48) occupied[i] = [mark, occupied[i]?.[1] ?? null];
+export function stampSeat(
+  cell: Seat[] | undefined,
+  me: Mark,
+  half: number,
+  level: number,
+  mode: "place" | "remove",
+  hours: HourCaps = defaultHourCaps(),
+): Seat[] {
+  const size = Math.max(capFor(half, hours), level + 1, cell?.length ?? 0, 2);
+  const seats = seatsOf(cell, size);
+  const mine = seats.findIndex((s) => isOwnMark(s, me));
+  if (mode === "remove") {
+    if (mine === level) seats[level] = null;
+    return seats;
   }
+  if (!levelAllowed(half, level, hours)) return seats;
+  if (seats[level] || mine >= 0) return seats;
+  seats[level] = { ...me };
+  return seats;
 }
 
-const MINE: Record<string, { days: number[]; start: number; len: number }[]> = {
-  "25": [{ days: [2, 16, 30], start: 16, len: 6 }],
-  "50": [{ days: [3, 8, 14, 18, 25], start: 20, len: 8 }],
-  "100": [{ days: [5, 12, 18, 22], start: 28, len: 6 }],
-  "250": [{ days: [7, 19], start: 8, len: 4 }],
-  "500": [{ days: [11, 27], start: 36, len: 6 }],
-};
-
-export function planMonth(year: number, monthIndex: number, limit = "50"): Occupancy {
-  const last = new Date(year, monthIndex + 1, 0).getDate();
-  return Array.from({ length: last }, (_, i) => {
-    const day = i + 1;
-    const occupied: Seat[][] = Array.from({ length: 48 }, () => [null, null]);
-    paint(occupied, (day * 2) % 6, 6, MARKS[day % MARKS.length]);
-    paint(occupied, 10 + (day % 5), 8, MARKS[(day + 1) % MARKS.length]);
-    paint(occupied, 22 + (day % 4), 6, MARKS[(day + 2) % MARKS.length]);
-    paint(occupied, 32 + (day % 3), 8, MARKS[(day + 3) % MARKS.length]);
-    paint(occupied, 44, 4, MARKS[(day + 4) % MARKS.length]);
-    for (const rule of MINE[limit] ?? []) {
-      if (rule.days.includes(day)) paint(occupied, rule.start, rule.len, ME);
-    }
-    for (let half = 0; half < 48; half += 1) {
-      if (occupied[half][0] && capFor(half) === 2 && (day + half) % 5 === 0) {
-        const extra = MARKS[(day + 5) % MARKS.length];
-        if (extra.t !== occupied[half][0]?.t && extra.t !== ME.t) occupied[half] = [occupied[half][0], extra];
-      }
-    }
-    return occupied;
+export function patchSeat(grid: Occupancy, dayIdx: number, half: number, level: number, seat: Seat): Occupancy {
+  return grid.map((row, r) => {
+    if (r !== dayIdx) return row;
+    return row.map((cell, c) => {
+      if (c !== half) return cell;
+      const next = seatsOf(cell, Math.max(level + 1, 2));
+      next[level] = seat;
+      return next;
+    });
   });
+}
+
+export function emptyMonth(year: number, monthIndex: number): Occupancy {
+  const last = new Date(year, monthIndex + 1, 0).getDate();
+  return Array.from({ length: last }, () => Array.from({ length: 48 }, () => [null, null] as Seat[]));
 }

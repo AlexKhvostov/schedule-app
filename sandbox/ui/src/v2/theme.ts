@@ -24,6 +24,7 @@ export function saveTheme(theme: UiTheme) {
     /* quota */
   }
   applyTheme(theme);
+  window.dispatchEvent(new Event("v2-theme"));
 }
 
 if (typeof document !== "undefined") applyTheme();

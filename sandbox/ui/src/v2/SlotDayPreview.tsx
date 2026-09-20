@@ -1,7 +1,8 @@
-import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { limitTone } from "../schedule/capacity";
 import { MARKS, ME } from "../schedule/marks";
+import { OptLevelLane } from "./OptLevelLane";
+import { ScheduleSlot } from "./ScheduleSlot";
 
 const SLOT_COUNT = 48;
 const PAST_UNTIL = 16;
@@ -29,34 +30,24 @@ function DemoCell({ half, level, mark }: { half: number; level: number; mark?: D
   const past = half < PAST_UNTIL;
   const locked = level === 1 && half >= 44;
   return (
-    <span
-      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${mark ? " is-on" : ""}`}
-      style={mark ? ({ ["--mark"]: mark.bg, ["--mark-ink"]: mark.fg } as CSSProperties) : undefined}
-    >
-      {mark ? (
-        <span className="v2-opt-face has-n">
-          <b>{mark.t}</b>
-          <i>{mark.tables}</i>
-        </span>
-      ) : null}
-    </span>
+    <ScheduleSlot
+      past={past}
+      locked={locked}
+      letters={mark?.t}
+      bg={mark?.bg}
+      fg={mark?.fg}
+      tables={mark?.tables}
+    />
   );
 }
 
 function Lane({ level, marks }: { level: number; marks: Record<number, DemoMark> }) {
   return (
-    <div className="v2-opt-lane">
-      <div className="v2-opt-nl">
-        <span className="v2-limit-chip" style={{ color: limitTone("50") }}>
-          50·{level + 1}
-        </span>
-      </div>
-      <div className="v2-opt-track">
-        {Array.from({ length: SLOT_COUNT }, (_, half) => (
-          <DemoCell key={half} half={half} level={level} mark={marks[half]} />
-        ))}
-      </div>
-    </div>
+    <OptLevelLane label={`50·${level + 1}`} tone={limitTone("50")}>
+      {Array.from({ length: SLOT_COUNT }, (_, half) => (
+        <DemoCell key={half} half={half} level={level} mark={marks[half]} />
+      ))}
+    </OptLevelLane>
   );
 }
 

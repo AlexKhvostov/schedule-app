@@ -18,8 +18,10 @@ export function emptyRoomPlay(roomId = "winamax") {
     id: `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     roomId,
     nick: "",
-    limits: ["50"],
-    kinds: ["nitro"] as ("nitro" | "regular")[],
+    limits: [] as string[],
+    nitroLimits: [] as string[],
+    regularLimits: [] as string[],
+    kinds: [] as ("nitro" | "regular")[],
     nickHistory: [] as { nick: string; at: string }[],
   };
 }

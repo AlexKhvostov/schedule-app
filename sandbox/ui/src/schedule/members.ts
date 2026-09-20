@@ -1,5 +1,6 @@
 import { LIMIT_OPTIONS } from "./capacity";
-import { MARK_CATALOG, RESERVED_TAGS, cssToHex, familyOf, parseMarkHex } from "./markCatalog";
+import { MARK_CATALOG, cssToHex, familyOf, parseMarkHex } from "./markCatalog";
+import { asVip } from "./marks";
 import { emptyRoomPlay } from "./rooms";
 
 export type MemberStatus = "active" | "pending" | "paused" | "archived" | "banned";
@@ -15,8 +16,11 @@ export type MemberMark = {
 };
 
 export type CommunityKind = "school" | "club";
+export type PayKind = "usdt_trc20" | "skrill" | "custom";
+
 export type PayMethod = {
   id: string;
+  kind?: PayKind;
   title: string;
   details: string;
   comment: string;
@@ -33,9 +37,58 @@ export type RoomPlay = {
   roomId: string;
   nick: string;
   limits: string[];
+  nitroLimits?: string[];
+  regularLimits?: string[];
   kinds: ("nitro" | "regular")[];
   nickHistory: NickStamp[];
 };
+
+export function cleanPlayLimits(list: string[] | undefined) {
+  return LIMIT_OPTIONS.filter((limit) => list?.includes(limit));
+}
+
+export function limitsOfKind(play: RoomPlay, kind: "nitro" | "regular") {
+  const named = kind === "nitro" ? play.nitroLimits : play.regularLimits;
+  if (Array.isArray(named)) return cleanPlayLimits(named);
+  if (play.kinds?.includes(kind)) return cleanPlayLimits(play.limits);
+  return [];
+}
+
+export function unionPlayLimits(play: RoomPlay) {
+  return cleanPlayLimits([...limitsOfKind(play, "nitro"), ...limitsOfKind(play, "regular")]);
+}
+
+export function withKindLimits(play: RoomPlay, kind: "nitro" | "regular", limits: string[]): RoomPlay {
+  const nitro = kind === "nitro" ? cleanPlayLimits(limits) : limitsOfKind(play, "nitro");
+  const regular = kind === "regular" ? cleanPlayLimits(limits) : limitsOfKind(play, "regular");
+  const kinds: ("nitro" | "regular")[] = [];
+  if (nitro.length) kinds.push("nitro");
+  if (regular.length) kinds.push("regular");
+  return {
+    ...play,
+    nitroLimits: nitro,
+    regularLimits: regular,
+    limits: cleanPlayLimits([...nitro, ...regular]),
+    kinds,
+  };
+}
+
+export function normalizePlay(play: RoomPlay): RoomPlay {
+  const nitro = limitsOfKind(play, "nitro");
+  const regular = limitsOfKind(play, "regular");
+  const limits = cleanPlayLimits([...nitro, ...regular]);
+  const kinds: ("nitro" | "regular")[] = [];
+  if (nitro.length) kinds.push("nitro");
+  if (regular.length) kinds.push("regular");
+  return {
+    ...play,
+    nitroLimits: nitro,
+    regularLimits: regular,
+    limits,
+    kinds,
+    nickHistory: (play.nickHistory ?? []).map((stamp) => ({ ...stamp })),
+  };
+}
 
 export type ClubMember = {
   id: string;
@@ -51,6 +104,7 @@ export type ClubMember = {
   google?: string;
   phone?: string;
   telegram?: string;
+  contactAlt?: string;
   birthday?: string;
   city?: string;
   country?: string;
@@ -68,7 +122,8 @@ export type ClubMember = {
   status: MemberStatus;
   appAccess: boolean;
   isAdmin?: boolean;
-  vip: number;
+  vipNitro: number;
+  vipRegular: number;
   distance: number;
   mark: MemberMark;
 };
@@ -76,6 +131,7 @@ export type ClubMember = {
 export function emptyPay(primary = false): PayMethod {
   return {
     id: `pay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    kind: "custom",
     title: "",
     details: "",
     comment: "",
@@ -101,7 +157,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     status: "active",
     appAccess: true,
     isAdmin: true,
-    vip: 1,
+    vipNitro: 1,
+    vipRegular: 2,
     distance: 2,
     mark: mark(12, "PL"),
   },
@@ -115,7 +172,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50"],
     status: "active",
     appAccess: true,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 8,
     mark: mark(48, "SV"),
   },
@@ -129,7 +187,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50", "100"],
     status: "active",
     appAccess: true,
-    vip: 2,
+    vipNitro: 2,
+    vipRegular: 1,
     distance: 11,
     mark: mark(88, "OK"),
   },
@@ -159,8 +218,9 @@ export const SEED_MEMBERS: ClubMember[] = [
     tables: 11,
     passwordSet: false,
     pays: [
-      { id: "pay-you-1", title: "Тинькофф", details: "2200 •••• 4412", comment: "", primary: true },
-      { id: "pay-you-2", title: "USDT TRC-20", details: "T…sandbox", comment: "", primary: false },
+      { id: "pay-you-usdt", kind: "usdt_trc20", title: "USDT TRC20", details: "T…sandbox", comment: "", primary: true },
+      { id: "pay-you-skrill", kind: "skrill", title: "Skrill", details: "", comment: "", primary: false },
+      { id: "pay-you-1", kind: "custom", title: "Тинькофф", details: "2200 •••• 4412", comment: "", primary: false },
     ],
     plays: [
       {
@@ -178,7 +238,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50", "100"],
     status: "active",
     appAccess: true,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 14,
     mark: mark(120, "YO"),
   },
@@ -192,7 +253,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["100", "250"],
     status: "active",
     appAccess: true,
-    vip: 3,
+    vipNitro: 3,
+    vipRegular: 0,
     distance: 19,
     mark: mark(152, "AL"),
   },
@@ -207,7 +269,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     status: "pending",
     community: "school",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 27,
     mark: mark(28, "IR"),
   },
@@ -221,7 +284,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50"],
     status: "paused",
     appAccess: true,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 33,
     mark: mark(176, "XP"),
   },
@@ -235,7 +299,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50", "100"],
     status: "archived",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 41,
     mark: mark(64, "LO"),
   },
@@ -249,7 +314,8 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50"],
     status: "banned",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 90,
     mark: mark(4, "GL"),
   },
@@ -267,7 +333,8 @@ export const GUILD_ONLY: ClubMember[] = [
     limits: [],
     status: "active",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 6,
     mark: { colorId: -1, fg: "#111827", t: "", bg: "#6b7280" },
   },
@@ -281,7 +348,8 @@ export const GUILD_ONLY: ClubMember[] = [
     limits: [],
     status: "active",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 18,
     mark: { colorId: -1, fg: "#111827", t: "", bg: "#6b7280" },
   },
@@ -295,7 +363,8 @@ export const GUILD_ONLY: ClubMember[] = [
     limits: [],
     status: "active",
     appAccess: false,
-    vip: 0,
+    vipNitro: 0,
+    vipRegular: 0,
     distance: 3,
     mark: { colorId: -1, fg: "#111827", t: "", bg: "#6b7280" },
   },
@@ -309,12 +378,7 @@ function cloneMember(row: ClubMember): ClubMember {
     nickHistory: [...(row.nickHistory ?? [])],
     pays: (row.pays ?? []).map((item) => ({ ...item })),
     discordRoles: [...(row.discordRoles ?? [])],
-    plays: (row.plays ?? []).map((item) => ({
-      ...item,
-      limits: [...item.limits],
-      kinds: [...item.kinds],
-      nickHistory: (item.nickHistory ?? []).map((stamp) => ({ ...stamp })),
-    })),
+    plays: (row.plays ?? []).map((item) => normalizePlay(item)),
   };
 }
 
@@ -349,10 +413,7 @@ export function hueOfBg(bg: string) {
 export function lettersBlocked(list: ClubMember[], tag: string, exceptId?: string) {
   const needle = tag.trim().toUpperCase();
   if (!needle) return false;
-  if (RESERVED_TAGS.includes(needle)) {
-    return list.find((row) => row.id === exceptId)?.mark.t !== needle;
-  }
-  return list.some((row) => row.id !== exceptId && row.mark.t === needle);
+  return list.some((row) => row.id !== exceptId && row.mark.t.trim().toUpperCase() === needle);
 }
 
 export function comboTakenByMembers(list: ClubMember[], colorId: number, bg: string, fg: string, exceptId?: string) {
@@ -368,9 +429,13 @@ export function comboTakenByMembers(list: ClubMember[], colorId: number, bg: str
   });
 }
 
-export function vipTaken(list: ClubMember[], vip: number, exceptId?: string) {
+export function memberVip(row: Pick<ClubMember, "vipNitro" | "vipRegular">, variant: "nitro" | "regular") {
+  return asVip(variant === "nitro" ? row.vipNitro : row.vipRegular);
+}
+
+export function vipTaken(list: ClubMember[], variant: "nitro" | "regular", vip: number, exceptId?: string) {
   if (!vip) return false;
-  return list.some((row) => row.id !== exceptId && row.vip === vip);
+  return list.some((row) => row.id !== exceptId && memberVip(row, variant) === vip);
 }
 
 function migrateStatus(value: unknown): MemberStatus {
@@ -399,21 +464,23 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
       ? item.nickHistory.filter((stamp) => stamp?.nick).map((stamp) => ({ nick: String(stamp.nick), at: String(stamp.at || "") }))
       : [];
     const fromLegacy = legacyNicks.filter((value) => value !== nick).map((value, i) => ({ nick: value, at: `2026-01-${String(i + 1).padStart(2, "0")}T12:00:00.000Z` }));
-    return {
+    return normalizePlay({
       id: item?.id || `play-${row.id}-${index}`,
       roomId: item?.roomId || "winamax",
       nick,
       limits: (item?.limits ?? row.limits ?? []).filter((limit) => LIMIT_OPTIONS.includes(limit as (typeof LIMIT_OPTIONS)[number])),
+      nitroLimits: item?.nitroLimits,
+      regularLimits: item?.regularLimits,
       kinds: (item?.kinds ?? ["nitro"]).filter((kind) => kind === "nitro" || kind === "regular") as ("nitro" | "regular")[],
       nickHistory: (stamps.length ? stamps : nick ? [{ nick, at: new Date().toISOString() }, ...fromLegacy] : fromLegacy).slice(0, 20),
-    };
+    });
   };
   const plays =
     Array.isArray(row.plays) && row.plays.length
       ? row.plays.map((item, index) => asPlay(item, index, row.room || row.discord || ""))
       : seed?.plays?.length
         ? seed.plays.map((item, index) => asPlay(item, index, row.room || row.discord || ""))
-        : [asPlay({ ...emptyRoomPlay("winamax"), nick: row.room || row.discord || "", limits: row.limits.length ? row.limits : ["50"] }, 0, row.room || row.discord || "")];
+        : [asPlay({ ...emptyRoomPlay("winamax"), nick: row.room || row.discord || "", limits: row.limits }, 0, row.room || row.discord || "")];
   const extraUtc = Number(row.extraUtc ?? seed?.extraUtc ?? 3);
   const tables = Number(row.tables ?? seed?.tables);
   return {
@@ -425,6 +492,7 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
     google: String(row.google ?? seed?.google ?? ""),
     phone: String(row.phone ?? seed?.phone ?? ""),
     telegram: String(row.telegram ?? seed?.telegram ?? ""),
+    contactAlt: String(row.contactAlt ?? seed?.contactAlt ?? ""),
     birthday: String(row.birthday ?? seed?.birthday ?? ""),
     city: String(row.city ?? seed?.city ?? ""),
     country: String(row.country ?? seed?.country ?? ""),
@@ -435,6 +503,8 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
     community: row.community === "school" || row.community === "club" ? row.community : seed?.community === "school" ? "school" : row.status === "pending" ? "school" : "club",
     avatar: String(row.avatar || seed?.avatar || ""),
     tables: Number.isFinite(tables) && tables >= 1 ? Math.min(30, Math.round(tables)) : 1,
+    vipNitro: asVip(row.vipNitro) || asVip((row as ClubMember & { vip?: number }).vip),
+    vipRegular: asVip(row.vipRegular),
     passwordSet: Boolean(row.passwordSet),
     pays,
     plays,
@@ -444,9 +514,68 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
 }
 
 export function memberOfSession(list: ClubMember[], session: { memberId?: string; nick: string }) {
-  if (session.memberId) return list.find((row) => row.id === session.memberId);
+  if (session.memberId) {
+    const byId = list.find((row) => row.id === session.memberId);
+    if (byId) return byId;
+  }
   const nick = session.nick.toLowerCase();
+  if (!nick) return undefined;
   return list.find((row) => row.discord.toLowerCase() === nick || row.email.toLowerCase().startsWith(nick));
+}
+
+/** Бай-ины, которые человек отметил в кабинете у Winamax. */
+export function loadStoredWinamaxLimits(memberId?: string): string[] {
+  if (!memberId) return [];
+  try {
+    const raw = localStorage.getItem(`v2-winamax-limits:${memberId}`);
+    const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+    return LIMIT_OPTIONS.filter((limit) => parsed.includes(limit));
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredWinamaxLimits(memberId: string | undefined, limits: string[]) {
+  if (!memberId) return;
+  localStorage.setItem(
+    `v2-winamax-limits:${memberId}`,
+    JSON.stringify(LIMIT_OPTIONS.filter((limit) => limits.includes(limit))),
+  );
+}
+
+function playsStoreKey(memberId: string) {
+  return `v2-member-plays:${memberId}`;
+}
+
+/** Полный набор румов из кабинета: Nitro/Regular отдельно, ник и история. */
+export function loadStoredPlays(memberId?: string): RoomPlay[] {
+  if (!memberId) return [];
+  try {
+    const raw = localStorage.getItem(playsStoreKey(memberId));
+    const parsed = raw ? (JSON.parse(raw) as RoomPlay[]) : [];
+    if (!Array.isArray(parsed) || !parsed.length) return [];
+    return parsed.map((row) => normalizePlay(row));
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredPlays(memberId: string | undefined, plays: RoomPlay[]) {
+  if (!memberId) return;
+  const cleaned = plays.map((row) => normalizePlay(row));
+  localStorage.setItem(playsStoreKey(memberId), JSON.stringify(cleaned));
+  const winamax = cleaned.find((row) => row.roomId === "winamax");
+  saveStoredWinamaxLimits(memberId, winamax ? unionPlayLimits(winamax) : []);
+}
+
+export function winamaxPlayLimits(session: { memberId?: string; nick: string }): string[] {
+  const row = memberOfSession(loadMembers(), session);
+  const play =
+    row?.plays?.find((item) => item.roomId === "winamax") ??
+    loadStoredPlays(session.memberId).find((item) => item.roomId === "winamax");
+  const stored = loadStoredWinamaxLimits(session.memberId);
+  const raw = play ? unionPlayLimits(play) : stored.length ? stored : row?.limits ?? [];
+  return LIMIT_OPTIONS.filter((limit) => raw.includes(limit));
 }
 
 export function loadMembers(): ClubMember[] {
@@ -461,7 +590,8 @@ export function loadMembers(): ClubMember[] {
                 ...row,
                 limits: (row.limits ?? []).filter((item) => LIMIT_OPTIONS.includes(item as (typeof LIMIT_OPTIONS)[number])),
                 status: migrateStatus(row.status),
-                vip: Number.isInteger(row.vip) && row.vip > 0 ? Number(row.vip) : 0,
+                vipNitro: asVip(row.vipNitro) || asVip((row as ClubMember & { vip?: number }).vip),
+                vipRegular: asVip(row.vipRegular),
                 mark: {
                   colorId: Number.isInteger(row.mark?.colorId) ? row.mark.colorId : -1,
                   bg: typeof row.mark?.bg === "string" && row.mark.bg ? row.mark.bg : MARK_CATALOG[row.mark?.colorId]?.bg,

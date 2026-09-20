@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { CompactField } from "@/components/ui/field";
 import { FloatingPanel } from "@/components/ui/floating-panel";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_SLOT_THEME,
   FILL_TOKEN_GROUPS,
@@ -23,6 +25,10 @@ import {
   type SlotTheme,
 } from "../schedule/slotTheme";
 import { SlotDayPreview } from "./SlotDayPreview";
+import { PersonAvatar } from "./PersonAvatar";
+import { ScheduleSlot } from "./ScheduleSlot";
+import { V2SaveButton } from "./V2SaveButton";
+import { ME } from "../schedule/marks";
 import { type UiTheme } from "./theme";
 import "./shadcn-kit.css";
 
@@ -98,6 +104,9 @@ const MENU = [
   { id: "brand", labelKey: "kitStack.brand" },
   { id: "buttons", labelKey: "kit.buttons" },
   { id: "fields", labelKey: "kit.fields" },
+  { id: "avatars", labelKey: "kit.avatars" },
+  { id: "mark", labelKey: "kit.mark" },
+  { id: "rails", labelKey: "kit.rails" },
 ];
 
 function rgbToHex(input: string) {
@@ -134,16 +143,6 @@ function Swatch({ name, hex, color }: { name: string; hex?: string; color: strin
       <b>{name}</b>
       {hex ? <span>{hex}</span> : null}
     </div>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className="shadcn-kit-field">
-      <span>{label}</span>
-      {children}
-      {hint ? <small>{hint}</small> : null}
-    </label>
   );
 }
 
@@ -364,6 +363,7 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
   const [panel, setPanel] = useState(false);
   const [pos, setPos] = useState({ x: 72, y: 96 });
   const [tick, setTick] = useState(0);
+  const [dirty, setDirty] = useState(true);
   const copy = tone === "game" ? "kitGame" : "kitStack";
   const stackKey = theme === "light" ? "stackLight" : "stackDark";
   const surfaces = tone === "game" ? SURFACES.game : SURFACES[stackKey];
@@ -506,30 +506,69 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
           <h2>{t("kit.fields")}</h2>
           <p>{t(`${copy}.fieldsLead`)}</p>
           <div className="shadcn-kit-states">
-            <Field label={t("kit.name")}>
+            <CompactField label={t("kit.name")}>
               <Input defaultValue="Ярослав" />
-            </Field>
-            <Field label={t("kit.placeholder")}>
+            </CompactField>
+            <CompactField label={t("kit.placeholder")}>
               <Input placeholder="you@club.local" />
-            </Field>
-            <Field label={t("kit.disabled")}>
+            </CompactField>
+            <CompactField label={t("kit.disabled")}>
               <Input disabled defaultValue="you@club.local" />
-            </Field>
-            <Field label={t("kit.error")} hint={t("kit.error")}>
+            </CompactField>
+            <CompactField label={t("kit.error")} hint={t("kit.error")} error>
               <Input className="border-destructive" defaultValue="you@" />
-            </Field>
-            <Field label={t("kit.room")}>
-              <NativeSelect defaultValue="winamax">
+            </CompactField>
+            <CompactField label={t("kit.room")}>
+              <NativeSelect className="w-full" defaultValue="winamax">
                 <option value="winamax">Winamax</option>
                 <option value="stars">PokerStars</option>
               </NativeSelect>
-            </Field>
-            <Field label={t("kit.note")}>
-              <textarea
-                className="h-auto w-full rounded-md border border-input bg-card px-2.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder={t("kit.placeholder")}
-              />
-            </Field>
+            </CompactField>
+            <CompactField label={t("kit.note")}>
+              <Textarea placeholder={t("kit.placeholder")} />
+            </CompactField>
+          </div>
+        </section>
+
+        <section className="shadcn-kit-sec" id="avatars">
+          <h2>{t("kit.avatars")}</h2>
+          <p>{t("kit.avatarsLead")}</p>
+          <div className="shadcn-kit-row items-end">
+            <div className="shadcn-kit-state">
+              <span>sm</span>
+              <PersonAvatar label="YO" size="sm" />
+            </div>
+            <div className="shadcn-kit-state">
+              <span>md</span>
+              <PersonAvatar label="YO" size="md" />
+            </div>
+            <div className="shadcn-kit-state">
+              <span>lg</span>
+              <PersonAvatar label="YO" size="lg" />
+            </div>
+          </div>
+        </section>
+
+        <section className="shadcn-kit-sec" id="mark">
+          <h2>{t("kit.mark")}</h2>
+          <p>{t("kit.markLead")}</p>
+          <div className="shadcn-kit-row">
+            <ScheduleSlot letters={ME.t} bg={ME.bg} fg={ME.fg} tables={ME.tables} />
+            <ScheduleSlot />
+            <ScheduleSlot past letters={ME.t} bg={ME.bg} fg={ME.fg} />
+            <ScheduleSlot locked />
+          </div>
+        </section>
+
+        <section className="shadcn-kit-sec">
+          <h2>{t("kit.saveCtrl")}</h2>
+          <p>{t("kit.saveCtrlLead")}</p>
+          <div className="shadcn-kit-row">
+            <V2SaveButton dirty={dirty} label={t("kit.save")} onClick={() => setDirty(false)} />
+            <V2SaveButton icon dirty={dirty} label={t("kit.save")} onClick={() => setDirty(false)} />
+            <Button size="sm" variant="ghost" onClick={() => setDirty(true)}>
+              {t("kitBlocks.reset")}
+            </Button>
           </div>
         </section>
 
@@ -552,6 +591,29 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
             <span className="text-xs">{t("kit.name")}</span>
             <Separator />
             <span className="text-muted-foreground text-xs">{t("kit.note")}</span>
+          </div>
+        </section>
+
+        <section className="shadcn-kit-sec" id="rails">
+          <h2>{t("kit.rails")}</h2>
+          <p>{t("kit.railsLead")}</p>
+          <div className="shadcn-kit-rails">
+            <article className="shadcn-kit-rail is-staff">
+              <b className="shadcn-kit-rail-tag">{t("kit.railStaff")}</b>
+              <span>{t("kit.railStaffHint")}</span>
+            </article>
+            <article className="shadcn-kit-rail is-club">
+              <b>{t("kit.railClub")}</b>
+              <span>Red Party</span>
+            </article>
+            <article className="shadcn-kit-rail is-discord">
+              <b>{t("kit.railDiscord")}</b>
+              <span>@username</span>
+            </article>
+            <article className="shadcn-kit-rail is-mail">
+              <b>{t("kit.railMail")}</b>
+              <span>name@mail.com</span>
+            </article>
           </div>
         </section>
 
@@ -650,15 +712,15 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
         }
       >
         <div className="grid gap-2">
-          <Field label={t("kit.room")}>
+          <CompactField label={t("kit.room")}>
             <NativeSelect defaultValue="stars" className="w-full">
               <option value="winamax">Winamax</option>
               <option value="stars">PokerStars</option>
             </NativeSelect>
-          </Field>
-          <Field label={t("kit.name")}>
+          </CompactField>
+          <CompactField label={t("kit.name")}>
             <Input placeholder="YouNick" />
-          </Field>
+          </CompactField>
         </div>
       </Dialog>
 
@@ -666,9 +728,9 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
         <FloatingPanel title="FloatingPanel" x={pos.x} y={pos.y} onMove={(x, y) => setPos({ x, y })} onClose={() => setPanel(false)}>
           <p className="text-xs text-muted-foreground">{t(`${copy}.panelLead`)}</p>
           <div className="mt-2 grid gap-2">
-            <Field label={t("kit.name")}>
+            <CompactField label={t("kit.name")}>
               <Input defaultValue="Ярослав" />
-            </Field>
+            </CompactField>
             <Button size="sm">{t("kit.save")}</Button>
           </div>
         </FloatingPanel>

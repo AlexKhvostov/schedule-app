@@ -1,4 +1,9 @@
-export const LIMIT_OPTIONS = ["25", "50", "100", "250", "500"] as const;
+export const LIMIT_OPTIONS = ["0.25", "0.50", "1", "2", "5", "10", "25", "50", "100", "250", "500"] as const;
+
+export function formatLimit(limit: string) {
+  return `${limit.replace(".", ",")} €`;
+}
+
 export const MAX_CAP = 6;
 
 export type HourCaps = number[];
@@ -201,8 +206,8 @@ export function maxLevelsForLimit(capacity: CapacityMap, limit: string) {
   const profile = profileOf(capacity, limit);
   return Math.max(
     maxLevels(profile.hours),
-    ...Object.values(profile.days).map(maxLevels),
-    ...Object.values(profile.weekdays).map(maxLevels),
+    ...(profile.monthOn ? Object.values(profile.days).map(maxLevels) : []),
+    ...(profile.weekOn ? Object.values(profile.weekdays).map(maxLevels) : []),
   );
 }
 

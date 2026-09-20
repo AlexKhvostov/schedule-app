@@ -7,13 +7,15 @@ type Props = {
   y: number;
   width?: number;
   z?: number;
+  compact?: boolean;
+  footer?: ReactNode;
   onMove: (x: number, y: number) => void;
   onFocus: () => void;
   onClose: () => void;
   children: ReactNode;
 };
 
-export function V2Float({ title, x, y, width = 300, z = 40, onMove, onFocus, onClose, children }: Props) {
+export function V2Float({ title, x, y, width = 300, z = 40, compact, footer, onMove, onFocus, onClose, children }: Props) {
   const drag = useRef<{ ox: number; oy: number } | null>(null);
 
   useEffect(() => {
@@ -36,17 +38,17 @@ export function V2Float({ title, x, y, width = 300, z = 40, onMove, onFocus, onC
 
   return createPortal(
     <div
-      className="v2-float fixed flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-md shadow-2xl"
+      className={`v2-float fixed flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-md shadow-2xl${compact ? " is-compact" : ""}`}
       style={{ left: x, top: y, width, zIndex: z }}
       onMouseDown={onFocus}
     >
       <div
-        className="v2-float-head flex h-10 shrink-0 cursor-grab items-center justify-between px-3 active:cursor-grabbing"
+        className={`v2-float-head flex shrink-0 cursor-grab items-center justify-between px-3 active:cursor-grabbing${compact ? " h-8" : " h-10"}`}
         onMouseDown={(event) => {
           drag.current = { ox: event.clientX - x, oy: event.clientY - y };
         }}
       >
-        <h2 className="text-[12px] font-semibold tracking-wide">{title}</h2>
+        <h2 className={`font-semibold tracking-wide${compact ? " text-[11px]" : " text-[12px]"}`}>{title}</h2>
         <button
           type="button"
           className="v2-muted grid h-6 w-6 place-items-center border-0 bg-transparent text-[12px]"
@@ -57,7 +59,8 @@ export function V2Float({ title, x, y, width = 300, z = 40, onMove, onFocus, onC
           <i className="fa-solid fa-xmark" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">{children}</div>
+      <div className={`min-h-0 flex-1 overflow-auto${compact ? " px-1.5 py-1" : " p-3"}`}>{children}</div>
+      {footer}
     </div>,
     document.body,
   );

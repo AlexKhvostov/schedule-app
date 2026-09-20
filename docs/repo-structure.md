@@ -3,8 +3,9 @@
 ```
 schedule-app/
   README.md
-  docs/                      продукт, сущности, стек, UX сетки
-  apps/web/                  боевой Next.js (пока заглушка)
+  docs/                      продукт, сущности, стек, UX сетки, схема БД
+  supabase/                  миграции и seed Postgres
+  apps/web/                  боевой Next.js
   sandbox/ui/                песочница: Vite + React + Tailwind + shadcn
   sandbox/legacy-html/       архив HTML-набросков, не используем
   references/                старые таблицы (в git только README)
@@ -12,6 +13,6 @@ schedule-app/
 
 GitHub: ветка `main`. Папка `references/` с выгрузками таблиц **не публикуется** (см. `.gitignore`).
 
-Порядок работы: вид в `sandbox/ui` → когда устаканится, перенос в `apps/web`.
+Порядок работы: вид и поведение собираем в `sandbox/ui` (это уже живой клубный UI). Когда экран устаканился — те же компоненты в `apps/web`. UI-кит и Блоки в бой как страницы игрока не едут.
 
-Как запустить песочницу и чем она отличается от MVP — [sandbox.md](sandbox.md).
+Как запустить песочницу, что продукт, а что лаборатория — [sandbox.md](sandbox.md).

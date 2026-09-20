@@ -289,6 +289,60 @@
   gap: 8px;
 }
 
+.shadcn-kit-rails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shadcn-kit-rail {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.shadcn-kit-rail b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shadcn-kit-rail span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.shadcn-kit-rail-tag {
+  display: inline-flex;
+  width: max-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.shadcn-kit-rail.is-staff {
+  box-shadow: 3px 0 0 var(--title, #5eead4) inset;
+}
+
+.shadcn-kit-rail.is-club {
+  box-shadow: 3px 0 0 #e11d2e inset;
+}
+
+.shadcn-kit-rail.is-discord {
+  box-shadow: 3px 0 0 #5865f2 inset;
+}
+
+.shadcn-kit-rail.is-mail {
+  box-shadow: 3px 0 0 var(--primary) inset;
+}
+
 .shadcn-kit-states {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

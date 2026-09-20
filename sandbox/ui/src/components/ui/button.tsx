@@ -15,13 +15,13 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground hover:bg-[#c41222]",
       },
       size: {
-        default: "h-8 px-3",
-        sm: "h-7 px-2.5",
+        default: "h-7 px-2.5 text-[13px]",
+        sm: "h-7 px-2 text-[12px]",
         compact: "h-7 px-2.5 text-[13px]",
         icon: "h-7 w-7",
       },
     },
-    defaultVariants: { variant: "default", size: "default" },
+    defaultVariants: { variant: "default", size: "compact" },
   },
 );
 

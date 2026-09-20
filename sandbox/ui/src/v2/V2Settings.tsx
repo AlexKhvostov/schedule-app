@@ -8,12 +8,13 @@ type Props = {
   showTables: boolean;
   showTip: boolean;
   editPulse: boolean;
+  showLocalTime: boolean;
   onDimPast: (value: boolean) => void;
   onHidePastDays: (value: boolean) => void;
   onShowTables: (value: boolean) => void;
   onShowTip: (value: boolean) => void;
   onEditPulse: (value: boolean) => void;
-  onOpenLook: () => void;
+  onShowLocalTime: (value: boolean) => void;
   onClose: () => void;
 };
 
@@ -23,12 +24,13 @@ export function V2Settings({
   showTables,
   showTip,
   editPulse,
+  showLocalTime,
   onDimPast,
   onHidePastDays,
   onShowTables,
   onShowTip,
   onEditPulse,
-  onOpenLook,
+  onShowLocalTime,
   onClose,
 }: Props) {
   const { t } = useTranslation();
@@ -57,6 +59,14 @@ export function V2Settings({
       icon: "fa-eye-slash",
       title: t("schedule.hidePastDays"),
       hint: t("schedule.hidePastDaysHint"),
+    },
+    {
+      key: "local",
+      on: showLocalTime,
+      toggle: () => onShowLocalTime(!showLocalTime),
+      icon: "fa-clock",
+      title: t("schedule.showLocalTime"),
+      hint: t("schedule.showLocalTimeHint"),
     },
     {
       key: "tables",
@@ -88,12 +98,8 @@ export function V2Settings({
     <div className="v2-mine-back" onClick={onClose}>
       <div className="v2-settings" onClick={(event) => event.stopPropagation()}>
         <header className="v2-settings-top">
-          <div>
-            <div className="v2-muted text-[11px] tracking-[0.14em] uppercase">{t("schedule.settings")}</div>
-            <h2 className="mt-1 text-[18px] font-semibold">{t("schedule.settingsTitle")}</h2>
-            <p className="v2-muted mt-1 text-[12px]">{t("schedule.settingsHint")}</p>
-          </div>
-          <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
+          <h2>{t("schedule.settingsTitle")}</h2>
+          <button type="button" className="v2-ctrl w-7 h-7" aria-label="close" onClick={onClose}>
             <i className="fa-solid fa-xmark" />
           </button>
         </header>
@@ -110,16 +116,6 @@ export function V2Settings({
               <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
             </button>
           ))}
-          <button type="button" className="v2-settings-row" onClick={onOpenLook}>
-            <span className="v2-settings-ico" style={{ color: "var(--primary)" }}>
-              <i className="fa-solid fa-palette" />
-            </span>
-            <span className="v2-settings-copy">
-              <b>{t("schedule.slotLookTitle")}</b>
-              <small>{t("schedule.slotLookHint")}</small>
-            </span>
-            <i className="fa-solid fa-chevron-right v2-muted text-[11px]" />
-          </button>
         </div>
       </div>
     </div>,

@@ -3,9 +3,8 @@ import { MARKS, ME } from "./marks";
 export const MARK_FG_DEFAULT = "#111827";
 export const MARK_CATALOG_SIZE = 200;
 export const MARK_SHADES_PER_FAMILY = 5;
-export const MARK_PREVIEW_TAG = "PL";
+export const MARK_PREVIEW_TAG = "AB";
 export const MARK_PREVIEW_TABLES = 12;
-export const RESERVED_TAGS = ["PL"];
 const MIN_INK_CONTRAST = 3.2;
 
 export type MarkColor = {
@@ -279,7 +278,6 @@ export function saveMarkAssigns(map: MarkAssignMap) {
 export function tagTaken(map: MarkAssignMap, tag: string, exceptId?: number) {
   const needle = tag.trim().toUpperCase();
   if (!needle) return false;
-  if (RESERVED_TAGS.includes(needle)) return true;
   return Object.entries(map).some(([id, row]) => Number(id) !== exceptId && row.t === needle);
 }
 

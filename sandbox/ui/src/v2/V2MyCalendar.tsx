@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { playerHourOffset, readCet, isPastDay } from "../schedule/cet";
-import { LIMIT_OPTIONS, limitTone } from "../schedule/capacity";
+import { readCet, isPastDay } from "../schedule/cet";
+import { LIMIT_OPTIONS, formatLimit, limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { downloadCalendarJpeg } from "./calendarJpeg";
 import { loadTheme } from "./theme";
+import { usePlayerClock } from "./usePlayerClock";
 import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
 
 type Props = {
@@ -73,7 +74,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   const [saving, setSaving] = useState(false);
   const [dimPastShifts, setDimPastShifts] = useState(true);
   const [cet] = useState(() => readCet());
-  const mskOffset = playerHourOffset();
+  const playerClock = usePlayerClock();
   const days = useMemo(() => daysInMonth(year, monthIndex, i18n.language), [year, monthIndex, i18n.language]);
   const lanes = useMemo(() => myTimeline(grids, tag), [grids, tag]);
   const runs = useMemo(() => myShifts(grids, tag), [grids, tag]);
@@ -217,7 +218,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
             {usedLimits.map((limit) => (
               <span key={limit} className="v2-mine-legend">
                 <i style={{ background: mineTone(limit) }} />
-                NL {limit}
+                {formatLimit(limit)}
               </span>
             ))}
           </div>
@@ -263,13 +264,17 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
               <span className="v2-tip-cet">
                 {clock(hover.start)} – {clock(hover.end)}
               </span>
-              <span className="v2-muted">{t("v2.tip.msk")}</span>
-              <span>
-                {clock(hover.start, mskOffset)} – {clock(hover.end, mskOffset)}
-              </span>
+              {playerClock.showLocal ? (
+                <>
+                  <span className="v2-muted">{playerClock.label}</span>
+                  <span>
+                    {clock(hover.start, playerClock.offset)} – {clock(hover.end, playerClock.offset)}
+                  </span>
+                </>
+              ) : null}
             </div>
             <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-              NL {hover.limit}
+              {formatLimit(hover.limit)}
             </div>
           </div>,
           document.body,
