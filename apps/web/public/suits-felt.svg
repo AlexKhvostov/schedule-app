@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 560 560">
+  <rect width="560" height="560" fill="#d6d1c9"/>
+  <g font-family="Georgia, 'Times New Roman', serif" font-size="78" text-anchor="middle">
+    <text x="92" y="128" fill="#7a4e58" opacity="0.13">♥</text>
+    <text x="278" y="118" fill="#44505c" opacity="0.1">♠</text>
+    <text x="458" y="136" fill="#7a5344" opacity="0.12">♦</text>
+    <text x="168" y="292" fill="#44505c" opacity="0.1">♣</text>
+    <text x="372" y="308" fill="#7a4e58" opacity="0.12">♥</text>
+    <text x="86" y="468" fill="#44505c" opacity="0.09">♠</text>
+    <text x="268" y="488" fill="#7a5344" opacity="0.11">♦</text>
+    <text x="462" y="458" fill="#44505c" opacity="0.09">♣</text>
+  </g>
+</svg>

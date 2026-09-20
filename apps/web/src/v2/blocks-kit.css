@@ -1,0 +1,66 @@
+.v2-blocks-kit .v2-blocks-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.v2-blocks-kit .v2-blocks-head b {
+  flex: none;
+  color: var(--primary);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.v2-blocks-kit .v2-blocks-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.v2-blocks-stage {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+.v2-blocks-stage > .v2-block,
+.v2-blocks-stage > .v2-cab-card,
+.v2-blocks-stage > .v2-guild-empty,
+.v2-blocks-stage > .v2-mem-filters,
+.v2-blocks-stage > .v2-mark-look {
+  width: min(720px, 100%);
+}
+
+.v2-blocks-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.v2-blocks-marks {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  width: auto;
+}
+
+.v2-blocks-kit .v2-blocks-lane {
+  display: grid;
+  gap: 3px;
+  flex: none;
+  width: max-content;
+  max-width: 100%;
+}
+
+.v2-blocks-kit .v2-blocks-lane .v2-opt-lane {
+  width: max-content;
+  max-width: 100%;
+  grid-template-columns: var(--opt-nl-w) max-content;
+}
+
+.v2-blocks-kit .v2-blocks-lane .v2-opt-track {
+  width: max-content;
+  max-width: none;
+  grid-template-columns: repeat(8, var(--opt-cell-w));
+}

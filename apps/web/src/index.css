@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+}
+
+:root,
+html[data-ui-theme="dark"],
+html.dark {
+  color-scheme: dark;
+  --background: #0e1118;
+  --foreground: #f4f5f7;
+  --card: #151a24;
+  --card-foreground: #f4f5f7;
+  --popover: #1a2030;
+  --popover-foreground: #f4f5f7;
+  --primary: #22d3ee;
+  --primary-foreground: #071014;
+  --primary-hover: #67e8f9;
+  --secondary: #1e2330;
+  --secondary-foreground: #f4f5f7;
+  --muted: #1e2330;
+  --muted-foreground: #9ca3af;
+  --accent: #1e2330;
+  --accent-foreground: #22d3ee;
+  --destructive: #f87171;
+  --destructive-foreground: #1a1010;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --border: #1e2330;
+  --input: #293041;
+  --ring: #22d3ee;
+  --header: #111620;
+  --header-foreground: #c9cdd4;
+  --title: #5eead4;
+  --chrome-from: #1a3344;
+  --chrome-to: #111620;
+  --sidebar: #111620;
+  --sidebar-primary: #22d3ee;
+  --cab-label: #6b7280;
+  --cab-well: #151a24;
+  --cab-well-border: #293041;
+  --cab-head: #111620;
+  --cab-ink: #f4f5f7;
+  --cab-muted: #9ca3af;
+  --radius: 0.5rem;
+  --chart-1: #22d3ee;
+  --chart-2: #38bdf8;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #4ade80;
+  --limit-25: var(--muted-foreground);
+  --limit-50: var(--primary);
+  --limit-100: var(--warning);
+  --limit-250: var(--chart-4);
+  --limit-500: #f472b6;
+  --now: #e11d2e;
+  --app-max: 1120px;
+}
+
+html[data-ui-theme="light"] {
+  color-scheme: light;
+  --background: #eef1f5;
+  --foreground: #111620;
+  --card: #ffffff;
+  --card-foreground: #111620;
+  --popover: #ffffff;
+  --popover-foreground: #111620;
+  --primary: #0e7490;
+  --primary-foreground: #f0fdff;
+  --primary-hover: #155e75;
+  --secondary: #e8ecf1;
+  --secondary-foreground: #111620;
+  --muted: #e8ecf1;
+  --muted-foreground: #5c6570;
+  --accent: #e8ecf1;
+  --accent-foreground: #0e7490;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+  --border: #d5dbe3;
+  --input: #c5ccd6;
+  --ring: #0891b2;
+  --header: #ffffff;
+  --header-foreground: #111620;
+  --title: #0f766e;
+  --chrome-from: #d7f3f6;
+  --chrome-to: #ffffff;
+  --sidebar: #ffffff;
+  --sidebar-primary: #0e7490;
+  --cab-label: #5c6570;
+  --cab-well: #ffffff;
+  --cab-well-border: #c5ccd6;
+  --cab-head: #e8ecf1;
+  --cab-ink: #111620;
+  --cab-muted: #5c6570;
+  --chart-1: #0891b2;
+  --chart-2: #0e7490;
+  --chart-3: #b45309;
+  --chart-4: #7c3aed;
+  --chart-5: #15803d;
+  --limit-25: var(--muted-foreground);
+  --limit-50: var(--primary);
+  --limit-100: var(--warning);
+  --limit-250: var(--chart-4);
+  --limit-500: #be185d;
+  --now: #e11d2e;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-background font-sans text-foreground antialiased;
+  -webkit-font-smoothing: antialiased;
+}

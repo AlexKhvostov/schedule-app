@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabase } from "@/lib/supabase";
-import { loadMember } from "@/lib/session";
+import { getSupabase } from "@/data/client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -14,14 +13,13 @@ export default function AuthCallbackPage() {
       const code = new URLSearchParams(window.location.search).get("code");
       if (db && code) await db.auth.exchangeCodeForSession(code);
       else if (db) await db.auth.getSession();
-      const member = await loadMember();
-      router.replace(!member ? "/" : member.access === "active" ? "/schedule" : "/wait");
+      router.replace("/");
     };
     void run();
   }, [router]);
 
   return (
-    <main className="grid min-h-screen place-items-center text-sm text-[var(--mute)]">
+    <main className="grid min-h-screen place-items-center text-sm text-[var(--muted-foreground)]">
       Входим…
     </main>
   );

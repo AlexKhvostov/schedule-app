@@ -1,0 +1,437 @@
+/* Neutral tokens live on .v2-root.is-kit-base. Layout here; .dark keeps a fallback palette. */
+.shadcn-kit {
+  --radius: 0.625rem;
+  min-height: 100%;
+  padding: 10px 8px 32px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.shadcn-kit.dark {
+  /* Tokens come from .v2-root.is-kit-base. .dark only enables Tailwind dark: variants. */
+}
+
+.shadcn-kit-col {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.shadcn-kit-hero {
+  display: grid;
+  gap: 4px;
+}
+
+.shadcn-kit-hero h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.shadcn-kit-hero p,
+.shadcn-kit-sec > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shadcn-kit-hero small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.shadcn-kit-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 4px 0;
+  background: var(--background);
+}
+
+.shadcn-kit-menu a {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 26px;
+  text-decoration: none;
+}
+
+.shadcn-kit-menu a:hover {
+  border-color: color-mix(in srgb, var(--ring) 40%, var(--border));
+}
+
+.shadcn-kit-stack-demo {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.shadcn-kit-stack-demo span {
+  display: grid;
+  gap: 4px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.shadcn-kit-stack-demo i {
+  display: block;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.shadcn-kit-slot-demo {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.shadcn-kit-day {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 8px;
+  background: var(--background);
+  scrollbar-width: thin;
+}
+
+.shadcn-kit-day .v2-opt-sheet {
+  min-width: max-content;
+}
+
+.shadcn-kit-day .v2-opt {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.shadcn-kit-day .v2-opt-sheet {
+  flex: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 8px;
+}
+
+.shadcn-kit-day .v2-days {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding-bottom: 6px;
+}
+
+.shadcn-kit-day .v2-days-inner {
+  padding-bottom: 4px;
+}
+
+.shadcn-kit-day .v2-opt-hours {
+  z-index: 1;
+}
+
+.shadcn-kit-fills {
+  display: grid;
+  gap: 4px;
+}
+
+.shadcn-kit-fill {
+  display: grid;
+  grid-template-columns: 128px 22px minmax(0, 1fr) 22px 72px;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.shadcn-kit-fill:not(:has(input[type="color"])) {
+  grid-template-columns: 128px 22px minmax(0, 1fr);
+}
+
+.shadcn-kit-fill > span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.shadcn-kit-fill > i {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.shadcn-kit-fill .v2-ctrl {
+  width: 100%;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.shadcn-kit-fill input[type="color"] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  cursor: pointer;
+}
+
+.shadcn-kit-fill-hex {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  text-transform: lowercase;
+}
+
+.shadcn-kit-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.shadcn-kit-tune {
+  display: grid;
+  grid-template-columns: 110px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+.shadcn-kit-tune span,
+.shadcn-kit-tune b {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.shadcn-kit-tune b {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--foreground);
+  text-align: right;
+}
+
+.shadcn-kit-sec {
+  display: grid;
+  gap: 8px;
+  padding: 10px 8px;
+  scroll-margin-top: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+
+.shadcn-kit-sec h2 {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.shadcn-kit-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.shadcn-kit-swatch {
+  display: grid;
+  gap: 4px;
+}
+
+.shadcn-kit-swatch i {
+  display: block;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.8);
+}
+
+.shadcn-kit-swatch b {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.shadcn-kit-swatch span {
+  color: var(--muted-foreground);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+}
+
+.shadcn-kit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shadcn-kit-rails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shadcn-kit-rail {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.shadcn-kit-rail b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shadcn-kit-rail span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.shadcn-kit-rail-tag {
+  display: inline-flex;
+  width: max-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.shadcn-kit-rail.is-staff {
+  box-shadow: 3px 0 0 var(--title, #5eead4) inset;
+}
+
+.shadcn-kit-rail.is-club {
+  box-shadow: 3px 0 0 #e11d2e inset;
+}
+
+.shadcn-kit-rail.is-discord {
+  box-shadow: 3px 0 0 #5865f2 inset;
+}
+
+.shadcn-kit-rail.is-mail {
+  box-shadow: 3px 0 0 var(--primary) inset;
+}
+
+.shadcn-kit-states {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.shadcn-kit-state {
+  display: grid;
+  gap: 4px;
+}
+
+.shadcn-kit-state > span,
+.shadcn-kit-field > span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.shadcn-kit-field {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.shadcn-kit-field > small {
+  color: var(--destructive);
+  font-size: 11px;
+}
+
+.shadcn-kit textarea {
+  min-height: 64px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.shadcn-kit-rules {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+
+.shadcn-kit-rules li::marker {
+  color: var(--primary);
+}
+
+/* Game: same shadcn slots, poker-app tones from the reference shot. */
+.shadcn-kit.is-game {
+  --background: #0b1024;
+  --foreground: #f4f7ff;
+  --card: #151c36;
+  --card-foreground: #f4f7ff;
+  --popover: #1a2344;
+  --popover-foreground: #f4f7ff;
+  --primary: #2ee86a;
+  --primary-foreground: #06210f;
+  --primary-hover: #4dff85;
+  --secondary: #1e2748;
+  --secondary-foreground: #f4f7ff;
+  --muted: #1e2748;
+  --muted-foreground: #8b95b8;
+  --accent: #243056;
+  --accent-foreground: #f4f7ff;
+  --destructive: #ff3b4a;
+  --destructive-foreground: #ffffff;
+  --success: #2ee86a;
+  --warning: #8b6cff;
+  --border: rgb(110 150 255 / 0.18);
+  --input: rgb(110 150 255 / 0.24);
+  --ring: #1ec8ff;
+  --header: #10172e;
+  --header-foreground: #8b95b8;
+  --chart-1: #4d7cff;
+  --chart-2: #2ee86a;
+  --chart-3: #1ec8ff;
+  --chart-4: #8b6cff;
+  --chart-5: #ff3b4a;
+  --sidebar: #10172e;
+  --sidebar-foreground: #f4f7ff;
+  --sidebar-primary: #4d7cff;
+  --sidebar-primary-foreground: #f4f7ff;
+  --sidebar-accent: #1e2748;
+  --sidebar-accent-foreground: #f4f7ff;
+  --sidebar-border: rgb(110 150 255 / 0.18);
+  --sidebar-ring: #1ec8ff;
+  --radius: 0.8rem;
+  background:
+    radial-gradient(900px 320px at 85% -8%, rgb(70 110 255 / 0.28), transparent 58%),
+    radial-gradient(520px 220px at 8% 100%, rgb(46 232 106 / 0.08), transparent 50%),
+    var(--background);
+}
