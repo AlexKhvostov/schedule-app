@@ -37,16 +37,17 @@ export async function loadMember(): Promise<LiveMember | null> {
   };
 }
 
-export async function signInDiscord() {
+export async function signInDiscord(): Promise<{ error: string | null }> {
   const db = getSupabase();
-  if (!db) return { error: "not-configured" };
-  return db.auth.signInWithOAuth({
+  if (!db) return { error: "Нет ключей Supabase." };
+  const { error } = await db.auth.signInWithOAuth({
     provider: "discord",
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
       scopes: "identify email",
     },
   });
+  return { error: error?.message ?? null };
 }
 
 export async function signOut() {
