@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/compact-menu";
 import { Dialog } from "@/components/ui/dialog";
 import { CompactField } from "@/components/ui/field";
 import { FloatingPanel } from "@/components/ui/floating-panel";
@@ -103,6 +104,7 @@ const MENU = [
   { id: "surfaces", labelKey: "kitStack.surfaces" },
   { id: "brand", labelKey: "kitStack.brand" },
   { id: "buttons", labelKey: "kit.buttons" },
+  { id: "menus", labelKey: "kit.menus" },
   { id: "fields", labelKey: "kit.fields" },
   { id: "avatars", labelKey: "kit.avatars" },
   { id: "mark", labelKey: "kit.mark" },
@@ -499,6 +501,23 @@ export function V2ShadcnKit({ tone = "stack", theme = "dark" }: { tone?: "stack"
                 </Button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="shadcn-kit-sec" id="menus">
+          <h2>{t("kit.menus")}</h2>
+          <p>{t("kit.menusLead")}</p>
+          <div className="shadcn-kit-row items-start">
+            <CompactMenu className={`is-kit theme-${theme}`}>
+              <CompactMenuGroup label={t("nav.club")}>
+                <CompactMenuItem icon="fa-users" label={t("nav.adminPeople")} hint={t("nav.adminPeopleHint")} active />
+                <CompactMenuItem icon="fa-sliders" label={t("nav.adminSchedule")} hint={t("nav.adminScheduleHint")} />
+              </CompactMenuGroup>
+              <CompactMenuGroup label={t("nav.root")} tone="root">
+                <CompactMenuItem icon="fa-key" label={t("nav.root")} hint={t("nav.adminRootHint")} />
+                <CompactMenuItem icon="fa-swatchbook" label={t("nav.uikit")} />
+              </CompactMenuGroup>
+            </CompactMenu>
           </div>
         </section>
 

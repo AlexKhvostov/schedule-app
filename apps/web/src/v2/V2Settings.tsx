@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { usePlacedModal } from "./windowPos";
 
 type Props = {
   dimPast: boolean;
@@ -34,6 +35,7 @@ export function V2Settings({
   onClose,
 }: Props) {
   const { t } = useTranslation();
+  const placed = usePlacedModal("settings");
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -95,17 +97,29 @@ export function V2Settings({
   ];
 
   return createPortal(
-    <div className="v2-mine-back" onClick={onClose}>
-      <div className="v2-settings" onClick={(event) => event.stopPropagation()}>
-        <header className="v2-settings-top">
+    <div
+      className="v2-mine-back"
+      onClick={(event) => {
+        if (placed.ignoreBackdropClick(event)) return;
+        onClose();
+      }}
+    >
+      <div
+        ref={placed.panelRef}
+        className="v2-settings"
+        style={placed.style}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="v2-modal-head" {...placed.headProps}>
+          <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
           <h2>{t("schedule.settingsTitle")}</h2>
-          <button type="button" className="v2-ctrl w-7 h-7" aria-label="close" onClick={onClose}>
+          <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
             <i className="fa-solid fa-xmark" />
           </button>
         </header>
         <div className="v2-settings-list">
           {rows.map((row) => (
-            <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} onClick={row.toggle}>
+            <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} onClick={row.toggle}>
               <span className="v2-settings-ico">
                 <i className={`fa-solid ${row.icon}`} />
               </span>

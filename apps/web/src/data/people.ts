@@ -2,7 +2,7 @@ import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { personLabel, type GuildRole } from "./guild";
 
-export type ClubAccess = "closed" | "member" | "admin" | "root";
+export type ClubAccess = "closed" | "member" | "admin" | "staff";
 
 export type AdminPerson = {
   discordId: string;
@@ -98,10 +98,28 @@ function asRoles(value: GuildRole[] | null | unknown): GuildRole[] {
 }
 
 function clubAccess(accessStatus: string | undefined, roles: string[]): ClubAccess {
-  if (roles.includes("root")) return "root";
   if (accessStatus !== "active") return "closed";
   if (roles.includes("admin")) return "admin";
-  return "member";
+  if (roles.includes("member")) return "member";
+  if (roles.includes("staff") || roles.includes("root")) return "staff";
+  return "closed";
+}
+
+export function hasRoot(row: Pick<AdminPerson, "clubRoles">) {
+  return row.clubRoles.includes("root");
+}
+
+export function isPlayerAccess(access: ClubAccess) {
+  return access === "member" || access === "admin";
+}
+
+export function peopleRank(row: Pick<AdminPerson, "bot" | "access" | "clubRoles">) {
+  if (row.bot) return 5;
+  if (hasRoot(row)) return 6;
+  if (row.access === "admin") return 0;
+  if (row.access === "member") return 1;
+  if (row.access === "staff") return 2;
+  return 3;
 }
 
 export function personTitle(row: Pick<AdminPerson, "nick" | "globalName" | "username" | "displayName">) {
@@ -202,15 +220,14 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
 
   people.sort((a, b) => {
     if (a.bot !== b.bot) return a.bot ? 1 : -1;
-    const rank = (access: ClubAccess) => (access === "root" ? 0 : access === "admin" ? 1 : access === "member" ? 2 : 3);
-    const byAccess = rank(a.access) - rank(b.access);
+    const byAccess = peopleRank(a) - peopleRank(b);
     if (byAccess) return byAccess;
     return discordPrimary(a).localeCompare(discordPrimary(b), "ru");
   });
   return people;
 }
 
-export async function setDiscordAccess(discordId: string, access: "closed" | "member" | "admin") {
+export async function setDiscordAccess(discordId: string, access: ClubAccess) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
   const { error } = await db.rpc("set_discord_access", { p_discord_id: discordId, p_access: access });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { CET, formatClock, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
+import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
 import { loadMembers, memberOfSession } from "../schedule/members";
 import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
 import { defaultHourLoad, loadHourLoad, saveHourLoad, type HourLoadMap } from "../schedule/hourLoad";
@@ -20,6 +20,7 @@ import { writeSession, type Session } from "./session";
 import { V2ShadcnKit } from "./V2ShadcnKit";
 import { V2BlocksKit } from "./V2BlocksKit";
 import { PersonAvatar } from "./PersonAvatar";
+import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/compact-menu";
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -38,17 +39,17 @@ function V2HeaderClock() {
   const clock = usePlayerClock();
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000);
+    const id = window.setInterval(() => setNow(new Date()), 15000);
     return () => window.clearInterval(id);
   }, []);
 
   return (
     <div className="v2-clock" title="CET">
-      <span className="v2-clock-time v2-mono">{formatClock(now, CET)}</span>
+      <span className="v2-clock-time v2-mono">{formatHm(now, CET)}</span>
       <span className="v2-clock-tag">CET</span>
       {clock.showLocal ? (
         <>
-          <span className="v2-clock-extra v2-mono">{formatClock(now, tzFromUtcOffset(clock.utc))}</span>
+          <span className="v2-clock-extra v2-mono">{formatHm(now, tzFromUtcOffset(clock.utc))}</span>
           <span className="v2-clock-extra is-label">{clock.label}</span>
         </>
       ) : null}
@@ -232,54 +233,42 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                 </button>
                 {adminOpen &&
                   createPortal(
-                    <div
+                    <CompactMenu
                       ref={adminPaneRef}
-                      className={`v2-staff-menu is-kit theme-${theme}`}
+                      className={`is-kit theme-${theme}`}
                       style={{
                         position: "fixed",
                         top: (adminRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
                         right: window.innerWidth - (adminRef.current?.getBoundingClientRect().right ?? 0),
                       }}
                     >
-                      <div className="v2-staff-group">
-                        <span>{t("nav.club")}</span>
+                      <CompactMenuGroup label={t("nav.club")}>
                         {clubItems.map((item) => (
-                          <button
+                          <CompactMenuItem
                             key={item.key}
-                            type="button"
-                            className={page === item.key ? "is-on" : ""}
+                            icon={item.icon}
+                            label={item.label}
+                            hint={item.hint}
+                            active={page === item.key}
                             onClick={() => goPage(item.key)}
-                          >
-                            <i className={`v2-staff-ico fa-solid ${item.icon}`} />
-                            <span>
-                              <b>{item.label}</b>
-                              {item.hint ? <small>{item.hint}</small> : null}
-                            </span>
-                          </button>
+                          />
                         ))}
-                      </div>
+                      </CompactMenuGroup>
                       {rootItems.length ? (
-                        <div className="v2-staff-group is-root">
-                          <span>{t("nav.root")}</span>
+                        <CompactMenuGroup label={t("nav.root")} tone="root">
                           {rootItems.map((item) => (
-                            <button
+                            <CompactMenuItem
                               key={item.key}
-                              type="button"
-                              className={page === item.key ? "is-on" : ""}
+                              icon={item.icon}
+                              label={item.label}
+                              hint={item.hint}
+                              active={page === item.key}
                               onClick={() => goPage(item.key)}
-                            >
-                              <i
-                                className={`v2-staff-ico ${item.icon.startsWith("fa-brands") ? item.icon : `fa-solid ${item.icon}`}`}
-                              />
-                              <span>
-                                <b>{item.label}</b>
-                                {item.hint ? <small>{item.hint}</small> : null}
-                              </span>
-                            </button>
+                            />
                           ))}
-                        </div>
+                        </CompactMenuGroup>
                       ) : null}
-                    </div>,
+                    </CompactMenu>,
                     document.body,
                   )}
               </div>
@@ -309,7 +298,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                   >
                     <div className="v2-account-who">
                       <b>{nick}</b>
-                      <small>{t(isRoot ? "account.roleRoot" : isAdmin ? "account.roleAdmin" : "account.roleMember")}</small>
+                      <small>{t(isRoot ? "account.roleRoot" : isAdmin ? "account.roleAdmin" : session.role === "staff" ? "account.roleStaff" : "account.roleMember")}</small>
                     </div>
                     <button type="button" className={`v2-account-cab${page === "cabinet" ? " is-on" : ""}`} onClick={() => goPage("cabinet")}>
                       <i className="fa-solid fa-id-card" />
@@ -357,9 +346,6 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                         </div>
                       </div>
                     </div>
-                    <button type="button" className="v2-account-out" onClick={onLogout}>
-                      {t("account.logout")}
-                    </button>
                   </div>,
                   document.body,
                 )}

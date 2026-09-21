@@ -18,7 +18,7 @@ export type LimitProfile = {
 export type CapacityMap = Record<string, LimitProfile>;
 
 export function defaultHourCaps(): HourCaps {
-  return Array.from({ length: 24 }, (_, hour) => (hour >= 22 || hour < 6 ? 2 : 1));
+  return Array.from({ length: 24 }, () => 1);
 }
 
 export function onesHourCaps(): HourCaps {

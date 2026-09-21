@@ -9,6 +9,7 @@ export type Mark = {
   avatarUrl?: string;
   username?: string;
   globalName?: string;
+  guildNick?: string;
   priority?: number | null;
   vipNitro?: number | null;
   vipRegular?: number | null;

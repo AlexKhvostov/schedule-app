@@ -1,8 +1,10 @@
+import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { limitTone } from "../schedule/capacity";
 import { MARKS, ME } from "../schedule/marks";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
 import { ScheduleSlot } from "./ScheduleSlot";
+import { usePlayerClock } from "./usePlayerClock";
 
 const SLOT_COUNT = 48;
 const PAST_UNTIL = 16;
@@ -53,6 +55,7 @@ function Lane({ level, marks }: { level: number; marks: Record<number, DemoMark>
 
 export function SlotDayPreview() {
   const { t } = useTranslation();
+  const clock = usePlayerClock();
   return (
     <div className="shadcn-kit-day">
       <div className="v2-opt is-kit">
@@ -69,15 +72,17 @@ export function SlotDayPreview() {
               <div className="v2-opt-lane">
                 <div className="v2-opt-track v2-opt-head v2-mono relative">
                   {Array.from({ length: 24 }, (_, hour) => {
-                    const msk = (hour + 3) % 24;
+                    const local = (hour + clock.offset) % 24;
                     return (
                       <span key={hour} data-h={hour} className="v2-opt-hour" style={{ gridColumn: `${hour * 2 + 1} / span 2` }}>
                         <b>
                           {hour}–{hour + 1}
                         </b>
-                        <small title="MSK">
-                          {msk}–{msk + 1 > 24 ? 24 : msk + 1}
-                        </small>
+                        {clock.showLocal ? (
+                          <small title={clock.label}>
+                            {local}–{local + 1 > 24 ? 24 : local + 1}
+                          </small>
+                        ) : null}
                       </span>
                     );
                   })}
@@ -87,7 +92,14 @@ export function SlotDayPreview() {
           </div>
           <div className="v2-days">
             <div className="v2-days-inner">
-              <div className="v2-opt-block">
+              <div
+                className="v2-opt-block is-today is-now-cut"
+                style={
+                  {
+                    ["--opt-now"]: `calc(var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${PAST_UNTIL} / ${SLOT_COUNT} + ${PAST_UNTIL} * var(--opt-gap))`,
+                  } as CSSProperties
+                }
+              >
                 <div className="v2-opt-gutter">
                   <div className="v2-opt-day v2-mono">
                     <b>18</b>
@@ -101,6 +113,7 @@ export function SlotDayPreview() {
                   </div>
                 </div>
                 <div className="v2-opt-lanes">
+                  <span className="v2-opt-now" aria-hidden />
                   <div className="v2-opt-limit">
                     <Lane level={0} marks={L0} />
                     <Lane level={1} marks={L1} />

@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { fitFloat } from "./windowPos";
 
 type Props = {
   title: string;
@@ -8,7 +9,6 @@ type Props = {
   width?: number;
   z?: number;
   compact?: boolean;
-  tall?: boolean;
   footer?: ReactNode;
   onMove: (x: number, y: number) => void;
   onFocus: () => void;
@@ -23,7 +23,6 @@ export function V2Float({
   width = 300,
   z = 40,
   compact,
-  tall,
   footer,
   onMove,
   onFocus,
@@ -31,49 +30,62 @@ export function V2Float({
   children,
 }: Props) {
   const drag = useRef<{ ox: number; oy: number } | null>(null);
+  const box = typeof window === "undefined" ? { x, y, width } : fitFloat(x, y, width);
 
-  useEffect(() => {
-    const move = (event: MouseEvent) => {
-      if (!drag.current) return;
-      const nextX = Math.min(window.innerWidth - 80, Math.max(8, event.clientX - drag.current.ox));
-      const nextY = Math.min(window.innerHeight - 48, Math.max(8, event.clientY - drag.current.oy));
-      onMove(nextX, nextY);
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const next = fitFloat(x, y, width);
+    if (next.x !== x || next.y !== y) onMove(next.x, next.y);
+    const onResize = () => {
+      const fitted = fitFloat(x, y, width);
+      if (fitted.x !== x || fitted.y !== y) onMove(fitted.x, fitted.y);
     };
-    const up = () => {
-      drag.current = null;
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, [onMove]);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [x, y, width, onMove]);
+
+  const onPointerDown = (event: PointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+  };
+
+  const onPointerMove = (event: PointerEvent<HTMLElement>) => {
+    if (!drag.current) return;
+    const next = fitFloat(event.clientX - drag.current.ox, event.clientY - drag.current.oy, width);
+    onMove(next.x, next.y);
+  };
+
+  const onPointerUp = () => {
+    drag.current = null;
+  };
 
   return createPortal(
     <div
-      className={`v2-float fixed flex flex-col overflow-hidden rounded-md shadow-2xl${tall ? " max-h-[min(82vh,680px)]" : " max-h-[min(72vh,520px)]"}${compact ? " is-compact" : ""}`}
-      style={{ left: x, top: y, width, zIndex: z }}
-      onMouseDown={onFocus}
+      className={`v2-float${compact ? " is-compact" : ""}`}
+      style={{ left: box.x, top: box.y, width: box.width, zIndex: z }}
+      onPointerDown={onFocus}
     >
-      <div
-        className={`v2-float-head flex shrink-0 cursor-grab items-center justify-between px-3 active:cursor-grabbing${compact ? " h-8" : " h-10"}`}
-        onMouseDown={(event) => {
-          drag.current = { ox: event.clientX - x, oy: event.clientY - y };
-        }}
+      <header
+        className="v2-modal-head"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
-        <h2 className={`font-semibold tracking-wide${compact ? " text-[11px]" : " text-[12px]"}`}>{title}</h2>
+        <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
+        <h2>{title}</h2>
         <button
           type="button"
-          className="v2-muted grid h-6 w-6 place-items-center border-0 bg-transparent text-[12px]"
-          onMouseDown={(event) => event.stopPropagation()}
+          className="v2-modal-close"
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={onClose}
           aria-label="close"
         >
           <i className="fa-solid fa-xmark" />
         </button>
-      </div>
-      <div className={`min-h-0 flex-1 overflow-auto${compact ? " px-1.5 py-1" : " p-3"}`}>{children}</div>
+      </header>
+      <div className="v2-float-body">{children}</div>
       {footer}
     </div>,
     document.body,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
@@ -8,6 +8,7 @@ import { downloadCalendarJpeg } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
+import { usePlacedModal } from "./windowPos";
 
 type Props = {
   year: number;
@@ -67,9 +68,36 @@ function HourCells() {
   );
 }
 
+function useFitScale(ref: RefObject<HTMLElement | null>) {
+  const [box, setBox] = useState({ w: 0, h: 0, scale: 1 });
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const fit = () => {
+      const w = node.offsetWidth;
+      const h = node.offsetHeight;
+      if (!w || !h) return;
+      const pad = 16;
+      const scale = Math.min(1, (window.innerWidth - pad) / w, (window.innerHeight - pad) / h);
+      setBox({ w, h, scale });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(node);
+    window.addEventListener("resize", fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [ref]);
+  return box;
+}
+
 export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const todayRef = useRef<HTMLDivElement>(null);
+  const placed = usePlacedModal("calendar");
+  const mineRef = useRef<HTMLDivElement>(null);
+  const fit = useFitScale(mineRef);
   const [hover, setHover] = useState<Hover | null>(null);
   const [saving, setSaving] = useState(false);
   const [dimPastShifts, setDimPastShifts] = useState(true);
@@ -91,10 +119,6 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  useEffect(() => {
-    todayRef.current?.scrollIntoView({ block: "nearest" });
-  }, []);
-
   const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string) => {
     const box = event.currentTarget.getBoundingClientRect();
     let x = box.right + 8;
@@ -105,11 +129,31 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   };
 
   return createPortal(
-    <div className={`v2-mine-back is-kit theme-${theme}`} onClick={onClose}>
-      <div className={`v2-mine is-kit theme-${theme}`} onClick={(event) => event.stopPropagation()}>
-        <header className="v2-mine-chrome">
+    <div
+      className={`v2-mine-back is-kit theme-${theme}`}
+      onClick={(event) => {
+        if (placed.ignoreBackdropClick(event)) return;
+        onClose();
+      }}
+    >
+      <div
+        ref={placed.panelRef}
+        className="v2-mine-fit"
+        style={{
+          ...(fit.w ? { width: fit.w * fit.scale, height: fit.h * fit.scale } : {}),
+          ...(placed.style ?? {}),
+        }}
+      >
+      <div
+        ref={mineRef}
+        className={`v2-mine is-kit theme-${theme}`}
+        style={fit.scale < 1 ? { transform: `scale(${fit.scale})` } : undefined}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="v2-modal-head" {...placed.headProps}>
+          <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
           <h2>{t("schedule.myCalendar")}</h2>
-          <button type="button" className="v2-ctrl w-8" aria-label="close" onClick={onClose}>
+          <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
             <i className="fa-solid fa-xmark" />
           </button>
         </header>
@@ -154,7 +198,6 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
             return (
               <div
                 key={day.d}
-                ref={isToday ? todayRef : undefined}
                 className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}`}
               >
                 <div className="v2-mine-date v2-mono">
@@ -250,6 +293,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
             {t("schedule.download")}
           </button>
         </footer>
+      </div>
       </div>
 
       {hover &&

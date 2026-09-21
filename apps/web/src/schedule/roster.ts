@@ -23,6 +23,10 @@ export function hoursFromSlots(slots: number) {
   return Math.round((slots / 2) * 10) / 10;
 }
 
+export function formatHours(value: number) {
+  return value.toFixed(1);
+}
+
 type SlotTally = { slots: number; left: number };
 type Tally = { mark: Mark; limit: string; slots: number; left: number };
 

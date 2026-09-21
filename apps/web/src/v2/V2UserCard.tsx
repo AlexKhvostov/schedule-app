@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { formatLimit } from "../schedule/capacity";
-import type { RosterRow } from "../schedule/roster";
+import { formatHours, type RosterRow } from "../schedule/roster";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { loadTheme } from "./theme";
@@ -63,7 +63,9 @@ export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
             <h3 id="v2-user-card-title">{guild}</h3>
             {user ? <p>@{user}</p> : null}
           </div>
-          <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} />
+          <span className="v2-mark-chip">
+            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} />
+          </span>
         </div>
         <p className="v2-user-card-lead">{t("schedule.userCardHint")}</p>
         <div className="v2-club-facts">
@@ -89,17 +91,17 @@ export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
           </div>
           <div className="v2-club-fact">
             <span>{monthLabel}</span>
-            <b>{t("schedule.monthStat", { hours: row.hours, slots: row.slots })}</b>
+            <b>{t("schedule.monthStat", { hours: formatHours(row.hours), slots: row.slots })}</b>
           </div>
           {Object.entries(row.byLimit).map(([limit, stat]) => (
             <div key={limit} className="v2-club-fact">
               <span>{t("schedule.limitCol", { limit: formatLimit(limit) })}</span>
-              <b>{t("schedule.monthStat", { hours: stat.hours, slots: stat.slots })}</b>
+              <b>{t("schedule.limitMonthStat", { marks: stat.slots, hours: formatHours(stat.hours), left: formatHours(stat.left) })}</b>
             </div>
           ))}
           <div className="v2-club-fact">
             <span>{t("schedule.colLeft")}</span>
-            <b>{t("schedule.hoursLeft", { n: row.left })}</b>
+            <b>{t("schedule.hoursLeft", { n: formatHours(row.left) })}</b>
           </div>
         </div>
       </div>

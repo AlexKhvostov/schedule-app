@@ -32,7 +32,7 @@ export function V2Priorities() {
                 <th className="is-nick">{t("priorities.col.nick")}</th>
                 {PRIORITY_MONTHS.map((month) => (
                   <th key={month.key} className="is-num">
-                    <b>{month.label}</b>
+                    <b>{month.label.replace(".20", ".")}</b>
                     <small>×{month.weight}</small>
                   </th>
                 ))}
@@ -45,7 +45,9 @@ export function V2Priorities() {
                   <td className="is-rank">
                     <span className={`v2-prio-rank${row.rank <= 3 ? " is-hot" : ""}`}>{row.rank}</span>
                   </td>
-                  <td className="is-nick">{row.nick}</td>
+                  <td className="is-nick" title={row.nick}>
+                    {row.nick}
+                  </td>
                   {row.months.map((value, index) => (
                     <td key={PRIORITY_MONTHS[index].key} className={`is-num${isZero(value) ? " is-zero" : ""}`}>
                       {value}

@@ -25,6 +25,7 @@ function viaOf(provider?: string | null): AuthVia {
 function roleOf(ids: string[]): AppRole {
   if (ids.includes("root")) return "root";
   if (ids.includes("admin")) return "admin";
+  if (ids.includes("staff")) return "staff";
   return "member";
 }
 

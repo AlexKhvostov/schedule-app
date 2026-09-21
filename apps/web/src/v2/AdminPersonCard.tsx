@@ -6,6 +6,7 @@ import { normalizePlay, type RoomPlay } from "../schedule/members";
 import { emptyRoomPlay } from "../schedule/rooms";
 import {
   discordPrimary,
+  hasRoot,
   saveMemberClub,
   saveMemberDistanceId,
   saveMemberProfile,
@@ -30,13 +31,13 @@ type Props = {
   selfMemberId?: string;
   busy: boolean;
   onClose: () => void;
-  onAccess: (access: "closed" | "member" | "admin") => void;
+  onAccess: (access: ClubAccess) => void;
   onMark: () => void;
   onReload: () => void;
 };
 
 function isClubSeat(row: AdminPerson) {
-  return row.access === "member" || row.access === "admin" || row.access === "root";
+  return row.access === "member" || row.access === "admin";
 }
 
 function guarantorLabel(row: AdminPerson) {
@@ -251,12 +252,12 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const roomNick = activePlay?.nick.trim() || "—";
   const guarantors = guarantorOptions(people, person.memberId, guarantorId);
   const clubRole =
-    person.access === "root"
-      ? t("admin.root.roleRoot")
-      : person.access === "admin"
-        ? t("admin.root.roleAdmin")
-        : person.access === "member"
-          ? t("admin.root.roleMember")
+    person.access === "admin"
+      ? t("admin.root.roleAdmin")
+      : person.access === "member"
+        ? t("admin.root.roleMember")
+        : person.access === "staff"
+          ? t("admin.root.roleStaff")
           : t("admin.people.access.closed");
 
   const patchPlay = (id: string, part: Partial<RoomPlay>) => {
@@ -392,12 +393,17 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
               <div className="v2-cab-body">
                 <AccessSeg
                   value={person.access}
-                  disabled={person.access === "root" || canCloseSelf}
+                  lockedClosed={hasRoot(person) || canCloseSelf}
                   busy={busy}
                   onChange={onAccess}
                 />
-                {person.access === "root" ? <p className="v2-cab-hint">{t("admin.people.rootLocked")}</p> : null}
-                {canCloseSelf && person.access !== "root" ? <p className="v2-cab-hint">{t("admin.people.selfLocked")}</p> : null}
+                {hasRoot(person) ? (
+                  <p className="v2-cab-hint">
+                    <i className="v2-club-root">{t("admin.root.roleRoot")}</i>
+                    {t("admin.people.rootHint")}
+                  </p>
+                ) : null}
+                {canCloseSelf && !hasRoot(person) ? <p className="v2-cab-hint">{t("admin.people.selfLocked")}</p> : null}
               </div>
             </section>
 
@@ -681,25 +687,24 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
 
 function AccessSeg({
   value,
-  disabled,
+  lockedClosed,
   busy,
   onChange,
 }: {
   value: ClubAccess;
-  disabled?: boolean;
+  lockedClosed?: boolean;
   busy?: boolean;
-  onChange: (next: "closed" | "member" | "admin") => void;
+  onChange: (next: ClubAccess) => void;
 }) {
   const { t } = useTranslation();
-  const current = value === "root" ? "admin" : value;
   return (
-    <div className={`v2-club-seg${disabled ? " is-off" : ""}`}>
-      {(["closed", "member", "admin"] as const).map((key) => (
+    <div className="v2-club-seg">
+      {(["closed", "member", "admin", "staff"] as const).map((key) => (
         <button
           key={key}
           type="button"
-          className={current === key ? `is-on is-${key}` : undefined}
-          disabled={disabled || busy || value === "root"}
+          className={value === key ? `is-on is-${key}` : undefined}
+          disabled={busy || (key === "closed" && lockedClosed)}
           onClick={() => onChange(key)}
         >
           {t(`admin.people.access.${key}`)}

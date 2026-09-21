@@ -10,7 +10,7 @@ function hasRole(roles: string[], id: string) {
   return roles.includes(id);
 }
 
-function RoleCard({ role, title, lead }: { role: "member" | "admin" | "root"; title: string; lead: string }) {
+function RoleCard({ role, title, lead }: { role: "member" | "admin" | "staff" | "root"; title: string; lead: string }) {
   return (
     <article className={`v2-role-card is-${role}`}>
       <b>{title}</b>
@@ -24,6 +24,7 @@ function RolePills({ roles, t }: { roles: string[]; t: (key: string) => string }
     <span className="v2-role-pills">
       {hasRole(roles, "member") ? <i className="is-member">{t("admin.root.roleMember")}</i> : null}
       {hasRole(roles, "admin") ? <i className="is-admin">{t("admin.root.roleAdmin")}</i> : null}
+      {hasRole(roles, "staff") ? <i className="is-staff">{t("admin.root.roleStaff")}</i> : null}
       {hasRole(roles, "root") ? <i className="is-root">{t("admin.root.roleRoot")}</i> : null}
     </span>
   );
@@ -110,13 +111,14 @@ export function V2Root() {
         <div className="v2-role-cards">
           <RoleCard role="member" title={t("admin.root.roleMember")} lead={t("admin.root.roleMemberLead")} />
           <RoleCard role="admin" title={t("admin.root.roleAdmin")} lead={t("admin.root.roleAdminLead")} />
+          <RoleCard role="staff" title={t("admin.root.roleStaff")} lead={t("admin.root.roleStaffLead")} />
           <RoleCard role="root" title={t("admin.root.roleRoot")} lead={t("admin.root.roleRootLead")} />
         </div>
         {live ? (
           <ul className="v2-root-admins">
             {(livePeople ?? []).map((row) => {
               const locked = hasRole(row.roles, "root");
-              const on = hasRole(row.roles, "admin") || locked;
+              const on = hasRole(row.roles, "admin");
               return (
                 <li key={row.id}>
                   <label className={locked ? "is-locked" : undefined} title={locked ? t("admin.root.adminLocked") : undefined}>

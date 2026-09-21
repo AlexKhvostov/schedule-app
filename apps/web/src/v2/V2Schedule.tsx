@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
-import { ME, markKey, markLabel, vipOf, type Mark } from "../schedule/marks";
+import { ME, markKey, vipOf, type Mark } from "../schedule/marks";
 import { emptyMonth, patchSeat, type Occupancy } from "../schedule/plan";
 import { readCet } from "../schedule/cet";
-import { rosterFromGrids, type RosterRow } from "../schedule/roster";
-import { fieldFill, columnFill, pctLabel } from "../schedule/analytics";
+import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
+import { fieldFill, columnFill } from "../schedule/analytics";
 import { OptField } from "./OptField";
 import { FillByHourChart } from "./FillByHourChart";
 import { V2Float } from "./V2Float";
@@ -19,6 +19,7 @@ import { showV2Toast } from "./V2Toast";
 import { gridsForCalendar, limitsWithMyMarks, myHoursMatrix, myTimeline } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, savePrefs } from "./prefs";
+import { fitFloat, usePlacedModal, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
 import { saveMemberTables, loadPublicNames } from "../data/people";
@@ -55,10 +56,6 @@ function monthShort(index: number, lang: string) {
   return raw.replace(/\./g, "").replace(/\sг\.?$/i, "");
 }
 
-function playerQuery(row: SchedulePlayer) {
-  return `${row.nick} ${row.markTag} ${row.publicCode}`.toLowerCase();
-}
-
 function isClubCode(value?: string | null) {
   return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
 }
@@ -88,6 +85,19 @@ function faceRoster(rows: RosterRow[]): RosterRow[] {
   });
 }
 
+function whoLines(row: SchedulePlayer) {
+  const server = showNick(row.guildNick);
+  const handle = showNick(row.username) ? `@${row.username}` : "";
+  const discord = showNick(row.globalName) || handle || showNick(row.nick);
+  const title = discord || server || "—";
+  const extra = [server, handle].filter((value) => {
+    if (!value) return false;
+    const bare = value.replace(/^@/, "");
+    return bare.toLowerCase() !== title.replace(/^@/, "").toLowerCase();
+  });
+  return { title, sub: [...new Set(extra)].join(" · ") };
+}
+
 function rowInitials(nick: string, mark: string) {
   const letters = nick.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   const parts = letters.split(/\s+/).filter(Boolean);
@@ -96,87 +106,14 @@ function rowInitials(nick: string, mark: string) {
   return (parts[0] || "?").slice(0, 2).toUpperCase();
 }
 
-function ActAsPicker({
-  players,
-  selfId,
-  actingId,
-  onPick,
-}: {
-  players: SchedulePlayer[];
-  selfId?: string;
-  actingId?: string;
-  onPick: (id: string) => void;
-}) {
-  const { t } = useTranslation();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const current = players.find((row) => row.id === actingId) ?? players.find((row) => row.id === selfId);
-  const needle = query.trim().toLowerCase();
-  const shown = [...players]
-    .sort((a, b) => Number(b.id === selfId) - Number(a.id === selfId) || a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }))
-    .filter((row) => !needle || playerQuery(row).includes(needle));
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [open]);
-
-  if (!players.length) return null;
-
-  return (
-    <div className="v2-mark-dock-who" ref={boxRef}>
-      <span>{t("schedule.actAsLabel")}</span>
-      <button
-        type="button"
-        className={`v2-mark-dock-who-hit${actingId && selfId && actingId !== selfId ? " is-other" : ""}`}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <b>{current ? (current.markTag || "—") : "—"}</b>
-        <em>{current?.nick ?? t("schedule.actAsSelf")}</em>
-        {current && selfId && current.id === selfId ? <small>{t("schedule.actAsSelf")}</small> : null}
-        <i className="fa-solid fa-angle-down" aria-hidden />
-      </button>
-      {open ? (
-        <div className="v2-mark-dock-who-menu">
-          <input
-            value={query}
-            placeholder={t("schedule.actAsSearch")}
-            onChange={(event) => setQuery(event.target.value)}
-            autoFocus
-          />
-          <ul>
-            {shown.length ? (
-              shown.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    className={row.id === actingId ? "is-on" : ""}
-                    onClick={() => {
-                      onPick(row.id);
-                      setQuery("");
-                      setOpen(false);
-                    }}
-                  >
-                    <b>{row.markTag || "—"}</b>
-                    <em>{row.nick}</em>
-                    {row.id === selfId ? <small>{t("schedule.actAsSelf")}</small> : <small>{row.publicCode}</small>}
-                  </button>
-                </li>
-              ))
-            ) : (
-              <li className="is-empty">{t("schedule.actAsEmpty")}</li>
-            )}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  );
+function heatFill(value: number, max: number, tone: "day" | "cell"): CSSProperties | undefined {
+  if (!value || !max) return undefined;
+  const t = Math.min(1, value / max);
+  const color = tone === "day" ? "var(--now, #e11d2e)" : "var(--chart-4, #a78bfa)";
+  return {
+    background: `color-mix(in srgb, ${color} ${Math.round(14 + t * 56)}%, var(--card))`,
+    color: t > 0.55 ? "#fff7f7" : "var(--foreground)",
+  };
 }
 
 function MarkPlanDock({
@@ -210,142 +147,248 @@ function MarkPlanDock({
 }) {
   const { t } = useTranslation();
   const drag = useRef<{ ox: number; oy: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [whoOpen, setWhoOpen] = useState(false);
   const n = Number(tables) || me.tables;
+  const isOther = Boolean(canActAs && actingId && selfId && actingId !== selfId);
+  const shown = [...players].sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
+
+  useEffect(() => {
+    if (!whoOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!boxRef.current?.contains(event.target as Node)) setWhoOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [whoOpen]);
+
+  const startDrag = (event: PointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("button, input, .v2-mark-dock-who-menu")) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+  };
 
   return createPortal(
     <div
-      className={`v2-mark-dock${canActAs && actingId && selfId && actingId !== selfId ? " is-proxy" : ""}`}
-      style={{ left: x, top: y }}
+      ref={boxRef}
+      className={`v2-mark-dock${isOther ? " is-proxy" : ""}`}
+      style={{
+        left: fitFloat(x, y).x,
+        top: fitFloat(x, y).y,
+      }}
       role="dialog"
-      aria-label={t("schedule.editDockTitle")}
+      aria-label={isOther ? t("schedule.editDockAs", { nick: me.discord }) : t("schedule.editDockTitle")}
+      onPointerDown={startDrag}
+      onPointerMove={(event: PointerEvent<HTMLElement>) => {
+        if (!drag.current) return;
+        const next = fitFloat(event.clientX - drag.current.ox, event.clientY - drag.current.oy);
+        onMove(next.x, next.y);
+      }}
+      onPointerUp={() => {
+        drag.current = null;
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+      }}
     >
-      <header
-        className="v2-mark-dock-head"
-        onPointerDown={(event: PointerEvent<HTMLElement>) => {
-          if ((event.target as HTMLElement).closest("input, button, .v2-mark-dock-who")) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { ox: event.clientX - x, oy: event.clientY - y };
-        }}
-        onPointerMove={(event: PointerEvent<HTMLElement>) => {
-          if (!drag.current) return;
-          onMove(
-            Math.min(window.innerWidth - 64, Math.max(8, event.clientX - drag.current.ox)),
-            Math.min(window.innerHeight - 40, Math.max(8, event.clientY - drag.current.oy)),
-          );
-        }}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-      >
-        <div className="v2-mark-dock-title">
-          <i className="fa-solid fa-grip-vertical v2-mark-dock-grip" aria-hidden />
-          <b>
-            {canActAs && actingId && selfId && actingId !== selfId
-              ? t("schedule.editDockAs", { nick: me.discord })
-              : t("schedule.editDockTitle")}
-          </b>
-          <button type="button" className="v2-mark-dock-close" aria-label={t("schedule.editDockDone")} onClick={onClose}>
-            <i className="fa-solid fa-xmark" />
+      <div className="v2-mark-dock-tools">
+        <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
+        {canActAs ? (
+          <button
+            type="button"
+            className={`v2-mark-dock-mark${isOther ? " is-other" : ""}`}
+            title={isOther ? t("schedule.actAsWarn") : t("schedule.actAsLabel")}
+            aria-expanded={whoOpen}
+            onClick={() => setWhoOpen((value) => !value)}
+          >
+            <span className="v2-mark-sample">
+              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
+            </span>
+            {isOther ? <small>{t("schedule.actAsForeign")}</small> : null}
+          </button>
+        ) : (
+          <span className="v2-mark-dock-mark">
+            <span className="v2-mark-sample">
+              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
+            </span>
+          </span>
+        )}
+        <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
+          <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
+            <i className="fa-solid fa-minus" />
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={30}
+            value={tables}
+            onChange={(event) => onDraft(event.target.value)}
+          />
+          <button type="button" aria-label="+1" onClick={() => onBump(1)}>
+            <i className="fa-solid fa-plus" />
           </button>
         </div>
-        <div className="v2-mark-dock-tools">
-          <span className="v2-mark-sample">
-            <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
-          </span>
-          <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
-            <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
-              <i className="fa-solid fa-minus" />
-            </button>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={30}
-              value={tables}
-              onChange={(event) => onDraft(event.target.value)}
-            />
-            <button type="button" aria-label="+1" onClick={() => onBump(1)}>
-              <i className="fa-solid fa-plus" />
-            </button>
-          </div>
-          <span className="v2-mark-dock-tables">{t("schedule.markCardTables")}</span>
-        </div>
-        {canActAs ? (
-          <ActAsPicker players={players} selfId={selfId} actingId={actingId} onPick={onActAs} />
-        ) : null}
         <button type="button" className="v2-mark-dock-done" onClick={onClose}>
           {t("schedule.editDockDone")}
         </button>
-      </header>
+      </div>
+      {whoOpen ? (
+        <div className="v2-mark-dock-who-menu">
+          <ul>
+            {shown.length ? (
+              shown.map((row) => {
+                const names = whoLines(row);
+                return (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      className={row.id === actingId ? "is-on" : ""}
+                      onClick={() => {
+                        onActAs(row.id);
+                        setWhoOpen(false);
+                      }}
+                    >
+                      <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
+                      <span className="v2-mark-sample">
+                        <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} />
+                      </span>
+                      <span className="v2-mark-dock-who-copy">
+                        <b>{names.title}</b>
+                        {names.sub ? <small>{names.sub}</small> : null}
+                      </span>
+                      {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
+                    </button>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="is-empty">{t("schedule.actAsEmpty")}</li>
+            )}
+          </ul>
+        </div>
+      ) : null}
     </div>,
     document.body,
   );
 }
 
-function HoursPanel({ matrix }: { matrix: ReturnType<typeof myHoursMatrix> }) {
+function HoursPanel({ matrix, onClose }: { matrix: ReturnType<typeof myHoursMatrix>; onClose: () => void }) {
   const { t } = useTranslation();
+  const placed = usePlacedModal("hours");
   const cols = matrix.limits;
-  return (
-    <div className="v2-hours-panel">
-      <p className="v2-mark-plan-note">{t("schedule.hoursHint")}</p>
-      <ul className="v2-mark-dock-stat">
-        {cols.map((limit) => {
-          const marks = matrix.counts[limit] || 0;
-          const hours = matrix.totals[limit] || 0;
-          return (
-            <li key={limit} className={marks ? "is-on" : ""}>
-              <b>{formatLimit(limit)}</b>
-              <em>{t("schedule.planMarks", { n: marks })}</em>
-              <i>{t("schedule.meHours", { n: hours })}</i>
-            </li>
-          );
-        })}
-      </ul>
-      {cols.length ? (
-        <div className="v2-mark-plan-scroll">
-          <table className="v2-mark-plan">
-            <thead>
-              <tr>
-                <th>{t("schedule.planDay")}</th>
-                {cols.map((limit) => (
-                  <th key={limit}>{limit}</th>
-                ))}
-                <th className="is-sum">Σ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.hours.map((row, dayIdx) => (
-                <tr key={dayIdx}>
-                  <th>{String(dayIdx + 1).padStart(2, "0")}</th>
+  const cellMax = Math.max(0, ...matrix.hours.flatMap((row) => cols.map((limit) => row[limit] || 0)));
+  const dayMax = Math.max(0, ...matrix.dayTotals);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="v2-mine-back"
+      onClick={(event) => {
+        if (placed.ignoreBackdropClick(event)) return;
+        onClose();
+      }}
+    >
+      <div
+        ref={placed.panelRef}
+        className="v2-hours-modal"
+        style={placed.style}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="v2-modal-head" {...placed.headProps}>
+          <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
+          <h2>{t("schedule.hoursTitle")}</h2>
+          <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </header>
+        {cols.length ? (
+          <div className="v2-hours-body">
+            <div className="v2-hours-sheet">
+              <table className="v2-mark-plan v2-hours-summary">
+                <thead>
+                  <tr>
+                    <th>{t("schedule.hoursStatLimit")}</th>
+                    <th title={t("schedule.hoursStatMarksHint")}>{t("schedule.hoursStatMarks")}</th>
+                    <th title={t("schedule.hoursStatHoursHint")}>{t("schedule.hoursStatHours")}</th>
+                    <th className="is-left" title={t("schedule.hoursStatLeftHint")}>
+                      {t("schedule.hoursStatLeft")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
                   {cols.map((limit) => (
-                    <td key={limit} className={row[limit] ? "is-on" : ""}>
-                      {row[limit] || ""}
-                    </td>
+                    <tr key={limit}>
+                      <th>{formatLimit(limit)}</th>
+                      <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
+                      <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
+                      <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>
+                    </tr>
                   ))}
-                  <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`}>{matrix.dayTotals[dayIdx] || ""}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th>Σ</th>
-                {cols.map((limit) => (
-                  <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
-                    {matrix.totals[limit] || ""}
-                  </td>
-                ))}
-                <td className={`is-sum${matrix.grand ? " is-on" : ""}`}>{matrix.grand || ""}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      ) : (
-        <p className="v2-mark-plan-note">{t("schedule.planLimitsEmpty")}</p>
-      )}
-    </div>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th>{t("schedule.hoursStatTotal")}</th>
+                    <td className={matrix.countGrand ? "is-on" : ""}>{matrix.countGrand || 0}</td>
+                    <td className={matrix.grand ? "is-on" : ""}>{formatHours(matrix.grand || 0)}</td>
+                    <td className={`is-left is-grand${matrix.leftGrand ? " is-on" : ""}`}>{formatHours(matrix.leftGrand || 0)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="v2-hours-sheet v2-hours-month">
+              <table className="v2-mark-plan">
+                <thead>
+                  <tr>
+                    <th>{t("schedule.planDay")}</th>
+                    {cols.map((limit) => (
+                      <th key={limit}>{limit}</th>
+                    ))}
+                    <th className="is-sum">Σ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrix.hours.map((row, dayIdx) => (
+                    <tr key={dayIdx}>
+                      <th>{String(dayIdx + 1).padStart(2, "0")}</th>
+                      {cols.map((limit) => (
+                        <td key={limit} className={row[limit] ? "is-on" : ""} style={heatFill(row[limit] || 0, cellMax, "cell")}>
+                          {row[limit] ? formatHours(row[limit]) : ""}
+                        </td>
+                      ))}
+                      <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`} style={heatFill(matrix.dayTotals[dayIdx] || 0, dayMax, "day")}>
+                        {matrix.dayTotals[dayIdx] ? formatHours(matrix.dayTotals[dayIdx]) : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th>Σ</th>
+                    {cols.map((limit) => (
+                      <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
+                        {matrix.totals[limit] ? formatHours(matrix.totals[limit]) : ""}
+                      </td>
+                    ))}
+                    <td className={`is-sum is-grand${matrix.grand ? " is-on" : ""}`}>{matrix.grand ? formatHours(matrix.grand) : ""}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <p className="v2-mark-plan-note">{t("schedule.planLimitsEmpty")}</p>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -424,10 +467,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
-  const [analyticsPos, setAnalyticsPos] = useState({ x: 760, y: 120 });
-  const [hoursPos, setHoursPos] = useState({ x: 420, y: 120 });
-  const [peoplePos, setPeoplePos] = useState({ x: 1080, y: 160 });
-  const [markPos, setMarkPos] = useState(() => ({
+  const [analyticsPos, setAnalyticsPos] = useWindowPos("analytics", { x: 760, y: 120 });
+  const [peoplePos, setPeoplePos] = useWindowPos("people", { x: 1080, y: 160 });
+  const [markPos, setMarkPos] = useWindowPos("mark-dock", () => ({
     x: typeof window === "undefined" ? 860 : Math.max(8, window.innerWidth - 408),
     y: 72,
   }));
@@ -603,27 +645,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [canEdit, selfId]);
 
   useEffect(() => {
-    if (!canActAs || !canEdit) return;
-    void listSchedulePlayers().then((rows) => {
-      if (selfId && !rows.some((row) => row.id === selfId)) {
-        const self = selfMarkRef.current;
-        rows = [
-          {
-            id: selfId,
-            nick: self.discord,
-            publicCode: self.room,
-            roomNick: self.room,
-            markTag: self.t,
-            markBg: self.bg,
-            markFg: self.fg,
-            tables: self.tables,
-          },
-          ...rows,
-        ];
-      }
-      setPlayers(rows);
-    });
-  }, [canActAs, canEdit]);
+    void listSchedulePlayers().then(setPlayers);
+  }, []);
 
   useEffect(() => {
     if (!markOpen) return;
@@ -663,22 +686,23 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     };
   }, [kind, limits]);
 
-  const roster = useMemo(
-    () =>
-      faceRoster(
-        rosterFromGrids(
-          limits
-            .map((limit) => ({ limit, grid: shownGrids[limit] }))
-            .filter((row): row is { limit: string; grid: Occupancy } => Boolean(row.grid)),
-          year,
-          monthIndex,
-          cetTick,
-          limitMarks ?? undefined,
-          kind,
-        ),
+  const clubPlayerIds = useMemo(() => new Set(players.map((row) => row.id)), [players]);
+  const roster = useMemo(() => {
+    const rows = faceRoster(
+      rosterFromGrids(
+        limits
+          .map((limit) => ({ limit, grid: shownGrids[limit] }))
+          .filter((row): row is { limit: string; grid: Occupancy } => Boolean(row.grid)),
+        year,
+        monthIndex,
+        cetTick,
+        limitMarks ?? undefined,
+        kind,
       ),
-    [shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind],
-  );
+    );
+    if (!isLiveData() || !clubPlayerIds.size) return rows;
+    return rows.filter((row) => !row.mark.memberId || clubPlayerIds.has(row.mark.memberId));
+  }, [shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
 
   useEffect(() => {
     if (!showPeople) {
@@ -695,30 +719,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       alive = false;
     };
   }, [showPeople, roster]);
-  const fill = useMemo(() => {
-    const empty = { pct: 0, taken: 0, seats: 0, futurePct: 0, futureTaken: 0, futureSeats: 0 };
-    return visibleGrids.reduce((acc, grid, index) => {
-      const row = fieldFill(
-        grid,
-        year,
-        monthIndex,
-        cetTick,
-        limits[index] ?? "",
-        undefined,
-        capacity,
-      );
-      acc.taken += row.taken;
-      acc.seats += row.seats;
-      acc.futureTaken += row.futureTaken;
-      acc.futureSeats += row.futureSeats;
-      acc.pct = acc.seats ? acc.taken / acc.seats : 0;
-      acc.futurePct = acc.futureSeats ? acc.futureTaken / acc.futureSeats : 0;
-      return acc;
-    }, empty);
-  }, [visibleGrids, year, monthIndex, cetTick, limits, capacity]);
-  const fillCols = useMemo(
-    () => columnFill(shownGrids, limits, capacity, year, monthIndex),
-    [shownGrids, limits, capacity, year, monthIndex],
+  const fillByLimit = useMemo(
+    () =>
+      limits.flatMap((limit) => {
+        const grid = shownGrids[limit];
+        if (!grid) return [];
+        return [
+          {
+            limit,
+            fill: fieldFill(grid, year, monthIndex, cetTick, limit, undefined, capacity),
+            cols: columnFill(shownGrids, [limit], capacity, year, monthIndex),
+          },
+        ];
+      }),
+    [shownGrids, limits, year, monthIndex, cetTick, capacity],
   );
   const allGrids = useMemo(() => gridsForCalendar(shownGrids, year, monthIndex), [shownGrids, year, monthIndex]);
   const dockLimits = useMemo(() => {
@@ -727,7 +741,36 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const set = new Set([...source, ...marked]);
     return LIMIT_OPTIONS.filter((limit) => set.has(limit));
   }, [playLimits, shownGrids, me, limits]);
-  const hoursMatrix = useMemo(() => myHoursMatrix(shownGrids, me, dockLimits), [shownGrids, me, dockLimits]);
+  const hoursMatrix = useMemo(
+    () => myHoursMatrix(shownGrids, me, dockLimits, { year, monthIndex, cet: cetTick }),
+    [shownGrids, me, dockLimits, year, monthIndex, cetTick],
+  );
+  const actPlayers = useMemo(() => {
+    const known = new Map(players.map((row) => [row.id, row]));
+    const seen = new Set<string>();
+    const rows: SchedulePlayer[] = [];
+    for (const mark of limitMarks ?? []) {
+      const id = mark.memberId;
+      if (!id || !mark.t.trim() || seen.has(id)) continue;
+      seen.add(id);
+      const extra = known.get(id);
+      rows.push({
+        id,
+        nick: extra?.nick || mark.discord,
+        publicCode: extra?.publicCode || mark.room,
+        roomNick: extra?.roomNick || mark.room,
+        markTag: mark.t,
+        markBg: mark.bg,
+        markFg: mark.fg,
+        tables: extra?.tables || mark.tables,
+        avatarUrl: extra?.avatarUrl || mark.avatarUrl,
+        username: extra?.username || mark.username,
+        globalName: extra?.globalName || mark.globalName,
+        guildNick: extra?.guildNick || mark.guildNick,
+      });
+    }
+    return rows.sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
+  }, [limitMarks, players]);
   const busyMap = useMemo(
     () => (isKit && canEdit ? myTimeline(allGrids, me) : undefined),
     [isKit, canEdit, allGrids, me],
@@ -741,9 +784,16 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       return;
     }
     const row = players.find((item) => item.id === id);
-    if (!row) return;
-    const mark = markFromPlayer(row);
-    setActingId(row.id);
+    if (row) {
+      const mark = markFromPlayer(row);
+      setActingId(row.id);
+      setMe(mark);
+      setTablesDraft(String(mark.tables));
+      return;
+    }
+    const mark = (limitMarks ?? []).find((item) => item.memberId === id);
+    if (!mark?.memberId) return;
+    setActingId(mark.memberId);
     setMe(mark);
     setTablesDraft(String(mark.tables));
   };
@@ -1262,7 +1312,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             tables={tablesDraft}
             x={markPos.x}
             y={markPos.y}
-            onMove={(x, y) => setMarkPos({ x, y })}
+            onMove={setMarkPos}
             onBump={bumpTables}
             onDraft={(value) => {
               setTablesDraft(value);
@@ -1275,64 +1325,29 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setCanEdit(false);
             }}
             canActAs={canActAs}
-            players={players}
+            players={actPlayers}
             selfId={selfId}
             actingId={actingId || selfId}
             onActAs={applyActAs}
           />
         ) : null}
-        {showHours && (
-          <V2Float
-            title={t("schedule.hoursTitle")}
-            x={hoursPos.x}
-            y={hoursPos.y}
-            width={Math.min(520, 168 + Math.max(2, hoursMatrix.limits.length) * 52)}
-            compact
-            z={front === "hours" ? 50 : 40}
-            onMove={(x, y) => setHoursPos({ x, y })}
-            onFocus={() => setFront("hours")}
-            onClose={() => setShowHours(false)}
-          >
-            <HoursPanel matrix={hoursMatrix} />
-          </V2Float>
-        )}
+        {showHours ? <HoursPanel matrix={hoursMatrix} onClose={() => setShowHours(false)} /> : null}
         {showAnalytics && (
           <V2Float
             title={t("schedule.analyticsTitle")}
             x={analyticsPos.x}
             y={analyticsPos.y}
             width={560}
-            tall
             z={front === "fill" ? 50 : 40}
-            onMove={(x, y) => setAnalyticsPos({ x, y })}
+            onMove={setAnalyticsPos}
             onFocus={() => setFront("fill")}
             onClose={() => setShowAnalytics(false)}
           >
             <div className="v2-analytics">
-              <div className="v2-analytics-bars">
-                {[
-                  { label: t("schedule.fillAll"), pct: fill.pct, a: fill.taken, b: fill.seats },
-                  { label: t("schedule.fillLeft"), pct: fill.futurePct, a: fill.futureTaken, b: fill.futureSeats },
-                ].map((row) => (
-                  <div key={row.label}>
-                    <div className="mb-1 flex justify-between text-[12px]">
-                      <span>{row.label}</span>
-                      <span className="v2-mono v2-accent">{pctLabel(row.pct)}</span>
-                    </div>
-                    <div className="v2-fill h-1.5 overflow-hidden rounded-full">
-                      <div className="v2-fill-bar h-full" style={{ width: pctLabel(row.pct) }} />
-                    </div>
-                    <div className="v2-muted mt-1 v2-mono text-[11px]">
-                      {row.a} / {row.b}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="v2-analytics-hour">
-                <h3>{t("schedule.fillByHour")}</h3>
-                <p>{t("schedule.fillByHourHint")}</p>
-                <FillByHourChart cols={fillCols} />
-              </div>
+              <p className="v2-analytics-lead">{t("schedule.fillByHourHint")}</p>
+              {fillByLimit.map((row) => (
+                <FillByHourChart key={row.limit} limit={row.limit} cols={row.cols} fill={row.fill} />
+              ))}
             </div>
           </V2Float>
         )}
@@ -1341,23 +1356,36 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             title={t("schedule.playersTitle")}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(580, 252 + Math.max(1, limits.length) * 58)}
+            width={Math.min(640, 240 + Math.max(1, limits.length) * 76)}
             compact
             z={front === "people" ? 50 : 40}
-            onMove={(x, y) => setPeoplePos({ x, y })}
+            onMove={setPeoplePos}
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
           >
             {roster.length ? (
               <table className="v2-people-table">
+                <colgroup>
+                  <col className="v2-people-col-n" />
+                  <col />
+                  <col className="v2-people-col-mark" />
+                  {limits.map((limit) => (
+                    <col key={limit} className="v2-people-col-limit" />
+                  ))}
+                  <col className="v2-people-col-tick" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th title={t("schedule.colRankHint")}>{t("schedule.colRank")}</th>
                     <th>{t("schedule.colPlayer")}</th>
                     <th>{t("schedule.colMark")}</th>
                     {limits.map((limit) => (
-                      <th key={limit} title={t("schedule.limitColHint", { limit: formatLimit(limit) })}>
-                        {limit}
+                      <th
+                        key={limit}
+                        className="v2-people-limit"
+                        title={t("schedule.colHoursHint", { limit: formatLimit(limit) })}
+                      >
+                        {formatLimit(limit)}, {t("schedule.colHoursUnit")}
                       </th>
                     ))}
                     <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
@@ -1399,22 +1427,31 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                           </span>
                         </td>
                         <td>
-                          <span className="v2-people-mark" style={{ background: row.mark.bg, color: row.mark.fg }}>
-                            {markLabel(row.mark.t)}
+                          <span className="v2-mark-chip">
+                            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} />
                           </span>
                         </td>
                         {limits.map((limit) => {
                           const stat = row.byLimit[limit];
+                          const label = formatLimit(limit);
+                          if (!stat) {
+                            return (
+                              <td
+                                key={limit}
+                                className="v2-people-num is-empty"
+                                title={t("schedule.limitEmptyHint", { limit: label })}
+                              >
+                                —
+                              </td>
+                            );
+                          }
                           return (
-                            <td key={limit} className="v2-people-stat">
-                              {stat ? (
-                                <span className="v2-people-lim">
-                                  <b>{stat.slots}</b>
-                                  <small>{t("schedule.hoursShort", { n: stat.hours })}</small>
-                                </span>
-                              ) : (
-                                <span className="v2-people-lim is-empty">—</span>
-                              )}
+                            <td
+                              key={limit}
+                              className="v2-people-num"
+                              title={t("schedule.colHoursHint", { limit: label })}
+                            >
+                              {formatHours(stat.hours)}
                             </td>
                           );
                         })}

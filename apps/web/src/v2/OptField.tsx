@@ -426,8 +426,8 @@ const OptCell = memo(function OptCell({
   );
 });
 
-const OptNowLine = memo(function OptNowLine({ cet }: { cet: CetStamp }) {
-  return <span className="v2-opt-now" style={{ left: nowLineLeft(cet.half, cet.slotProgress) }} aria-hidden />;
+const OptNowLine = memo(function OptNowLine() {
+  return <span className="v2-opt-now" aria-hidden />;
 });
 
 const OptHeadNow = memo(function OptHeadNow({ cet }: { cet: CetStamp }) {
@@ -479,7 +479,8 @@ const OptBody = memo(function OptBody({
             key={day.d}
             ref={today ? todayRef : undefined}
             data-row={dayIdx}
-            className={`v2-opt-block${today ? " is-today" : ""}${day.weekend ? " is-weekend" : ""}${dayPast ? " is-day-past" : ""}`}
+            className={`v2-opt-block${today ? " is-today" : ""}${day.weekend ? " is-weekend" : ""}${dayPast ? " is-day-past" : ""}${today && dimPast ? " is-now-cut" : ""}`}
+            style={today ? ({ ["--opt-now"]: nowLineLeft(cet.half, cet.slotProgress) } as CSSProperties) : undefined}
           >
             <div className="v2-opt-gutter">
               <div className="v2-opt-day v2-mono">
@@ -506,7 +507,7 @@ const OptBody = memo(function OptBody({
               </div>
             </div>
             <div className="v2-opt-lanes">
-              {today && <OptNowLine cet={cet} />}
+              {today && <OptNowLine />}
               {limits.map((limit) => {
                 const row = grids[limit]?.[dayIdx] ?? [];
                 const limitHours = hoursOf(capacity, limit, day.d, weekdayOf(year, monthIndex, day.d));
@@ -596,25 +597,38 @@ const HELP_GROUPS = [
 
 const OptHelp = memo(function OptHelp() {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   return (
-    <section className="v2-opt-help">
-      <div className="v2-opt-help-head">
-        <h3>{t("v2.help.title")}</h3>
-        <p>{t("v2.help.lead")}</p>
-      </div>
-      <div className="v2-opt-help-groups">
-        {HELP_GROUPS.map((group) => (
-          <article key={group.id} className="v2-opt-help-card">
-            <h4>{t(`v2.help.groups.${group.id}`)}</h4>
-            {group.items.map((key) => (
-              <div key={key} className="v2-opt-help-item">
-                <b>{t(`v2.help.${key}.h`)}</b>
-                <p>{t(`v2.help.${key}.p`)}</p>
-              </div>
+    <section className={`v2-opt-help${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="v2-opt-help-toggle"
+        aria-expanded={open}
+        aria-controls="v2-opt-help-body"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <i className="fa-regular fa-circle-question" aria-hidden />
+        <span>{t("v2.help.title")}</span>
+        <i className={`fa-solid fa-angle-down${open ? " is-open" : ""}`} aria-hidden />
+      </button>
+      {open ? (
+        <div className="v2-opt-help-body" id="v2-opt-help-body">
+          <p className="v2-opt-help-lead">{t("v2.help.lead")}</p>
+          <div className="v2-opt-help-groups">
+            {HELP_GROUPS.map((group) => (
+              <article key={group.id} className="v2-opt-help-card">
+                <h4>{t(`v2.help.groups.${group.id}`)}</h4>
+                {group.items.map((key) => (
+                  <div key={key} className="v2-opt-help-item">
+                    <b>{t(`v2.help.${key}.h`)}</b>
+                    <p>{t(`v2.help.${key}.p`)}</p>
+                  </div>
+                ))}
+              </article>
             ))}
-          </article>
-        ))}
-      </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 });

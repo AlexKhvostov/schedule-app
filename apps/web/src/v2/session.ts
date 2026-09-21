@@ -4,7 +4,7 @@ const SESSION_KEY = "v2-session";
 
 export type Access = "active" | "pending" | "profile";
 export type AuthVia = "discord" | "google" | "email" | "magic";
-export type AppRole = "root" | "admin" | "member";
+export type AppRole = "root" | "admin" | "staff" | "member";
 
 export type Session = {
   nick: string;
@@ -38,7 +38,7 @@ export function readSession(): Session | null {
       nick,
       access: parsed.access === "pending" || parsed.access === "profile" ? parsed.access : "active",
       via: parsed.via ?? "email",
-      role: parsed.role === "root" || parsed.role === "admin" || parsed.role === "member" ? parsed.role : roleFor(nick, parsed.memberId),
+      role: parsed.role === "root" || parsed.role === "admin" || parsed.role === "staff" || parsed.role === "member" ? parsed.role : roleFor(nick, parsed.memberId),
       memberId: parsed.memberId,
       markTag: parsed.markTag ?? null,
       markBg: parsed.markBg,

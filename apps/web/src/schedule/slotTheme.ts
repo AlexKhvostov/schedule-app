@@ -53,6 +53,7 @@ export const DEFAULT_SLOT_THEME: SlotTheme = {
   film: 60,
   gray: 0.9,
   fills: {
+    hours: { from: "token", token: "day" },
     timeline: { from: "token", token: "day" },
     day: { from: "token", token: "card" },
     level: { from: "token", token: "card" },
@@ -107,7 +108,10 @@ export function loadSlotTheme(): SlotTheme {
     const raw = localStorage.getItem(SLOT_THEME_KEY);
     if (!raw) return cloneSlotTheme();
     const parsed = JSON.parse(raw) as Partial<SlotTheme>;
-    const fills = parsed.fills && Object.keys(parsed.fills).length > 0 ? parsed.fills : { ...DEFAULT_SLOT_THEME.fills };
+    const fills =
+      parsed.fills && Object.keys(parsed.fills).length > 0
+        ? { ...DEFAULT_SLOT_THEME.fills, ...parsed.fills }
+        : { ...DEFAULT_SLOT_THEME.fills };
     return { ...DEFAULT_SLOT_THEME, ...parsed, fills };
   } catch {
     return cloneSlotTheme();

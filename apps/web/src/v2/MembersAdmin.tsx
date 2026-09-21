@@ -5,10 +5,13 @@ import { CompactField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { isLiveData } from "../data/config";
-import { loadCachedRoster, refreshGuildRoster } from "../data/guild";
+import { refreshGuildRoster } from "../data/guild";
 import {
   discordPrimary,
+  hasRoot,
+  isPlayerAccess,
   listAdminPeople,
+  peopleRank,
   personTitle,
   saveMemberDistanceId,
   saveMemberMark,
@@ -30,7 +33,7 @@ import { loadTheme } from "./theme";
 import { showV2Toast } from "./V2Toast";
 import { V2SaveButton } from "./V2SaveButton";
 
-type StatusFilter = "club" | "all" | "closed" | "member" | "admin" | "bot";
+type StatusFilter = "club" | "member" | "admin" | "staff" | "closed" | "all" | "root" | "bot";
 type SortKey = "access" | "nick" | "joined" | "color";
 
 type RowDraft = {
@@ -251,7 +254,7 @@ function asMarkMember(row: AdminPerson): ClubMember {
     limits: [],
     status: row.access === "closed" ? "pending" : "active",
     appAccess: row.access !== "closed",
-    isAdmin: row.access === "admin" || row.access === "root",
+    isAdmin: row.access === "admin",
     vipNitro: 0,
     vipRegular: 0,
     distance: 0,
@@ -468,17 +471,16 @@ function NickFilter({
   );
 }
 
-export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language.startsWith("en") ? "en" : "ru";
+export function MembersAdmin() {
+  const { t } = useTranslation();
   const selfMemberId = readSession()?.memberId;
   const [list, setList] = useState<AdminPerson[]>([]);
   const [accessMap, setAccessMap] = useState<Map<string, ScheduleAccessKey[]>>(new Map());
   const [roomNicks, setRoomNicks] = useState<Map<string, MemberRoomNick[]>>(new Map());
   const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
   const [busyLoad, setBusyLoad] = useState(true);
+  const [busyGuild, setBusyGuild] = useState(false);
   const [busyId, setBusyId] = useState("");
-  const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [nickQ, setNickQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("club");
   const [sort, setSort] = useState<SortKey>("access");
@@ -494,13 +496,12 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
       setBusyLoad(false);
       return;
     }
-    const [people, roster] = await Promise.all([listAdminPeople(), loadCachedRoster()]);
+    const people = await listAdminPeople();
     const memberIds = people.map((row) => row.memberId).filter((id): id is string => Boolean(id));
     const [map, nicks] = await Promise.all([loadScheduleAccessMap(memberIds), loadMemberRoomNicks(memberIds)]);
     setList(people);
     setAccessMap(map);
     setRoomNicks(nicks);
-    setSyncedAt(roster?.fetchedAt ?? null);
     setBusyLoad(false);
   };
 
@@ -508,8 +509,18 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
     void reload();
   }, []);
 
-  const setAccess = async (row: AdminPerson, access: "closed" | "member" | "admin") => {
-    if (row.access === "root") return;
+  const pullDiscord = async () => {
+    if (busyGuild) return;
+    setBusyGuild(true);
+    const next = await refreshGuildRoster();
+    if (next.error) showV2Toast("err", t(`guild.err.${next.error}.title`));
+    else showV2Toast("ok", t("admin.people.refreshOk"));
+    await reload();
+    setBusyGuild(false);
+  };
+
+  const setAccess = async (row: AdminPerson, access: ClubAccess) => {
+    if (hasRoot(row) && access === "closed") return;
     if (row.memberId && row.memberId === selfMemberId && access === "closed") return;
     setBusyId(row.discordId);
     const result = await setDiscordAccess(row.discordId, access);
@@ -539,10 +550,10 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
     const draft = shownOf(row);
     const saved = savedDraft(row, accessMap);
     if (sameDraft(draft, saved)) return;
-    if (row.access === "root" && draft.access !== "root") return;
+    if (hasRoot(row) && draft.access === "closed") return;
     if (row.memberId === selfMemberId && draft.access === "closed") return;
     setBusyId(row.discordId);
-    if (draft.access !== row.access && row.access !== "root" && draft.access !== "root") {
+    if (draft.access !== row.access) {
       const result = await setDiscordAccess(row.discordId, draft.access);
       if (result.error) {
         showV2Toast("err", t("admin.people.saveErr"));
@@ -605,9 +616,11 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
     const humans = list.filter((row) => !row.bot);
     const closed = humans.filter((row) => row.access === "closed").length;
     const member = humans.filter((row) => row.access === "member").length;
-    const admin = humans.filter((row) => row.access === "admin" || row.access === "root").length;
+    const admin = humans.filter((row) => row.access === "admin").length;
+    const staff = humans.filter((row) => row.access === "staff").length;
+    const root = humans.filter((row) => hasRoot(row)).length;
     const bot = list.filter((row) => row.bot).length;
-    return { all: humans.length + bot, club: member + admin, closed, member, admin, bot };
+    return { all: humans.length + bot, club: member + admin, closed, member, admin, staff, root, bot };
   }, [list]);
 
   const rows = useMemo(() => {
@@ -615,10 +628,12 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
     const copy = people.filter((row) => {
       if (statusFilter === "bot" && !row.bot) return false;
       if (row.bot && statusFilter !== "all" && statusFilter !== "bot") return false;
-      if (statusFilter === "club" && row.access === "closed") return false;
+      if (statusFilter === "club" && !isPlayerAccess(row.access)) return false;
       if (statusFilter === "closed" && row.access !== "closed") return false;
       if (statusFilter === "member" && row.access !== "member") return false;
-      if (statusFilter === "admin" && row.access !== "admin" && row.access !== "root") return false;
+      if (statusFilter === "admin" && row.access !== "admin") return false;
+      if (statusFilter === "staff" && row.access !== "staff") return false;
+      if (statusFilter === "root" && !hasRoot(row)) return false;
       if (!q) return true;
       return [discordPrimary(row), row.username, row.globalName, row.nick, row.discordId, row.publicCode, row.displayName, row.distanceExtId]
         .filter(Boolean)
@@ -630,14 +645,7 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
       if (sort === "joined") return (a.joinedAt ?? "").localeCompare(b.joinedAt ?? "");
       if (sort === "nick") return discordPrimary(a).localeCompare(discordPrimary(b), "ru");
       if (sort === "color") return markHue(a) - markHue(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-      const rank = (row: AdminPerson) => {
-        if (row.bot) return 4;
-        if (row.access === "root") return 0;
-        if (row.access === "admin") return 1;
-        if (row.access === "member") return 2;
-        return 3;
-      };
-      return rank(a) - rank(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
+      return peopleRank(a) - peopleRank(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
     });
     return copy;
   }, [people, nickQ, statusFilter, sort]);
@@ -646,15 +654,22 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
   const profile = list.find((row) => row.discordId === profileFor) ?? null;
 
   return (
-    <div className="v2-people-pad px-5 py-5">
-      <p className="v2-muted max-w-3xl text-[13px] leading-relaxed">{t("admin.people.lead")}</p>
-      {syncedAt ? (
-        <p className="v2-muted mt-1 text-[12px]">
-          {t("guild.synced", {
-            time: new Date(syncedAt).toLocaleString(lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
-          })}
-        </p>
-      ) : null}
+    <div className="v2-people-pad">
+      <div className="v2-people-bar">
+        <h2>{t("nav.adminPeople")}</h2>
+        {isLiveData() ? (
+          <button
+            type="button"
+            className="v2-guild-refresh"
+            disabled={busyGuild}
+            title={t("admin.people.refreshHint")}
+            onClick={() => void pullDiscord()}
+          >
+            <i className={`fa-solid fa-rotate${busyGuild ? " fa-spin" : ""}`} />
+            {busyGuild ? t("admin.people.refreshDiscordBusy") : t("admin.people.refreshDiscord")}
+          </button>
+        ) : null}
+      </div>
 
       {!isLiveData() ? (
         <div className="v2-guild-empty mt-6">
@@ -668,7 +683,7 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
             <NickFilter value={nickQ} onChange={setNickQ} people={people} />
             <CompactField label={t("admin.people.colAccess")}>
               <NativeSelect className="w-full" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                {(["club", "all", "closed", "member", "admin", "bot"] as const).map((key) => (
+                {(["club", "member", "admin", "staff", "closed", "all", "root", "bot"] as const).map((key) => (
                   <option key={key} value={key}>
                     {t(`admin.people.accessFilter.${key}`)} · {counts[key]}
                   </option>
@@ -689,22 +704,6 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
                 <input type="checkbox" checked={showBots} onChange={(event) => setShowBots(event.target.checked)} />
                 <span>{t("admin.people.showBots")}</span>
               </label>
-              {isRoot ? (
-                <button
-                  type="button"
-                  className="v2-guild-refresh"
-                  disabled={busyLoad}
-                  title={t("admin.people.refreshHint")}
-                  aria-label={t("guild.refresh")}
-                  onClick={() => {
-                    setBusyLoad(true);
-                    void refreshGuildRoster().then(() => reload());
-                  }}
-                >
-                  <i className={`fa-solid fa-rotate${busyLoad ? " fa-spin" : ""}`} />
-                  {busyLoad ? t("guild.loading") : t("guild.refresh")}
-                </button>
-              ) : null}
             </div>
           </div>
           <div className="v2-club-scroll">
@@ -741,7 +740,7 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
                 {rows.map((row) => {
                   const draft = shownOf(row);
                   const dirty = !sameDraft(draft, savedDraft(row, accessMap));
-                  const statusLocked = row.access === "root" || row.memberId === selfMemberId;
+                  const closedLocked = hasRoot(row) || row.memberId === selfMemberId;
                   const limitsLocked = row.bot || (!row.memberId && draft.access === "closed");
                   return (
                     <tr key={row.discordId} className={row.access === "closed" || row.bot ? "is-dim" : undefined}>
@@ -775,19 +774,27 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
                       <td>
                         {row.bot ? (
                           <i className="v2-club-bot">{t("admin.people.access.bot")}</i>
-                        ) : row.access === "root" ? (
-                          <i className="v2-club-root">{t("admin.root.roleRoot")}</i>
                         ) : (
-                          <NativeSelect
-                            className="v2-mem-status w-full"
-                            value={draft.access}
-                            disabled={statusLocked || busyId === row.discordId}
-                            onChange={(event) => patchRow(row, { access: event.target.value as ClubAccess })}
-                          >
-                            <option value="closed">{t("admin.people.access.closed")}</option>
-                            <option value="member">{t("admin.people.access.member")}</option>
-                            <option value="admin">{t("admin.people.access.admin")}</option>
-                          </NativeSelect>
+                          <span className="v2-mem-status-cell">
+                            <NativeSelect
+                              className="v2-mem-status w-full"
+                              value={draft.access}
+                              disabled={busyId === row.discordId}
+                              onChange={(event) => {
+                                const next = event.target.value as ClubAccess;
+                                if (next === "closed" && closedLocked) return;
+                                patchRow(row, { access: next });
+                              }}
+                            >
+                              <option value="closed" disabled={closedLocked}>
+                                {t("admin.people.access.closed")}
+                              </option>
+                              <option value="member">{t("admin.people.access.member")}</option>
+                              <option value="admin">{t("admin.people.access.admin")}</option>
+                              <option value="staff">{t("admin.people.access.staff")}</option>
+                            </NativeSelect>
+                            {hasRoot(row) ? <i className="v2-club-root">{t("admin.root.roleRoot")}</i> : null}
+                          </span>
                         )}
                       </td>
                       <td>
@@ -835,7 +842,7 @@ export function MembersAdmin({ isRoot }: { isRoot?: boolean }) {
                 })}
                 {!rows.length && !busyLoad && (
                   <tr>
-                    <td colSpan={7} className="v2-muted py-8 text-center text-[13px]">
+                    <td colSpan={7} className="v2-muted py-4 text-center text-[12px]">
                       {list.length ? t("admin.people.empty") : t("admin.people.noSnapshot")}
                     </td>
                   </tr>

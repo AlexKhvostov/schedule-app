@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
   if (!member) return json({ error: "forbidden" }, 403);
 
   const { data: roles } = await supabase.from("member_roles").select("role_id").eq("member_id", member.id);
-  if (!(roles ?? []).some((row) => row.role_id === "root")) return json({ error: "root-only" }, 403);
+  if (!(roles ?? []).some((row) => row.role_id === "root" || row.role_id === "admin")) return json({ error: "forbidden" }, 403);
 
   const token = Deno.env.get("DISCORD_BOT_TOKEN")?.trim() ?? "";
   const guildId = Deno.env.get("DISCORD_GUILD_ID")?.trim() ?? "";

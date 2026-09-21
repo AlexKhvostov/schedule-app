@@ -32,6 +32,7 @@ export type GuildRoster = {
 export type GuildLoadError =
   | "not-live"
   | "unauthorized"
+  | "forbidden"
   | "root-only"
   | "not-configured"
   | "bot-not-in-guild"
@@ -154,6 +155,7 @@ async function errorCode(error: { message: string; context?: Response }, data: u
   if (
     body === "not-configured" ||
     body === "root-only" ||
+    body === "forbidden" ||
     body === "bot-not-in-guild" ||
     body === "members-intent" ||
     body === "bad-token" ||
@@ -176,6 +178,7 @@ export async function refreshGuildRoster(): Promise<{ roster: GuildRoster | null
     const known =
       code === "not-configured" ||
       code === "root-only" ||
+      code === "forbidden" ||
       code === "bot-not-in-guild" ||
       code === "members-intent" ||
       code === "bad-token" ||

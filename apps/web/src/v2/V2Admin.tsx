@@ -90,13 +90,13 @@ function FoldHead({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={`v2-fold-head flex items-center gap-4 px-5 py-4${open ? " is-open" : ""}`}>
-      <div className="min-w-0 flex-1">
-        <span className="v2-admin-kicker block text-[11px] tracking-[0.16em] uppercase">{kicker}</span>
-        <h2 className="mt-1 text-[18px] font-semibold">{title}</h2>
-        {open && lead && <p className="v2-muted mt-2 max-w-3xl text-[13px] leading-relaxed">{lead}</p>}
+    <div className={`v2-fold-head${open ? " is-open" : ""}`}>
+      <div className="v2-fold-copy">
+        <span className="v2-admin-kicker">{kicker}</span>
+        <h2>{title}</h2>
+        {open && lead ? <p className="v2-fold-lead">{lead}</p> : null}
       </div>
-      <button type="button" className="v2-ctrl shrink-0 px-4" onClick={onToggle}>
+      <button type="button" className="v2-ctrl v2-fold-btn" onClick={onToggle}>
         {open ? t("admin.fold.close") : t("admin.fold.open")}
       </button>
     </div>
@@ -260,16 +260,18 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   };
 
   return (
-    <div className="v2-ink mx-auto w-full px-6 py-8">
-      <header className="mb-8">
+    <div className="v2-ink v2-admin-page">
+      {section !== "people" ? (
+      <header className="v2-admin-page-head">
         <span className="v2-admin-kicker">{section === "root" ? t("nav.root") : t("nav.club")}</span>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-          {section === "schedule" ? t("nav.adminSchedule") : section === "root" ? t("admin.root.title") : t("nav.adminPeople")}
+        <h1>
+          {section === "schedule" ? t("nav.adminSchedule") : t("admin.root.title")}
         </h1>
-        <p className="v2-muted mt-2 max-w-3xl text-[13px] leading-relaxed">
-          {section === "schedule" ? t("admin.scheduleLead") : section === "root" ? t("admin.root.lead") : t("admin.people.foldLead")}
+        <p>
+          {section === "schedule" ? t("admin.scheduleLead") : t("admin.root.lead")}
         </p>
       </header>
+      ) : null}
 
       {section === "root" && isRoot ? (
         <section className="v2-admin-card">
@@ -326,7 +328,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
             <p className="v2-muted mt-2 px-1 text-[10px] leading-relaxed">{t("admin.capacity.resetLimitHint")}</p>
           </aside>
 
-          <div className="min-w-0 flex-1 px-5 py-5">
+          <div className="min-w-0 flex-1 v2-cap-body">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="v2-seg">
                 <button type="button" className={tab === "week" ? "is-on" : ""} onClick={() => setTab("week")}>
@@ -538,7 +540,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
               </button>
             ))}
           </aside>
-          <div className="min-w-0 flex-1 px-5 py-5">
+          <div className="min-w-0 flex-1 v2-cap-body">
             <div className="v2-load-legend v2-muted">
               <span>{t("admin.load.legend")}</span>
               {LOAD_PASTELS.filter((tone) => tone.color).map((tone) => (
@@ -608,7 +610,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
 
       {section === "people" ? (
       <section className="v2-admin-card">
-        <MembersAdmin isRoot={isRoot} />
+        <MembersAdmin />
       </section>
       ) : null}
     </div>
