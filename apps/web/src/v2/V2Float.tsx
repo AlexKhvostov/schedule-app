@@ -9,6 +9,7 @@ type Props = {
   width?: number;
   z?: number;
   compact?: boolean;
+  className?: string;
   footer?: ReactNode;
   onMove: (x: number, y: number) => void;
   onFocus: () => void;
@@ -23,6 +24,7 @@ export function V2Float({
   width = 300,
   z = 40,
   compact,
+  className,
   footer,
   onMove,
   onFocus,
@@ -62,7 +64,7 @@ export function V2Float({
 
   return createPortal(
     <div
-      className={`v2-float${compact ? " is-compact" : ""}`}
+      className={`v2-float${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
       style={{ left: box.x, top: box.y, width: box.width, zIndex: z }}
       onPointerDown={onFocus}
     >

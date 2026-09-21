@@ -21,6 +21,7 @@ import {
 } from "../data/people";
 import { loadMemberRoomNicks, type MemberRoomNick } from "../data/plays";
 import { loadScheduleAccessMap, saveScheduleAccess, type ScheduleAccessKey } from "../data/scheduleAccess";
+import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
 import { LIMIT_OPTIONS, formatLimit } from "../schedule/capacity";
 import { roomName } from "../schedule/rooms";
 import { bestInk, cssToHex, parseMarkHex } from "../schedule/markCatalog";
@@ -309,11 +310,13 @@ function ColorWell({
 function MarkModal({
   member,
   list,
+  showTables = false,
   onClose,
   onSave,
 }: {
   member: ClubMember;
   list: ClubMember[];
+  showTables?: boolean;
   onClose: () => void;
   onSave: (mark: ClubMember["mark"]) => void;
 }) {
@@ -338,7 +341,7 @@ function MarkModal({
           <div className="v2-mem-step">
             <span>{t("admin.marks.slot")}</span>
             <span className="v2-opt is-kit v2-mark-sample">
-              <ScheduleSlot letters={letters} bg={bg} fg={fg} tables={member.tables ?? 12} />
+              <ScheduleSlot letters={letters} bg={bg} fg={fg} tables={member.tables ?? 12} showTables={showTables} />
             </span>
           </div>
           <div className="v2-mem-step v2-mark-letters">
@@ -363,6 +366,7 @@ function MarkModal({
             pastLabel={t("admin.marks.previewPast")}
             futureLabel={t("admin.marks.previewFuture")}
             lead={t("admin.marks.previewLead")}
+            showTables={showTables}
           />
         </div>
         <div className="v2-mem-apply">
@@ -487,6 +491,7 @@ export function MembersAdmin() {
   const [showBots, setShowBots] = useState(false);
   const [markFor, setMarkFor] = useState<string | null>(null);
   const [profileFor, setProfileFor] = useState<string | null>(null);
+  const [countTables, setCountTables] = useState(false);
 
   const reload = async () => {
     if (!isLiveData()) {
@@ -507,6 +512,21 @@ export function MembersAdmin() {
 
   useEffect(() => {
     void reload();
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    const apply = () => {
+      void loadScheduleSettings().then((next) => {
+        if (live) setCountTables(next.countTables);
+      });
+    };
+    apply();
+    const off = subscribeScheduleSettings(apply);
+    return () => {
+      live = false;
+      off();
+    };
   }, []);
 
   const pullDiscord = async () => {
@@ -768,7 +788,7 @@ export function MembersAdmin() {
                             setMarkFor(row.memberId);
                           }}
                         >
-                          <ScheduleSlot letters={row.markTag ?? ""} bg={row.markBg} fg={row.markFg} tables={row.tables ?? 12} />
+                          <ScheduleSlot letters={row.markTag ?? ""} bg={row.markBg} fg={row.markFg} tables={row.tables ?? 12} showTables={countTables} />
                         </button>
                       </td>
                       <td>
@@ -857,6 +877,7 @@ export function MembersAdmin() {
         <MarkModal
           member={asMarkMember(editing)}
           list={list.filter((row) => row.memberId).map(asMarkMember)}
+          showTables={countTables}
           onClose={() => setMarkFor(null)}
           onSave={(mark) => {
             const memberId = editing.memberId;
@@ -882,6 +903,7 @@ export function MembersAdmin() {
           onAccess={(access) => void setAccess(profile, access)}
           onMark={() => setMarkFor(profile.memberId ?? profile.discordId)}
           onReload={() => void reload()}
+          countTables={countTables}
         />
       )}
     </div>

@@ -1,6 +1,16 @@
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
-const KEY = "v2-window-pos";
+const KEY = "v2-window-pos-d";
+
+export function centerPos(width = 320, height = 280): WindowPos {
+  if (typeof window === "undefined") return { x: 40, y: 80 };
+  const w = Math.min(width, Math.max(168, window.innerWidth - 16));
+  const h = Math.min(height, Math.max(120, window.innerHeight - 16));
+  return {
+    x: Math.max(8, Math.round((window.innerWidth - w) / 2)),
+    y: Math.max(8, Math.round((window.innerHeight - h) / 2)),
+  };
+}
 
 export type WindowPos = { x: number; y: number };
 

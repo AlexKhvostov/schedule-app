@@ -132,6 +132,7 @@ export async function removeSlot(input: {
   monthIndex: number;
   day: number;
   half: number;
+  level: number;
 }) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
@@ -144,7 +145,44 @@ export async function removeSlot(input: {
     .eq("member_id", input.memberId)
     .eq("kind_id", kindId)
     .eq("slot_date", slot_date)
-    .eq("half", input.half);
+    .eq("half", input.half)
+    .eq("level", input.level);
+  return { error: error?.message };
+}
+
+export async function removeForeignSlots(input: {
+  limit: string;
+  variant: "nitro" | "regular";
+  slots: { date: string; half: number; level: number }[];
+}) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const };
+  const kindId = await kindIdOf(input.limit, input.variant);
+  if (!kindId) return { error: "unknown-kind" as const };
+  const { error } = await db.rpc("remove_foreign_slots", {
+    p_kind_id: kindId,
+    p_slots: input.slots,
+  });
+  return { error: error?.message };
+}
+
+export async function replaceForeignSlots(input: {
+  memberId?: string;
+  limit: string;
+  variant: "nitro" | "regular";
+  slots: { date: string; half: number; level: number }[];
+  tables: number;
+}) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const };
+  const kindId = await kindIdOf(input.limit, input.variant);
+  if (!kindId) return { error: "unknown-kind" as const };
+  const { error } = await db.rpc("replace_foreign_slots", {
+    p_kind_id: kindId,
+    p_member_id: input.memberId || null,
+    p_slots: input.slots,
+    p_tables: clampTables(input.tables),
+  });
   return { error: error?.message };
 }
 

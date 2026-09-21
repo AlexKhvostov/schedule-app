@@ -37,7 +37,7 @@
     "adminPeople": "Users",
     "adminPeopleHint": "Access, requests and player cards",
     "adminSchedule": "Schedule settings",
-    "adminScheduleHint": "Slot capacity and hour wash",
+    "adminScheduleHint": "Capacity, hour wash and grid rules",
     "adminRootHint": "Discord bot and club roles",
     "club": "Club",
     "root": "Root",
@@ -178,7 +178,7 @@
     "hideTables": "Hide tables",
     "settings": "Settings",
     "settingsTitle": "Field view",
-    "settingsHint": "How to read the grid: the past, your clock, tables, and the slot tooltip.",
+    "settingsHint": "How to read the grid: the past, your clock, and the slot tooltip.",
     "dimPast": "Dim the past",
     "dimPastHint": "Dims the past. Turn off to keep past as bright as the future.",
     "hidePastDays": "Hide past days",
@@ -189,7 +189,7 @@
     "showTables": "Tables on marks",
     "showTablesHint": "Show the table count on each chip.",
     "showTip": "Slot tooltip",
-    "showTipHint": "A compact card with date, time, mark, Discord guild nick, Winamax nick, and tables. No IDs. Opens on a click on an occupied slot, or on someone else’s mark while editing.",
+    "showTipHint": "A compact card with date, time, mark, Discord guild nick, and Winamax nick. No IDs. Click an occupied slot. While editing someone else’s mark, left click still opens it — or right-click if the club allows deleting others’ marks.",
     "editMode": "Editing",
     "hours": "Hours",
     "hoursTitle": "My hours",
@@ -200,7 +200,7 @@
     "hoursStatLeft": "Left",
     "hoursStatTotal": "Total",
     "hoursStatMarksHint": "How many marks this month",
-    "hoursStatHoursHint": "Hours planned in total",
+    "hoursStatHoursHint": "Unique half-hours. Two marks in the same half still count as 0.5 h.",
     "hoursStatLeftHint": "Hours still left to play as of now",
     "tools": "Tools",
     "toolsMenu": "Open tools",
@@ -208,8 +208,26 @@
     "loadingHint": "Loading slots.",
     "toastPlaced": "Mark placed",
     "toastRemoved": "Mark removed",
+    "toastReplaced": "Other marks removed, yours placed",
     "toastSaveError": "Could not save. The mark was put back.",
     "toastNoAccess": "No access to this schedule. An admin grants it.",
+    "overwrite": {
+      "titleRemove": "Remove mark",
+      "titleReplace": "Replace mark",
+      "marksOne": "This mark",
+      "marksMany": "These marks",
+      "slotCount_one": "{{count}} seat",
+      "slotCount_other": "{{count}} seats",
+      "flowRemove": "Remove",
+      "flowEmpty": "Empty",
+      "flowPlace": "Yours",
+      "flowNotify": "Notify",
+      "confirmRemove": "Remove",
+      "confirmReplace": "Replace",
+      "cancel": "Cancel",
+      "off": "The club does not currently allow deleting other people’s marks.",
+      "replaceOff": "The club does not currently allow replacing other people’s marks."
+    },
     "pickMonth": "Pick month",
     "fieldMenu": "Limit and kind",
     "prevYear": "Previous year",
@@ -346,6 +364,22 @@
     "discordIdHint": "Discord’s id, not our club id.",
     "whoLead": "This is an info block for admins. Everyone will see only the name.",
     "whoPrivacy": "This is an info block for admins. Everyone will see only the name.",
+    "notifyTitle": "Bot notifications",
+    "notifyLead": "Where the bot writes if your mark was removed, or later when it is your turn to fill the month.",
+    "notifyAdminLead": "Where the bot writes this person. You can change it here without asking them.",
+    "notifyNeedTelegram": "Add your Telegram in the profile above first. The bot can write there once the club connects it.",
+    "notifyNeedEmail": "Add your email in the login block below first. The bot can write there later.",
+    "notify": {
+      "discord": "Discord",
+      "discordHint": "A DM from the club bot",
+      "discordNote": "We write a Discord DM. This is the default channel.",
+      "telegram": "Telegram",
+      "telegramHint": "A Telegram message",
+      "telegramNote": "When the club connects a Telegram bot, send it /start — then messages go here.",
+      "email": "Email",
+      "emailHint": "Mail to your login address",
+      "emailNote": "Email comes next. Until then the bot still writes on Discord."
+    },
     "namePublic": "This is an info block for admins. Everyone will see only the name.",
     "headerTz": "Time zone",
     "headerTzHint": "Your local time — so others know when they can reach you. Showing a second clock on the grid is a schedule setting.",
@@ -496,7 +530,7 @@
   "admin": {
     "title": "Admin",
     "lead": "",
-    "scheduleLead": "Slot capacity by CET hour and the pastel load wash on the grid. Pick tournament kind and limit first.",
+    "scheduleLead": "Grid rules, slot capacity by CET hour and the pastel load wash. Pick tournament kind and limit first.",
     "members": "Members",
     "save": "Save",
     "access": {
@@ -514,17 +548,77 @@
       "approve": "Allow"
     },
     "saved": "Saved",
+    "control": {
+      "kicker": "grid",
+      "title": "Schedule control",
+      "lead": "Rules for the grid: other people’s marks, and tables. Off means the rule is not in use.",
+      "overwrite": "Allow deleting other people’s marks",
+      "overwriteHint": "A click on someone else’s mark removes it after a warning. Their own marks still clear with no prompt. Placing still needs an empty seat.",
+      "replace": "Replace other people’s marks",
+      "replaceHint": "A drag over a range with other marks first removes them, then places yours. A click on someone else’s mark still only removes it. They get a notification.",
+      "tables": "Work with tables",
+      "tablesHint": "When on, the edit dock sets a table count and it is stored on the mark. Off means tables are unused."
+    },
     "root": {
       "kicker": "root",
       "title": "Root",
-      "lead": "Developer only. Discord bot credentials and who is a club admin. Regular admins do not see this.",
+      "lead": "Developer only. Club bots, auto-notices, and who is a club admin. Regular admins do not see this.",
+      "rolesKicker": "club",
       "discordTitle": "App Discord",
       "discordLead": "App name, bot id and server id.",
       "appName": "App / bot name",
       "appId": "Application ID",
       "botToken": "Bot token",
+      "tokenOn": "set",
+      "tokenOff": "missing",
+      "tokenKeep": "Leave empty to keep the current token",
+      "tokenPh": "Paste a new token",
       "guildId": "Guild ID",
       "guildName": "Guild name",
+      "noticeChat": "Club notice channel",
+      "noticeChatPh": "Discord channel ID, e.g. for the fill queue",
+      "configKicker": "settings",
+      "configTitle": "Bot settings",
+      "autoKicker": "notices",
+      "autoTitle": "Auto-notices",
+      "autoLead": "The toggle turns this bot’s mailing on. Off means the service stays quiet even if a person picked this channel in their cabinet.",
+      "autoMark": "Mark removed",
+      "autoMarkHint": "If someone else’s mark is removed: the club channel gets whose mark, the slot and who removed it; DMs go to the owner and to the person who removed it.",
+      "autoQueue": "Month fill queue",
+      "autoQueueHint": "When a person ticks “done”, the next one sees it in chat and in a DM. We do not run the queue yet — this is only the switch.",
+      "soon": "later",
+      "sendKicker": "message",
+      "sendTitle": "Send as the bot",
+      "sendText": "Text",
+      "sendGo": "Send",
+      "sendOk": "Message sent",
+      "sendErr": "Could not send. Check the token and the target.",
+      "sendNoToken": "Set the bot token first.",
+      "sendUseChat": "Use the club channel",
+      "botsLocal": "Bot settings are stored in the live database.",
+      "discordBot": {
+        "kicker": "discord",
+        "title": "Discord bot",
+        "lead": "Three blocks: settings, mailing toggles, and a manual send. The token is never shown — only replaced.",
+        "name": "App / bot name",
+        "configLead": "Application and guild IDs. The token stays on the server and is not returned to the browser.",
+        "sendLead": "A Discord user or channel ID. For a person, the bot opens a DM.",
+        "target": "To",
+        "targetPh": "Discord user or channel ID"
+      },
+      "telegramBot": {
+        "kicker": "telegram",
+        "title": "Telegram bot",
+        "lead": "A separate bot. The same three blocks: settings, notices, send.",
+        "name": "Bot name",
+        "username": "Bot username",
+        "chat": "Club chat",
+        "chatPh": "Group or channel ID",
+        "configLead": "Username and the chat for public notices. The token can only be written, not read back.",
+        "sendLead": "A person or group chat ID. The person must send /start to the bot first.",
+        "target": "To",
+        "targetPh": "Chat ID or @username"
+      },
       "adminsTitle": "Club roles",
       "adminsLead": "Member and administrator play. An admin is still a member, with extra rights. Staff accompany the club and do not play. Root is a service role, not a club seat.",
       "roleMember": "Member",
@@ -581,7 +675,7 @@
       "specialWeek": "{{day}} has its own capacity rule.",
       "specialMax": "Maximum levels: {{n}}",
       "equalize": "Apply maximum capacity to every day",
-      "equalizeHint": "If one date has capacity 3 and another has 1, the second day shows two fully locked levels. Day rows stay the same height.",
+      "equalizeHint": "Every day is the same height. If Tuesday has no second level, the extra band is still there — empty, without the 50·2 label. The grid does not jump.",
       "daysTitle": "Days of the month",
       "daysHint": "Unmarked dates use the All days rule. Click a date for its own rule. You can select several dates at once.",
       "allDays": "All days",
@@ -847,7 +941,7 @@
       "git": "Git minimal",
       "table": "Table",
       "opt": "Optimized",
-      "optHint": "With edit on: click or drag empty slots to place, your marks to clear. Click someone else’s mark for who is there. With edit off, a click shows the card.",
+      "optHint": "With edit on: click or drag empty slots to place, your marks to clear. Click someone else’s mark for who is there. If the club allows deleting others’ marks, left-click removes them after a warning and right-click shows the card. With edit off, a click shows the card.",
       "levelShort": "lv."
     },
     "search": {
@@ -860,7 +954,7 @@
       "level": "Level {{n}}",
       "empty": "Free",
       "busy": "Already {{limit}}",
-      "busyHint": "You already play this half-hour on another limit. This slot cannot take your mark.",
+      "busyHint": "You already have a mark this half-hour on another limit. You can still place here — hours still count that half once.",
       "busyLegend": "Other limit",
       "locked": "Level {{n}} is closed",
       "lockedHint": "This hour has capacity {{cap}}. Marks are allowed when capacity is at least {{need}}.",
@@ -894,11 +988,11 @@
       },
       "place": {
         "h": "Place",
-        "p": "In edit mode, click a free slot. Hold and drag in the same level row — the frame shows what will be taken."
+        "p": "In edit mode, click a free slot. Hold and drag in the same level row — the frame shows what will be taken. A red frame means you already stand on another limit this half-hour: you can still place. A second mark on the neighbouring level of the same limit is allowed too."
       },
       "remove": {
         "h": "Remove",
-        "p": "Click your mark to clear it. Drag across your marks in the same row to clear the range. Other people’s marks stay put."
+        "p": "Click your mark to clear it. Drag across your marks in the same row to clear the range. If the club allows deleting others’ marks, a click or drag from someone else’s mark removes them after a warning. Then you can place yours in the empty seats."
       },
       "tables": {
         "h": "Tables",
@@ -910,7 +1004,7 @@
       },
       "tip": {
         "h": "Slot card",
-        "p": "With edit off, click an occupied slot for time, mark, Discord, Winamax, and tables. With edit on, the same click works on someone else’s mark. The card leaves when you move the mouse, scroll, or press a key."
+        "p": "With edit off, click an occupied slot for time, mark, Discord, Winamax. If the club counts tables, the card also shows the table count. With edit on, the same click works on someone else’s mark. If the club allows deleting others’ marks, use the right mouse button for the card. The card leaves when you move the mouse, scroll, or press a key."
       },
       "search": {
         "h": "Search",
@@ -918,7 +1012,7 @@
       },
       "settings": {
         "h": "Settings",
-        "p": "The gear: dim the past, hide past days, tables on marks, and the slot tooltip."
+        "p": "The gear: dim the past, hide past days, and the slot tooltip. If the club counts tables, also tables on marks."
       }
     }
   },

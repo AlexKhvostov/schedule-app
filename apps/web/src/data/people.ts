@@ -1,6 +1,7 @@
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { personLabel, type GuildRole } from "./guild";
+import type { NotifyChannel } from "./botSettings";
 
 export type ClubAccess = "closed" | "member" | "admin" | "staff";
 
@@ -41,6 +42,7 @@ export type AdminPerson = {
   extraUtc: number | null;
   telegram: string | null;
   contactAlt: string | null;
+  notifyChannel: NotifyChannel;
   logins: MemberLogins;
 };
 
@@ -139,7 +141,7 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
     db.from("members").select("id, public_code, access_status, community_status, guarantor_id, mark_tag, mark_bg, mark_fg, tables, grid_priority, vip_nitro, vip_regular, distance_ext_id, auth_user_id, created_at, approved_at"),
     db.from("identities").select("member_id, provider, provider_uid, username, display_name"),
     db.from("member_roles").select("member_id, role_id"),
-    db.from("profiles").select("member_id, display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt"),
+    db.from("profiles").select("member_id, display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt, notify_channel"),
   ]);
 
   const memberById = new Map(((members ?? []) as MemberRow[]).map((row) => [row.id, row]));
@@ -214,6 +216,7 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
       extraUtc: typeof profile?.extra_utc === "number" ? profile.extra_utc : null,
       telegram: profile?.telegram ?? null,
       contactAlt: profile?.contact_alt ?? null,
+      notifyChannel: asNotifyChannel(profile?.notify_channel),
       logins: memberId ? (loginsByMember.get(memberId) ?? emptyLogins()) : emptyLogins(),
     } satisfies AdminPerson;
   });
@@ -313,6 +316,7 @@ export type ProfilePatch = {
   extraUtc?: number;
   telegram?: string | null;
   contactAlt?: string | null;
+  notifyChannel?: NotifyChannel;
 };
 
 export type MyCabinet = {
@@ -331,7 +335,13 @@ export type MyCabinet = {
   extraUtc: number;
   telegram: string | null;
   contactAlt: string | null;
+  notifyChannel: NotifyChannel;
 };
+
+function asNotifyChannel(value: string | null | undefined): NotifyChannel {
+  if (value === "telegram" || value === "email") return value;
+  return "discord";
+}
 
 function emptyToNull(value: string | null | undefined) {
   const text = value?.trim();
@@ -345,7 +355,7 @@ export async function loadMyCabinet(memberId: string): Promise<MyCabinet | null>
     db.from("members").select("community_status, tables, created_at, vip_nitro, vip_regular").eq("id", memberId).maybeSingle(),
     db
       .from("profiles")
-      .select("display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt")
+      .select("display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt, notify_channel")
       .eq("member_id", memberId)
       .maybeSingle(),
   ]);
@@ -366,6 +376,7 @@ export async function loadMyCabinet(memberId: string): Promise<MyCabinet | null>
     extraUtc: typeof profile?.extra_utc === "number" ? profile.extra_utc : 3,
     telegram: profile?.telegram ?? null,
     contactAlt: profile?.contact_alt ?? null,
+    notifyChannel: asNotifyChannel(profile?.notify_channel),
   };
 }
 
@@ -383,6 +394,7 @@ export async function saveMemberProfile(memberId: string, patch: ProfilePatch) {
   if ("extraUtc" in patch) row.extra_utc = patch.extraUtc ?? 3;
   if ("telegram" in patch) row.telegram = emptyToNull(patch.telegram);
   if ("contactAlt" in patch) row.contact_alt = emptyToNull(patch.contactAlt);
+  if ("notifyChannel" in patch) row.notify_channel = asNotifyChannel(patch.notifyChannel);
   if (!Object.keys(row).length) return { error: null };
   const { data, error } = await db.from("profiles").update(row).eq("member_id", memberId).select("member_id");
   if (error) return { error: error.message };

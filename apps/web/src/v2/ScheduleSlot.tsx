@@ -59,9 +59,10 @@ type StripProps = {
   pastLabel: string;
   futureLabel: string;
   lead: string;
+  showTables?: boolean;
 };
 
-export function ScheduleSlotStrip({ letters, bg, fg, pastLabel, futureLabel, lead }: StripProps) {
+export function ScheduleSlotStrip({ letters, bg, fg, pastLabel, futureLabel, lead, showTables = true }: StripProps) {
   const tag = letters.trim();
   return (
     <div className="v2-mark-look">
@@ -70,10 +71,10 @@ export function ScheduleSlotStrip({ letters, bg, fg, pastLabel, futureLabel, lea
         <span>{pastLabel}</span>
         <div className="v2-opt v2-mark-look-grid is-kit">
           <div className="v2-opt-track v2-mark-look-track">
-            <ScheduleSlot past />
-            <ScheduleSlot past letters={tag} bg={bg} fg={fg} />
-            <ScheduleSlot letters={tag} bg={bg} fg={fg} />
-            <ScheduleSlot />
+            <ScheduleSlot past showTables={showTables} />
+            <ScheduleSlot past letters={tag} bg={bg} fg={fg} showTables={showTables} />
+            <ScheduleSlot letters={tag} bg={bg} fg={fg} showTables={showTables} />
+            <ScheduleSlot showTables={showTables} />
             <i className="v2-mark-look-now" aria-hidden />
           </div>
         </div>

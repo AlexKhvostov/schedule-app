@@ -1,17 +1,21 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { formatLimit } from "../schedule/capacity";
 import { formatHours, type RosterRow } from "../schedule/roster";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
-import { loadTheme } from "./theme";
+import { V2Float } from "./V2Float";
 
 type Props = {
   row: RosterRow;
   givenName?: string;
   monthLabel: string;
+  x: number;
+  y: number;
+  z: number;
+  onMove: (x: number, y: number) => void;
+  onFocus: () => void;
   onClose: () => void;
+  showTables?: boolean;
 };
 
 function isClubCode(value?: string | null) {
@@ -32,7 +36,7 @@ function initials(nick: string, mark: string) {
   return (parts[0] || "?").slice(0, 2).toUpperCase();
 }
 
-export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
+export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocus, onClose, showTables = false }: Props) {
   const { t } = useTranslation();
   const guild = showNick(row.mark.discord) || "—";
   const room = showNick(row.mark.room);
@@ -40,23 +44,9 @@ export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
   const globalName = showNick(row.mark.globalName);
   const name = givenName?.trim() || "";
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return createPortal(
-    <div className={`v2-mem-overlay theme-${loadTheme()}`} onClick={onClose}>
-      <div className="v2-mem-modal v2-user-card" role="dialog" aria-labelledby="v2-user-card-title" onClick={(event) => event.stopPropagation()}>
-        <header className="v2-user-card-head">
-          <span className="v2-admin-kicker">{t("schedule.userCard")}</span>
-          <button type="button" className="v2-ctrl px-3" onClick={onClose}>
-            {t("schedule.userCardClose")}
-          </button>
-        </header>
+  return (
+    <V2Float title={t("schedule.userCard")} x={x} y={y} width={320} z={z} compact className="v2-user-float" onMove={onMove} onFocus={onFocus} onClose={onClose}>
+      <div className="v2-user-card">
         <div className="v2-user-card-hero">
           <PersonAvatar src={row.mark.avatarUrl} label={initials(guild, row.mark.t)} size="lg" />
           <div className="min-w-0 flex-1">
@@ -64,7 +54,7 @@ export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
             {user ? <p>@{user}</p> : null}
           </div>
           <span className="v2-mark-chip">
-            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} />
+            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
           </span>
         </div>
         <p className="v2-user-card-lead">{t("schedule.userCardHint")}</p>
@@ -105,7 +95,6 @@ export function V2UserCard({ row, givenName, monthLabel, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>,
-    document.body,
+    </V2Float>
   );
 }

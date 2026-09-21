@@ -34,6 +34,26 @@ export function levelAllowed(halfIndex: number, level: number, hours: HourCaps =
   return level < capFor(halfIndex, hours);
 }
 
+export type DayLevel = { level: number; ghost: boolean };
+
+/** Lanes for the day. Equalize keeps extra rows as ghost spacers so every day is the same height. */
+export function shownLevels(depth: number, hours: HourCaps, dayRow?: Seat[][]): DayLevel[] {
+  const n = Math.max(1, depth);
+  const rows: DayLevel[] = [];
+  for (let level = 0; level < n; level += 1) {
+    let live = false;
+    for (let half = 0; half < 48; half += 1) {
+      if (levelAllowed(half, level, hours) || dayRow?.[half]?.[level]) {
+        live = true;
+        break;
+      }
+    }
+    rows.push({ level, ghost: !live });
+  }
+  if (rows.every((row) => row.ghost)) return [{ level: 0, ghost: false }];
+  return rows;
+}
+
 export function seatsOf(cell: Seat[] | undefined, size = 2): Seat[] {
   const c = cell ?? [];
   const n = Math.max(size, c.length, 2);
@@ -70,7 +90,6 @@ export function toggleSeat(
       return seats;
     }
     if (seats[level]) return seats;
-    if (mine >= 0) seats[mine] = null;
     seats[level] = { ...me };
     return seats;
   }
@@ -91,16 +110,23 @@ export function stampSeat(
   level: number,
   mode: "place" | "remove",
   hours: HourCaps = defaultHourCaps(),
+  removeForeign = false,
+  replaceForeign = false,
 ): Seat[] {
   const size = Math.max(capFor(half, hours), level + 1, cell?.length ?? 0, 2);
   const seats = seatsOf(cell, size);
   const mine = seats.findIndex((s) => isOwnMark(s, me));
   if (mode === "remove") {
-    if (mine === level) seats[level] = null;
+    if (removeForeign) {
+      if (seats[level] && mine !== level) seats[level] = null;
+    } else if (mine === level) {
+      seats[level] = null;
+    }
     return seats;
   }
   if (!levelAllowed(half, level, hours)) return seats;
-  if (seats[level] || mine >= 0) return seats;
+  if (isOwnMark(seats[level], me)) return seats;
+  if (seats[level] && !replaceForeign) return seats;
   seats[level] = { ...me };
   return seats;
 }

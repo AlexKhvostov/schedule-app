@@ -106,40 +106,51 @@ export function myHoursMatrix(
 ) {
   const cols = limits.length ? [...limits] : [];
   const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length), ...cols.map((limit) => grids[limit]?.length ?? 0));
-  const slots = Array.from({ length: days }, () =>
+  const marks = Array.from({ length: days }, () =>
     Object.fromEntries(cols.map((limit) => [limit, 0])) as Record<string, number>,
   );
-  const leftSlots = Array.from({ length: days }, () =>
+  const unique = Array.from({ length: days }, () =>
     Object.fromEntries(cols.map((limit) => [limit, 0])) as Record<string, number>,
   );
+  const leftUnique = Array.from({ length: days }, () =>
+    Object.fromEntries(cols.map((limit) => [limit, 0])) as Record<string, number>,
+  );
+  const dayHalves = Array.from({ length: days }, () => new Set<number>());
+  const dayLeftHalves = Array.from({ length: days }, () => new Set<number>());
   for (const limit of cols) {
     const grid = grids[limit];
     if (!grid) continue;
     for (let dayIdx = 0; dayIdx < grid.length; dayIdx += 1) {
       (grid[dayIdx] ?? []).forEach((cell, half) => {
-        if (!cell?.some((mark) => seatIsMine(mark, who))) return;
-        slots[dayIdx][limit] += 1;
-        if (!at || !isPastSlot(at.year, at.monthIndex, dayIdx + 1, half, at.cet)) leftSlots[dayIdx][limit] += 1;
+        const mine = (cell ?? []).filter((mark) => seatIsMine(mark, who)).length;
+        if (!mine) return;
+        marks[dayIdx][limit] += mine;
+        unique[dayIdx][limit] += 1;
+        dayHalves[dayIdx].add(half);
+        if (!at || !isPastSlot(at.year, at.monthIndex, dayIdx + 1, half, at.cet)) {
+          leftUnique[dayIdx][limit] += 1;
+          dayLeftHalves[dayIdx].add(half);
+        }
       });
     }
   }
-  const hours = slots.map((row) =>
+  const hours = unique.map((row) =>
     Object.fromEntries(cols.map((limit) => [limit, hoursFromSlots(row[limit])])) as Record<string, number>,
   );
   const totals = Object.fromEntries(
-    cols.map((limit) => [limit, hoursFromSlots(slots.reduce((sum, row) => sum + row[limit], 0))]),
+    cols.map((limit) => [limit, hoursFromSlots(unique.reduce((sum, row) => sum + row[limit], 0))]),
   ) as Record<string, number>;
   const left = Object.fromEntries(
-    cols.map((limit) => [limit, hoursFromSlots(leftSlots.reduce((sum, row) => sum + row[limit], 0))]),
+    cols.map((limit) => [limit, hoursFromSlots(leftUnique.reduce((sum, row) => sum + row[limit], 0))]),
   ) as Record<string, number>;
   const leftCounts = Object.fromEntries(
-    cols.map((limit) => [limit, leftSlots.reduce((sum, row) => sum + row[limit], 0)]),
+    cols.map((limit) => [limit, leftUnique.reduce((sum, row) => sum + row[limit], 0)]),
   ) as Record<string, number>;
-  const dayTotals = slots.map((row) => hoursFromSlots(cols.reduce((sum, limit) => sum + row[limit], 0)));
-  const grand = hoursFromSlots(slots.reduce((sum, row) => sum + cols.reduce((acc, limit) => acc + row[limit], 0), 0));
-  const leftGrand = hoursFromSlots(leftSlots.reduce((sum, row) => sum + cols.reduce((acc, limit) => acc + row[limit], 0), 0));
+  const dayTotals = dayHalves.map((set) => hoursFromSlots(set.size));
+  const grand = hoursFromSlots(dayHalves.reduce((sum, set) => sum + set.size, 0));
+  const leftGrand = hoursFromSlots(dayLeftHalves.reduce((sum, set) => sum + set.size, 0));
   const countTotals = Object.fromEntries(
-    cols.map((limit) => [limit, slots.reduce((sum, row) => sum + row[limit], 0)]),
+    cols.map((limit) => [limit, marks.reduce((sum, row) => sum + row[limit], 0)]),
   ) as Record<string, number>;
   const countGrand = cols.reduce((sum, limit) => sum + countTotals[limit], 0);
   const leftCountGrand = cols.reduce((sum, limit) => sum + leftCounts[limit], 0);

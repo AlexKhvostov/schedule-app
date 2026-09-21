@@ -13,10 +13,11 @@ import {
   type AdminPerson,
   type ClubAccess,
 } from "../data/people";
+import type { NotifyChannel } from "../data/botSettings";
 import { loadMyPlays, saveMyPlays } from "../data/plays";
 import { CabinetLoginPanel, type LoginDraft } from "./CabinetLoginPanel";
 import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
-import { Field } from "./cabinetUi";
+import { Field, NotifyPicks } from "./cabinetUi";
 import { PermanentPriority } from "./PermanentPriority";
 import { ScheduleAccessPanel } from "./ScheduleAccessPanel";
 import { ScheduleSlot } from "./ScheduleSlot";
@@ -34,6 +35,7 @@ type Props = {
   onAccess: (access: ClubAccess) => void;
   onMark: () => void;
   onReload: () => void;
+  countTables?: boolean;
 };
 
 function isClubSeat(row: AdminPerson) {
@@ -147,7 +149,7 @@ function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy: bool
   );
 }
 
-export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onMark, onReload }: Props) {
+export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onMark, onReload, countTables = false }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const canCloseSelf = person.memberId === selfMemberId;
@@ -161,6 +163,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const [country, setCountry] = useState(person.country ?? "");
   const [birthday, setBirthday] = useState(person.birthday?.slice(0, 10) ?? "");
   const [extraUtc, setExtraUtc] = useState(person.extraUtc ?? 3);
+  const [channel, setChannel] = useState<NotifyChannel>(person.notifyChannel ?? "discord");
+  const [savedChannel, setSavedChannel] = useState<NotifyChannel>(person.notifyChannel ?? "discord");
 
   const [tables, setTables] = useState(String(person.tables ?? 1));
   const [vipNitro, setVipNitro] = useState(vipText(person.vipNitro));
@@ -186,6 +190,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     setCountry(person.country ?? "");
     setBirthday(person.birthday?.slice(0, 10) ?? "");
     setExtraUtc(person.extraUtc ?? 3);
+    setChannel(person.notifyChannel ?? "discord");
+    setSavedChannel(person.notifyChannel ?? "discord");
     setTables(String(person.tables ?? 1));
     setVipNitro(vipText(person.vipNitro));
     setVipRegular(vipText(person.vipRegular));
@@ -288,6 +294,18 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     else ok();
   };
 
+  const saveNotify = async () => {
+    if (!person.memberId) return;
+    setSaving(true);
+    const result = await saveMemberProfile(person.memberId, { notifyChannel: channel });
+    setSaving(false);
+    if (result.error) fail();
+    else {
+      setSavedChannel(channel);
+      ok();
+    }
+  };
+
   const saveLogin = async () => {
     if (!person.memberId) return;
     const email = login.email.trim();
@@ -375,7 +393,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
           </div>
           {person.markTag ? (
             <span className="v2-mark-chip">
-              <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} />
+              <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
             </span>
           ) : null}
           <button type="button" className="v2-ctrl px-3" onClick={onClose}>
@@ -471,7 +489,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                 <div className="v2-cab-spread">
                   <div className="v2-cab-idline is-mark">
                     <span className="v2-mark-chip">
-                      <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} />
+                      <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
                     </span>
                     <div className="v2-cab-idcopy">
                       <b>{person.markTag || t("cabinet.markNone")}</b>
@@ -493,16 +511,18 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   <StaffOnly>
                     <div className="v2-club-mark-row mt-0">
                       <span className="v2-mark-chip">
-                        <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} />
+                        <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
                       </span>
                       <button type="button" className="v2-ctrl px-3" onClick={onMark}>
                         {t("admin.people.markEdit")}
                       </button>
                     </div>
                     <div className="v2-club-form">
-                      <Field label={t("cabinet.tables")} hint={t("admin.people.tablesHint")}>
-                        <input className="v2-ctrl w-full px-3" inputMode="numeric" value={tables} onChange={(event) => setTables(event.target.value.replace(/[^\d]/g, "").slice(0, 2))} />
-                      </Field>
+                      {countTables ? (
+                        <Field label={t("cabinet.tables")} hint={t("admin.people.tablesHint")}>
+                          <input className="v2-ctrl w-full px-3" inputMode="numeric" value={tables} onChange={(event) => setTables(event.target.value.replace(/[^\d]/g, "").slice(0, 2))} />
+                        </Field>
+                      ) : null}
                       <Field label={t("cabinet.communityTitle")} hint={t("cabinet.communityHint")}>
                         <select className="v2-ctrl w-full px-2" value={community} onChange={(event) => setCommunity(event.target.value as "school" | "club")}>
                           <option value="club">{t("cabinet.community.club")}</option>
@@ -638,6 +658,32 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       setBirthday(profileSaved.birthday);
                       setExtraUtc(profileSaved.extraUtc);
                     }} />
+                  </div>
+                </section>
+
+                <section className="v2-block v2-cab-card is-notify">
+                  <div className="v2-cab-head">
+                    <h2>{t("cabinet.notifyTitle")}</h2>
+                  </div>
+                  <div className="v2-cab-body">
+                    <p className="v2-cab-hint">{t("cabinet.notifyAdminLead")}</p>
+                    <NotifyPicks value={channel} disabled={!canEdit || saving} onChange={setChannel} />
+                    <p className="v2-cab-note">
+                      <i className="fa-solid fa-bell" aria-hidden />
+                      <span>
+                        {channel === "telegram" && !telegram
+                          ? t("cabinet.notifyNeedTelegram")
+                          : channel === "email" && !login.email
+                            ? t("cabinet.notifyNeedEmail")
+                            : t(`cabinet.notify.${channel}Note`)}
+                      </span>
+                    </p>
+                    <SaveBar
+                      dirty={channel !== savedChannel}
+                      busy={saving}
+                      onSave={() => void saveNotify()}
+                      onCancel={() => setChannel(savedChannel)}
+                    />
                   </div>
                 </section>
 

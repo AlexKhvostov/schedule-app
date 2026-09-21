@@ -7,26 +7,29 @@ import { emptyMonth, patchSeat, type Occupancy } from "../schedule/plan";
 import { readCet } from "../schedule/cet";
 import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
 import { fieldFill, columnFill } from "../schedule/analytics";
-import { OptField } from "./OptField";
+import { OptField, type OverwriteAsk } from "./OptField";
 import { FillByHourChart } from "./FillByHourChart";
 import { V2Float } from "./V2Float";
 import { V2MyCalendar } from "./V2MyCalendar";
 import { V2Settings } from "./V2Settings";
 import { V2UserCard } from "./V2UserCard";
+import { OverwriteConfirm } from "./OverwriteConfirm";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { showV2Toast } from "./V2Toast";
 import { gridsForCalendar, limitsWithMyMarks, myHoursMatrix, myTimeline } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, savePrefs } from "./prefs";
-import { fitFloat, usePlacedModal, useWindowPos } from "./windowPos";
+import { centerPos, fitFloat, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
 import { saveMemberTables, loadPublicNames } from "../data/people";
 import { listLimitMarks, listSchedulePlayers, markFromPlayer, type SchedulePlayer } from "../data/players";
 import { loadMyPlays } from "../data/plays";
 import { accessKey, loadScheduleAccess } from "../data/scheduleAccess";
-import { loadMonthGrids, placeSlot, removeSlot, subscribeOccupancy } from "../data/slots";
+import { loadMonthGrids, placeSlot, removeSlot, removeForeignSlots, replaceForeignSlots, subscribeOccupancy } from "../data/slots";
+import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
+import { notifyMarkRemoved, slotWhenLabel } from "../data/notifyMark";
 import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
 import { readSession } from "./session";
 
@@ -121,7 +124,9 @@ function MarkPlanDock({
   tables,
   x,
   y,
+  z,
   onMove,
+  onFocus,
   onBump,
   onDraft,
   onClose,
@@ -130,12 +135,15 @@ function MarkPlanDock({
   selfId,
   actingId,
   onActAs,
+  countTables = false,
 }: {
   me: Mark;
   tables: string;
   x: number;
   y: number;
+  z?: number;
   onMove: (x: number, y: number) => void;
+  onFocus?: () => void;
   onBump: (delta: number) => void;
   onDraft: (value: string) => void;
   onClose: () => void;
@@ -144,6 +152,7 @@ function MarkPlanDock({
   selfId?: string;
   actingId?: string;
   onActAs: (id: string) => void;
+  countTables?: boolean;
 }) {
   const { t } = useTranslation();
   const drag = useRef<{ ox: number; oy: number } | null>(null);
@@ -175,10 +184,14 @@ function MarkPlanDock({
       style={{
         left: fitFloat(x, y).x,
         top: fitFloat(x, y).y,
+        zIndex: z ?? 50,
       }}
       role="dialog"
       aria-label={isOther ? t("schedule.editDockAs", { nick: me.discord }) : t("schedule.editDockTitle")}
-      onPointerDown={startDrag}
+      onPointerDown={(event) => {
+        onFocus?.();
+        startDrag(event);
+      }}
       onPointerMove={(event: PointerEvent<HTMLElement>) => {
         if (!drag.current) return;
         const next = fitFloat(event.clientX - drag.current.ox, event.clientY - drag.current.oy);
@@ -202,33 +215,35 @@ function MarkPlanDock({
             onClick={() => setWhoOpen((value) => !value)}
           >
             <span className="v2-mark-sample">
-              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
+              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} showTables={countTables} />
             </span>
             {isOther ? <small>{t("schedule.actAsForeign")}</small> : null}
           </button>
         ) : (
           <span className="v2-mark-dock-mark">
             <span className="v2-mark-sample">
-              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
+              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} showTables={countTables} />
             </span>
           </span>
         )}
-        <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
-          <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
-            <i className="fa-solid fa-minus" />
-          </button>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={30}
-            value={tables}
-            onChange={(event) => onDraft(event.target.value)}
-          />
-          <button type="button" aria-label="+1" onClick={() => onBump(1)}>
-            <i className="fa-solid fa-plus" />
-          </button>
-        </div>
+        {countTables ? (
+          <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
+            <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
+              <i className="fa-solid fa-minus" />
+            </button>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={30}
+              value={tables}
+              onChange={(event) => onDraft(event.target.value)}
+            />
+            <button type="button" aria-label="+1" onClick={() => onBump(1)}>
+              <i className="fa-solid fa-plus" />
+            </button>
+          </div>
+        ) : null}
         <button type="button" className="v2-mark-dock-done" onClick={onClose}>
           {t("schedule.editDockDone")}
         </button>
@@ -251,7 +266,7 @@ function MarkPlanDock({
                     >
                       <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
                       <span className="v2-mark-sample">
-                        <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} />
+                        <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
                       </span>
                       <span className="v2-mark-dock-who-copy">
                         <b>{names.title}</b>
@@ -273,122 +288,124 @@ function MarkPlanDock({
   );
 }
 
-function HoursPanel({ matrix, onClose }: { matrix: ReturnType<typeof myHoursMatrix>; onClose: () => void }) {
-  const { t } = useTranslation();
-  const placed = usePlacedModal("hours");
+function weekdayLabels(lang: string) {
+  const loc = lang.startsWith("en") ? "en-US" : "ru-RU";
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(2026, 5, 1 + i).toLocaleDateString(loc, { weekday: "short" }).replace(".", ""),
+  );
+}
+
+function HoursPanel({
+  matrix,
+  year,
+  monthIndex,
+  x,
+  y,
+  z,
+  onMove,
+  onFocus,
+  onClose,
+}: {
+  matrix: ReturnType<typeof myHoursMatrix>;
+  year: number;
+  monthIndex: number;
+  x: number;
+  y: number;
+  z: number;
+  onMove: (x: number, y: number) => void;
+  onFocus: () => void;
+  onClose: () => void;
+}) {
+  const { t, i18n } = useTranslation();
   const cols = matrix.limits;
-  const cellMax = Math.max(0, ...matrix.hours.flatMap((row) => cols.map((limit) => row[limit] || 0)));
   const dayMax = Math.max(0, ...matrix.dayTotals);
+  const pad = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
+  const cells: (number | null)[] = [...Array.from({ length: pad }, () => null), ...matrix.hours.map((_, i) => i)];
+  while (cells.length % 7) cells.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const wdays = weekdayLabels(i18n.language);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="v2-mine-back"
-      onClick={(event) => {
-        if (placed.ignoreBackdropClick(event)) return;
-        onClose();
-      }}
+  return (
+    <V2Float
+      title={t("schedule.hoursTitle")}
+      x={x}
+      y={y}
+      width={312}
+      z={z}
+      compact
+      className="v2-hours-float"
+      onMove={onMove}
+      onFocus={onFocus}
+      onClose={onClose}
     >
-      <div
-        ref={placed.panelRef}
-        className="v2-hours-modal"
-        style={placed.style}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="v2-modal-head" {...placed.headProps}>
-          <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
-          <h2>{t("schedule.hoursTitle")}</h2>
-          <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
-            <i className="fa-solid fa-xmark" />
-          </button>
-        </header>
-        {cols.length ? (
-          <div className="v2-hours-body">
-            <div className="v2-hours-sheet">
-              <table className="v2-mark-plan v2-hours-summary">
-                <thead>
-                  <tr>
-                    <th>{t("schedule.hoursStatLimit")}</th>
-                    <th title={t("schedule.hoursStatMarksHint")}>{t("schedule.hoursStatMarks")}</th>
-                    <th title={t("schedule.hoursStatHoursHint")}>{t("schedule.hoursStatHours")}</th>
-                    <th className="is-left" title={t("schedule.hoursStatLeftHint")}>
-                      {t("schedule.hoursStatLeft")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cols.map((limit) => (
-                    <tr key={limit}>
-                      <th>{formatLimit(limit)}</th>
-                      <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
-                      <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
-                      <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th>{t("schedule.hoursStatTotal")}</th>
-                    <td className={matrix.countGrand ? "is-on" : ""}>{matrix.countGrand || 0}</td>
-                    <td className={matrix.grand ? "is-on" : ""}>{formatHours(matrix.grand || 0)}</td>
-                    <td className={`is-left is-grand${matrix.leftGrand ? " is-on" : ""}`}>{formatHours(matrix.leftGrand || 0)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div className="v2-hours-sheet v2-hours-month">
-              <table className="v2-mark-plan">
-                <thead>
-                  <tr>
-                    <th>{t("schedule.planDay")}</th>
-                    {cols.map((limit) => (
-                      <th key={limit}>{limit}</th>
-                    ))}
-                    <th className="is-sum">Σ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {matrix.hours.map((row, dayIdx) => (
-                    <tr key={dayIdx}>
-                      <th>{String(dayIdx + 1).padStart(2, "0")}</th>
-                      {cols.map((limit) => (
-                        <td key={limit} className={row[limit] ? "is-on" : ""} style={heatFill(row[limit] || 0, cellMax, "cell")}>
-                          {row[limit] ? formatHours(row[limit]) : ""}
-                        </td>
-                      ))}
-                      <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`} style={heatFill(matrix.dayTotals[dayIdx] || 0, dayMax, "day")}>
-                        {matrix.dayTotals[dayIdx] ? formatHours(matrix.dayTotals[dayIdx]) : ""}
+      {cols.length ? (
+        <div className="v2-hours-body">
+          <table className="v2-hours-summary">
+            <thead>
+              <tr>
+                <th>{t("schedule.hoursStatLimit")}</th>
+                <th title={t("schedule.hoursStatMarksHint")}>{t("schedule.hoursStatMarks")}</th>
+                <th title={t("schedule.hoursStatHoursHint")}>{t("schedule.hoursStatHours")}</th>
+                <th className="is-left" title={t("schedule.hoursStatLeftHint")}>
+                  {t("schedule.hoursStatLeft")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {cols.map((limit) => (
+                <tr key={limit}>
+                  <th>{formatLimit(limit)}</th>
+                  <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
+                  <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
+                  <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>{t("schedule.hoursStatTotal")}</th>
+                <td className={matrix.countGrand ? "is-on" : ""}>{matrix.countGrand || 0}</td>
+                <td className={matrix.grand ? "is-on" : ""}>{formatHours(matrix.grand || 0)}</td>
+                <td className={`is-left is-grand${matrix.leftGrand ? " is-on" : ""}`}>{formatHours(matrix.leftGrand || 0)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <table className="v2-hours-cal">
+            <thead>
+              <tr>
+                {wdays.map((day) => (
+                  <th key={day}>{day}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weeks.map((week, wi) => (
+                <tr key={wi}>
+                  {week.map((dayIdx, di) => {
+                    if (dayIdx === null) return <td key={`${wi}-${di}`} className="is-out" />;
+                    const value = matrix.dayTotals[dayIdx] || 0;
+                    return (
+                      <td
+                        key={dayIdx}
+                        className={value ? "is-on" : "is-empty"}
+                        style={heatFill(value, dayMax, "day")}
+                        title={`${dayIdx + 1}: ${value ? formatHours(value) : "0"}`}
+                      >
+                        <b>{dayIdx + 1}</b>
+                        <em>{value ? formatHours(value) : ""}</em>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th>Σ</th>
-                    {cols.map((limit) => (
-                      <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
-                        {matrix.totals[limit] ? formatHours(matrix.totals[limit]) : ""}
-                      </td>
-                    ))}
-                    <td className={`is-sum is-grand${matrix.grand ? " is-on" : ""}`}>{matrix.grand ? formatHours(matrix.grand) : ""}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <p className="v2-mark-plan-note">{t("schedule.planLimitsEmpty")}</p>
-        )}
-      </div>
-    </div>,
-    document.body,
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="v2-mark-plan-note">{t("schedule.planLimitsEmpty")}</p>
+      )}
+    </V2Float>
   );
 }
 
@@ -465,15 +482,21 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [searchOpen, setSearchOpen] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [peek, setPeek] = useState<RosterRow | null>(null);
+  const [allowOverwrite, setAllowOverwrite] = useState(false);
+  const [allowReplace, setAllowReplace] = useState(false);
+  const [countTables, setCountTables] = useState(false);
+  const [overwriteAsk, setOverwriteAsk] = useState<OverwriteAsk | null>(null);
+  const [overwriteBusy, setOverwriteBusy] = useState(false);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
-  const [analyticsPos, setAnalyticsPos] = useWindowPos("analytics", { x: 760, y: 120 });
-  const [peoplePos, setPeoplePos] = useWindowPos("people", { x: 1080, y: 160 });
-  const [markPos, setMarkPos] = useWindowPos("mark-dock", () => ({
-    x: typeof window === "undefined" ? 860 : Math.max(8, window.innerWidth - 408),
-    y: 72,
-  }));
-  const [front, setFront] = useState<"fill" | "people" | "hours">("fill");
+  const [analyticsPos, setAnalyticsPos] = useWindowPos("analytics", () => centerPos(560, 360));
+  const [peoplePos, setPeoplePos] = useWindowPos("people", () => centerPos(420, 360));
+  const [hoursPos, setHoursPos] = useWindowPos("hours", () => centerPos(312, 340));
+  const [calPos, setCalPos] = useWindowPos("calendar", () => centerPos(640, 480));
+  const [settingsPos, setSettingsPos] = useWindowPos("settings", () => centerPos(300, 360));
+  const [userPos, setUserPos] = useWindowPos("user-card", () => centerPos(360, 320));
+  const [markPos, setMarkPos] = useWindowPos("mark-dock", () => centerPos(280, 56));
+  const [front, setFront] = useState<"fill" | "people" | "hours" | "calendar" | "settings" | "user" | "mark">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
   const limitsRef = useRef<HTMLDivElement>(null);
   const kindRef = useRef<HTMLDivElement>(null);
@@ -483,6 +506,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const loadGen = useRef(0);
   const gridsRef = useRef(grids);
   const inflight = useRef(0);
+  const quietUntil = useRef(0);
   const refreshTimer = useRef(0);
   const tablesSaveTimer = useRef(0);
   gridsRef.current = grids;
@@ -498,11 +522,26 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [limits, playLimits]);
   const fetchKey = fetchLimits.join("|");
   const loadStamp = `${year}-${monthIndex}-${kind}-${fetchKey}`;
+  const viewStamp = `${year}-${monthIndex}-${kind}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
   const shownGrids = useMemo(() => {
     if (!gridLoading) return grids;
+    if (readyStamp.startsWith(`${viewStamp}-`)) return grids;
     return Object.fromEntries((fetchLimits.length ? fetchLimits : limits).map((limit) => [limit, emptyMonth(year, monthIndex)]));
-  }, [gridLoading, grids, fetchLimits, limits, year, monthIndex]);
+  }, [gridLoading, grids, fetchLimits, limits, year, monthIndex, readyStamp, viewStamp]);
+
+  const pullGrids = useCallback(
+    (stamp: string) => {
+      const gen = loadGen.current;
+      return loadMonthGrids(year, monthIndex, kind, fetchLimits).then((next) => {
+        if (gen !== loadGen.current) return;
+        if (inflight.current > 0) return;
+        if (next) setGrids(next);
+        setReadyStamp(stamp);
+      });
+    },
+    [year, monthIndex, kind, fetchLimits],
+  );
 
   useEffect(() => {
     setPlayLimits(winamaxPlayLimits({ memberId: actingId || selfId, nick: me.discord || sessionNick }));
@@ -535,12 +574,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     void loadMonthGrids(year, monthIndex, kind, fetchLimits)
       .then((next) => {
         if (gen !== loadGen.current) return;
+        if (inflight.current > 0) return;
         if (next) setGrids(next);
         else setGrids(blank);
         setReadyStamp(loadStamp);
       })
       .catch(() => {
         if (gen !== loadGen.current) return;
+        if (inflight.current > 0) return;
         setReadyStamp(loadStamp);
       });
   }, [year, monthIndex, kind, fetchKey]);
@@ -592,11 +633,28 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (!isLiveData()) return;
     return subscribeOccupancy(() => {
       if (inflight.current > 0) return;
-      void loadMonthGrids(year, monthIndex, kind, fetchLimits).then((next) => {
-        if (next && inflight.current === 0) setGrids(next);
-      });
+      if (Date.now() < quietUntil.current) return;
+      void pullGrids(loadStamp);
     });
-  }, [year, monthIndex, kind, fetchKey]);
+  }, [loadStamp, pullGrids]);
+
+  useEffect(() => {
+    let live = true;
+    const apply = () => {
+      void loadScheduleSettings().then((next) => {
+        if (!live) return;
+        setAllowOverwrite(next.allowOverwriteMarks);
+        setAllowReplace(next.allowReplaceMarks);
+        setCountTables(next.countTables);
+      });
+    };
+    apply();
+    const off = subscribeScheduleSettings(apply);
+    return () => {
+      live = false;
+      off();
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -813,6 +871,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       showV2Toast(diffs[0].placed ? "ok" : "off", t(diffs[0].placed ? "schedule.toastPlaced" : "schedule.toastRemoved"));
       if (!isLiveData() || !writeId) return;
       window.clearTimeout(refreshTimer.current);
+      loadGen.current += 1;
+      quietUntil.current = Date.now() + 800;
       for (const diff of diffs) {
         const payload = {
           memberId: writeId,
@@ -838,14 +898,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
               return;
             }
-            if (inflight.current === 0) {
-              refreshTimer.current = window.setTimeout(() => {
-                if (inflight.current > 0) return;
-                void loadMonthGrids(year, monthIndex, kind, fetchLimits).then((fresh) => {
-                  if (fresh && inflight.current === 0) setGrids(fresh);
-                });
-              }, 280);
-            }
           })
           .catch(() => {
             inflight.current = Math.max(0, inflight.current - 1);
@@ -858,8 +910,73 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           });
       }
     },
-    [kind, monthIndex, year, fetchLimits, t],
+    [kind, monthIndex, year, t],
   );
+
+  const confirmOverwrite = () => {
+    const ask = overwriteAsk;
+    if (!ask || overwriteBusy) return;
+    const pingOwners = () => {
+      void notifyMarkRemoved({
+        owners: ask.people
+          .filter((row) => row.memberId)
+          .map((row) => ({ id: row.memberId as string, name: row.discord, tag: row.tag })),
+        actorMemberId: selfId || me.memberId,
+        actorName: sessionNick || me.discord || me.t || "",
+        kind: ask.kind,
+        when: slotWhenLabel(ask.slots),
+        limit: formatLimit(ask.limit),
+        lang: i18n.language,
+      });
+    };
+    if (!isLiveData()) {
+      setGrids((prev) => ({ ...prev, [ask.limit]: ask.next }));
+      setOverwriteAsk(null);
+      showV2Toast("off", t(ask.kind === "replace" ? "schedule.toastReplaced" : "schedule.toastRemoved"));
+      return;
+    }
+    setOverwriteBusy(true);
+    const run =
+      ask.kind === "replace"
+        ? replaceForeignSlots({
+            memberId: me.memberId || selfId,
+            limit: ask.limit,
+            variant: kind,
+            slots: ask.slots,
+            tables: me.tables,
+          })
+        : removeForeignSlots({
+            limit: ask.limit,
+            variant: kind,
+            slots: ask.slots,
+          });
+    void run
+      .then(({ error }) => {
+        setOverwriteBusy(false);
+        setOverwriteAsk(null);
+        if (error) {
+          showV2Toast(
+            "err",
+            error.includes("overwrite-off")
+              ? t("schedule.overwrite.off")
+              : error.includes("replace-off")
+                ? t("schedule.overwrite.replaceOff")
+                : t("schedule.toastSaveError"),
+          );
+          return;
+        }
+        pingOwners();
+        showV2Toast("off", t(ask.kind === "replace" ? "schedule.toastReplaced" : "schedule.toastRemoved"));
+        loadGen.current += 1;
+        quietUntil.current = Date.now() + 800;
+        setGrids((prev) => ({ ...prev, [ask.limit]: ask.next }));
+      })
+      .catch(() => {
+        setOverwriteBusy(false);
+        setOverwriteAsk(null);
+        showV2Toast("err", t("schedule.toastSaveError"));
+      });
+  };
 
   const toggleLimit = (value: string) => {
     setLimits((prev) => {
@@ -904,6 +1021,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const on = !canEdit;
     setCanEdit(on);
     setMarkOpen(on);
+    if (on) setFront("mark");
     setToolsOpen(false);
   };
 
@@ -914,8 +1032,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       title: t("schedule.myCalendar"),
       on: showMine,
       run: () => {
-        setShowMine(true);
-        setShowSettings(false);
+        setShowMine((open) => !open);
+        setFront("calendar");
         setToolsOpen(false);
       },
     },
@@ -958,8 +1076,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       title: t("schedule.settings"),
       on: showSettings,
       run: () => {
-        setShowSettings(true);
-        setShowMine(false);
+        setShowSettings((open) => !open);
+        setFront("settings");
         setToolsOpen(false);
       },
     },
@@ -971,6 +1089,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       run: toggleEdit,
     },
   ] as const;
+
+  const zOf = (id: typeof front) => (front === id ? 56 : 48);
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
@@ -1247,7 +1367,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           year={year}
           monthIndex={monthIndex}
           me={me}
-          showTables={!hideTables}
+          showTables={countTables && !hideTables}
+          countTables={countTables}
           dimPast={dimPast}
           hidePastDays={hidePastDays}
           showTip={showTip}
@@ -1259,6 +1380,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           grids={shownGrids}
           hourLoad={hourLoad}
           onGridChange={onGridChange}
+          allowOverwrite={allowOverwrite}
+          allowReplace={allowReplace}
+          onOverwriteAsk={setOverwriteAsk}
           skin={skin}
           busy={busyMap}
         />
@@ -1280,6 +1404,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             tag={selfMark.t}
             grids={gridsForCalendar(shownGrids, year, monthIndex)}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
+            x={calPos.x}
+            y={calPos.y}
+            z={zOf("calendar")}
+            onMove={setCalPos}
+            onFocus={() => setFront("calendar")}
             onClose={() => setShowMine(false)}
           />
         )}
@@ -1288,9 +1417,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             dimPast={dimPast}
             hidePastDays={hidePastDays}
             showTables={!hideTables}
+            countTables={countTables}
             showTip={showTip}
             editPulse={editPulse}
             showLocalTime={showExtraTz}
+            x={settingsPos.x}
+            y={settingsPos.y}
+            z={zOf("settings")}
+            onMove={setSettingsPos}
+            onFocus={() => setFront("settings")}
             onDimPast={setDimPast}
             onHidePastDays={setHidePastDays}
             onShowTables={(value) => setHideTables(!value)}
@@ -1312,7 +1447,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             tables={tablesDraft}
             x={markPos.x}
             y={markPos.y}
+            z={zOf("mark")}
             onMove={setMarkPos}
+            onFocus={() => setFront("mark")}
             onBump={bumpTables}
             onDraft={(value) => {
               setTablesDraft(value);
@@ -1329,16 +1466,30 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             selfId={selfId}
             actingId={actingId || selfId}
             onActAs={applyActAs}
+            countTables={countTables}
           />
         ) : null}
-        {showHours ? <HoursPanel matrix={hoursMatrix} onClose={() => setShowHours(false)} /> : null}
+        {showHours ? (
+          <HoursPanel
+            matrix={hoursMatrix}
+            year={year}
+            monthIndex={monthIndex}
+            x={hoursPos.x}
+            y={hoursPos.y}
+            z={zOf("hours")}
+            onMove={setHoursPos}
+            onFocus={() => setFront("hours")}
+            onClose={() => setShowHours(false)}
+          />
+        ) : null}
         {showAnalytics && (
           <V2Float
             title={t("schedule.analyticsTitle")}
             x={analyticsPos.x}
             y={analyticsPos.y}
             width={560}
-            z={front === "fill" ? 50 : 40}
+            compact
+            z={zOf("fill")}
             onMove={setAnalyticsPos}
             onFocus={() => setFront("fill")}
             onClose={() => setShowAnalytics(false)}
@@ -1358,7 +1509,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             y={peoplePos.y}
             width={Math.min(640, 240 + Math.max(1, limits.length) * 76)}
             compact
-            z={front === "people" ? 50 : 40}
+            z={zOf("people")}
             onMove={setPeoplePos}
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
@@ -1404,11 +1555,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                         className={`v2-people-row${vip ? " is-vip" : ""}`}
                         title={vip ? t("cabinet.vipLabel") : undefined}
                         tabIndex={0}
-                        onClick={() => setPeek(row)}
+                        onClick={() => {
+                          setPeek(row);
+                          setFront("user");
+                        }}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             setPeek(row);
+                            setFront("user");
                           }
                         }}
                       >
@@ -1428,7 +1583,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                         </td>
                         <td>
                           <span className="v2-mark-chip">
-                            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} />
+                            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={countTables && !hideTables} />
                           </span>
                         </td>
                         {limits.map((limit) => {
@@ -1483,9 +1638,32 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             row={peek}
             givenName={peek.mark.memberId ? publicNames.get(peek.mark.memberId) : undefined}
             monthLabel={monthTitle(cursor, i18n.language)}
+            x={userPos.x}
+            y={userPos.y}
+            z={zOf("user")}
+            onMove={setUserPos}
+            onFocus={() => setFront("user")}
             onClose={() => setPeek(null)}
+            showTables={countTables && !hideTables}
           />
         ) : null}
+        {overwriteAsk
+          ? createPortal(
+              <OverwriteConfirm
+                kind={overwriteAsk.kind}
+                people={overwriteAsk.people}
+                painter={{ tag: me.t, bg: me.bg, fg: me.fg }}
+                limitLabel={formatLimit(overwriteAsk.limit)}
+                busy={overwriteBusy}
+                onCancel={() => {
+                  if (overwriteBusy) return;
+                  setOverwriteAsk(null);
+                }}
+                onConfirm={confirmOverwrite}
+              />,
+              document.body,
+            )
+          : null}
       </div>
     </main>
   );

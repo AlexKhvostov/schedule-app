@@ -1,15 +1,19 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { usePlacedModal } from "./windowPos";
+import { V2Float } from "./V2Float";
 
 type Props = {
   dimPast: boolean;
   hidePastDays: boolean;
   showTables: boolean;
+  countTables?: boolean;
   showTip: boolean;
   editPulse: boolean;
   showLocalTime: boolean;
+  x: number;
+  y: number;
+  z: number;
+  onMove: (x: number, y: number) => void;
+  onFocus: () => void;
   onDimPast: (value: boolean) => void;
   onHidePastDays: (value: boolean) => void;
   onShowTables: (value: boolean) => void;
@@ -23,9 +27,15 @@ export function V2Settings({
   dimPast,
   hidePastDays,
   showTables,
+  countTables = false,
   showTip,
   editPulse,
   showLocalTime,
+  x,
+  y,
+  z,
+  onMove,
+  onFocus,
   onDimPast,
   onHidePastDays,
   onShowTables,
@@ -35,15 +45,6 @@ export function V2Settings({
   onClose,
 }: Props) {
   const { t } = useTranslation();
-  const placed = usePlacedModal("settings");
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const rows = [
     {
@@ -70,14 +71,18 @@ export function V2Settings({
       title: t("schedule.showLocalTime"),
       hint: t("schedule.showLocalTimeHint"),
     },
-    {
-      key: "tables",
-      on: showTables,
-      toggle: () => onShowTables(!showTables),
-      icon: "fa-table-cells",
-      title: t("schedule.showTables"),
-      hint: t("schedule.showTablesHint"),
-    },
+    ...(countTables
+      ? [
+          {
+            key: "tables",
+            on: showTables,
+            toggle: () => onShowTables(!showTables),
+            icon: "fa-table-cells",
+            title: t("schedule.showTables"),
+            hint: t("schedule.showTablesHint"),
+          },
+        ]
+      : []),
     {
       key: "tip",
       on: showTip,
@@ -96,43 +101,22 @@ export function V2Settings({
     },
   ];
 
-  return createPortal(
-    <div
-      className="v2-mine-back"
-      onClick={(event) => {
-        if (placed.ignoreBackdropClick(event)) return;
-        onClose();
-      }}
-    >
-      <div
-        ref={placed.panelRef}
-        className="v2-settings"
-        style={placed.style}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="v2-modal-head" {...placed.headProps}>
-          <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
-          <h2>{t("schedule.settingsTitle")}</h2>
-          <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
-            <i className="fa-solid fa-xmark" />
+  return (
+    <V2Float title={t("schedule.settingsTitle")} x={x} y={y} width={300} z={z} compact onMove={onMove} onFocus={onFocus} onClose={onClose}>
+      <div className="v2-settings-list">
+        {rows.map((row) => (
+          <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} onClick={row.toggle}>
+            <span className="v2-settings-ico">
+              <i className={`fa-solid ${row.icon}`} />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{row.title}</b>
+              <small>{row.hint}</small>
+            </span>
+            <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
           </button>
-        </header>
-        <div className="v2-settings-list">
-          {rows.map((row) => (
-            <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} onClick={row.toggle}>
-              <span className="v2-settings-ico">
-                <i className={`fa-solid ${row.icon}`} />
-              </span>
-              <span className="v2-settings-copy">
-                <b>{row.title}</b>
-                <small>{row.hint}</small>
-              </span>
-              <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
-    </div>,
-    document.body,
+    </V2Float>
   );
 }

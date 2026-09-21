@@ -27,8 +27,8 @@ export function formatHours(value: number) {
   return value.toFixed(1);
 }
 
-type SlotTally = { slots: number; left: number };
-type Tally = { mark: Mark; limit: string; slots: number; left: number };
+type SlotTally = { halves: Set<string>; leftHalves: Set<string> };
+type Tally = { mark: Mark; limit: string; halves: Set<string>; leftHalves: Set<string> };
 
 function rosterKey(mark: Mark, limit: string) {
   return `${markKey(mark)}|${limit}`;
@@ -36,6 +36,11 @@ function rosterKey(mark: Mark, limit: string) {
 
 function personKey(mark: Mark) {
   return mark.memberId || markKey(mark);
+}
+
+function addHalf(into: { halves: Set<string>; leftHalves: Set<string> }, key: string, past: boolean) {
+  into.halves.add(key);
+  if (!past) into.leftHalves.add(key);
 }
 
 function tallyGrid(
@@ -50,21 +55,21 @@ function tallyGrid(
     const day = dayIdx + 1;
     row.forEach((cell, half) => {
       const past = isPastSlot(year, monthIndex, day, half, cet);
+      const key = `${day}:${half}`;
       cell.forEach((mark) => {
         if (!mark) return;
-        const key = rosterKey(mark, limit);
-        const cur = into.get(key) ?? { mark, limit, slots: 0, left: 0 };
+        const id = rosterKey(mark, limit);
+        const cur = into.get(id) ?? { mark, limit, halves: new Set(), leftHalves: new Set() };
         cur.mark = mark;
-        cur.slots += 1;
-        if (!past) cur.left += 1;
-        into.set(key, cur);
+        addHalf(cur, key, past);
+        into.set(id, cur);
       });
     });
   });
 }
 
 function packLimit(stat: SlotTally): LimitHours {
-  return { slots: stat.slots, hours: hoursFromSlots(stat.slots), left: hoursFromSlots(stat.left) };
+  return { slots: stat.halves.size, hours: hoursFromSlots(stat.halves.size), left: hoursFromSlots(stat.leftHalves.size) };
 }
 
 function rankKey(n?: number | null) {
@@ -87,12 +92,12 @@ function finishPeople(
     })
     .map((row, i) => {
       const byLimit: Record<string, LimitHours> = {};
-      let slots = 0;
-      let left = 0;
+      const halves = new Set<string>();
+      const leftHalves = new Set<string>();
       for (const [limit, stat] of row.limits) {
         byLimit[limit] = packLimit(stat);
-        slots += stat.slots;
-        left += stat.left;
+        for (const key of stat.halves) halves.add(key);
+        for (const key of stat.leftHalves) leftHalves.add(key);
       }
       const firstLimit = [...row.limits.keys()][0] ?? "";
       return {
@@ -100,9 +105,9 @@ function finishPeople(
         mark: row.mark,
         limit: firstLimit,
         byLimit,
-        slots,
-        hours: hoursFromSlots(slots),
-        left: hoursFromSlots(left),
+        slots: halves.size,
+        hours: hoursFromSlots(halves.size),
+        left: hoursFromSlots(leftHalves.size),
       };
     });
 }
@@ -123,9 +128,9 @@ function faceOf(mark: Mark, faces: Mark[]) {
 }
 
 function addLimitStat(into: Map<string, SlotTally>, limit: string, add: SlotTally) {
-  const cur = into.get(limit) ?? { slots: 0, left: 0 };
-  cur.slots += add.slots;
-  cur.left += add.left;
+  const cur = into.get(limit) ?? { halves: new Set<string>(), leftHalves: new Set<string>() };
+  for (const key of add.halves) cur.halves.add(key);
+  for (const key of add.leftHalves) cur.leftHalves.add(key);
   into.set(limit, cur);
 }
 

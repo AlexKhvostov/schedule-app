@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isOwnMark, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
-import { daysInMonth, levelAllowed, seatsOf, stampSeat, type Occupancy } from "../schedule/plan";
+import { daysInMonth, levelAllowed, seatsOf, shownLevels, stampSeat, type Occupancy } from "../schedule/plan";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
@@ -17,6 +17,7 @@ type Props = {
   monthIndex: number;
   me: Mark;
   showTables: boolean;
+  countTables?: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
   showTip: boolean;
@@ -30,6 +31,33 @@ type Props = {
   onGridChange: (limit: string, next: Occupancy) => void;
   skin?: "classic" | "theme";
   busy?: (string | null)[][];
+  allowOverwrite?: boolean;
+  allowReplace?: boolean;
+  onOverwriteAsk?: (ask: OverwriteAsk) => void;
+};
+
+export type OverwriteSlot = { date: string; half: number; level: number };
+
+export type OverwritePerson = {
+  key: string;
+  memberId?: string;
+  tag: string;
+  bg: string;
+  fg: string;
+  avatarUrl?: string;
+  discord: string;
+  username?: string;
+  room: string;
+  slots: OverwriteSlot[];
+};
+
+export type OverwriteAsk = {
+  kind: "remove" | "replace";
+  limit: string;
+  people: OverwritePerson[];
+  memberIds: string[];
+  slots: OverwriteSlot[];
+  next: Occupancy;
 };
 
 type SlotHit = {
@@ -62,7 +90,7 @@ const TIP_SLACK = 12;
 
 type TipPoint = { x: number; y: number };
 type TipApi = {
-  show: (hit: SlotHit, rest?: TipPoint) => void;
+  show: (hit: SlotHit, rest?: TipPoint, force?: boolean) => void;
   hide: () => void;
 };
 
@@ -101,6 +129,33 @@ function displayNick(value?: string | null) {
   return text;
 }
 
+function showNick(value?: string | null) {
+  const text = value?.trim() ?? "";
+  if (!text || isClubCode(text)) return "";
+  return text;
+}
+
+function ownerKey(mark: Mark) {
+  return mark.memberId || mark.discord || mark.t || "mark";
+}
+
+function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
+  const discord = showNick(mark.discord) || showNick(mark.guildNick) || showNick(mark.globalName) || showNick(mark.username) || mark.t.trim() || "—";
+  const username = showNick(mark.username);
+  const room = showNick(mark.room);
+  return {
+    key: ownerKey(mark),
+    memberId: mark.memberId,
+    tag: mark.t,
+    bg: mark.bg,
+    fg: mark.fg,
+    avatarUrl: mark.avatarUrl,
+    discord,
+    username: username && username.toLowerCase() !== discord.replace(/^@/, "").toLowerCase() ? username : "",
+    room,
+  };
+}
+
 function markQuery(focus: string) {
   return focus.trim().toUpperCase();
 }
@@ -123,8 +178,19 @@ function nowLineLeft(half: number, progress: number) {
   return `calc(${nowAlongTrack(half, progress)})`;
 }
 
-function lanesOf(capacity: CapacityMap, limit: string, day: number, year: number, monthIndex: number) {
-  return Array.from({ length: lanesForDay(capacity, limit, day, year, monthIndex) }, (_, i) => i);
+function levelsOf(
+  capacity: CapacityMap,
+  limit: string,
+  day: number,
+  year: number,
+  monthIndex: number,
+  dayRow?: Occupancy[number],
+) {
+  const hours = hoursOf(capacity, limit, day, weekdayOf(year, monthIndex, day));
+  return {
+    hours,
+    levels: shownLevels(lanesForDay(capacity, limit, day, year, monthIndex), hours, dayRow),
+  };
 }
 
 function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, withPos = false): SlotHit | null {
@@ -489,12 +555,14 @@ const OptBody = memo(function OptBody({
               </div>
               <div className="v2-opt-gutter-nls">
                 {limits.map((limit) => {
-                  const levels = lanesOf(capacity, limit, day.d, year, monthIndex);
-                  const chips = levels.map((level) => (
+                  const { levels } = levelsOf(capacity, limit, day.d, year, monthIndex, grids[limit]?.[dayIdx]);
+                  const named = levels.filter((row) => !row.ghost).length;
+                  const chips = levels.map(({ level, ghost }) => (
                     <OptNlChip
                       key={`${dayIdx}-${limit}-${level}`}
                       tone={limitTone(limit)}
-                      label={`${limit}${levels.length > 1 ? `·${level + 1}` : ""}`}
+                      ghost={ghost}
+                      label={`${limit}${named > 1 ? `·${level + 1}` : ""}`}
                     />
                   ));
                   if (skin !== "theme") return chips;
@@ -510,19 +578,22 @@ const OptBody = memo(function OptBody({
               {today && <OptNowLine />}
               {limits.map((limit) => {
                 const row = grids[limit]?.[dayIdx] ?? [];
-                const limitHours = hoursOf(capacity, limit, day.d, weekdayOf(year, monthIndex, day.d));
-                const levels = lanesOf(capacity, limit, day.d, year, monthIndex);
-                const lanes = levels.map((level) => {
+                const { hours: limitHours, levels } = levelsOf(capacity, limit, day.d, year, monthIndex, row);
+                const named = levels.filter((item) => !item.ghost).length;
+                const lanes = levels.map(({ level, ghost }) => {
                   const lane = `${dayIdx}-${limit}-${level}`;
                   return (
                     <OptLevelLane
                       key={lane}
                       laneKey={lane}
                       showNl={false}
+                      ghost={ghost}
                       tone={limitTone(limit)}
-                      label={`${limit}${levels.length > 1 ? `·${level + 1}` : ""}`}
+                      label={`${limit}${named > 1 ? `·${level + 1}` : ""}`}
                     >
-                        {Array.from({ length: SLOT_COUNT }, (_, half) => {
+                        {ghost
+                          ? null
+                          : Array.from({ length: SLOT_COUNT }, (_, half) => {
                           const locked = !levelAllowed(half, level, limitHours);
                           const mark = seatsOf(row[half], level + 1)[level];
                           const useMat = skin === "theme";
@@ -595,7 +666,7 @@ const HELP_GROUPS = [
   { id: "screen", items: ["search", "settings"] as const },
 ];
 
-const OptHelp = memo(function OptHelp() {
+const OptHelp = memo(function OptHelp({ countTables = false }: { countTables?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
@@ -618,7 +689,9 @@ const OptHelp = memo(function OptHelp() {
             {HELP_GROUPS.map((group) => (
               <article key={group.id} className="v2-opt-help-card">
                 <h4>{t(`v2.help.groups.${group.id}`)}</h4>
-                {group.items.map((key) => (
+                {group.items
+                  .filter((key) => countTables || key !== "tables")
+                  .map((key) => (
                   <div key={key} className="v2-opt-help-item">
                     <b>{t(`v2.help.${key}.h`)}</b>
                     <p>{t(`v2.help.${key}.p`)}</p>
@@ -639,6 +712,7 @@ function OptTip({
   grids,
   capacity,
   showTip,
+  countTables = false,
   waitRef,
   skin,
 }: {
@@ -647,6 +721,7 @@ function OptTip({
   grids: Record<string, Occupancy>;
   capacity: CapacityMap;
   showTip: boolean;
+  countTables?: boolean;
   waitRef: MutableRefObject<TipApi>;
   skin?: "classic" | "theme";
 }) {
@@ -669,8 +744,8 @@ function OptTip({
         restRef.current = null;
         setHover(null);
       },
-      show: (hit, rest) => {
-        if (!showTip && !hit.busyLimit) {
+      show: (hit, rest, force) => {
+        if (!showTip && !hit.busyLimit && !force) {
           restRef.current = null;
           setHover(null);
           return;
@@ -781,10 +856,12 @@ function OptTip({
               <dt>{t("v2.tip.winamax")}</dt>
               <dd>{displayNick(mark.room)}</dd>
             </div>
-            <div>
-              <dt>{t("v2.tip.tables")}</dt>
-              <dd>{tablesLabel(mark.tables, i18n.language)}</dd>
-            </div>
+            {countTables ? (
+              <div>
+                <dt>{t("v2.tip.tables")}</dt>
+                <dd>{tablesLabel(mark.tables, i18n.language)}</dd>
+              </div>
+            ) : null}
           </dl>
         </div>
       ) : locked ? (
@@ -807,6 +884,7 @@ export const OptField = memo(function OptField({
   monthIndex,
   me,
   showTables,
+  countTables = false,
   dimPast,
   hidePastDays,
   showTip,
@@ -820,11 +898,42 @@ export const OptField = memo(function OptField({
   onGridChange,
   skin = "classic",
   busy,
+  allowOverwrite = false,
+  allowReplace = false,
+  onOverwriteAsk,
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
-  const propsRef = useRef({ year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin, busy });
-  propsRef.current = { year, monthIndex, me, capacity, grids, onGridChange, dimPast, canEdit, skin, busy };
+  const propsRef = useRef({
+    year,
+    monthIndex,
+    me,
+    capacity,
+    grids,
+    onGridChange,
+    dimPast,
+    canEdit,
+    skin,
+    busy,
+    allowOverwrite,
+    allowReplace,
+    onOverwriteAsk,
+  });
+  propsRef.current = {
+    year,
+    monthIndex,
+    me,
+    capacity,
+    grids,
+    onGridChange,
+    dimPast,
+    canEdit,
+    skin,
+    busy,
+    allowOverwrite,
+    allowReplace,
+    onOverwriteAsk,
+  };
   const dragRef = useRef<{
     pointerId: number;
     mode: "place" | "remove" | "look";
@@ -833,6 +942,7 @@ export const OptField = memo(function OptField({
     x: number;
     y: number;
     panned: boolean;
+    foreign: boolean;
   } | null>(null);
   const tipApi = useRef<TipApi>({ show: () => {}, hide: () => {} });
   const [cet, setCet] = useState<CetStamp>(() => readCet());
@@ -926,23 +1036,61 @@ export const OptField = memo(function OptField({
     const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
     const from = Math.min(origin.half, endHalf);
     const to = Math.max(origin.half, endHalf);
+    const originMark = seatsOf(grid[origin.dayIdx]?.[origin.half], origin.level + 1)[origin.level];
+    const originOwn = Boolean(originMark && isOwnMark(originMark, p.me));
+    const originForeign = Boolean(originMark && !isOwnMark(originMark, p.me));
+    const isRange = from !== to;
+    const wantReplace = Boolean(p.allowReplace && isRange && !originOwn);
+    const removeForeign = Boolean(
+      !wantReplace && mode === "remove" && originForeign && (p.allowOverwrite || p.allowReplace),
+    );
+    const stampMode: "place" | "remove" = wantReplace ? "place" : mode;
+    const displaced = new Map<string, OverwritePerson>();
+    const memberIds = new Set<string>();
+    const slots: OverwriteAsk["slots"] = [];
+    const date = `${p.year}-${String(p.monthIndex + 1).padStart(2, "0")}-${String(origin.day).padStart(2, "0")}`;
     let changed = false;
     const next = grid.map((row, r) => {
       if (r !== origin.dayIdx) return row;
       return row.map((item, half) => {
         if (half < from || half > to) return item;
         if (isPastSlot(p.year, p.monthIndex, origin.day, half, now)) return item;
-        if (mode === "place") {
-          const other = p.busy?.[origin.dayIdx]?.[half];
-          if (other && other !== origin.limit) return item;
-        }
-        const stamped = stampSeat(item, p.me, half, origin.level, mode, hoursCaps);
         const before = seatsOf(item, origin.level + 1)[origin.level];
-        if ((before?.t ?? "") !== (stamped[origin.level]?.t ?? "")) changed = true;
+        const stamped = stampSeat(item, p.me, half, origin.level, stampMode, hoursCaps, removeForeign, wantReplace);
+        const after = stamped[origin.level];
+        if ((before?.t ?? "") !== (after?.t ?? "")) changed = true;
+        const beforeForeign = Boolean(before && !isOwnMark(before, p.me));
+        if (wantReplace) {
+          const afterOwn = Boolean(after && isOwnMark(after, p.me));
+          const wasOwn = Boolean(before && isOwnMark(before, p.me));
+          if (afterOwn && !wasOwn) slots.push({ date, half, level: origin.level });
+        }
+        if ((removeForeign || wantReplace) && beforeForeign && before) {
+          const slot = { date, half, level: origin.level };
+          if (removeForeign) slots.push(slot);
+          const owner = packOwner(before);
+          const prev = displaced.get(owner.key);
+          if (prev) prev.slots.push(slot);
+          else displaced.set(owner.key, { ...owner, slots: [slot] });
+          if (before.memberId) memberIds.add(before.memberId);
+        }
         return stamped;
       });
     });
     if (!changed) return;
+    if (removeForeign || (wantReplace && displaced.size)) {
+      if (displaced.size && p.onOverwriteAsk) {
+        p.onOverwriteAsk({
+          kind: wantReplace ? "replace" : "remove",
+          limit: origin.limit,
+          people: [...displaced.values()],
+          memberIds: [...memberIds],
+          slots,
+          next,
+        });
+      }
+      return;
+    }
     p.onGridChange(origin.limit, next);
   };
 
@@ -988,13 +1136,22 @@ export const OptField = memo(function OptField({
     const seats = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1);
     const mark = seats[hit.level];
     const own = isOwnMark(mark, p.me);
-    const busy = Boolean(hit.busyLimit && hit.busyLimit !== hit.limit);
     let mode: "place" | "remove" | "look" = "look";
     if (p.canEdit && !past) {
       if (own) mode = "remove";
-      else if (!mark && !locked && !busy) mode = "place";
+      else if (mark && (p.allowOverwrite || p.allowReplace)) mode = "remove";
+      else if (!mark && !locked) mode = "place";
     }
-    dragRef.current = { pointerId: event.pointerId, mode, origin: hit, endHalf: hit.half, x: event.clientX, y: event.clientY, panned: false };
+    dragRef.current = {
+      pointerId: event.pointerId,
+      mode,
+      origin: hit,
+      endHalf: hit.half,
+      x: event.clientX,
+      y: event.clientY,
+      panned: false,
+      foreign: Boolean(mark && !own),
+    };
     if (mode === "look") return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1011,7 +1168,11 @@ export const OptField = memo(function OptField({
     const endHalf = halfOnLane(drag.origin, event.clientX);
     if (endHalf === drag.endHalf) return;
     drag.endHalf = endHalf;
-    showPick(drag.origin, drag.origin.half, endHalf, drag.mode);
+    const paint =
+      drag.mode === "remove" && drag.foreign && propsRef.current.allowReplace && endHalf !== drag.origin.half
+        ? "place"
+        : drag.mode;
+    showPick(drag.origin, drag.origin.half, endHalf, paint);
   }, []);
 
   const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -1029,7 +1190,11 @@ export const OptField = memo(function OptField({
       tipApi.current.hide();
       return;
     }
-    tipApi.current.show(hit, { x: event.clientX, y: event.clientY });
+    tipApi.current.show(
+      hit,
+      { x: event.clientX, y: event.clientY },
+      propsRef.current.allowOverwrite || propsRef.current.allowReplace,
+    );
   }, []);
 
   const onPointerOver = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -1133,7 +1298,7 @@ export const OptField = memo(function OptField({
           </div>
         </div>
         </div>
-        <OptHelp />
+        <OptHelp countTables={countTables} />
       </div>
       <OptTip
         year={year}
@@ -1141,6 +1306,7 @@ export const OptField = memo(function OptField({
         grids={grids}
         capacity={capacity}
         showTip={showTip}
+        countTables={countTables}
         waitRef={tipApi}
         skin={skin}
       />

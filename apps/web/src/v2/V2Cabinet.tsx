@@ -20,10 +20,11 @@ import { emptyRoomPlay } from "../schedule/rooms";
 import { isLiveData } from "../data/config";
 import { loadCachedGuild, loadMyDiscord, personLabel, type GuildPerson } from "../data/guild";
 import { loadMyCabinet, saveMemberProfile, type MyCabinet } from "../data/people";
+import type { NotifyChannel } from "../data/botSettings";
 import { loadMyPlays, saveMyPlays } from "../data/plays";
 import { CabinetLoginPanel, type LoginDraft } from "./CabinetLoginPanel";
 import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
-import { BlockBar, Field } from "./cabinetUi";
+import { BlockBar, Field, NotifyPicks } from "./cabinetUi";
 import { loadDiscordOrg } from "./discordOrg";
 import { PayMethodsPanel } from "./PayMethodsPanel";
 import { PermanentPriority } from "./PermanentPriority";
@@ -195,6 +196,8 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const [playId, setPlayId] = useState(() => plays[0]?.id ?? "");
   const [limitsOpen, setLimitsOpen] = useState(false);
   const limitsRef = useRef<HTMLDivElement>(null);
+  const [channel, setChannel] = useState<NotifyChannel>("discord");
+  const [savedChannel, setSavedChannel] = useState<NotifyChannel>("discord");
 
   useEffect(() => {
     if (!live || !session.memberId) return;
@@ -242,6 +245,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
     const nextLogin = { email: card?.email ?? "", google: mine?.google ?? "", password: "" };
     setLogin(nextLogin);
     setSavedLogin(nextLogin);
+    const nextChannel = card?.notifyChannel ?? "discord";
+    setChannel(nextChannel);
+    setSavedChannel(nextChannel);
   }, [live, cardReady, card, session.nick]);
 
   useEffect(() => {
@@ -304,6 +310,20 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
     setProfile(next);
     setSavedProfile(next);
     savePlayerUtc(next.extraUtc);
+    ping();
+  };
+
+  const saveNotify = async () => {
+    if (live && session.memberId) {
+      const result = await saveMemberProfile(session.memberId, { notifyChannel: channel });
+      if (result.error) {
+        showV2Toast("err", t("cabinet.saveErr"));
+        return;
+      }
+      setCard((prev) => (prev ? { ...prev, notifyChannel: channel } : prev));
+    }
+    setSavedChannel(channel);
+    showV2Toast("ok", t("cabinet.saved"));
     ping();
   };
 
@@ -584,6 +604,34 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
           onSave={() => void saveProfile()}
           onCancel={() => setProfile({ ...savedProfile })}
         />
+        </div>
+      </section>
+
+      <section className="v2-block v2-cab-card is-notify">
+        <div className="v2-cab-head">
+          <h2>{t("cabinet.notifyTitle")}</h2>
+        </div>
+        <div className="v2-cab-body">
+          <p className="v2-cab-hint">{t("cabinet.notifyLead")}</p>
+          <NotifyPicks value={channel} disabled={!canEditCard} onChange={setChannel} />
+          <p className="v2-cab-note">
+            <i className="fa-solid fa-bell" aria-hidden />
+            <span>
+              {channel === "telegram" && !profile.telegram
+                ? t("cabinet.notifyNeedTelegram")
+                : channel === "email" && !login.email
+                  ? t("cabinet.notifyNeedEmail")
+                  : t(`cabinet.notify.${channel}Note`)}
+            </span>
+          </p>
+          <BlockBar
+            editing
+            dirty={channel !== savedChannel}
+            saveLabel={t("cabinet.save")}
+            cancelLabel={t("cabinet.cancel")}
+            onSave={() => void saveNotify()}
+            onCancel={() => setChannel(savedChannel)}
+          />
         </div>
       </section>
 

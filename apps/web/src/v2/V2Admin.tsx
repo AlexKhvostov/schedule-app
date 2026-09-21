@@ -20,8 +20,11 @@ import {
 } from "../schedule/capacity";
 import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
 import { MembersAdmin } from "./MembersAdmin";
+import { FoldHead } from "./FoldHead";
 import { V2Root } from "./V2Root";
 import { V2SaveButton } from "./V2SaveButton";
+import { showV2Toast } from "./V2Toast";
+import { loadScheduleSettings, saveCountTables, saveOverwriteMarks, saveReplaceMarks, subscribeScheduleSettings } from "../data/scheduleSettings";
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -75,40 +78,19 @@ function extremesOf(rows: MatrixRow[]) {
   return { deep, shallow };
 }
 
-function FoldHead({
-  kicker,
-  title,
-  lead,
-  open,
-  onToggle,
-}: {
-  kicker: string;
-  title: string;
-  lead?: string;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className={`v2-fold-head${open ? " is-open" : ""}`}>
-      <div className="v2-fold-copy">
-        <span className="v2-admin-kicker">{kicker}</span>
-        <h2>{title}</h2>
-        {open && lead ? <p className="v2-fold-lead">{lead}</p> : null}
-      </div>
-      <button type="button" className="v2-ctrl v2-fold-btn" onClick={onToggle}>
-        {open ? t("admin.fold.close") : t("admin.fold.open")}
-      </button>
-    </div>
-  );
-}
-
 export function V2Admin({ capacity, hourLoad, isRoot, section = "people", variant, onVariantChange, onCapacityChange, onHourLoadChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
   const [draft, setDraft] = useState<MatrixRow[] | null>(null);
   const [open, setOpen] = useState(true);
+  const [controlOpen, setControlOpen] = useState(true);
+  const [allowOverwrite, setAllowOverwrite] = useState(false);
+  const [overwriteSaving, setOverwriteSaving] = useState(false);
+  const [allowReplace, setAllowReplace] = useState(false);
+  const [replaceSaving, setReplaceSaving] = useState(false);
+  const [countTables, setCountTables] = useState(false);
+  const [tablesSaving, setTablesSaving] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
   const [loadSaved, setLoadSaved] = useState(false);
@@ -151,6 +133,25 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
     window.addEventListener("mouseup", stop);
     return () => window.removeEventListener("mouseup", stop);
   }, []);
+
+  useEffect(() => {
+    if (section !== "schedule") return;
+    let live = true;
+    const apply = () => {
+      void loadScheduleSettings().then((next) => {
+        if (!live) return;
+        setAllowOverwrite(next.allowOverwriteMarks);
+        setAllowReplace(next.allowReplaceMarks);
+        setCountTables(next.countTables);
+      });
+    };
+    apply();
+    const off = subscribeScheduleSettings(apply);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [section]);
 
   useEffect(() => {
     setDraft(null);
@@ -273,14 +274,108 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
       </header>
       ) : null}
 
-      {section === "root" && isRoot ? (
-        <section className="v2-admin-card">
-          <V2Root />
-        </section>
-      ) : null}
+      {section === "root" && isRoot ? <V2Root /> : null}
 
       {section === "schedule" ? (
         <>
+      <section className="v2-admin-card">
+        <FoldHead
+          kicker={t("admin.control.kicker")}
+          title={t("admin.control.title")}
+          lead={t("admin.control.lead")}
+          open={controlOpen}
+          onToggle={() => setControlOpen((value) => !value)}
+        />
+        <div className="px-1 pb-3" hidden={!controlOpen}>
+          <button
+            type="button"
+            className={`v2-settings-row${allowOverwrite ? " is-on" : ""}`}
+            disabled={overwriteSaving}
+            title={t("admin.control.overwriteHint")}
+            onClick={() => {
+              const next = !allowOverwrite;
+              setAllowOverwrite(next);
+              setOverwriteSaving(true);
+              void saveOverwriteMarks(next).then((result) => {
+                setOverwriteSaving(false);
+                if (result.error) {
+                  setAllowOverwrite(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-eraser" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.overwrite")}</b>
+              <small>{t("admin.control.overwriteHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${allowOverwrite ? " is-on" : ""}`} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`v2-settings-row${allowReplace ? " is-on" : ""}`}
+            disabled={replaceSaving}
+            title={t("admin.control.replaceHint")}
+            onClick={() => {
+              const next = !allowReplace;
+              setAllowReplace(next);
+              setReplaceSaving(true);
+              void saveReplaceMarks(next).then((result) => {
+                setReplaceSaving(false);
+                if (result.error) {
+                  setAllowReplace(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-right-left" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.replace")}</b>
+              <small>{t("admin.control.replaceHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${allowReplace ? " is-on" : ""}`} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`v2-settings-row${countTables ? " is-on" : ""}`}
+            disabled={tablesSaving}
+            title={t("admin.control.tablesHint")}
+            onClick={() => {
+              const next = !countTables;
+              setCountTables(next);
+              setTablesSaving(true);
+              void saveCountTables(next).then((result) => {
+                setTablesSaving(false);
+                if (result.error) {
+                  setCountTables(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-table-cells" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.tables")}</b>
+              <small>{t("admin.control.tablesHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${countTables ? " is-on" : ""}`} aria-hidden />
+          </button>
+        </div>
+      </section>
       <section className="v2-admin-card">
         <FoldHead
           kicker={t("admin.capacity.kicker")}

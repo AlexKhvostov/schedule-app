@@ -1,4 +1,6 @@
 import { type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { NotifyChannel } from "../data/botSettings";
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -53,6 +55,41 @@ export function BlockBar({
           </button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+const NOTIFY_PICKS = [
+  ["discord", "fa-brands fa-discord"],
+  ["telegram", "fa-brands fa-telegram"],
+  ["email", "fa-solid fa-envelope"],
+] as const;
+
+export function NotifyPicks({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: NotifyChannel;
+  disabled?: boolean;
+  onChange: (id: NotifyChannel) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="v2-notify-picks">
+      {NOTIFY_PICKS.map(([id, icon]) => (
+        <button
+          key={id}
+          type="button"
+          className={`v2-notify-pick is-${id}${value === id ? " is-on" : ""}`}
+          disabled={disabled}
+          onClick={() => onChange(id)}
+        >
+          <i className={icon} aria-hidden />
+          <b>{t(`cabinet.notify.${id}`)}</b>
+          <small>{t(`cabinet.notify.${id}Hint`)}</small>
+        </button>
+      ))}
     </div>
   );
 }

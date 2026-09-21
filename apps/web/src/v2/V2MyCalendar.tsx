@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
@@ -8,7 +8,7 @@ import { downloadCalendarJpeg } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
-import { usePlacedModal } from "./windowPos";
+import { fitFloat } from "./windowPos";
 
 type Props = {
   year: number;
@@ -17,6 +17,11 @@ type Props = {
   tag: string;
   grids: Record<string, Occupancy>;
   today: number | null;
+  x: number;
+  y: number;
+  z: number;
+  onMove: (x: number, y: number) => void;
+  onFocus: () => void;
   onClose: () => void;
 };
 
@@ -93,10 +98,10 @@ function useFitScale(ref: RefObject<HTMLElement | null>) {
   return box;
 }
 
-export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClose }: Props) {
+export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const placed = usePlacedModal("calendar");
   const mineRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ ox: number; oy: number } | null>(null);
   const fit = useFitScale(mineRef);
   const [hover, setHover] = useState<Hover | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,14 +116,6 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
   const hoverHour = hover ? Math.floor(hover.start / 2) : null;
   const theme = loadTheme();
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string) => {
     const box = event.currentTarget.getBoundingClientRect();
     let x = box.right + 8;
@@ -128,29 +125,70 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
     setHover({ day, start, end, limit, x, y });
   };
 
-  return createPortal(
+  const tip = hover ? (
     <div
-      className={`v2-mine-back is-kit theme-${theme}`}
-      onClick={(event) => {
-        if (placed.ignoreBackdropClick(event)) return;
-        onClose();
-      }}
+      className={`v2-tip is-kit theme-${theme} pointer-events-none fixed z-[80] min-w-[220px] rounded-md px-3 py-2.5 text-[12px] shadow-xl`}
+      style={{ left: hover.x, top: hover.y }}
     >
-      <div
-        ref={placed.panelRef}
-        className="v2-mine-fit"
-        style={{
-          ...(fit.w ? { width: fit.w * fit.scale, height: fit.h * fit.scale } : {}),
-          ...(placed.style ?? {}),
-        }}
-      >
+      <div className="font-semibold">{tipDate(year, monthIndex, hover.day, i18n.language)}</div>
+      <div className="v2-mono mt-1.5 grid grid-cols-[36px_1fr] gap-x-2 gap-y-0.5 text-[12px]">
+        <span className="v2-muted">{t("v2.tip.cet")}</span>
+        <span className="v2-tip-cet">
+          {clock(hover.start)} – {clock(hover.end)}
+        </span>
+        {playerClock.showLocal ? (
+          <>
+            <span className="v2-muted">{playerClock.label}</span>
+            <span>
+              {clock(hover.start, playerClock.offset)} – {clock(hover.end, playerClock.offset)}
+            </span>
+          </>
+        ) : null}
+      </div>
+      <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
+        {formatLimit(hover.limit)}
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      {createPortal(
+        <div
+          className={`v2-mine-fit is-float is-kit theme-${theme}`}
+          style={{
+            position: "fixed",
+            left: x,
+            top: y,
+            zIndex: z,
+            ...(fit.w ? { width: fit.w * fit.scale, height: fit.h * fit.scale } : {}),
+          }}
+          onPointerDown={onFocus}
+        >
       <div
         ref={mineRef}
         className={`v2-mine is-kit theme-${theme}`}
         style={fit.scale < 1 ? { transform: `scale(${fit.scale})` } : undefined}
-        onClick={(event) => event.stopPropagation()}
       >
-        <header className="v2-modal-head" {...placed.headProps}>
+        <header
+          className="v2-modal-head"
+          onPointerDown={(event: PointerEvent<HTMLElement>) => {
+            if ((event.target as HTMLElement).closest("button")) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+          }}
+          onPointerMove={(event: PointerEvent<HTMLElement>) => {
+            if (!drag.current) return;
+            const next = fitFloat(event.clientX - drag.current.ox, event.clientY - drag.current.oy);
+            onMove(next.x, next.y);
+          }}
+          onPointerUp={() => {
+            drag.current = null;
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
+        >
           <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
           <h2>{t("schedule.myCalendar")}</h2>
           <button type="button" className="v2-modal-close" aria-label="close" onClick={onClose}>
@@ -294,36 +332,10 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, onClo
           </button>
         </footer>
       </div>
-      </div>
-
-      {hover &&
-        createPortal(
-          <div
-            className={`v2-tip is-kit theme-${theme} pointer-events-none fixed z-[80] min-w-[220px] rounded-md px-3 py-2.5 text-[12px] shadow-xl`}
-            style={{ left: hover.x, top: hover.y }}
-          >
-            <div className="font-semibold">{tipDate(year, monthIndex, hover.day, i18n.language)}</div>
-            <div className="v2-mono mt-1.5 grid grid-cols-[36px_1fr] gap-x-2 gap-y-0.5 text-[12px]">
-              <span className="v2-muted">{t("v2.tip.cet")}</span>
-              <span className="v2-tip-cet">
-                {clock(hover.start)} – {clock(hover.end)}
-              </span>
-              {playerClock.showLocal ? (
-                <>
-                  <span className="v2-muted">{playerClock.label}</span>
-                  <span>
-                    {clock(hover.start, playerClock.offset)} – {clock(hover.end, playerClock.offset)}
-                  </span>
-                </>
-              ) : null}
-            </div>
-            <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-              {formatLimit(hover.limit)}
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>,
-    document.body,
+        document.body,
+      )}
+      {tip ? createPortal(tip, document.body) : null}
+    </>
   );
 }
