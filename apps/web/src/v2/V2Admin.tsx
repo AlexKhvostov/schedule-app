@@ -38,10 +38,13 @@ function inCapRange(ri: number, hour: number, range: CapRange | null) {
   return ri >= rMin && ri <= rMax && hour >= hMin && hour <= hMax;
 }
 
+type AdminSection = "people" | "schedule" | "root";
+
 type Props = {
   capacity: CapacityMap;
   hourLoad: HourLoadMap;
   isRoot?: boolean;
+  section?: AdminSection;
   variant: "nitro" | "regular";
   onVariantChange: (variant: "nitro" | "regular") => void;
   onCapacityChange: (next: CapacityMap) => void;
@@ -100,15 +103,13 @@ function FoldHead({
   );
 }
 
-export function V2Admin({ capacity, hourLoad, isRoot, variant, onVariantChange, onCapacityChange, onHourLoadChange }: Props) {
+export function V2Admin({ capacity, hourLoad, isRoot, section = "people", variant, onVariantChange, onCapacityChange, onHourLoadChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
   const [draft, setDraft] = useState<MatrixRow[] | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [loadOpen, setLoadOpen] = useState(false);
-  const [peopleOpen, setPeopleOpen] = useState(true);
-  const [rootOpen, setRootOpen] = useState(false);
   const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
   const [loadSaved, setLoadSaved] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -260,20 +261,24 @@ export function V2Admin({ capacity, hourLoad, isRoot, variant, onVariantChange, 
 
   return (
     <div className="v2-ink mx-auto w-full px-6 py-8">
-      <h1 className="mb-8 text-2xl font-semibold tracking-tight">{t("admin.title")}</h1>
+      <header className="mb-8">
+        <span className="v2-admin-kicker">{section === "root" ? t("nav.root") : t("nav.club")}</span>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          {section === "schedule" ? t("nav.adminSchedule") : section === "root" ? t("admin.root.title") : t("nav.adminPeople")}
+        </h1>
+        <p className="v2-muted mt-2 max-w-3xl text-[13px] leading-relaxed">
+          {section === "schedule" ? t("admin.scheduleLead") : section === "root" ? t("admin.root.lead") : t("admin.people.foldLead")}
+        </p>
+      </header>
 
-      {isRoot ? (
-        <section className="v2-admin-card mb-6">
-          <FoldHead
-            kicker={t("admin.root.kicker")}
-            title={t("admin.root.title")}
-            lead={t("admin.root.lead")}
-            open={rootOpen}
-            onToggle={() => setRootOpen((value) => !value)}
-          />
-          {rootOpen && <V2Root />}
+      {section === "root" && isRoot ? (
+        <section className="v2-admin-card">
+          <V2Root />
         </section>
       ) : null}
+
+      {section === "schedule" ? (
+        <>
       <section className="v2-admin-card">
         <FoldHead
           kicker={t("admin.capacity.kicker")}
@@ -598,17 +603,14 @@ export function V2Admin({ capacity, hourLoad, isRoot, variant, onVariantChange, 
         </div>
         )}
       </section>
+        </>
+      ) : null}
 
-      <section className="v2-admin-card mt-6">
-        <FoldHead
-          kicker={t("admin.people.kicker")}
-          title={t("admin.people.title")}
-          lead={t("admin.people.foldLead")}
-          open={peopleOpen}
-          onToggle={() => setPeopleOpen((value) => !value)}
-        />
-        {peopleOpen && <MembersAdmin isRoot={isRoot} />}
+      {section === "people" ? (
+      <section className="v2-admin-card">
+        <MembersAdmin isRoot={isRoot} />
       </section>
+      ) : null}
     </div>
   );
 }

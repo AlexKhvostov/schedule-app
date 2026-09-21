@@ -32,6 +32,14 @@
     "heatmap": "Heatmap",
     "cabinet": "Profile",
     "admin": "Admin",
+    "adminMenu": "Admin",
+    "adminOpen": "Open admin",
+    "adminPeople": "Users",
+    "adminPeopleHint": "Access, requests and player cards",
+    "adminSchedule": "Schedule settings",
+    "adminScheduleHint": "Slot capacity and hour wash",
+    "adminRootHint": "Discord bot and club roles",
+    "club": "Club",
     "root": "Root",
     "wait": "Waiting",
     "distance": "Distance · soon",
@@ -123,7 +131,10 @@
   "account": {
     "roleRoot": "root",
     "roleAdmin": "administrator",
-    "roleMember": "member"
+    "roleMember": "member",
+    "theme": "Theme",
+    "language": "Language",
+    "logout": "Log out"
   },
   "theme": {
     "toLight": "Light theme",
@@ -175,6 +186,11 @@
     "showTip": "Slot tooltip",
     "showTipHint": "A compact card with date, time, mark, Discord guild nick, Winamax nick, and tables. No IDs. Opens on a click on an occupied slot, or on someone else’s mark while editing.",
     "editMode": "Editing",
+    "hours": "Hours",
+    "hoursTitle": "My hours",
+    "hoursHint": "Hours from your marks this month, by limit and day.",
+    "tools": "Tools",
+    "toolsMenu": "Open tools",
     "loading": "Loading schedule",
     "loadingHint": "Loading slots.",
     "toastPlaced": "Mark placed",
@@ -182,6 +198,7 @@
     "toastSaveError": "Could not save. The mark was put back.",
     "toastNoAccess": "No access to this schedule. An admin grants it.",
     "pickMonth": "Pick month",
+    "fieldMenu": "Limit and kind",
     "prevYear": "Previous year",
     "nextYear": "Next year",
     "editModeHint": "Marks can be placed or removed only while this is on — fewer accidental clicks.",
@@ -192,6 +209,7 @@
     "markCardOk": "OK",
     "editDockTitle": "Edit window",
     "editDockAs": "Editing as {{nick}}",
+    "editDockDone": "Done",
     "actAsLabel": "Player",
     "actAsSelf": "you",
     "actAsSearch": "Nick or mark",
@@ -260,6 +278,8 @@
     "analytics": "Analytics",
     "analyticsTitle": "Field fill",
     "analyticsHint": "Limit {{limit}} is open. Only this field is counted.",
+    "fillByHour": "By CET hour",
+    "fillByHourHint": "Each bar is the same half-hour as the grid, across every day and level on screen.",
     "fillAll": "Whole month",
     "fillLeft": "Still ahead",
     "colMark": "Mark",
@@ -451,6 +471,7 @@
   "admin": {
     "title": "Admin",
     "lead": "",
+    "scheduleLead": "Slot capacity by CET hour and the pastel load wash on the grid. Pick tournament kind and limit first.",
     "members": "Members",
     "save": "Save",
     "access": {
@@ -825,40 +846,44 @@
       "more": "Space below is reserved for later month slices: player hours, VIP, limits. For now it just marks the end of the field."
     },
     "help": {
-      "kicker": "cheat sheet",
-      "title": "How the schedule works",
-      "lead": "The everyday bits.",
+      "title": "How the grid works",
+      "lead": "The everyday bits: marks first, then reading the grid, then the screen.",
+      "groups": {
+        "marks": "Marks",
+        "read": "Grid",
+        "screen": "Screen"
+      },
       "edit": {
         "h": "Edit mode",
-        "p": "Turn on the checkbox at the top right. Without it, marks are not placed or removed — fewer accidental clicks."
+        "p": "The pencil at the top right. Without it, marks are not placed or removed — fewer accidental clicks."
       },
       "place": {
-        "h": "Place a mark",
-        "p": "In edit mode, click a free slot. Hold and drag several slots in the same level row — the frame shows what will be taken."
+        "h": "Place",
+        "p": "In edit mode, click a free slot. Hold and drag in the same level row — the frame shows what will be taken."
       },
       "remove": {
-        "h": "Remove a mark",
-        "p": "In edit mode, click your mark to clear it. Drag across your marks in the same row to clear the range. Other people’s marks stay put."
+        "h": "Remove",
+        "p": "Click your mark to clear it. Drag across your marks in the same row to clear the range. Other people’s marks stay put."
       },
       "tables": {
-        "h": "Table count",
-        "p": "In the edit dock, plus, minus, or type a number. That count is saved on the slot and stays. Another slot can take a different count."
+        "h": "Tables",
+        "p": "In the edit dock, plus, minus, or a number. That count is saved on the slot and stays. Another slot can take a different count."
+      },
+      "cursor": {
+        "h": "Highlight",
+        "p": "Date and limit light up on the left, the hour on top. In edit mode a frame wraps the whole hour of that day."
       },
       "tip": {
         "h": "Slot card",
-        "p": "With edit off, click an occupied slot for date, time, mark, Discord guild nick, current Winamax nick, and tables. With edit on, the same click works on someone else’s mark. The card leaves as soon as you move the mouse, scroll, or press a key."
+        "p": "With edit off, click an occupied slot for time, mark, Discord, Winamax, and tables. With edit on, the same click works on someone else’s mark. The card leaves when you move the mouse, scroll, or press a key."
       },
       "search": {
-        "h": "Find a mark",
+        "h": "Search",
         "p": "Type two letters in the Aa field. Other marks fade; the hit pulses."
       },
       "settings": {
         "h": "Settings",
         "p": "The gear: dim the past, hide past days, tables on marks, and the slot tooltip."
-      },
-      "cursor": {
-        "h": "Cursor on the grid",
-        "p": "Date and limit light up on the left, hour and half-hour on top. In edit mode a frame wraps the whole hour of that day."
       }
     }
   },

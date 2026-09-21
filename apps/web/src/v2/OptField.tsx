@@ -5,13 +5,12 @@ import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isOwnMark, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
 import { daysInMonth, levelAllowed, seatsOf, stampSeat, type Occupancy } from "../schedule/plan";
-import { columnFill, pctLabel } from "../schedule/analytics";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
-import { OptLevelLane } from "./OptLevelLane";
+import { OptLevelLane, OptNlChip } from "./OptLevelLane";
 
 type Props = {
   year: number;
@@ -110,7 +109,7 @@ function nowAlongTrack(half: number, progress: number) {
   const t = Math.min(SLOT_COUNT, Math.max(0, half + Math.min(1, Math.max(0, progress))));
   const cell = Math.min(SLOT_COUNT - 1, Math.floor(t));
   const frac = t - cell;
-  return `var(--opt-pad-l) + (100% - var(--opt-nl-w) - var(--opt-nl-gap) - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${cell + frac} / ${SLOT_COUNT} + ${cell} * var(--opt-gap)`;
+  return `var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${cell + frac} / ${SLOT_COUNT} + ${cell} * var(--opt-gap)`;
 }
 
 function nowHeadLeft(half: number, progress: number) {
@@ -121,7 +120,7 @@ function nowHeadLeft(half: number, progress: number) {
 }
 
 function nowLineLeft(half: number, progress: number) {
-  return `calc(var(--opt-nl-w) + var(--opt-nl-gap) + ${nowAlongTrack(half, progress)})`;
+  return `calc(${nowAlongTrack(half, progress)})`;
 }
 
 function lanesOf(capacity: CapacityMap, limit: string, day: number, year: number, monthIndex: number) {
@@ -482,9 +481,29 @@ const OptBody = memo(function OptBody({
             data-row={dayIdx}
             className={`v2-opt-block${today ? " is-today" : ""}${day.weekend ? " is-weekend" : ""}${dayPast ? " is-day-past" : ""}`}
           >
-            <div className="v2-opt-day v2-mono">
-              <b>{String(day.d).padStart(2, "0")}</b>
-              <small>{day.wd}</small>
+            <div className="v2-opt-gutter">
+              <div className="v2-opt-day v2-mono">
+                <b>{String(day.d).padStart(2, "0")}</b>
+                <small>{day.wd}</small>
+              </div>
+              <div className="v2-opt-gutter-nls">
+                {limits.map((limit) => {
+                  const levels = lanesOf(capacity, limit, day.d, year, monthIndex);
+                  const chips = levels.map((level) => (
+                    <OptNlChip
+                      key={`${dayIdx}-${limit}-${level}`}
+                      tone={limitTone(limit)}
+                      label={`${limit}${levels.length > 1 ? `·${level + 1}` : ""}`}
+                    />
+                  ));
+                  if (skin !== "theme") return chips;
+                  return (
+                    <div key={limit} className="v2-opt-gutter-limit">
+                      {chips}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="v2-opt-lanes">
               {today && <OptNowLine cet={cet} />}
@@ -498,6 +517,7 @@ const OptBody = memo(function OptBody({
                     <OptLevelLane
                       key={lane}
                       laneKey={lane}
+                      showNl={false}
                       tone={limitTone(limit)}
                       label={`${limit}${levels.length > 1 ? `·${level + 1}` : ""}`}
                     >
@@ -568,58 +588,32 @@ const OptBody = memo(function OptBody({
   );
 });
 
-const OptFoot = memo(function OptFoot({ cols }: { cols: number[] }) {
+const HELP_GROUPS = [
+  { id: "marks", items: ["edit", "place", "remove", "tables"] as const },
+  { id: "read", items: ["cursor", "tip"] as const },
+  { id: "screen", items: ["search", "settings"] as const },
+];
+
+const OptHelp = memo(function OptHelp() {
   const { t } = useTranslation();
   return (
-    <section className="v2-opt-foot">
-      <div className="v2-opt-foot-copy">
-        <span>{t("v2.foot.kicker")}</span>
-        <h3>{t("v2.foot.title")}</h3>
-        <p>{t("v2.foot.lead")}</p>
+    <section className="v2-opt-help">
+      <div className="v2-opt-help-head">
+        <h3>{t("v2.help.title")}</h3>
+        <p>{t("v2.help.lead")}</p>
       </div>
-      <div className="v2-opt-foot-chart">
-        <div className="v2-opt-fill-axis" aria-hidden>
-          <b>100%</b>
-          <span>50%</span>
-          <small>0%</small>
-        </div>
-        <div className="v2-opt-fill-plot">
-          <div className="v2-opt-track v2-opt-fill">
-            {cols.map((pct, half) => (
-              <span
-                key={half}
-                className="v2-opt-fill-col"
-                style={{ ["--p" as string]: String(pct) }}
-                title={`${slotSpan(half)} CET · ${pctLabel(pct)}`}
-              >
-                {half % 4 === 0 ? <em>{Math.round(pct * 100)}</em> : null}
-              </span>
+      <div className="v2-opt-help-groups">
+        {HELP_GROUPS.map((group) => (
+          <article key={group.id} className="v2-opt-help-card">
+            <h4>{t(`v2.help.groups.${group.id}`)}</h4>
+            {group.items.map((key) => (
+              <div key={key} className="v2-opt-help-item">
+                <b>{t(`v2.help.${key}.h`)}</b>
+                <p>{t(`v2.help.${key}.p`)}</p>
+              </div>
             ))}
-          </div>
-          <div className="v2-opt-track v2-opt-fill-hours" aria-hidden>
-            {Array.from({ length: 24 }, (_, hour) => (
-              <span key={hour} style={{ gridColumn: `${hour * 2 + 1} / span 2` }}>
-                {hour}
-              </span>
-            ))}
-          </div>
-          <div className="v2-opt-fill-x">{t("v2.foot.cet")}</div>
-        </div>
-      </div>
-      <div className="v2-opt-help">
-        <div className="v2-opt-foot-copy">
-          <span>{t("v2.help.kicker")}</span>
-          <h3>{t("v2.help.title")}</h3>
-          <p>{t("v2.help.lead")}</p>
-        </div>
-        <div className="v2-opt-help-grid">
-          {(["edit", "place", "remove", "tables", "tip", "search", "settings", "cursor"] as const).map((key) => (
-            <article key={key}>
-              <b>{t(`v2.help.${key}.h`)}</b>
-              <p>{t(`v2.help.${key}.p`)}</p>
-            </article>
-          ))}
-        </div>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -822,6 +816,9 @@ export const OptField = memo(function OptField({
     mode: "place" | "remove" | "look";
     origin: SlotHit;
     endHalf: number;
+    x: number;
+    y: number;
+    panned: boolean;
   } | null>(null);
   const tipApi = useRef<TipApi>({ show: () => {}, hide: () => {} });
   const [cet, setCet] = useState<CetStamp>(() => readCet());
@@ -834,10 +831,6 @@ export const OptField = memo(function OptField({
   const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
   const clock = usePlayerClock();
   const [slotLook, setSlotLook] = useState(() => loadSlotLook());
-  const fillCols = useMemo(
-    () => columnFill(grids, limits, capacity, year, monthIndex),
-    [grids, limits, capacity, year, monthIndex],
-  );
 
   useEffect(() => {
     const sync = () => setSlotLook(loadSlotLook());
@@ -890,6 +883,12 @@ export const OptField = memo(function OptField({
       const target = hidePastDays ? row : idx >= 2 ? blocks[idx - 2] : blocks[0];
       const delta = target.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
       if (Math.abs(delta) > 0.5) scroller.scrollTop = Math.max(0, scroller.scrollTop + delta);
+      const nowLine = scroller.querySelector<HTMLElement>(".v2-opt-now");
+      if (nowLine && scroller.scrollWidth > scroller.clientWidth + 8) {
+        const mid = scroller.clientWidth * 0.42;
+        const dx = nowLine.getBoundingClientRect().left - scroller.getBoundingClientRect().left - mid;
+        scroller.scrollLeft = Math.max(0, scroller.scrollLeft + dx);
+      }
     };
     let alive = true;
     const run = () => {
@@ -955,7 +954,7 @@ export const OptField = memo(function OptField({
     }
     if (!apply) return;
     if (drag.mode === "look") {
-      inspectHit(drag.origin, { x: event.clientX, y: event.clientY });
+      if (!drag.panned) inspectHit(drag.origin, { x: event.clientX, y: event.clientY });
       return;
     }
     applyRange(drag.origin, drag.endHalf, drag.mode);
@@ -966,7 +965,6 @@ export const OptField = memo(function OptField({
     const root = rootRef.current;
     const hit = hitFromEvent(event.target, root, true);
     if (!hit) return;
-    event.preventDefault();
     tipApi.current.hide();
     const p = propsRef.current;
     const now = readCet();
@@ -982,16 +980,20 @@ export const OptField = memo(function OptField({
       if (own) mode = "remove";
       else if (!mark && !locked && !busy) mode = "place";
     }
-    dragRef.current = { pointerId: event.pointerId, mode, origin: hit, endHalf: hit.half };
-    if (mode !== "look") {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      showPick(hit, hit.half, hit.half, mode);
-    }
+    dragRef.current = { pointerId: event.pointerId, mode, origin: hit, endHalf: hit.half, x: event.clientX, y: event.clientY, panned: false };
+    if (mode === "look") return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    showPick(hit, hit.half, hit.half, mode);
   }, []);
 
   const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId || drag.mode === "look") return;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.mode === "look") {
+      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 8) drag.panned = true;
+      return;
+    }
     const endHalf = halfOnLane(drag.origin, event.clientX);
     if (endHalf === drag.endHalf) return;
     drag.endHalf = endHalf;
@@ -1060,30 +1062,39 @@ export const OptField = memo(function OptField({
       onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
     >
-      <div className="v2-opt-sheet">
+      <div className="v2-opt-sheet" ref={daysRef}>
+        <div className="v2-opt-board">
         <div className="v2-opt-hours">
-          <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
-          <div className="v2-opt-nl v2-opt-lab">NL</div>
-          <div className="v2-opt-track v2-opt-head v2-mono relative">
-            {hours.map((h) => {
-              const local = (h + clock.offset) % 24;
-              return (
-                <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
-                  <b>
-                    {h}–{h + 1}
-                  </b>
-                  {clock.showLocal ? (
-                    <small title={clock.label}>
-                      {local}–{local + 1 > 24 ? 24 : local + 1}
-                    </small>
-                  ) : null}
-                </span>
-              );
-            })}
-            <OptHeadNow cet={cet} />
+          <div className="v2-opt-gutter">
+            <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
+            <div className="v2-opt-gutter-nls">
+              <div className="v2-opt-nl v2-opt-lab">NL</div>
+            </div>
+          </div>
+          <div className="v2-opt-lanes">
+            <div className="v2-opt-lane">
+              <div className="v2-opt-track v2-opt-head v2-mono relative">
+                {hours.map((h) => {
+                  const local = (h + clock.offset) % 24;
+                  return (
+                    <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
+                      <b>
+                        {h}–{h + 1}
+                      </b>
+                      {clock.showLocal ? (
+                        <small title={clock.label}>
+                          {local}–{local + 1 > 24 ? 24 : local + 1}
+                        </small>
+                      ) : null}
+                    </span>
+                  );
+                })}
+                <OptHeadNow cet={cet} />
+              </div>
+            </div>
           </div>
         </div>
-        <div ref={daysRef} className="v2-days min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="v2-days">
           <div className="v2-days-inner">
             <OptBody
               year={year}
@@ -1104,10 +1115,11 @@ export const OptField = memo(function OptField({
             {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
               <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>
             )}
-            <OptFoot cols={fillCols} />
             <div className="v2-opt-frame-host" aria-hidden />
           </div>
         </div>
+        </div>
+        <OptHelp />
       </div>
       <OptTip
         year={year}

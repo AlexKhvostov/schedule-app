@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
@@ -6,8 +6,9 @@ import { ME, markKey, markLabel, vipOf, type Mark } from "../schedule/marks";
 import { emptyMonth, patchSeat, type Occupancy } from "../schedule/plan";
 import { readCet } from "../schedule/cet";
 import { rosterFromGrids, type RosterRow } from "../schedule/roster";
-import { fieldFill, pctLabel } from "../schedule/analytics";
+import { fieldFill, columnFill, pctLabel } from "../schedule/analytics";
 import { OptField } from "./OptField";
+import { FillByHourChart } from "./FillByHourChart";
 import { V2Float } from "./V2Float";
 import { V2MyCalendar } from "./V2MyCalendar";
 import { V2Settings } from "./V2Settings";
@@ -15,7 +16,7 @@ import { V2UserCard } from "./V2UserCard";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { showV2Toast } from "./V2Toast";
-import { gridsForCalendar, limitsWithMyMarks, myHoursMatrix, myPlayStats, myTimeline } from "./myShifts";
+import { gridsForCalendar, limitsWithMyMarks, myHoursMatrix, myTimeline } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, savePrefs } from "./prefs";
 import { isLiveData } from "../data/config";
@@ -181,12 +182,12 @@ function ActAsPicker({
 function MarkPlanDock({
   me,
   tables,
-  matrix,
   x,
   y,
   onMove,
   onBump,
   onDraft,
+  onClose,
   canActAs,
   players,
   selfId,
@@ -195,12 +196,12 @@ function MarkPlanDock({
 }: {
   me: Mark;
   tables: string;
-  matrix: ReturnType<typeof myHoursMatrix>;
   x: number;
   y: number;
   onMove: (x: number, y: number) => void;
   onBump: (delta: number) => void;
   onDraft: (value: string) => void;
+  onClose: () => void;
   canActAs?: boolean;
   players: SchedulePlayer[];
   selfId?: string;
@@ -210,26 +211,6 @@ function MarkPlanDock({
   const { t } = useTranslation();
   const drag = useRef<{ ox: number; oy: number } | null>(null);
   const n = Number(tables) || me.tables;
-  const cols = matrix.limits;
-
-  useEffect(() => {
-    const move = (event: MouseEvent) => {
-      if (!drag.current) return;
-      onMove(
-        Math.min(window.innerWidth - 72, Math.max(8, event.clientX - drag.current.ox)),
-        Math.min(window.innerHeight - 48, Math.max(8, event.clientY - drag.current.oy)),
-      );
-    };
-    const up = () => {
-      drag.current = null;
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, [onMove]);
 
   return createPortal(
     <div
@@ -240,22 +221,36 @@ function MarkPlanDock({
     >
       <header
         className="v2-mark-dock-head"
-        onMouseDown={(event) => {
+        onPointerDown={(event: PointerEvent<HTMLElement>) => {
           if ((event.target as HTMLElement).closest("input, button, .v2-mark-dock-who")) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
           drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+        }}
+        onPointerMove={(event: PointerEvent<HTMLElement>) => {
+          if (!drag.current) return;
+          onMove(
+            Math.min(window.innerWidth - 64, Math.max(8, event.clientX - drag.current.ox)),
+            Math.min(window.innerHeight - 40, Math.max(8, event.clientY - drag.current.oy)),
+          );
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
         }}
       >
         <div className="v2-mark-dock-title">
+          <i className="fa-solid fa-grip-vertical v2-mark-dock-grip" aria-hidden />
           <b>
             {canActAs && actingId && selfId && actingId !== selfId
               ? t("schedule.editDockAs", { nick: me.discord })
               : t("schedule.editDockTitle")}
           </b>
-          <i className="fa-solid fa-grip-vertical" aria-hidden />
+          <button type="button" className="v2-mark-dock-close" aria-label={t("schedule.editDockDone")} onClick={onClose}>
+            <i className="fa-solid fa-xmark" />
+          </button>
         </div>
-        {canActAs ? (
-          <ActAsPicker players={players} selfId={selfId} actingId={actingId} onPick={onActAs} />
-        ) : null}
         <div className="v2-mark-dock-tools">
           <span className="v2-mark-sample">
             <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} />
@@ -276,9 +271,26 @@ function MarkPlanDock({
               <i className="fa-solid fa-plus" />
             </button>
           </div>
-          <em>{t("schedule.meHours", { n: matrix.grand })}</em>
+          <span className="v2-mark-dock-tables">{t("schedule.markCardTables")}</span>
         </div>
+        {canActAs ? (
+          <ActAsPicker players={players} selfId={selfId} actingId={actingId} onPick={onActAs} />
+        ) : null}
+        <button type="button" className="v2-mark-dock-done" onClick={onClose}>
+          {t("schedule.editDockDone")}
+        </button>
       </header>
+    </div>,
+    document.body,
+  );
+}
+
+function HoursPanel({ matrix }: { matrix: ReturnType<typeof myHoursMatrix> }) {
+  const { t } = useTranslation();
+  const cols = matrix.limits;
+  return (
+    <div className="v2-hours-panel">
+      <p className="v2-mark-plan-note">{t("schedule.hoursHint")}</p>
       <ul className="v2-mark-dock-stat">
         {cols.map((limit) => {
           const marks = matrix.counts[limit] || 0;
@@ -293,51 +305,47 @@ function MarkPlanDock({
         })}
       </ul>
       {cols.length ? (
-        <>
-      <p className="v2-mark-plan-note">{t("schedule.planTableHint")}</p>
-      <div className="v2-mark-plan-scroll">
-        <table className="v2-mark-plan">
-          <thead>
-            <tr>
-              <th>{t("schedule.planDay")}</th>
-              {cols.map((limit) => (
-                <th key={limit}>{limit}</th>
-              ))}
-              <th className="is-sum">Σ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {matrix.hours.map((row, dayIdx) => (
-              <tr key={dayIdx}>
-                <th>{String(dayIdx + 1).padStart(2, "0")}</th>
+        <div className="v2-mark-plan-scroll">
+          <table className="v2-mark-plan">
+            <thead>
+              <tr>
+                <th>{t("schedule.planDay")}</th>
                 {cols.map((limit) => (
-                  <td key={limit} className={row[limit] ? "is-on" : ""}>
-                    {row[limit] || ""}
+                  <th key={limit}>{limit}</th>
+                ))}
+                <th className="is-sum">Σ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.hours.map((row, dayIdx) => (
+                <tr key={dayIdx}>
+                  <th>{String(dayIdx + 1).padStart(2, "0")}</th>
+                  {cols.map((limit) => (
+                    <td key={limit} className={row[limit] ? "is-on" : ""}>
+                      {row[limit] || ""}
+                    </td>
+                  ))}
+                  <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`}>{matrix.dayTotals[dayIdx] || ""}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>Σ</th>
+                {cols.map((limit) => (
+                  <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
+                    {matrix.totals[limit] || ""}
                   </td>
                 ))}
-                <td className={`is-sum${matrix.dayTotals[dayIdx] ? " is-on" : ""}`}>{matrix.dayTotals[dayIdx] || ""}</td>
+                <td className={`is-sum${matrix.grand ? " is-on" : ""}`}>{matrix.grand || ""}</td>
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th>Σ</th>
-              {cols.map((limit) => (
-                <td key={limit} className={matrix.totals[limit] ? "is-on" : ""}>
-                  {matrix.totals[limit] || ""}
-                </td>
-              ))}
-              <td className={`is-sum${matrix.grand ? " is-on" : ""}`}>{matrix.grand || ""}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-        </>
+            </tfoot>
+          </table>
+        </div>
       ) : (
         <p className="v2-mark-plan-note">{t("schedule.planLimitsEmpty")}</p>
       )}
-    </div>,
-    document.body,
+    </div>
   );
 }
 
@@ -409,23 +417,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [pickYear, setPickYear] = useState(year);
   const [focus, setFocus] = useState("");
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showHours, setShowHours] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
   const [analyticsPos, setAnalyticsPos] = useState({ x: 760, y: 120 });
+  const [hoursPos, setHoursPos] = useState({ x: 420, y: 120 });
   const [peoplePos, setPeoplePos] = useState({ x: 1080, y: 160 });
   const [markPos, setMarkPos] = useState(() => ({
     x: typeof window === "undefined" ? 860 : Math.max(8, window.innerWidth - 408),
     y: 72,
   }));
-  const [front, setFront] = useState<"fill" | "people">("fill");
+  const [front, setFront] = useState<"fill" | "people" | "hours">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
   const limitsRef = useRef<HTMLDivElement>(null);
   const kindRef = useRef<HTMLDivElement>(null);
   const monthRef = useRef<HTMLDivElement>(null);
-  const editPackRef = useRef<HTMLDivElement>(null);
-  const tablesInputRef = useRef<HTMLInputElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   const loadGen = useRef(0);
   const gridsRef = useRef(grids);
   const inflight = useRef(0);
@@ -557,18 +569,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, []);
 
   useEffect(() => {
-    if (!limitsOpen && !kindOpen && !monthOpen) return;
+    if (!limitsOpen && !kindOpen && !monthOpen && !searchOpen) return;
     const close = (event: MouseEvent) => {
       const node = event.target as Node;
       if (!limitsRef.current?.contains(node)) setLimitsOpen(false);
       if (!kindRef.current?.contains(node)) setKindOpen(false);
       if (!monthRef.current?.contains(node)) setMonthOpen(false);
+      if (!searchRef.current?.contains(node)) setSearchOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setLimitsOpen(false);
         setKindOpen(false);
         setMonthOpen(false);
+        setSearchOpen(false);
       }
     };
     window.addEventListener("mousedown", close);
@@ -577,7 +591,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       window.removeEventListener("mousedown", close);
       window.removeEventListener("keydown", onKey);
     };
-  }, [limitsOpen, kindOpen, monthOpen]);
+  }, [limitsOpen, kindOpen, monthOpen, searchOpen]);
 
   useEffect(() => {
     if (!canEdit) {
@@ -614,17 +628,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   useEffect(() => {
     if (!markOpen) return;
     setTablesDraft(String(me.tables));
-    const id = window.setTimeout(() => tablesInputRef.current?.focus(), 0);
-    if (isKit) return () => window.clearTimeout(id);
-    const close = (event: MouseEvent) => {
-      if (!editPackRef.current?.contains(event.target as Node)) setMarkOpen(false);
+  }, [markOpen, me.tables]);
+
+  useEffect(() => {
+    const onDoc = (event: MouseEvent) => {
+      if (!toolsRef.current?.contains(event.target as Node)) setToolsOpen(false);
     };
-    window.addEventListener("mousedown", close);
-    return () => {
-      window.clearTimeout(id);
-      window.removeEventListener("mousedown", close);
-    };
-  }, [markOpen, isKit]);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   const visibleGrids = useMemo(() => limits.map((limit) => shownGrids[limit]).filter(Boolean), [shownGrids, limits]);
   const fieldMarks = useMemo(() => {
@@ -704,13 +716,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       return acc;
     }, empty);
   }, [visibleGrids, year, monthIndex, cetTick, limits, capacity]);
-  const mineByLimit = useMemo(
-    () =>
-      limits.map((limit) => ({
-        limit,
-        ...myPlayStats(shownGrids[limit] ? { [limit]: shownGrids[limit] } : {}, me, year, monthIndex, cetTick),
-      })),
-    [shownGrids, limits, me, year, monthIndex, cetTick],
+  const fillCols = useMemo(
+    () => columnFill(shownGrids, limits, capacity, year, monthIndex),
+    [shownGrids, limits, capacity, year, monthIndex],
   );
   const allGrids = useMemo(() => gridsForCalendar(shownGrids, year, monthIndex), [shownGrids, year, monthIndex]);
   const dockLimits = useMemo(() => {
@@ -719,7 +727,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const set = new Set([...source, ...marked]);
     return LIMIT_OPTIONS.filter((limit) => set.has(limit));
   }, [playLimits, shownGrids, me, limits]);
-  const planMatrix = useMemo(() => (isKit ? myHoursMatrix(shownGrids, me, dockLimits) : null), [isKit, shownGrids, me, dockLimits]);
+  const hoursMatrix = useMemo(() => myHoursMatrix(shownGrids, me, dockLimits), [shownGrids, me, dockLimits]);
   const busyMap = useMemo(
     () => (isKit && canEdit ? myTimeline(allGrids, me) : undefined),
     [isKit, canEdit, allGrids, me],
@@ -842,25 +850,92 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     applyTables(cur + delta);
   };
 
-  const commitTables = () => {
-    const n = Number(tablesDraft);
-    applyTables(Number.isFinite(n) ? n : me.tables);
-    setMarkOpen(false);
+  const toggleEdit = () => {
+    const on = !canEdit;
+    setCanEdit(on);
+    setMarkOpen(on);
+    setToolsOpen(false);
   };
+
+  const tools = [
+    {
+      key: "mine",
+      icon: "fa-regular fa-calendar",
+      title: t("schedule.myCalendar"),
+      on: showMine,
+      run: () => {
+        setShowMine(true);
+        setShowSettings(false);
+        setToolsOpen(false);
+      },
+    },
+    {
+      key: "hours",
+      icon: "fa-solid fa-clock",
+      title: t("schedule.hours"),
+      on: showHours,
+      run: () => {
+        setShowHours((open) => !open);
+        setFront("hours");
+        setToolsOpen(false);
+      },
+    },
+    {
+      key: "analytics",
+      icon: "fa-solid fa-chart-column",
+      title: t("schedule.analytics"),
+      on: showAnalytics,
+      run: () => {
+        setShowAnalytics((open) => !open);
+        setFront("fill");
+        setToolsOpen(false);
+      },
+    },
+    {
+      key: "people",
+      icon: "fa-solid fa-users",
+      title: t("schedule.players"),
+      on: showPeople,
+      run: () => {
+        setShowPeople((open) => !open);
+        setFront("people");
+        setToolsOpen(false);
+      },
+    },
+    {
+      key: "settings",
+      icon: "fa-solid fa-gear",
+      title: t("schedule.settings"),
+      on: showSettings,
+      run: () => {
+        setShowSettings(true);
+        setShowMine(false);
+        setToolsOpen(false);
+      },
+    },
+    {
+      key: "edit",
+      icon: "fa-solid fa-pencil",
+      title: t("schedule.editMode"),
+      on: canEdit,
+      run: toggleEdit,
+    },
+  ] as const;
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <section
-        className={`v2-sched-bar flex h-10 shrink-0 items-center gap-2 border-b px-4${canEdit ? " is-edit" : ""}${editPulse ? "" : " is-quiet"}`}
+        className={`v2-sched-bar flex h-10 shrink-0 items-center border-b${canEdit ? " is-edit" : ""}${editPulse ? "" : " is-quiet"}`}
         style={{ borderColor: canEdit ? "transparent" : undefined }}
       >
-        <button type="button" className="v2-ctrl w-8" onClick={() => shiftMonth(-1)} aria-label="prev">
+        <div className="v2-filters">
+        <button type="button" className="v2-ctrl w-8 v2-month-shift" onClick={() => shiftMonth(-1)} aria-label="prev">
           <i className="fa-solid fa-chevron-left" />
         </button>
         <div className="relative" ref={monthRef}>
           <button
             type="button"
-            className="v2-ctrl min-w-[142px] justify-between px-3 font-semibold"
+            className="v2-ctrl v2-month-hit"
             aria-expanded={monthOpen}
             aria-haspopup="dialog"
             aria-label={t("schedule.pickMonth")}
@@ -872,9 +947,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               });
               setLimitsOpen(false);
               setKindOpen(false);
+              setToolsOpen(false);
+              setSearchOpen(false);
             }}
           >
-            {monthTitle(cursor, i18n.language)}
+            <span className="v2-month-full">{monthTitle(cursor, i18n.language)}</span>
+            <span className="v2-month-short">
+              {monthShort(monthIndex, i18n.language)} {year}
+            </span>
             <i className="fa-regular fa-calendar v2-muted ml-2" />
           </button>
           {monthOpen && (
@@ -911,21 +991,24 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             </div>
           )}
         </div>
-        <button type="button" className="v2-ctrl w-8" onClick={() => shiftMonth(1)} aria-label="next">
+        <button type="button" className="v2-ctrl w-8 v2-month-shift" onClick={() => shiftMonth(1)} aria-label="next">
           <i className="fa-solid fa-chevron-right" />
         </button>
-        <div className="relative" ref={limitsRef}>
+        <div className="v2-field-wide">
+        <div className="v2-limit-wrap relative" ref={limitsRef}>
           <button
             type="button"
-            className="v2-ctrl px-3"
+            className={`v2-ctrl v2-field-hit v2-limit-hit${limits.length > 1 ? " is-many" : ""}`}
+            title={limits.join(" · ")}
             onClick={() => {
               setLimitsOpen((open) => !open);
               setKindOpen(false);
               setMonthOpen(false);
             }}
           >
-            Лимит: <span className="v2-mono ml-1">{limits.join(" · ")}</span>
-            <i className="fa-solid fa-angle-down v2-muted ml-2" />
+            <span className="v2-field-lab">{t("schedule.limit")}: </span>
+            <span className="v2-mono v2-limit-vals">{limits.join("·")}</span>
+            <i className="fa-solid fa-angle-down v2-muted" />
           </button>
           {limitsOpen && (
             <div className="v2-bar-menu">
@@ -944,7 +1027,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         <div className="relative" ref={kindRef}>
           <button
             type="button"
-            className="v2-ctrl px-3"
+            className="v2-ctrl v2-field-hit"
             onClick={() => {
               setKindOpen((open) => !open);
               setLimitsOpen(false);
@@ -979,8 +1062,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             </div>
           )}
         </div>
-        <form className="v2-mark-find relative shrink-0" onSubmit={(e) => e.preventDefault()}>
-          <i className="fa-solid fa-magnifying-glass v2-muted pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-[10px]" />
+        </div>
+        <form className="v2-mark-find v2-mark-find-wide relative shrink-0" onSubmit={(e) => e.preventDefault()}>
           <input
             className={`v2-ctrl v2-mark-find-input${focus.trim() ? " has-q" : ""}`}
             list="v2-marks"
@@ -1002,143 +1085,109 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               <i className="fa-solid fa-xmark" />
             </button>
           ) : null}
-          <datalist id="v2-marks">
-            {fieldMarks.filter((mark) => mark.t).map((mark) => (
-              <option key={markKey(mark)} value={mark.t} />
-            ))}
-          </datalist>
         </form>
-        <div className="v2-bar-groups ml-auto">
-        <div className="v2-bar-pack v2-tools-pack">
-          <button type="button" className="v2-ctrl w-8" title={t("schedule.myCalendar")} onClick={() => { setShowMine(true); setShowSettings(false); }}>
-            <i className="fa-regular fa-calendar" />
-          </button>
+        <div className="v2-mark-pick" ref={searchRef}>
           <button
             type="button"
-            className="v2-ctrl w-8"
-            title={t("schedule.analytics")}
+            className={`v2-ctrl v2-mark-pick-hit${searchOpen || focus.trim() ? " is-on" : ""}`}
+            title={t("v2.search.hint")}
+            aria-label={t("v2.search.hint")}
+            aria-expanded={searchOpen}
             onClick={() => {
-              setShowAnalytics((open) => !open);
-              setFront("fill");
+              setSearchOpen((open) => !open);
+              setMonthOpen(false);
+              setLimitsOpen(false);
+              setKindOpen(false);
+              setToolsOpen(false);
             }}
           >
-            <i className="fa-solid fa-chart-column" />
+            <span className="v2-mono">{focus.trim() || t("schedule.searchAll")}</span>
+            <i className="fa-solid fa-angle-down v2-muted" />
           </button>
-          <button
-            type="button"
-            className="v2-ctrl w-8"
-            title={t("schedule.players")}
-            onClick={() => {
-              setShowPeople((open) => !open);
-              setFront("people");
-            }}
-          >
-            <i className="fa-solid fa-users" />
-          </button>
-          <button
-            type="button"
-            className="v2-ctrl w-8"
-            title={t("schedule.settings")}
-            onClick={() => {
-              setShowSettings(true);
-              setShowMine(false);
-            }}
-          >
-            <i className="fa-solid fa-gear" />
-          </button>
-        </div>
-        <div className={`v2-bar-pack v2-edit-pack${canEdit ? " is-on" : ""}${editPulse ? "" : " is-quiet"}`} ref={editPackRef}>
-          <button
-            type="button"
-            className={`v2-edit-toggle${canEdit ? " is-on" : ""}`}
-            role="switch"
-            aria-checked={canEdit}
-            title={t("schedule.editModeHint")}
-            onClick={() => {
-              const on = !canEdit;
-              setCanEdit(on);
-              if (isKit || canActAs) setMarkOpen(on);
-            }}
-          >
-            <span className="v2-edit-switch" aria-hidden />
-            <span>{t("schedule.editMode")}</span>
-          </button>
-          {isKit ? null : (
-            <>
-          <div className="v2-mark-sample">
+          {searchOpen ? (
+            <div className="v2-bar-menu">
               <button
                 type="button"
-                className="v2-mark-setup"
-                title={canEdit ? t("schedule.markCardTables") : t("schedule.editModeHint")}
-                aria-label={`${me.t} ${me.tables}`}
-                aria-expanded={markOpen}
+                className={!focus.trim() ? "is-on" : ""}
                 onClick={() => {
-                  if (!canEdit) return;
-                  setMarkOpen((open) => !open);
+                  setFocus("");
+                  setSearchOpen(false);
                 }}
-                onContextMenu={(event) => event.preventDefault()}
               >
-                <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={me.tables} />
+                {t("schedule.searchAll")}
               </button>
-          </div>
-          {markOpen && (
-            <div className="v2-mark-card" role="dialog" aria-label={t("schedule.markCardName")}>
-              {canActAs ? (
-                <ActAsPicker players={players} selfId={selfId} actingId={actingId || selfId} onPick={applyActAs} />
-              ) : null}
-              <div className="v2-mark-card-top">
-                <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={Number(tablesDraft) || me.tables} />
-                <div>
-                  <span>{t("schedule.markCardName")}</span>
-                  <strong>{me.t}</strong>
-                </div>
-              </div>
-              <p className="v2-mark-card-label">{t("schedule.markCardTables")}</p>
-              <div className="v2-mark-card-step">
-                <button type="button" className="v2-mark-card-btn" aria-label="−1" onClick={() => bumpTables(-1)}>
-                  <i className="fa-solid fa-minus" />
-                </button>
-                <input
-                  ref={tablesInputRef}
-                  className="v2-mark-card-n"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={30}
-                  value={tablesDraft}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setTablesDraft(value);
-                    if (!value.trim()) return;
-                    const n = Number(value);
-                    if (Number.isFinite(n)) applyTables(n);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") commitTables();
-                    if (event.key === "Escape") setMarkOpen(false);
-                  }}
-                />
-                <button type="button" className="v2-mark-card-btn" aria-label="+1" onClick={() => bumpTables(1)}>
-                  <i className="fa-solid fa-plus" />
-                </button>
-              </div>
-                <button type="button" className="v2-mark-card-ok" onClick={commitTables}>
-                  {t("schedule.markCardOk")}
-                </button>
+              {fieldMarks
+                .filter((mark) => mark.t)
+                .map((mark) => (
+                  <button
+                    key={markKey(mark)}
+                    type="button"
+                    className={focus.trim().toLowerCase() === mark.t.toLowerCase() ? "is-on" : ""}
+                    onClick={() => {
+                      setFocus(mark.t);
+                      setSearchOpen(false);
+                    }}
+                  >
+                    <span className="v2-mono">{mark.t}</span>
+                  </button>
+                ))}
             </div>
-          )}
-            </>
-          )}
+          ) : null}
         </div>
-        <div className="v2-bar-pack v2-me-stat" title={t("schedule.meStatHint")}>
-          {mineByLimit.map((row) => (
-            <span key={row.limit}>
-              <b>{formatLimit(row.limit)}</b>
-              <em>{t("schedule.meHours", { n: row.hours })}</em>
-              <i>{t("schedule.meLeft", { n: row.left })}</i>
-            </span>
+        <datalist id="v2-marks">
+          {fieldMarks.filter((mark) => mark.t).map((mark) => (
+            <option key={markKey(mark)} value={mark.t} />
           ))}
+        </datalist>
         </div>
+        <div className="v2-tools" ref={toolsRef}>
+          <div className="v2-bar-pack v2-tools-pack">
+            {tools.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`v2-ctrl w-8${item.on ? " is-on" : ""}${item.key === "edit" ? " is-edit" : ""}`}
+                title={item.title}
+                aria-pressed={item.on}
+                onClick={item.run}
+              >
+                <i className={item.icon} />
+              </button>
+            ))}
+          </div>
+          <div className="v2-tools-fold">
+            <button
+              type="button"
+              className={`v2-tools-fold-hit${toolsOpen ? " is-on" : ""}${canEdit ? " is-edit" : ""}`}
+              title={t("schedule.tools")}
+              aria-label={t("schedule.toolsMenu")}
+              aria-expanded={toolsOpen}
+              onClick={() => {
+                setToolsOpen((open) => !open);
+                setMonthOpen(false);
+                setLimitsOpen(false);
+                setKindOpen(false);
+                setSearchOpen(false);
+              }}
+            >
+              <i className="fa-solid fa-ellipsis" />
+            </button>
+            {toolsOpen ? (
+              <div className="v2-tools-fold-menu">
+                {tools.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`${item.on ? "is-on" : ""}${item.key === "edit" ? " is-edit" : ""}`}
+                    onClick={item.run}
+                  >
+                    <i className={item.icon} />
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -1173,36 +1222,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           </div>
         ) : null}
         </div>
-        <section className="v2-muted flex h-9 shrink-0 items-center gap-5 px-4 text-[11px]">
-          <div className="flex items-center gap-3">
-            <span>
-              <i className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: selfMark.bg }} />
-              Моя метка
-            </span>
-            <span>
-              <i className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: "#A78BFA" }} />
-              Игрок
-            </span>
-            <span>
-              <i className="v2-lock-swatch mr-1 inline-block h-2 w-5 rounded-sm" />
-              Уровень закрыт
-            </span>
-            <span className="inline-flex items-center">
-              <i className="mr-1.5 inline-block h-3 w-1 rounded-sm" style={{ background: "#ff2d2d", boxShadow: "0 0 8px rgba(255, 45, 45, 0.85)" }} />
-              Сейчас
-            </span>
-            {isKit && canEdit ? (
-              <span>
-                <i
-                  className="mr-1 inline-block h-2 w-3 rounded-sm"
-                  style={{ background: "color-mix(in srgb, var(--now, #e11d2e) 35%, var(--muted))", boxShadow: "inset 0 0 0 1px var(--now, #e11d2e)" }}
-                />
-                {t("v2.tip.busyLegend")}
-              </span>
-            ) : null}
-          </div>
-          <p className="ml-auto">{t("v2.skin.optHint")}</p>
-        </section>
         {showMine && (
           <V2MyCalendar
             year={year}
@@ -1237,11 +1256,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onClose={() => setShowSettings(false)}
           />
         )}
-        {isKit && markOpen && planMatrix ? (
+        {markOpen ? (
           <MarkPlanDock
             me={me}
             tables={tablesDraft}
-            matrix={planMatrix}
             x={markPos.x}
             y={markPos.y}
             onMove={(x, y) => setMarkPos({ x, y })}
@@ -1252,6 +1270,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               const n = Number(value);
               if (Number.isFinite(n)) applyTables(n);
             }}
+            onClose={() => {
+              setMarkOpen(false);
+              setCanEdit(false);
+            }}
             canActAs={canActAs}
             players={players}
             selfId={selfId}
@@ -1259,34 +1281,58 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onActAs={applyActAs}
           />
         ) : null}
+        {showHours && (
+          <V2Float
+            title={t("schedule.hoursTitle")}
+            x={hoursPos.x}
+            y={hoursPos.y}
+            width={Math.min(520, 168 + Math.max(2, hoursMatrix.limits.length) * 52)}
+            compact
+            z={front === "hours" ? 50 : 40}
+            onMove={(x, y) => setHoursPos({ x, y })}
+            onFocus={() => setFront("hours")}
+            onClose={() => setShowHours(false)}
+          >
+            <HoursPanel matrix={hoursMatrix} />
+          </V2Float>
+        )}
         {showAnalytics && (
           <V2Float
             title={t("schedule.analyticsTitle")}
             x={analyticsPos.x}
             y={analyticsPos.y}
+            width={560}
+            tall
             z={front === "fill" ? 50 : 40}
             onMove={(x, y) => setAnalyticsPos({ x, y })}
             onFocus={() => setFront("fill")}
             onClose={() => setShowAnalytics(false)}
           >
-            <div className="space-y-4">
-              {[
-                { label: t("schedule.fillAll"), pct: fill.pct, a: fill.taken, b: fill.seats },
-                { label: t("schedule.fillLeft"), pct: fill.futurePct, a: fill.futureTaken, b: fill.futureSeats },
-              ].map((row) => (
-                <div key={row.label}>
-                  <div className="mb-1 flex justify-between text-[12px]">
-                    <span>{row.label}</span>
-                    <span className="v2-mono v2-accent">{pctLabel(row.pct)}</span>
+            <div className="v2-analytics">
+              <div className="v2-analytics-bars">
+                {[
+                  { label: t("schedule.fillAll"), pct: fill.pct, a: fill.taken, b: fill.seats },
+                  { label: t("schedule.fillLeft"), pct: fill.futurePct, a: fill.futureTaken, b: fill.futureSeats },
+                ].map((row) => (
+                  <div key={row.label}>
+                    <div className="mb-1 flex justify-between text-[12px]">
+                      <span>{row.label}</span>
+                      <span className="v2-mono v2-accent">{pctLabel(row.pct)}</span>
+                    </div>
+                    <div className="v2-fill h-1.5 overflow-hidden rounded-full">
+                      <div className="v2-fill-bar h-full" style={{ width: pctLabel(row.pct) }} />
+                    </div>
+                    <div className="v2-muted mt-1 v2-mono text-[11px]">
+                      {row.a} / {row.b}
+                    </div>
                   </div>
-                  <div className="v2-fill h-1.5 overflow-hidden rounded-full">
-                    <div className="v2-fill-bar h-full" style={{ width: pctLabel(row.pct) }} />
-                  </div>
-                  <div className="v2-muted mt-1 v2-mono text-[11px]">
-                    {row.a} / {row.b}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="v2-analytics-hour">
+                <h3>{t("schedule.fillByHour")}</h3>
+                <p>{t("schedule.fillByHourHint")}</p>
+                <FillByHourChart cols={fillCols} />
+              </div>
             </div>
           </V2Float>
         )}

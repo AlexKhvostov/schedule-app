@@ -81,7 +81,9 @@ html.dark {
   --limit-250: var(--chart-4);
   --limit-500: #f472b6;
   --now: #e11d2e;
-  --app-max: 1120px;
+  --clock: #5eead4;
+  --clock-tag: #99f6e4;
+  --app-max: 1320px;
 }
 
 html[data-ui-theme="light"] {
@@ -132,12 +134,15 @@ html[data-ui-theme="light"] {
   --limit-250: var(--chart-4);
   --limit-500: #be185d;
   --now: #e11d2e;
+  --clock: #0e7490;
+  --clock-tag: #155e75;
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 body {

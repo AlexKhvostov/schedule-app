@@ -19,6 +19,7 @@ import { V2Guild } from "./V2Guild";
 import { writeSession, type Session } from "./session";
 import { V2ShadcnKit } from "./V2ShadcnKit";
 import { V2BlocksKit } from "./V2BlocksKit";
+import { PersonAvatar } from "./PersonAvatar";
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -42,25 +43,32 @@ function V2HeaderClock() {
   }, []);
 
   return (
-    <div className="flex shrink-0 items-baseline gap-2 px-3">
-      <span className="v2-cet v2-mono text-[18px] font-semibold tabular-nums">
-        {formatClock(now, CET)}
-      </span>
-      <span className="v2-cet text-[11px] font-semibold tracking-[0.14em] uppercase">
-        CET
-      </span>
+    <div className="v2-clock" title="CET">
+      <span className="v2-clock-time v2-mono">{formatClock(now, CET)}</span>
+      <span className="v2-clock-tag">CET</span>
       {clock.showLocal ? (
         <>
-          <span className="v2-cet-extra ml-2 v2-mono text-[12px] italic tabular-nums">
-            {formatClock(now, tzFromUtcOffset(clock.utc))}
-          </span>
-          <span className="v2-cet-extra text-[8px] font-medium tracking-[0.08em] uppercase italic">
-            {clock.label}
-          </span>
+          <span className="v2-clock-extra v2-mono">{formatClock(now, tzFromUtcOffset(clock.utc))}</span>
+          <span className="v2-clock-extra is-label">{clock.label}</span>
         </>
       ) : null}
     </div>
   );
+}
+
+type StaffItem = { key: string; label: string; icon: string; hint?: string };
+
+function bootPage(canGrid: boolean, isRoot: boolean, access: Session["access"]) {
+  if (typeof window !== "undefined") {
+    const hash = window.location.hash;
+    if (isRoot && hash === "#blocks") return "blocks";
+    if (isRoot && hash === "#uikit") return "uikit";
+    if (isRoot && hash === "#guild") return "guild";
+    if (isRoot && hash === "#admin-root") return "admin-root";
+    if (hash === "#admin-schedule") return "admin-schedule";
+    if (hash === "#admin" || hash === "#admin-people") return "admin-people";
+  }
+  return canGrid ? "schedule" : access === "profile" ? "cabinet" : "wait";
 }
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
@@ -69,12 +77,9 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const canGrid = session.access === "active";
   const isRoot = session.role === "root";
   const isAdmin = isRoot || session.role === "admin";
-  const [page, setPage] = useState(() => {
-    if (isRoot && typeof window !== "undefined" && window.location.hash === "#blocks") return "blocks";
-    if (isRoot && typeof window !== "undefined" && window.location.hash === "#uikit") return "uikit";
-    return canGrid ? "schedule" : session.access === "profile" ? "cabinet" : "wait";
-  });
+  const [page, setPage] = useState(() => bootPage(canGrid, isRoot, session.access));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
   const [slotTheme, setSlotTheme] = useState(() => (typeof window === "undefined" ? null : loadSlotTheme()));
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
@@ -82,21 +87,52 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kind));
   const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
-  const mark = nick.slice(0, 2).toUpperCase();
+  const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
+  const avatarUrl = session.avatarUrl || demoAvatar || null;
 
   const menuRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
+  const adminRef = useRef<HTMLDivElement>(null);
+  const adminPaneRef = useRef<HTMLDivElement>(null);
 
   const goPage = (key: string) => {
     setPage(key);
     setMenuOpen(false);
+    setAdminOpen(false);
     if (typeof window === "undefined") return;
-    if (key === "uikit") window.location.hash = "uikit";
-    else if (key === "blocks") window.location.hash = "blocks";
-    else if (window.location.hash === "#uikit" || window.location.hash === "#blocks") {
-      window.history.replaceState(null, "", window.location.pathname);
-    }
+    const hashes: Record<string, string> = {
+      uikit: "uikit",
+      blocks: "blocks",
+      guild: "guild",
+      "admin-people": "admin",
+      "admin-schedule": "admin-schedule",
+      "admin-root": "admin-root",
+    };
+    const nextHash = hashes[key];
+    if (nextHash) window.location.hash = nextHash;
+    else if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
   };
+
+  const pages: StaffItem[] = canGrid
+    ? [
+        { key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" },
+        { key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" },
+      ]
+    : [];
+
+  const clubItems: StaffItem[] = [
+    { key: "admin-people", label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") },
+    { key: "admin-schedule", label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") },
+  ];
+  const rootItems: StaffItem[] = isRoot
+    ? [
+        { key: "admin-root", label: t("nav.root"), icon: "fa-key", hint: t("nav.adminRootHint") },
+        { key: "uikit", label: t("nav.uikit"), icon: "fa-swatchbook" },
+        { key: "blocks", label: t("nav.uikitBlocks"), icon: "fa-layer-group" },
+        { key: "guild", label: t("nav.guild"), icon: "fa-brands fa-discord" },
+      ]
+    : [];
+  const staffOn = page.startsWith("admin") || page === "uikit" || page === "blocks" || page === "guild";
 
   useEffect(() => {
     if (session.access === "active" && page === "wait") setPage("schedule");
@@ -133,8 +169,8 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   useEffect(() => {
     const onDoc = (event: MouseEvent) => {
       const node = event.target as Node;
-      if (menuRef.current?.contains(node) || paneRef.current?.contains(node)) return;
-      setMenuOpen(false);
+      if (!menuRef.current?.contains(node) && !paneRef.current?.contains(node)) setMenuOpen(false);
+      if (!adminRef.current?.contains(node) && !adminPaneRef.current?.contains(node)) setAdminOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -151,32 +187,20 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
     setTheme(next);
   };
 
-  const nav = canGrid
-    ? [
-        { key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" },
-        { key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" },
-      ]
-    : [
-        { key: "wait", label: t("nav.wait"), icon: "fa-hourglass-half" },
-        { key: "cabinet", label: t("nav.cabinet"), icon: "fa-user" },
-      ];
-
   return (
     <div className="v2-stage">
       <div
         className={`v2-root is-kit-base theme-${theme} flex min-h-0 flex-col overflow-hidden`}
         style={(slotTheme ? slotThemeVars(slotTheme) : undefined) as CSSProperties | undefined}
       >
-        <header className="v2-top z-30 flex h-10 w-full shrink-0 items-center border-b px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div className="flex items-center gap-2 font-semibold">
-              <span className="v2-brand-mark v2-mono grid h-6 w-6 place-items-center rounded text-[11px]">
-                RP
-              </span>
+        <header className="v2-top">
+          <div className="v2-top-start">
+            <div className="v2-brand">
+              <span className="v2-brand-mark v2-mono">RP</span>
               <span className="v2-brand-name">Red Party</span>
             </div>
-            <nav className="v2-nav">
-              {nav.map((item) => (
+            <nav className="v2-nav" aria-label={t("nav.menu")}>
+              {pages.map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -184,43 +208,93 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                   onClick={() => goPage(item.key)}
                 >
                   <i className={`fa-solid ${item.icon}`} />
-                  {item.label}
+                  <span>{item.label}</span>
                 </button>
               ))}
             </nav>
           </div>
           <V2HeaderClock />
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            <button
-              type="button"
-              className="v2-theme-hit"
-              title={t(theme === "dark" ? "theme.toLight" : "theme.toDark")}
-              aria-label={t(theme === "dark" ? "theme.toLight" : "theme.toDark")}
-              onClick={toggleTheme}
-            >
-              <i className={`fa-solid ${theme === "dark" ? "fa-sun" : "fa-moon"} text-[12px]`} />
-            </button>
-            <div className="v2-lang">
-              {(["ru", "en"] as const).map((code) => (
-                <button key={code} type="button" className={lang === code ? "is-on" : ""} onClick={() => setAppLanguage(code)}>
-                  {code.toUpperCase()}
+          <div className="v2-top-end">
+            {isAdmin ? (
+              <div className="v2-staff" ref={adminRef}>
+                <button
+                  type="button"
+                  className={`v2-staff-hit${adminOpen || staffOn ? " is-on" : ""}`}
+                  aria-expanded={adminOpen}
+                  aria-label={t("nav.adminOpen")}
+                  onClick={() => {
+                    setAdminOpen((open) => !open);
+                    setMenuOpen(false);
+                  }}
+                >
+                  <i className="fa-solid fa-shield-halved" />
+                  <span>{t("nav.adminMenu")}</span>
                 </button>
-              ))}
-            </div>
+                {adminOpen &&
+                  createPortal(
+                    <div
+                      ref={adminPaneRef}
+                      className={`v2-staff-menu is-kit theme-${theme}`}
+                      style={{
+                        position: "fixed",
+                        top: (adminRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                        right: window.innerWidth - (adminRef.current?.getBoundingClientRect().right ?? 0),
+                      }}
+                    >
+                      <div className="v2-staff-group">
+                        <span>{t("nav.club")}</span>
+                        {clubItems.map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className={page === item.key ? "is-on" : ""}
+                            onClick={() => goPage(item.key)}
+                          >
+                            <i className={`v2-staff-ico fa-solid ${item.icon}`} />
+                            <span>
+                              <b>{item.label}</b>
+                              {item.hint ? <small>{item.hint}</small> : null}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {rootItems.length ? (
+                        <div className="v2-staff-group is-root">
+                          <span>{t("nav.root")}</span>
+                          {rootItems.map((item) => (
+                            <button
+                              key={item.key}
+                              type="button"
+                              className={page === item.key ? "is-on" : ""}
+                              onClick={() => goPage(item.key)}
+                            >
+                              <i
+                                className={`v2-staff-ico ${item.icon.startsWith("fa-brands") ? item.icon : `fa-solid ${item.icon}`}`}
+                              />
+                              <span>
+                                <b>{item.label}</b>
+                                {item.hint ? <small>{item.hint}</small> : null}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>,
+                    document.body,
+                  )}
+              </div>
+            ) : null}
             <div className="v2-account" ref={menuRef}>
               <button
                 type="button"
-                className={`v2-account-hit${menuOpen ? " is-on" : ""}`}
-                onClick={() => setMenuOpen((open) => !open)}
+                className={`v2-account-hit${menuOpen || page === "cabinet" ? " is-on" : ""}`}
+                aria-label={nick}
+                onClick={() => {
+                  setMenuOpen((open) => !open);
+                  setAdminOpen(false);
+                }}
               >
-                <span className="v2-account-mark v2-mono grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold">
-                  {mark}
-                </span>
-                <span className="v2-account-name">
-                  <b>{nick}</b>
-                  <small>{t(isRoot ? "account.roleRoot" : isAdmin ? "account.roleAdmin" : "account.roleMember")}</small>
-                </span>
-                <i className="fa-solid fa-angle-down text-[10px]" />
+                <PersonAvatar src={avatarUrl} label={nick} size="sm" />
               </button>
               {menuOpen &&
                 createPortal(
@@ -233,33 +307,59 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                       right: window.innerWidth - (menuRef.current?.getBoundingClientRect().right ?? 0),
                     }}
                   >
-                    <button type="button" onClick={() => goPage("cabinet")}>
-                      <i className="fa-regular fa-user" />
-                      {t("nav.cabinet")}
+                    <div className="v2-account-who">
+                      <b>{nick}</b>
+                      <small>{t(isRoot ? "account.roleRoot" : isAdmin ? "account.roleAdmin" : "account.roleMember")}</small>
+                    </div>
+                    <button type="button" className={`v2-account-cab${page === "cabinet" ? " is-on" : ""}`} onClick={() => goPage("cabinet")}>
+                      <i className="fa-solid fa-id-card" />
+                      <span>{t("nav.cabinet")}</span>
+                      <i className="fa-solid fa-angle-right" />
                     </button>
-                    {isAdmin ? (
-                      <button type="button" onClick={() => goPage("admin")}>
-                        <i className="fa-solid fa-sliders" />
-                        {t("nav.admin")}
-                      </button>
-                    ) : null}
-                    {isRoot ? (
-                      <div className="v2-account-root">
-                        <span>{t("nav.root")}</span>
-                        <button type="button" onClick={() => goPage("uikit")}>
-                          <i className="fa-solid fa-swatchbook" />
-                          {t("nav.uikit")}
-                        </button>
-                        <button type="button" onClick={() => goPage("blocks")}>
-                          <i className="fa-solid fa-layer-group" />
-                          {t("nav.uikitBlocks")}
-                        </button>
-                        <button type="button" onClick={() => goPage("guild")}>
-                          <i className="fa-brands fa-discord" />
-                          {t("nav.guild")}
-                        </button>
+                    <div className="v2-account-prefs">
+                      <div className="v2-account-pref">
+                        <span>{t("account.theme")}</span>
+                        <div className="v2-toggle" role="group" aria-label={t("account.theme")}>
+                          <button
+                            type="button"
+                            className={theme === "dark" ? "is-on" : ""}
+                            aria-pressed={theme === "dark"}
+                            title={t("theme.toDark")}
+                            onClick={() => theme !== "dark" && toggleTheme()}
+                          >
+                            <i className="fa-solid fa-moon" />
+                          </button>
+                          <button
+                            type="button"
+                            className={theme === "light" ? "is-on" : ""}
+                            aria-pressed={theme === "light"}
+                            title={t("theme.toLight")}
+                            onClick={() => theme !== "light" && toggleTheme()}
+                          >
+                            <i className="fa-solid fa-sun" />
+                          </button>
+                        </div>
                       </div>
-                    ) : null}
+                      <div className="v2-account-pref">
+                        <span>{t("account.language")}</span>
+                        <div className="v2-toggle" role="group" aria-label={t("account.language")}>
+                          {(["ru", "en"] as const).map((code) => (
+                            <button
+                              key={code}
+                              type="button"
+                              className={lang === code ? "is-on" : ""}
+                              aria-pressed={lang === code}
+                              onClick={() => setAppLanguage(code)}
+                            >
+                              {code.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" className="v2-account-out" onClick={onLogout}>
+                      {t("account.logout")}
+                    </button>
                   </div>,
                   document.body,
                 )}
@@ -267,7 +367,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => setPage("cabinet")} />}
+          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage("cabinet")} />}
           {page === "cabinet" && (
             <div className="v2-cab-stage min-h-0 flex-1 overflow-auto">
               <V2Cabinet
@@ -312,10 +412,11 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           )}
           {canGrid && page === "priorities" && <V2Priorities />}
           {isRoot && page === "guild" && <V2Guild />}
-          {isAdmin && page === "admin" && (
+          {isAdmin && page.startsWith("admin") && (
             <div className="min-h-0 flex-1 overflow-auto">
               <V2Admin
                 isRoot={isRoot}
+                section={page === "admin-root" ? "root" : page === "admin-schedule" ? "schedule" : "people"}
                 variant={adminVariant}
                 capacity={adminCapacity}
                 hourLoad={hourLoad}
@@ -341,6 +442,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
             </div>
           )}
         </div>
+        <footer className="v2-app-foot">Red Party</footer>
       </div>
     </div>
   );

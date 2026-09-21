@@ -13,6 +13,7 @@ export type LiveMember = {
   nick: string;
   via: AuthVia;
   role: AppRole;
+  avatarUrl: string | null;
 };
 
 function viaOf(provider?: string | null): AuthVia {
@@ -71,7 +72,7 @@ export async function loadLiveMember(): Promise<LiveMember | null> {
   const { data: discord } = ident?.provider_uid
     ? await db
         .from("discord_members")
-        .select("guild_nick, global_name, username")
+        .select("guild_nick, global_name, username, avatar_url")
         .eq("discord_id", ident.provider_uid)
         .maybeSingle()
     : { data: null };
@@ -94,6 +95,7 @@ export async function loadLiveMember(): Promise<LiveMember | null> {
     nick,
     via: viaOf(ident?.provider),
     role: roleOf((roles ?? []).map((row) => row.role_id)),
+    avatarUrl: discord?.avatar_url ?? null,
   };
 }
 
@@ -107,6 +109,7 @@ export function liveToSession(member: LiveMember): Session {
     markTag: member.markTag,
     markBg: member.markBg,
     markFg: member.markFg,
+    avatarUrl: member.avatarUrl,
   };
 }
 

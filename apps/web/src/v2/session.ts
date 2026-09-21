@@ -15,6 +15,7 @@ export type Session = {
   markTag?: string | null;
   markBg?: string;
   markFg?: string;
+  avatarUrl?: string | null;
 };
 
 export function roleFor(nick: string, memberId?: string): AppRole {
@@ -42,6 +43,7 @@ export function readSession(): Session | null {
       markTag: parsed.markTag ?? null,
       markBg: parsed.markBg,
       markFg: parsed.markFg,
+      avatarUrl: parsed.avatarUrl ?? null,
     };
   } catch {
     return null;

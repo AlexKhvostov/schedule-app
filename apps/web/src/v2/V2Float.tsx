@@ -8,6 +8,7 @@ type Props = {
   width?: number;
   z?: number;
   compact?: boolean;
+  tall?: boolean;
   footer?: ReactNode;
   onMove: (x: number, y: number) => void;
   onFocus: () => void;
@@ -15,7 +16,20 @@ type Props = {
   children: ReactNode;
 };
 
-export function V2Float({ title, x, y, width = 300, z = 40, compact, footer, onMove, onFocus, onClose, children }: Props) {
+export function V2Float({
+  title,
+  x,
+  y,
+  width = 300,
+  z = 40,
+  compact,
+  tall,
+  footer,
+  onMove,
+  onFocus,
+  onClose,
+  children,
+}: Props) {
   const drag = useRef<{ ox: number; oy: number } | null>(null);
 
   useEffect(() => {
@@ -38,7 +52,7 @@ export function V2Float({ title, x, y, width = 300, z = 40, compact, footer, onM
 
   return createPortal(
     <div
-      className={`v2-float fixed flex max-h-[min(72vh,520px)] flex-col overflow-hidden rounded-md shadow-2xl${compact ? " is-compact" : ""}`}
+      className={`v2-float fixed flex flex-col overflow-hidden rounded-md shadow-2xl${tall ? " max-h-[min(82vh,680px)]" : " max-h-[min(72vh,520px)]"}${compact ? " is-compact" : ""}`}
       style={{ left: x, top: y, width, zIndex: z }}
       onMouseDown={onFocus}
     >

@@ -24,7 +24,7 @@ export const SLOT_FILL_VARS: Record<SlotFillRole, string> = {
 export const FILL_TOKEN_GROUPS = {
   surfaces: ["background", "card", "popover", "muted", "header", "sidebar"],
   slots: ["slot", "slot-past", "day", "level", "lane"],
-  brand: ["primary", "title", "ring", "border", "input", "secondary", "destructive", "success", "warning", "foreground"],
+  brand: ["primary", "title", "clock", "ring", "border", "input", "secondary", "destructive", "success", "warning", "foreground"],
 } as const;
 
 export const FILL_TOKENS = [
