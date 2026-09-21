@@ -13,7 +13,8 @@
 | Сетка слотов на месяц | **Свои React-компоненты** на Tailwind | ни один кит не умеет 48×31 клеток |
 | База, Discord-вход, живые слоты | **Supabase** (Postgres, Auth, Realtime), регион EU | облако |
 | Выкладка сайта | **Vercel** | облако |
-| Скрейпер и будущий Discord-бот | **Render** (уже есть аккаунт) | отдельный сервис, не сайт |
+| Скрейпер (позже) | **Render** (уже есть аккаунт) | отдельный сервис, не сайт |
+| Discord-бот (снимок, снятие метки, отправка Root) | **Supabase Edge Functions** | `discord-guild`, `notify-mark-removed`, `bot-send` |
 | Интерфейс RU / EN | **i18next** | песочница, затем Next.js |
 
 Язык интерфейса в коде: **TypeScript**. Тексты UI — только в `locales/ru.json` и `locales/en.json`.

@@ -2,7 +2,7 @@
 
 Одна база: **Postgres в Supabase** (проект `wvfllegshaqonqqpbtle`, EU). Не несколько баз — несколько таблиц в одной. Discord — внешний сервис, не наша таблица. Вход (`auth.users`) — схема Auth **того же** проекта.
 
-Сверку живой схемы делали 21 сентября 2026. Интерактивная схема с перетаскиванием таблиц — Canvas «Схема базы» рядом с чатом в Cursor. SQL: [`../supabase/migrations`](../supabase/migrations). Сид справочников: [`../supabase/seed.sql`](../supabase/seed.sql). Смысл сущностей: [модель данных](domain-model.md).
+Сверку живой схемы делали **22 сентября 2026**. Интерактивная схема с перетаскиванием таблиц — Canvas «Схема базы» рядом с чатом в Cursor. SQL: [`../supabase/migrations`](../supabase/migrations). Сид справочников: [`../supabase/seed.sql`](../supabase/seed.sql). Смысл сущностей: [модель данных](domain-model.md).
 
 ## Где лежит то, что видно на экране
 
@@ -34,8 +34,8 @@
 | Правило «заменять чужие метки» | `schedule_settings.allow_replace_marks` | По умолчанию выкл. Пишет admin/root. Протяжка: RPC `replace_foreign_slots` сначала DELETE чужих, затем INSERT кисти. Клик по чужой остаётся снятием |
 | Правило «работа со столами» | `schedule_settings.count_tables` | По умолчанию выкл. Пишет admin/root. Выкл — продукт столы не показывает и не правит. Колонки `members.tables` / `occupancy.tables` в схеме остаются |
 | Руки за месяц (дистанции) | `distances` | человек + рум + месяц + Nitro/Regular + лимит. Экран и импорт — позже. Пишет SQL `is_staff()` (admin/root) |
-| Куда бот пишет человеку | `profiles.notify_channel` | `discord` (по умолчанию), `telegram`, `email`. Пишет владелец карточки |
-| Настройки ботов | `bot_settings` + `bot_secrets` | Две строки: Discord и Telegram. Публичные поля читает клуб, пишет root. Токен — только запись через RPC `set_bot_token`, SELECT клиенту закрыт. Автоуведомления: `notify_mark_removed`, `notify_fill_queue`. Писать от имени бота может только root |
+| Куда бот пишет человеку | `profiles.notify_channel` | `discord` (по умолчанию), `telegram`, `email`. Пишет владелец и SQL `is_staff()` (admin/root) из карточки человека |
+| Настройки ботов | `bot_settings` + `bot_secrets` | Две строки: Discord и Telegram. Публичные поля читает клуб, пишет root. Токен — только запись через RPC `set_bot_token`, SELECT клиенту закрыт. Автоуведомления: `notify_mark_removed`, `notify_fill_queue`. Канал клуба — `notice_chat`. Писать от имени бота может только root |
 
 Слот в базе — не лист 48×31. Это список регистраций.
 
@@ -49,7 +49,7 @@ Discord.com
 
 Склейка лица с карточки к снимку сервера: `identities.provider_uid = discord_members.discord_id` при `provider = discord`. **Внешнего ключа нет специально.** Снимок можно перезаписать целиком. Карточку расписания на каждого с сервера не создаём.
 
-## Живые таблицы (24 в `public`)
+## Живые таблицы в `public`
 
 Центр — `members`. От него идут анкета, вход, роли и слоты. Справочники сходятся в `schedule_kinds`. Слот (`occupancy`) держится за человека и за вид. Дистанции — отдельная стопка фактов, не колонки у человека.
 
@@ -97,6 +97,12 @@ erDiagram
   IDENTITIES {
     text provider_uid "склейка без FK"
   }
+  BOT_SETTINGS {
+    text bot PK
+  }
+  BOT_SECRETS {
+    text bot PK
+  }
 ```
 
 `discord_guild` и `discord_members` живут рядом, но не ссылаются на `members`.
@@ -106,7 +112,7 @@ erDiagram
 | Таблица | Сейчас | Зачем |
 |---|---|---|
 | `members` | живые карточки, не снимок «1» | Участник: заявка `pending/active/blocked`, метка, столы, VIP Nitro/Regular, тип Training/RedParty, поручитель, заготовка `grid_priority`, `distance_ext_id` |
-| `profiles` | 1:1 с `members` | Анкета. Не права |
+| `profiles` | 1:1 с `members` | Анкета. Не права. `notify_channel`: куда бот пишет человеку |
 | `identities` | привязки входа | Discord / позже Google / почта + кэш ника и аватара |
 | `app_roles` | 4 | `member`, `admin` (Administrator), `staff`, `root` |
 | `member_roles` | несколько на человека | Игроки: `member` или `member`+`admin`. Сопровождение: `staff`. Root — overlay, **не** носит `member`/`admin`. SQL `is_staff()` = admin **или** root, клубный staff туда не входит |
@@ -170,6 +176,15 @@ erDiagram
 
 Пишет Edge Function `discord-guild` (пункт **Сервер** в меню только у root; сама функция пускает admin или root). Приложение читает таблицы, в Discord на каждом экране не ходит.
 
+### Боты
+
+| Таблица | Сейчас |
+|---|---|
+| `bot_settings` | две строки: `discord` и `telegram`. Канал клуба, галки «метку сняли» и «очередь заполнения». Пишет root |
+| `bot_secrets` | токен той же строки. Клиенту SELECT закрыт. Пишет RPC `set_bot_token` |
+
+Списка операторов в продукте нет. Edge Functions: `notify-mark-removed` (канал + личка обоим, текст всегда «удалена»), `bot-send` (только root). Telegram — карточка есть, живых сообщений нет.
+
 ## Ключи, которые нельзя ломать
 
 - **Человек** — `members.id`. Discord можно перепривязать в `identities`, человек тот же.
@@ -188,7 +203,7 @@ erDiagram
 - Ставить слот может только `active`.
 - На закрытый уровень поставить нельзя (триггер смотрит `hours_of`).
 - Если на час заданы и число месяца, и день недели — берётся **минимум**.
-- Живое обновление: Realtime на `occupancy`, `members` и `schedule_settings`. Журнал `occupancy_events` в realtime не входит.
+- Живое обновление: Realtime на `occupancy`, `members` и `schedule_settings`. Журнал `occupancy_events` в realtime не входит. Клиент после **своей** успешной записи месяц целиком не качает — иначе метка мигает. Чужие изменения подтягивает realtime.
 - Постановка и снятие пишут строку в `occupancy_events` (триггер). Сетка этот журнал не читает. Строки старше 2 месяцев удаляет ночной cron. Снятие чужой через `remove_foreign_slots` и замена через `replace_foreign_slots` тоже пишут журнал.
 - Если чужую метку сняли (клик или замена), Edge Function `notify-mark-removed` пишет в клубный Discord-канал: какая метка, слот, кто снял — и в личку обоим. Галка в Root. Канал человека в кабинете и в карточке участника: Discord / Telegram / почта.
 

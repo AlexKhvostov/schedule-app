@@ -14,7 +14,14 @@
 
 Корень репозитория специально почти пустой: рабочие вещи живут в своих папках.
 
-Документация продукта: [`docs/README.md`](docs/README.md) (читать по порядку). Что доделали в расписании: [`docs/schedule-now.md`](docs/schedule-now.md). Живой UI и переход в `apps/web`: [`docs/sandbox.md`](docs/sandbox.md). UX сетки: [`docs/schedule-ux.md`](docs/schedule-ux.md).
+Документация продукта: [`docs/README.md`](docs/README.md) (читать по порядку). Что доделали в расписании: [`docs/schedule-now.md`](docs/schedule-now.md). Решения: [`docs/decisions.md`](docs/decisions.md). Живой UI и переход в `apps/web`: [`docs/sandbox.md`](docs/sandbox.md). UX сетки: [`docs/schedule-ux.md`](docs/schedule-ux.md).
+
+Живой продукт локально:
+
+```bash
+cd apps/web
+npx next dev -p 3000
+```
 
 Песочницу UI локально:
 
