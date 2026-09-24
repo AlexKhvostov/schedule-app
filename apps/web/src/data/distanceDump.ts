@@ -1,3 +1,5 @@
+import { getSupabase } from "./client";
+
 export type DistanceVariant = "nitro" | "regular";
 
 export type DistanceSlice = {
@@ -71,7 +73,7 @@ function pickSep(header: string) {
 function parseLimit(raw: string): { limitId: string; variant: DistanceVariant } | null {
   const match = /^(E)?(\d+(?:\.\d+)?)$/i.exec(raw.trim());
   if (!match) return null;
-  return { variant: match[1] ? "nitro" : "regular", limitId: match[2] };
+  return { variant: match[1] ? "regular" : "nitro", limitId: match[2] };
 }
 
 function parseNumber(raw: string) {
@@ -80,7 +82,7 @@ function parseNumber(raw: string) {
   return Number.isFinite(value) ? value : null;
 }
 
-function sortLimitIds(ids: string[]) {
+export function sortDistanceLimits(ids: string[]) {
   return [...ids].sort((a, b) => (LIMIT_RANK[a] ?? 99) - (LIMIT_RANK[b] ?? 99) || Number(a) - Number(b) || a.localeCompare(b));
 }
 
@@ -189,7 +191,7 @@ export function parseDistanceCsv(text: string, fileName: string): DistanceDump &
   return {
     fileName,
     monthStart: monthFromDumpName(fileName),
-    limits: sortLimitIds([...limitSet]),
+    limits: sortDistanceLimits([...limitSet]),
     slices,
     people,
     skipped,
@@ -200,6 +202,248 @@ export function parseDistanceCsv(text: string, fileName: string): DistanceDump &
 
 export function formatHands(value: number, locale: string) {
   return value.toLocaleString(locale.startsWith("en") ? "en-US" : "ru-RU");
+}
+
+function csvCell(value: string | number, sep: string) {
+  const text = String(value);
+  if (text.includes('"') || text.includes("\n") || text.includes("\r") || text.includes(sep)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+export function dumpPreviewCsv(input: {
+  people: DistancePerson[];
+  limits: string[];
+  kind: "all" | DistanceVariant;
+  sums: ReturnType<typeof sumDistance> | null;
+  labels: { id: string; nick: string; total: string; sum: string };
+}) {
+  const sep = ";";
+  const showNitro = input.kind !== "regular";
+  const showRegular = input.kind !== "nitro";
+  const header = [input.labels.id, input.labels.nick];
+  if (showNitro) for (const limit of input.limits) header.push(limit);
+  if (showRegular) for (const limit of input.limits) header.push(`E${limit}`);
+  header.push(input.labels.total);
+  const lines = [header.map((cell) => csvCell(cell, sep)).join(sep)];
+
+  const totalOf = (nitro: number, regular: number, all: number) =>
+    input.kind === "nitro" ? nitro : input.kind === "regular" ? regular : all;
+
+  for (const row of input.people) {
+    const cells: (string | number)[] = [row.playerId, row.nick];
+    if (showNitro) for (const limit of input.limits) cells.push(row.at.nitro[limit] ?? 0);
+    if (showRegular) for (const limit of input.limits) cells.push(row.at.regular[limit] ?? 0);
+    cells.push(totalOf(row.nitroTotal, row.regularTotal, row.total));
+    lines.push(cells.map((cell) => csvCell(cell, sep)).join(sep));
+  }
+
+  if (input.sums && input.people.length) {
+    const cells: (string | number)[] = ["", input.labels.sum];
+    if (showNitro) for (const limit of input.limits) cells.push(input.sums.nitro[limit] ?? 0);
+    if (showRegular) for (const limit of input.limits) cells.push(input.sums.regular[limit] ?? 0);
+    cells.push(totalOf(input.sums.nitroTotal, input.sums.regularTotal, input.sums.total));
+    lines.push(cells.map((cell) => csvCell(cell, sep)).join(sep));
+  }
+
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
+}
+
+export function downloadTextFile(fileName: string, text: string) {
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function parseDistanceLimit(raw: string) {
+  return parseLimit(raw);
+}
+
+const FALLBACK_REDPARTY_ROLE = "1208022351652986891";
+
+function roleHasId(roles: unknown, roleId: string) {
+  if (!Array.isArray(roles) || !roleId) return false;
+  return roles.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    return String((item as { id?: string }).id) === roleId;
+  });
+}
+
+export type DistanceLink = {
+  discordId: string | null;
+  memberId: string | null;
+};
+
+export type DistancePeopleFlags = {
+  redPartyIds: Set<string>;
+  cardIds: Set<string>;
+  byExt: Map<string, DistanceLink>;
+  ready: boolean;
+};
+
+export type DistanceDumpRow = {
+  distance_ext_id: string;
+  variant_id: DistanceVariant;
+  limit_id: string;
+  hands: number;
+  game_nick: string;
+};
+
+export type DistanceWriteResult = {
+  inserted: number;
+  skipped: number;
+  unknown: number;
+};
+
+export function dumpSliceKey(ext: string, variant: string, limitId: string) {
+  return `${ext}|${variant}|${limitId}`;
+}
+
+export function dumpWriteRows(dump: DistanceDump): DistanceDumpRow[] {
+  const rows: DistanceDumpRow[] = [];
+  for (const person of dump.people) {
+    for (const variant of ["nitro", "regular"] as const) {
+      for (const [limitId, hands] of Object.entries(person.at[variant])) {
+        if (hands > 0) {
+          rows.push({
+            distance_ext_id: person.playerId,
+            variant_id: variant,
+            limit_id: limitId,
+            hands,
+            game_nick: person.nick.trim(),
+          });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+export function dumpLabelFromName(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "").trim();
+}
+
+export async function loadDistancePeopleFlags(): Promise<DistancePeopleFlags> {
+  const empty = { redPartyIds: new Set<string>(), cardIds: new Set<string>(), byExt: new Map<string, DistanceLink>(), ready: false };
+  const db = getSupabase();
+  if (!db) return empty;
+  const [{ data: settings }, { data: cards }, { data: map }, { data: guild }, { data: idents }] = await Promise.all([
+    db.from("club_settings").select("required_discord_role_id").eq("id", true).maybeSingle(),
+    db.from("members").select("id, distance_ext_id").not("distance_ext_id", "is", null),
+    db.from("discord_distance_ids").select("discord_id, distance_ext_id"),
+    db.from("discord_members").select("discord_id, roles"),
+    db.from("identities").select("member_id, provider_uid").eq("provider", "discord"),
+  ]);
+  const roleId = String(settings?.required_discord_role_id || FALLBACK_REDPARTY_ROLE);
+  const cardIds = new Set<string>();
+  const memberExt = new Map<string, string>();
+  const byExt = new Map<string, DistanceLink>();
+  for (const row of cards ?? []) {
+    const ext = String(row.distance_ext_id ?? "").trim();
+    if (!ext) continue;
+    cardIds.add(ext);
+    memberExt.set(String(row.id), ext);
+    byExt.set(ext, { discordId: null, memberId: String(row.id) });
+  }
+  const redByDiscord = new Map<string, boolean>();
+  for (const row of guild ?? []) {
+    redByDiscord.set(String(row.discord_id), roleHasId(row.roles, roleId));
+  }
+  const redPartyIds = new Set<string>();
+  for (const row of map ?? []) {
+    const ext = String(row.distance_ext_id);
+    const discordId = String(row.discord_id);
+    const prev = byExt.get(ext);
+    byExt.set(ext, { discordId, memberId: prev?.memberId ?? null });
+    if (redByDiscord.get(discordId)) redPartyIds.add(ext);
+  }
+  const identDiscord = new Map<string, string>();
+  for (const row of idents ?? []) {
+    identDiscord.set(String(row.member_id), String(row.provider_uid));
+  }
+  for (const [memberId, ext] of memberExt) {
+    const discordId = identDiscord.get(memberId);
+    if (discordId) {
+      const prev = byExt.get(ext);
+      byExt.set(ext, { discordId: prev?.discordId ?? discordId, memberId });
+      if (redByDiscord.get(discordId)) redPartyIds.add(ext);
+    }
+  }
+  return { redPartyIds, cardIds, byExt, ready: true };
+}
+
+export async function loadExistingDistanceKeys(monthStart: string, entryKind: string, part: number) {
+  const empty = new Map<string, number>();
+  const db = getSupabase();
+  if (!db || !monthStart) return empty;
+  const { data } = await db
+    .from("distances")
+    .select("distance_ext_id, variant_id, limit_id, hands")
+    .eq("month_start", monthStart)
+    .eq("entry_kind", entryKind)
+    .eq("part", part);
+  const keys = new Map<string, number>();
+  for (const row of data ?? []) {
+    keys.set(dumpSliceKey(String(row.distance_ext_id), String(row.variant_id), String(row.limit_id)), Number(row.hands) || 0);
+  }
+  return keys;
+}
+
+export async function saveDistanceDump(input: {
+  monthStart: string;
+  entryKind: string;
+  part: number;
+  batchLabel: string;
+  note: string;
+  rows: DistanceDumpRow[];
+}) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const, result: null };
+  const { data, error } = await db.rpc("save_distance_dump", {
+    p_room_slug: "winamax",
+    p_month_start: input.monthStart,
+    p_entry_kind: input.entryKind,
+    p_part: input.part,
+    p_batch_label: input.batchLabel,
+    p_note: input.note,
+    p_rows: input.rows,
+  });
+  if (error) return { error: error.message ?? error.code ?? "save", result: null };
+  const row = data as DistanceWriteResult | null;
+  return {
+    error: null,
+    result: {
+      inserted: Number(row?.inserted) || 0,
+      skipped: Number(row?.skipped) || 0,
+      unknown: Number(row?.unknown) || 0,
+    },
+  };
+}
+
+export async function countDistanceRows(monthStart?: string) {
+  const db = getSupabase();
+  if (!db) return 0;
+  let query = db.from("distances").select("id", { count: "exact", head: true });
+  if (monthStart) query = query.eq("month_start", monthStart);
+  const { count } = await query;
+  return count ?? 0;
+}
+
+export async function clearDistanceRows(monthStart?: string) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const, deleted: 0 };
+  const { data, error } = await db.rpc("clear_distance_rows", {
+    p_month_start: monthStart ?? null,
+  });
+  if (error) return { error: error.message ?? error.code ?? "clear", deleted: 0 };
+  return { error: null, deleted: Number((data as { deleted?: number } | null)?.deleted) || 0 };
 }
 
 export function sumDistance(people: DistancePerson[], limits: string[]) {

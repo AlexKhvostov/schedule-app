@@ -90,6 +90,27 @@ async function fetchOccupancyRows(
   }
 }
 
+type MonthScheduleRow = {
+  member_id: string;
+  limit_id: string;
+  slot_date: string;
+  half: number;
+  level: number;
+  tables: number;
+  mark_tag: string | null;
+  mark_bg: string | null;
+  mark_fg: string | null;
+  member_tables: number | null;
+  discord: string | null;
+  room_nick: string | null;
+  avatar_url: string | null;
+  username: string | null;
+  global_name: string | null;
+  grid_priority: number | null;
+  vip_nitro: number | null;
+  vip_regular: number | null;
+};
+
 export type MemberOccupiedSlot = {
   limit: string;
   dayIdx: number;
@@ -133,17 +154,57 @@ export async function loadMemberOccupiedSlots(
   return rows;
 }
 
-export async function loadMonthGrids(
+function missingMonthRpc(message?: string) {
+  return Boolean(message && /load_month_schedule|Could not find the function/i.test(message));
+}
+
+function markFromScheduleRow(row: MonthScheduleRow): Mark {
+  return {
+    t: row.mark_tag ?? "",
+    discord: row.discord ?? "",
+    room: row.room_nick ?? "",
+    bg: row.mark_bg ?? "",
+    fg: row.mark_fg ?? "",
+    tables: clampTables(row.member_tables),
+    memberId: row.member_id,
+    avatarUrl: row.avatar_url ?? "",
+    username: row.username ?? "",
+    globalName: row.global_name ?? "",
+    priority: typeof row.grid_priority === "number" && row.grid_priority > 0 ? row.grid_priority : null,
+    vipNitro: asVip(row.vip_nitro) || null,
+    vipRegular: asVip(row.vip_regular) || null,
+  };
+}
+
+function paintScheduleRows(grids: Record<string, Occupancy>, rows: MonthScheduleRow[]) {
+  const marks = new Map<string, Mark>();
+  for (const row of rows) {
+    if (!marks.has(row.member_id)) marks.set(row.member_id, markFromScheduleRow(row));
+    const dayIdx = Number(String(row.slot_date).slice(8, 10)) - 1;
+    const grid = grids[row.limit_id];
+    const half = Number(row.half);
+    const level = Number(row.level);
+    if (!grid?.[dayIdx] || half < 0 || half > 47 || level < 0) continue;
+    const cell = grid[dayIdx][half] ?? [];
+    const next = cell.slice();
+    while (next.length <= level) next.push(null);
+    const face = marks.get(row.member_id);
+    next[level] = face ? { ...face, tables: clampTables(row.tables, face.tables) } : null;
+    grid[dayIdx][half] = next;
+  }
+}
+
+async function loadMonthGridsLegacy(
   year: number,
   monthIndex: number,
   variant: "nitro" | "regular",
   limits: string[],
-): Promise<MonthGridsResult | null> {
+  grids: Record<string, Occupancy>,
+): Promise<MonthGridsResult> {
   const db = getSupabase();
-  if (!db) return null;
+  if (!db) return { grids };
   const kinds = await loadKinds();
   const wanted = kinds.filter((row) => row.variantId === variant && limits.includes(row.limitId));
-  const grids = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
   if (!wanted.length) return { grids };
   const { from, to } = ymRange(year, monthIndex);
   const ids = wanted.map((row) => row.id);
@@ -200,6 +261,30 @@ export async function loadMonthGrids(
     grid[dayIdx][row.half] = next;
   }
   return { grids };
+}
+
+export async function loadMonthGrids(
+  year: number,
+  monthIndex: number,
+  variant: "nitro" | "regular",
+  limits: string[],
+): Promise<MonthGridsResult | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const grids = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
+  if (!limits.length) return { grids };
+  const { data, error } = await db.rpc("load_month_schedule", {
+    p_year: year,
+    p_month: monthIndex + 1,
+    p_variant: variant,
+    p_limit_ids: limits,
+  });
+  if (!error) {
+    paintScheduleRows(grids, (data ?? []) as MonthScheduleRow[]);
+    return { grids };
+  }
+  if (!missingMonthRpc(error.message)) return { grids, error: error.message };
+  return loadMonthGridsLegacy(year, monthIndex, variant, limits, grids);
 }
 
 function missingOwnRpc(message?: string) {

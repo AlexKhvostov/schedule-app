@@ -14,6 +14,7 @@ import { V2Schedule } from "./V2Schedule";
 import { V2Priorities } from "./V2Priorities";
 import { V2Admin } from "./V2Admin";
 import { V2Distances } from "./V2Distances";
+import { V2DistanceBook } from "./V2DistanceBook";
 import { V2Cabinet } from "./V2Cabinet";
 import { V2Home } from "./V2Home";
 import { V2Wait } from "./V2Wait";
@@ -70,8 +71,9 @@ function bootPage(isRoot: boolean, permissions: string[] = []) {
     if (isRoot && hash === "#uikit") return "uikit";
     if (isRoot && hash === "#guild") return "guild";
     if (isRoot && hash === "#admin-root") return "admin-root";
+    if (isRoot && (hash === "#root-distance" || hash === "#root-import")) return "root-distance";
+    if (can("admin.people") && hash === "#admin-distance") return "admin-distance";
     if (can("schedule.manage") && hash === "#admin-schedule") return "admin-schedule";
-    if (can("distances") && hash === "#admin-distance") return "admin-distance";
     if (can("admin.people") && (hash === "#admin" || hash === "#admin-people")) return "admin-people";
     if (can("schedule") && hash === "#schedule") return "schedule";
     if (can("priorities") && hash === "#priorities") return "priorities";
@@ -94,9 +96,8 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const canProfile = can("profile");
   const canPriorities = session.access === "active" && can("priorities");
   const canPeople = can("admin.people");
-  const canDistances = can("distances");
   const canScheduleAdmin = can("schedule.manage");
-  const isAdmin = canPeople || canDistances || canScheduleAdmin;
+  const isAdmin = isRoot || canPeople || canScheduleAdmin;
   const [page, setPage] = useState(() => bootPage(isRoot, menuPermissions));
   const [menuOpen, setMenuOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -129,6 +130,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
       blocks: "blocks",
       guild: "guild",
       "admin-people": "admin",
+      "root-distance": "root-distance",
       "admin-distance": "admin-distance",
       "admin-schedule": "admin-schedule",
       "admin-root": "admin-root",
@@ -146,24 +148,26 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
 
   const clubItems: StaffItem[] = [
     ...(canPeople ? [{ key: "admin-people", label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") }] : []),
-    ...(canDistances ? [{ key: "admin-distance", label: t("nav.adminDistance"), icon: "fa-chart-column", hint: t("nav.adminDistanceHint") }] : []),
+    ...(canPeople ? [{ key: "admin-distance", label: t("nav.adminDistance"), icon: "fa-chart-column", hint: t("nav.adminDistanceHint") }] : []),
     ...(canScheduleAdmin ? [{ key: "admin-schedule", label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") }] : []),
   ];
   const rootItems: StaffItem[] = isRoot
     ? [
         { key: "admin-root", label: t("nav.root"), icon: "fa-key", hint: t("nav.adminRootHint") },
+        { key: "root-distance", label: t("nav.rootImport"), icon: "fa-file-csv", hint: t("nav.rootImportHint") },
         { key: "uikit", label: t("nav.uikit"), icon: "fa-swatchbook" },
         { key: "blocks", label: t("nav.uikitBlocks"), icon: "fa-layer-group" },
         { key: "guild", label: t("nav.guild"), icon: "fa-brands fa-discord" },
       ]
     : [];
-  const staffOn = page.startsWith("admin") || page === "uikit" || page === "blocks" || page === "guild";
+  const staffOn = page.startsWith("admin") || page === "root-distance" || page === "uikit" || page === "blocks" || page === "guild";
 
   useEffect(() => {
     if (page === "wait" && session.access === "active") setPage("home");
     if (page === "cabinet" && !canProfile) setPage("home");
     if (page === "schedule" && !canGrid) setPage("home");
     if (page === "priorities" && !canPriorities) setPage("home");
+    if (page === "admin-distance" && !canPeople) setPage("home");
   }, [session.access, page, canProfile, canGrid, canPriorities]);
 
   useEffect(() => {
@@ -434,7 +438,12 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           )}
           {canPriorities && page === "priorities" && <V2Priorities />}
           {isRoot && page === "guild" && <V2Guild />}
-          {canDistances && page === "admin-distance" && (
+          {canPeople && page === "admin-distance" && (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <V2DistanceBook />
+            </div>
+          )}
+          {isRoot && page === "root-distance" && (
             <div className="min-h-0 flex-1 overflow-auto">
               <V2Distances />
             </div>
