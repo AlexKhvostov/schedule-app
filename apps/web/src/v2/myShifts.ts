@@ -22,7 +22,101 @@ export function gridsForCalendar(grids: Record<string, Occupancy>, year: number,
   ) as Record<string, Occupancy>;
 }
 
-/** Одна линия на день: в каждом получасе не больше одного лимита. */
+/** Календарь: все свои слоты, даже на лимитах вне фильтра. */
+export function gridsWithMySlots(
+  grids: Record<string, Occupancy>,
+  occupied: (string[] | null)[][] | undefined,
+  me: Mark | string,
+  year: number,
+  monthIndex: number,
+): Record<string, Occupancy> {
+  const loaded = new Set<string>(LIMIT_OPTIONS.filter((limit) => grids[limit]));
+  const next = gridsForCalendar(grids, year, monthIndex);
+  if (!occupied) return next;
+  const face = typeof me === "string" ? ({ t: me, discord: "", room: "", bg: "", fg: "", tables: 1 } as Mark) : me;
+  for (let dayIdx = 0; dayIdx < occupied.length; dayIdx += 1) {
+    for (let half = 0; half < 48; half += 1) {
+      for (const limit of occupied[dayIdx]?.[half] ?? []) {
+        if (loaded.has(limit)) continue;
+        const grid = next[limit];
+        const cell = grid?.[dayIdx]?.[half];
+        if (!cell || cell.some((mark) => seatIsMine(mark, me))) continue;
+        const copy = cell.slice();
+        const idx = copy.findIndex((seat) => !seat);
+        if (idx >= 0) copy[idx] = { ...face };
+        else copy.push({ ...face });
+        grid[dayIdx][half] = copy;
+      }
+    }
+  }
+  return next;
+}
+
+function blankOccupied(days: number): (string[] | null)[][] {
+  return Array.from({ length: days }, () => Array.from({ length: 48 }, () => null));
+}
+
+function limitsOf(set: Set<string>) {
+  const found = LIMIT_OPTIONS.filter((limit) => set.has(limit));
+  return found.length ? found : null;
+}
+
+type SlotClock = { year: number; monthIndex: number; cet: CetStamp };
+
+function isGone(dayIdx: number, half: number, at?: SlotClock) {
+  return Boolean(at && isPastSlot(at.year, at.monthIndex, dayIdx + 1, half, at.cet));
+}
+
+/** Лимиты, где в этом получасе стоит своя метка — только по уже загруженной сетке. */
+export function myOccupiedLimits(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  at?: SlotClock,
+): (string[] | null)[][] {
+  const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length));
+  const names = LIMIT_OPTIONS.filter((limit) => grids[limit]);
+  return Array.from({ length: days }, (_, dayIdx) =>
+    Array.from({ length: 48 }, (_, half) => {
+      if (isGone(dayIdx, half, at)) return null;
+      const found = names.filter((limit) => grids[limit]?.[dayIdx]?.[half]?.some((mark) => seatIsMine(mark, who)));
+      return found.length ? found : null;
+    }),
+  );
+}
+
+export function occupiedFromSlots(
+  slots: { limit: string; dayIdx: number; half: number }[],
+  days: number,
+): (string[] | null)[][] {
+  const buckets = blankOccupied(days).map((row) => row.map(() => new Set<string>()));
+  for (const slot of slots) {
+    const cell = buckets[slot.dayIdx]?.[slot.half];
+    if (cell) cell.add(slot.limit);
+  }
+  return buckets.map((row) => row.map((set) => limitsOf(set)));
+}
+
+/** Слоты с сервера по всем лимитам + правки по тем лимитам, что уже на экране. */
+export function mergeOccupiedLimits(
+  remote: (string[] | null)[][] | undefined,
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  at?: SlotClock,
+): (string[] | null)[][] {
+  const local = myOccupiedLimits(grids, who, at);
+  const loaded = new Set(LIMIT_OPTIONS.filter((limit) => grids[limit]));
+  const days = Math.max(remote?.length ?? 0, local.length);
+  return Array.from({ length: days }, (_, dayIdx) =>
+    Array.from({ length: 48 }, (_, half) => {
+      if (isGone(dayIdx, half, at)) return null;
+      const set = new Set(remote?.[dayIdx]?.[half] ?? []);
+      for (const limit of loaded) set.delete(limit);
+      for (const limit of local[dayIdx]?.[half] ?? []) set.add(limit);
+      return limitsOf(set);
+    }),
+  );
+}
+
 export function myTimeline(grids: Record<string, Occupancy>, who: Mark | string): (string | null)[][] {
   const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length));
   return Array.from({ length: days }, (_, dayIdx) =>

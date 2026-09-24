@@ -89,13 +89,6 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!club?.notify_mark_removed) return json({ sent: 0, skipped: "off" });
 
-  const { data: grid } = await supabase
-    .from("schedule_settings")
-    .select("allow_overwrite_marks, allow_replace_marks")
-    .eq("id", true)
-    .maybeSingle();
-  if (!grid?.allow_overwrite_marks && !grid?.allow_replace_marks) return json({ error: "flag-off" }, 403);
-
   const body = (await req.json().catch(() => null)) as {
     owners?: unknown;
     memberIds?: unknown;

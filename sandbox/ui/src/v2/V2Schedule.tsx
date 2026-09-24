@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
 import { ME, markKey, markLabel, vipOf, type Mark } from "../schedule/marks";
 import { emptyMonth, patchSeat, type Occupancy } from "../schedule/plan";
+import { monthShort, monthTitle } from "../schedule/formatDate";
 import { readCet } from "../schedule/cet";
 import { rosterFromGrids, type RosterRow } from "../schedule/roster";
 import { fieldFill, pctLabel } from "../schedule/analytics";
@@ -38,21 +39,6 @@ type Props = {
   canActAs?: boolean;
   onKindChange?: (kind: "nitro" | "regular") => void;
 };
-
-function monthTitle(date: Date, lang: string) {
-  const raw = date.toLocaleDateString(lang.startsWith("en") ? "en-US" : "ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
-  return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/\sг\.?$/i, "");
-}
-
-function monthShort(index: number, lang: string) {
-  const raw = new Date(2026, index, 1).toLocaleDateString(lang.startsWith("en") ? "en-US" : "ru-RU", {
-    month: "short",
-  });
-  return raw.replace(/\./g, "").replace(/\sг\.?$/i, "");
-}
 
 function playerQuery(row: SchedulePlayer) {
   return `${row.nick} ${row.markTag} ${row.publicCode}`.toLowerCase();
@@ -874,7 +860,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setKindOpen(false);
             }}
           >
-            {monthTitle(cursor, i18n.language)}
+            {monthTitle(year, monthIndex, i18n.language)}
             <i className="fa-regular fa-calendar v2-muted ml-2" />
           </button>
           {monthOpen && (
@@ -1207,7 +1193,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2MyCalendar
             year={year}
             monthIndex={monthIndex}
-            title={monthTitle(cursor, i18n.language)}
+            title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
             grids={gridsForCalendar(shownGrids, year, monthIndex)}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
@@ -1399,7 +1385,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2UserCard
             row={peek}
             givenName={peek.mark.memberId ? publicNames.get(peek.mark.memberId) : undefined}
-            monthLabel={monthTitle(cursor, i18n.language)}
+            monthLabel={monthTitle(year, monthIndex, i18n.language)}
             onClose={() => setPeek(null)}
           />
         ) : null}

@@ -19,7 +19,6 @@ import { CabinetLoginPanel, type LoginDraft } from "./CabinetLoginPanel";
 import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
 import { Field, NotifyPicks } from "./cabinetUi";
 import { PermanentPriority } from "./PermanentPriority";
-import { ScheduleAccessPanel } from "./ScheduleAccessPanel";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { loadTheme } from "./theme";
@@ -33,13 +32,14 @@ type Props = {
   busy: boolean;
   onClose: () => void;
   onAccess: (access: ClubAccess) => void;
+  onCreateCard?: () => void;
   onMark: () => void;
   onReload: () => void;
   countTables?: boolean;
 };
 
 function isClubSeat(row: AdminPerson) {
-  return row.access === "member" || row.access === "admin";
+  return row.accessStatus === "active" && Boolean(row.memberId);
 }
 
 function guarantorLabel(row: AdminPerson) {
@@ -149,7 +149,7 @@ function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy: bool
   );
 }
 
-export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onMark, onReload, countTables = false }: Props) {
+export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onCreateCard, onMark, onReload, countTables = false }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const canCloseSelf = person.memberId === selfMemberId;
@@ -257,15 +257,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const activePlay = plays.find((row) => row.id === playId) ?? plays[0];
   const roomNick = activePlay?.nick.trim() || "—";
   const guarantors = guarantorOptions(people, person.memberId, guarantorId);
-  const clubRole =
-    person.access === "admin"
-      ? t("admin.root.roleAdmin")
-      : person.access === "member"
-        ? t("admin.root.roleMember")
-        : person.access === "staff"
-          ? t("admin.root.roleStaff")
-          : t("admin.people.access.closed");
-
   const patchPlay = (id: string, part: Partial<RoomPlay>) => {
     setPlays((prev) => prev.map((row) => (row.id === id ? { ...row, ...part } : row)));
   };
@@ -345,7 +336,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
       else fail();
       return;
     }
-    const distance = await saveMemberDistanceId(person.memberId, distanceId);
+    const distance = await saveMemberDistanceId(person.memberId, distanceId, person.discordId);
     setSaving(false);
     if (distance.error === "duplicate") showV2Toast("err", t("admin.people.distanceIdDup"));
     else if (distance.error === "bad-shape") showV2Toast("err", t("admin.people.distanceIdBad"));
@@ -409,12 +400,19 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                 <span className="v2-staff-only-tag">{t("admin.people.staffOnly")}</span>
               </div>
               <div className="v2-cab-body">
-                <AccessSeg
-                  value={person.access}
-                  lockedClosed={hasRoot(person) || canCloseSelf}
-                  busy={busy}
-                  onChange={onAccess}
-                />
+                {person.memberId ? (
+                  <AccessSeg
+                    value={person.accessStatus === "active" ? "member" : "closed"}
+                    lockedClosed={hasRoot(person) || canCloseSelf}
+                    busy={busy}
+                    onChange={onAccess}
+                  />
+                ) : (
+                  <button type="button" className="v2-ctrl" disabled={busy} onClick={onCreateCard}>
+                    {t("admin.people.createCard")}
+                  </button>
+                )}
+                {person.memberId && !person.onGuild ? <p className="v2-cab-hint">{t("admin.people.leftGuildHint")}</p> : null}
                 {hasRoot(person) ? (
                   <p className="v2-cab-hint">
                     <i className="v2-club-root">{t("admin.root.roleRoot")}</i>
@@ -575,7 +573,9 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                     </div>
                     <div className="v2-cab-facts">
                       <Fact label={t("admin.people.loggedIn")}>{person.loggedIn ? t("admin.people.yes") : t("admin.people.no")}</Fact>
-                      <Fact label={t("admin.people.clubRole")}>{clubRole}</Fact>
+                      <Fact label={t("admin.people.colAccess")}>
+                        {person.accessStatus === "active" ? t("admin.people.profileActive") : t("admin.people.profileBlocked")}
+                      </Fact>
                       <Fact label={t("cabinet.clubCode")} mono>
                         {dash(person.publicCode)}
                       </Fact>
@@ -721,7 +721,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                 />
 
                 <PayMethodsPanel memberId={person.memberId} canEdit={canEdit} live />
-                {person.memberId ? <ScheduleAccessPanel memberId={person.memberId} /> : null}
               </>
             )}
         </div>
@@ -745,7 +744,7 @@ function AccessSeg({
   const { t } = useTranslation();
   return (
     <div className="v2-club-seg">
-      {(["closed", "member", "admin", "staff"] as const).map((key) => (
+      {(["closed", "member"] as const).map((key) => (
         <button
           key={key}
           type="button"

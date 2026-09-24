@@ -28,6 +28,7 @@ export function markFromPlayer(row: SchedulePlayer): Mark {
     bg: row.markBg,
     fg: row.markFg,
     tables: row.tables,
+    memberId: row.id,
   };
 }
 

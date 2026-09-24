@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
 import { LIMIT_OPTIONS, formatLimit, limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
+import { formatDayLong } from "../schedule/formatDate";
 import { downloadCalendarJpeg } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -41,11 +42,7 @@ function clock(half: number, hourShift = 0) {
 }
 
 function tipDate(year: number, monthIndex: number, day: number, lang: string) {
-  const loc = lang.startsWith("en") ? "en-US" : "ru-RU";
-  const date = new Date(year, monthIndex, day);
-  const weekday = date.toLocaleDateString(loc, { weekday: "long" });
-  const rest = date.toLocaleDateString(loc, { day: "numeric", month: "long" });
-  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`;
+  return formatDayLong(year, monthIndex, day, lang);
 }
 
 function mineTone(limit: string) {

@@ -1,4 +1,5 @@
 import { capAt, defaultHourCaps, type HourCaps } from "./capacity";
+import { weekdayShort } from "./formatDate";
 import { isOwnMark, type Mark } from "./marks";
 
 export type Seat = Mark | null;
@@ -7,15 +8,13 @@ export type Occupancy = Seat[][][];
 export const LEVEL_COUNT = 2;
 
 export function daysInMonth(year: number, monthIndex: number, locale: string) {
-  const loc = locale.startsWith("en") ? "en-US" : "ru-RU";
   const list: { d: number; wd: string; weekend: boolean }[] = [];
   const last = new Date(year, monthIndex + 1, 0).getDate();
   for (let d = 1; d <= last; d += 1) {
-    const dt = new Date(year, monthIndex, d);
-    const dow = dt.getDay();
+    const dow = new Date(year, monthIndex, d).getDay();
     list.push({
       d,
-      wd: dt.toLocaleDateString(loc, { weekday: "short" }).replace(".", ""),
+      wd: weekdayShort(dow, locale),
       weekend: dow === 0 || dow === 6,
     });
   }

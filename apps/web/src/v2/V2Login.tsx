@@ -41,27 +41,29 @@ export function V2Login({ onEnter }: Props) {
           </div>
         </div>
         <h1>{t("login.title")}</h1>
-        <p>{t("login.lead")}</p>
+        <p>{live ? t("login.lead") : t("login.offlineLead")}</p>
         <div className="v2-login-oauth">
-          <button
-            type="button"
-            className="v2-login-oauth-btn is-discord"
-            disabled={waiting}
-            onClick={() => {
-              if (!live) {
-                go("you", "active", "discord", "RP-415");
-                return;
-              }
-              setWaiting(true);
-              void signInDiscord().then((result) => {
-                if (result.error && result.error !== "not-configured") setError(t("login.liveError"));
-                setWaiting(false);
-              });
-            }}
-          >
-            <i className="fa-brands fa-discord" />
-            {waiting ? t("login.connecting") : t("login.discord")}
-          </button>
+          {live ? (
+            <button
+              type="button"
+              className="v2-login-oauth-btn is-discord"
+              disabled={waiting}
+              onClick={() => {
+                setWaiting(true);
+                void signInDiscord().then((result) => {
+                  if (result.error && result.error !== "not-configured") setError(t("login.liveError"));
+                  setWaiting(false);
+                });
+              }}
+            >
+              <i className="fa-brands fa-discord" />
+              {waiting ? t("login.connecting") : t("login.discord")}
+            </button>
+          ) : (
+            <button type="button" className="v2-login-oauth-btn" onClick={() => go("you", "active", "discord", "RP-415")}>
+              {t("login.demoEnter")}
+            </button>
+          )}
         </div>
         {error ? <p className="v2-login-err">{error}</p> : null}
       </div>

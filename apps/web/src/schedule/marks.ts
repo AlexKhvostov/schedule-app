@@ -40,6 +40,13 @@ export function isOwnMark(seat: Mark | null | undefined, me: Mark) {
   return seat.discord === me.discord;
 }
 
+/** Logged-in self, never the acting-as brush. Prefer memberId when both sides have it. */
+export function isSelfSeat(seat: Mark | null | undefined, self: Mark) {
+  if (!seat) return false;
+  if (self.memberId && seat.memberId) return seat.memberId === self.memberId;
+  return isOwnMark(seat, self);
+}
+
 /** Цвета как в старой таблице: светлая плашка, тёмные буквы */
 export const MARKS: Mark[] = [
   { t: "PL", discord: "polar", room: "PolarWin", bg: "#ffd966", fg: "#1a2118", tables: 12 },

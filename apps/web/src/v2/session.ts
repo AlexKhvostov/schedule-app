@@ -11,6 +11,7 @@ export type Session = {
   access: Access;
   via: AuthVia;
   role: AppRole;
+  permissions?: string[];
   memberId?: string;
   markTag?: string | null;
   markBg?: string;
@@ -39,6 +40,7 @@ export function readSession(): Session | null {
       access: parsed.access === "pending" || parsed.access === "profile" ? parsed.access : "active",
       via: parsed.via ?? "email",
       role: parsed.role === "root" || parsed.role === "admin" || parsed.role === "staff" || parsed.role === "member" ? parsed.role : roleFor(nick, parsed.memberId),
+      permissions: Array.isArray(parsed.permissions) ? parsed.permissions.filter((item): item is string => typeof item === "string") : [],
       memberId: parsed.memberId,
       markTag: parsed.markTag ?? null,
       markBg: parsed.markBg,

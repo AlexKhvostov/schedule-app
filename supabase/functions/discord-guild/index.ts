@@ -5,7 +5,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type DiscordRole = { id: string; name: string; color: number; position: number };
+type DiscordRole = { id: string; name: string; color: number; position: number; managed?: boolean };
 type DiscordUser = { id: string; username: string; global_name?: string | null; avatar?: string | null; bot?: boolean };
 type DiscordMember = {
   user?: DiscordUser;
@@ -68,7 +68,7 @@ async function allMembers(token: string, guildId: string) {
     if (!last) return { data: rows, status: 200 };
     after = last;
   }
-  return { data: rows, status: 200 };
+  return { error: "member list exceeded safe pagination limit", status: 502 };
 }
 
 Deno.serve(async (req) => {
@@ -80,15 +80,34 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
     global: { headers: { Authorization: authHeader } },
   });
+  const serviceKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+    (() => {
+      try {
+        return JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default as string | undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey ?? "", { auth: { persistSession: false } });
 
   const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth.user) return json({ error: "unauthorized" }, 401);
-
-  const { data: member } = await supabase.from("members").select("id").eq("auth_user_id", auth.user.id).maybeSingle();
-  if (!member) return json({ error: "forbidden" }, 403);
-
-  const { data: roles } = await supabase.from("member_roles").select("role_id").eq("member_id", member.id);
-  if (!(roles ?? []).some((row) => row.role_id === "root" || row.role_id === "admin")) return json({ error: "forbidden" }, 403);
+  let allowed = false;
+  if (!authError && auth.user) {
+    const { data: member } = await supabase.from("members").select("id").eq("auth_user_id", auth.user.id).maybeSingle();
+    if (member) {
+      const result = await supabase.rpc("member_has_permission", {
+        p_member_id: member.id,
+        p_permission: "admin.people",
+      });
+      allowed = Boolean(result.data);
+    }
+  } else {
+    const cronToken = req.headers.get("x-cron-token") ?? "";
+    const { data: cron } = await admin.from("discord_sync_cron_secret").select("token").eq("id", true).maybeSingle();
+    allowed = Boolean(cronToken && cron?.token === cronToken);
+  }
+  if (!allowed) return json({ error: "forbidden" }, 403);
 
   const token = Deno.env.get("DISCORD_BOT_TOKEN")?.trim() ?? "";
   const guildId = Deno.env.get("DISCORD_GUILD_ID")?.trim() ?? "";
@@ -111,6 +130,15 @@ Deno.serve(async (req) => {
   }
 
   const roleById = new Map((rolesRes.data ?? []).map((row) => [row.id, row]));
+  const guildRoles = (rolesRes.data ?? [])
+    .filter((role) => role.name !== "@everyone")
+    .map((role) => ({
+      id: role.id,
+      name: role.name,
+      color: roleColor(role.color),
+      position: role.position,
+      managed: Boolean(role.managed),
+    }));
   const members = (membersRes.data ?? [])
     .filter((row) => row.user)
     .map((row) => {
@@ -148,16 +176,6 @@ Deno.serve(async (req) => {
     fetchedAt: new Date().toISOString(),
   };
 
-  const serviceKey =
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-    (() => {
-      try {
-        return JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default as string | undefined;
-      } catch {
-        return undefined;
-      }
-    })();
-  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey ?? "", { auth: { persistSession: false } });
   const { error: persistError } = await admin.rpc("replace_discord_roster", {
     p_guild: {
       id: snapshot.guild.id,
@@ -176,6 +194,7 @@ Deno.serve(async (req) => {
       joined_at: row.joinedAt,
       roles: row.roles,
     })),
+    p_roles: guildRoles,
   });
   if (persistError) return json({ error: "persist", detail: persistError.message }, 500);
 

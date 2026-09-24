@@ -129,7 +129,7 @@ export async function loadMyDiscord(memberId: string): Promise<GuildPerson | nul
   if (!db) return null;
   const { data: ident } = await db
     .from("identities")
-    .select("provider_uid")
+    .select("provider_uid, username, display_name, guild_nick, avatar_url, discord_roles")
     .eq("member_id", memberId)
     .eq("provider", "discord")
     .maybeSingle();
@@ -139,7 +139,17 @@ export async function loadMyDiscord(memberId: string): Promise<GuildPerson | nul
     .select("discord_id, username, global_name, guild_nick, avatar_url, bot, joined_at, roles, synced_at")
     .eq("discord_id", ident.provider_uid)
     .maybeSingle();
-  return data ? personFromRow(data as DiscordMemberRow) : null;
+  if (data) return personFromRow(data as DiscordMemberRow);
+  return {
+    id: ident.provider_uid,
+    username: ident.username || "",
+    globalName: ident.display_name,
+    nick: ident.guild_nick,
+    avatarUrl: ident.avatar_url,
+    bot: false,
+    joinedAt: null,
+    roles: asRoles(ident.discord_roles),
+  };
 }
 
 async function errorCode(error: { message: string; context?: Response }, data: unknown): Promise<GuildLoadError> {

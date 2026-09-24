@@ -18,13 +18,14 @@ import {
   type CapacityMap,
   type HourCaps,
 } from "../schedule/capacity";
+import { weekdayShort } from "../schedule/formatDate";
 import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
 import { MembersAdmin } from "./MembersAdmin";
 import { FoldHead } from "./FoldHead";
 import { V2Root } from "./V2Root";
 import { V2SaveButton } from "./V2SaveButton";
 import { showV2Toast } from "./V2Toast";
-import { loadScheduleSettings, saveCountTables, saveOverwriteMarks, saveReplaceMarks, subscribeScheduleSettings } from "../data/scheduleSettings";
+import { loadScheduleSettings, saveActAs, saveCountTables, saveEditByButton, saveOverwriteMarks, subscribeScheduleSettings } from "../data/scheduleSettings";
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -87,10 +88,12 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   const [controlOpen, setControlOpen] = useState(true);
   const [allowOverwrite, setAllowOverwrite] = useState(false);
   const [overwriteSaving, setOverwriteSaving] = useState(false);
-  const [allowReplace, setAllowReplace] = useState(false);
-  const [replaceSaving, setReplaceSaving] = useState(false);
+  const [allowActAs, setAllowActAs] = useState(false);
+  const [actAsSaving, setActAsSaving] = useState(false);
   const [countTables, setCountTables] = useState(false);
   const [tablesSaving, setTablesSaving] = useState(false);
+  const [editByButton, setEditByButton] = useState(true);
+  const [editByButtonSaving, setEditByButtonSaving] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
   const [loadSaved, setLoadSaved] = useState(false);
@@ -102,13 +105,10 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   const paintRef = useRef<(CapRange & { cap: number }) | null>(null);
   const baselineRef = useRef<MatrixRow[]>([]);
   const profile = profileOf(capacity, limit);
-  const weekLabels = useMemo(() => {
-    const loc = i18n.language.startsWith("en") ? "en-US" : "ru-RU";
-    return WEEK_ORDER.map((id) => {
-      const date = new Date(2026, 5, id === 0 ? 7 : id);
-      return { id, label: date.toLocaleDateString(loc, { weekday: "short" }).replace(".", "") };
-    });
-  }, [i18n.language]);
+  const weekLabels = useMemo(
+    () => WEEK_ORDER.map((id) => ({ id, label: weekdayShort(id, i18n.language) })),
+    [i18n.language],
+  );
 
   useEffect(() => {
     const stop = () => {
@@ -141,8 +141,9 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
       void loadScheduleSettings().then((next) => {
         if (!live) return;
         setAllowOverwrite(next.allowOverwriteMarks);
-        setAllowReplace(next.allowReplaceMarks);
+        setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
+        setEditByButton(next.editByButton);
       });
     };
     apply();
@@ -318,17 +319,17 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
           </button>
           <button
             type="button"
-            className={`v2-settings-row${allowReplace ? " is-on" : ""}`}
-            disabled={replaceSaving}
-            title={t("admin.control.replaceHint")}
+            className={`v2-settings-row${allowActAs ? " is-on" : ""}`}
+            disabled={actAsSaving}
+            title={t("admin.control.actAsHint")}
             onClick={() => {
-              const next = !allowReplace;
-              setAllowReplace(next);
-              setReplaceSaving(true);
-              void saveReplaceMarks(next).then((result) => {
-                setReplaceSaving(false);
+              const next = !allowActAs;
+              setAllowActAs(next);
+              setActAsSaving(true);
+              void saveActAs(next).then((result) => {
+                setActAsSaving(false);
                 if (result.error) {
-                  setAllowReplace(!next);
+                  setAllowActAs(!next);
                   showV2Toast("err", t("admin.people.saveErr"));
                   return;
                 }
@@ -337,13 +338,13 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
             }}
           >
             <span className="v2-settings-ico">
-              <i className="fa-solid fa-right-left" />
+              <i className="fa-solid fa-user-pen" />
             </span>
             <span className="v2-settings-copy">
-              <b>{t("admin.control.replace")}</b>
-              <small>{t("admin.control.replaceHint")}</small>
+              <b>{t("admin.control.actAs")}</b>
+              <small>{t("admin.control.actAsHint")}</small>
             </span>
-            <span className={`v2-settings-switch${allowReplace ? " is-on" : ""}`} aria-hidden />
+            <span className={`v2-settings-switch${allowActAs ? " is-on" : ""}`} aria-hidden />
           </button>
           <button
             type="button"
@@ -373,6 +374,35 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
               <small>{t("admin.control.tablesHint")}</small>
             </span>
             <span className={`v2-settings-switch${countTables ? " is-on" : ""}`} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`v2-settings-row${editByButton ? " is-on" : ""}`}
+            disabled={editByButtonSaving}
+            title={t("admin.control.editByButtonHint")}
+            onClick={() => {
+              const next = !editByButton;
+              setEditByButton(next);
+              setEditByButtonSaving(true);
+              void saveEditByButton(next).then((result) => {
+                setEditByButtonSaving(false);
+                if (result.error) {
+                  setEditByButton(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-pencil" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.editByButton")}</b>
+              <small>{t("admin.control.editByButtonHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${editByButton ? " is-on" : ""}`} aria-hidden />
           </button>
         </div>
       </section>

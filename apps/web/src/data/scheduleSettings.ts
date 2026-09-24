@@ -2,29 +2,32 @@ import { getSupabase } from "./client";
 
 export type ClubGridSettings = {
   allowOverwriteMarks: boolean;
-  allowReplaceMarks: boolean;
+  allowActAs: boolean;
   countTables: boolean;
+  editByButton: boolean;
 };
 
-const EMPTY: ClubGridSettings = { allowOverwriteMarks: false, allowReplaceMarks: false, countTables: false };
+const EMPTY: ClubGridSettings = {
+  allowOverwriteMarks: false,
+  allowActAs: false,
+  countTables: false,
+  editByButton: true,
+};
 
 export async function loadScheduleSettings(): Promise<ClubGridSettings> {
   const db = getSupabase();
   if (!db) return EMPTY;
   const { data } = await db
     .from("schedule_settings")
-    .select("allow_overwrite_marks, allow_replace_marks, count_tables")
+    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button")
     .eq("id", true)
     .maybeSingle();
   return {
     allowOverwriteMarks: Boolean(data?.allow_overwrite_marks),
-    allowReplaceMarks: Boolean(data?.allow_replace_marks),
+    allowActAs: Boolean(data?.allow_act_as),
     countTables: Boolean(data?.count_tables),
+    editByButton: data?.edit_by_button !== false,
   };
-}
-
-export async function loadOverwriteMarks(): Promise<boolean> {
-  return (await loadScheduleSettings()).allowOverwriteMarks;
 }
 
 export async function saveOverwriteMarks(value: boolean) {
@@ -35,12 +38,16 @@ export async function saveCountTables(value: boolean) {
   return saveScheduleFlag("count_tables", value);
 }
 
-export async function saveReplaceMarks(value: boolean) {
-  return saveScheduleFlag("allow_replace_marks", value);
+export async function saveActAs(value: boolean) {
+  return saveScheduleFlag("allow_act_as", value);
+}
+
+export async function saveEditByButton(value: boolean) {
+  return saveScheduleFlag("edit_by_button", value);
 }
 
 async function saveScheduleFlag(
-  column: "allow_overwrite_marks" | "allow_replace_marks" | "count_tables",
+  column: "allow_overwrite_marks" | "allow_act_as" | "count_tables" | "edit_by_button",
   value: boolean,
 ) {
   const db = getSupabase();

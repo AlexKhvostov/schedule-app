@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CET, formatClock } from "../schedule/cet";
 import { loadCachedRoster, personLabel, refreshGuildRoster, type GuildLoadError, type GuildRoster } from "../data/guild";
 import { PersonAvatar } from "./PersonAvatar";
+import { catalogRoles, RolePick, RolePills } from "./RolePills";
 
 type Filter = "people" | "bots" | "all";
 
@@ -23,6 +24,7 @@ export function V2Guild() {
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("people");
+  const [roleFilter, setRoleFilter] = useState<string[]>([]);
 
   const boot = async () => {
     setBusy(true);
@@ -46,6 +48,11 @@ export function V2Guild() {
 
   const people = roster?.members.filter((row) => !row.bot).length ?? 0;
   const bots = roster?.members.filter((row) => row.bot).length ?? 0;
+  const rolePicked = useMemo(() => new Set(roleFilter), [roleFilter]);
+  const roleCatalog = useMemo(() => catalogRoles(roster?.members ?? []), [roster]);
+  const toggleRole = (id: string) => {
+    setRoleFilter((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
 
   const rows = useMemo(() => {
     const list = roster?.members ?? [];
@@ -53,6 +60,7 @@ export function V2Guild() {
     return list.filter((row) => {
       if (filter === "people" && row.bot) return false;
       if (filter === "bots" && !row.bot) return false;
+      if (rolePicked.size && !row.roles.some((role) => rolePicked.has(role.id))) return false;
       if (!q) return true;
       return [row.nick, row.globalName, row.username, row.id, ...row.roles.map((role) => role.name)]
         .filter(Boolean)
@@ -60,7 +68,7 @@ export function V2Guild() {
         .toLowerCase()
         .includes(q);
     });
-  }, [roster, query, filter]);
+  }, [roster, query, filter, rolePicked]);
 
   return (
     <div className="v2-guild-stage min-h-0 flex-1 overflow-auto">
@@ -134,6 +142,15 @@ export function V2Guild() {
                   </button>
                 ))}
               </div>
+              <div className="v2-guild-role-pick">
+                <RolePick
+                  roles={roleCatalog}
+                  picked={rolePicked}
+                  onToggle={toggleRole}
+                  label={t("guild.col.roles")}
+                  emptyLabel={t("admin.people.filterRolesAll")}
+                />
+              </div>
             </div>
             <div className="v2-guild-scroll">
               <table className="v2-guild-table">
@@ -161,17 +178,7 @@ export function V2Guild() {
                       <td className="is-user">@{row.username}</td>
                       <td className="is-id">{row.id}</td>
                       <td>
-                        {row.roles.length ? (
-                          <div className="v2-guild-roles">
-                            {row.roles.map((role) => (
-                              <span key={role.id} style={role.color ? { color: role.color, background: `color-mix(in srgb, ${role.color} 16%, transparent)` } : undefined}>
-                                {role.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="v2-muted">—</span>
-                        )}
+                        <RolePills roles={row.roles} max={3} />
                       </td>
                       <td className="is-date">{joinedLabel(row.joinedAt, lang)}</td>
                     </tr>

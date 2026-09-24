@@ -14,6 +14,10 @@ export type LiveMember = {
   via: AuthVia;
   role: AppRole;
   avatarUrl: string | null;
+  permissions: string[];
+  isRoot: boolean;
+  blockReason: "manual" | "discord_left" | "missing_redparty" | null;
+  hasRequiredRole: boolean;
 };
 
 function viaOf(provider?: string | null): AuthVia {
@@ -22,11 +26,24 @@ function viaOf(provider?: string | null): AuthVia {
   return "discord";
 }
 
-function roleOf(ids: string[]): AppRole {
-  if (ids.includes("root")) return "root";
-  if (ids.includes("admin")) return "admin";
-  if (ids.includes("staff")) return "staff";
+function roleOf(isRoot: boolean, permissions: string[]): AppRole {
+  if (isRoot) return "root";
+  if (permissions.includes("admin.people")) return "admin";
   return "member";
+}
+
+type DiscordCheck = {
+  present: boolean;
+  hasRequiredRole: boolean;
+  error?: string;
+};
+
+export async function checkMyDiscordMember(): Promise<DiscordCheck | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await db.functions.invoke("discord-member-check", { body: {} });
+  if (error) return { present: false, hasRequiredRole: false, error: error.message };
+  return data as DiscordCheck;
 }
 
 export async function signInDiscord(redirectTo = `${window.location.origin}/auth/callback`) {
@@ -66,10 +83,18 @@ export async function loadLiveMember(): Promise<LiveMember | null> {
   if (!member) return null;
   const { data: ident } = await db
     .from("identities")
-    .select("provider, provider_uid, username, display_name, guild_nick")
+    .select("provider, provider_uid, username, display_name, guild_nick, avatar_url")
     .eq("member_id", member.id)
     .maybeSingle();
-  const { data: roles } = await db.from("member_roles").select("role_id").eq("member_id", member.id);
+  const { data: context } = await db.rpc("member_access_context");
+  const accessContext = (context ?? {}) as {
+    permissions?: string[];
+    isRoot?: boolean;
+    blockReason?: LiveMember["blockReason"];
+    hasRequiredRole?: boolean;
+  };
+  const permissions = Array.isArray(accessContext.permissions) ? accessContext.permissions : [];
+  const isRoot = Boolean(accessContext.isRoot);
   const { data: discord } = ident?.provider_uid
     ? await db
         .from("discord_members")
@@ -95,22 +120,75 @@ export async function loadLiveMember(): Promise<LiveMember | null> {
     tables: member.tables,
     nick,
     via: viaOf(ident?.provider),
-    role: roleOf((roles ?? []).map((row) => row.role_id)),
-    avatarUrl: discord?.avatar_url ?? null,
+    role: roleOf(isRoot, permissions),
+    avatarUrl: discord?.avatar_url ?? ident?.avatar_url ?? null,
+    permissions,
+    isRoot,
+    blockReason: accessContext.blockReason ?? null,
+    hasRequiredRole: Boolean(accessContext.hasRequiredRole),
   };
 }
 
 export function liveToSession(member: LiveMember): Session {
   return {
     nick: member.nick,
-    access: member.access === "active" ? "active" : "pending",
+    access: member.access === "active" ? "active" : member.access === "pending" ? "profile" : "pending",
     via: member.via,
     role: member.role,
+    permissions: member.permissions,
     memberId: member.id,
     markTag: member.markTag,
     markBg: member.markBg,
     markFg: member.markFg,
     avatarUrl: member.avatarUrl,
+  };
+}
+
+export type LiveEntry =
+  | { kind: "member"; session: Session }
+  | {
+      kind: "gate";
+      nick: string;
+      requestStatus: "open" | "dismissed" | null;
+      requestKind: "join" | "restore";
+      canRequest: boolean;
+      reason: "manual" | "discord_left" | "missing_redparty" | "not_member" | null;
+      avatarUrl: string | null;
+    }
+  | { kind: "none" };
+
+export async function loadLiveEntry(): Promise<LiveEntry> {
+  const db = getSupabase();
+  if (!db) return { kind: "none" };
+  const { data: auth } = await db.auth.getUser();
+  if (!auth.user) return { kind: "none" };
+  const check = await checkMyDiscordMember();
+  let member = await loadLiveMember();
+  if (!member && check?.present && check.hasRequiredRole) {
+    await db.rpc("self_create_profile");
+    member = await loadLiveMember();
+  }
+  if (member?.access === "active") return { kind: "member", session: liveToSession(member) };
+  const meta = auth.user.user_metadata ?? {};
+  const nick = String(meta.full_name || meta.custom_claims || meta.user_name || meta.name || auth.user.email || "user");
+  const requestKind = member ? "restore" : "join";
+  const { data: req } = await db
+    .from("club_join_requests")
+    .select("id,status")
+    .in("status", ["open", "dismissed"])
+    .eq("kind", requestKind)
+    .eq("auth_user_id", auth.user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return {
+    kind: "gate",
+    nick,
+    requestStatus: req?.status === "open" || req?.status === "dismissed" ? req.status : null,
+    requestKind,
+    canRequest: Boolean((member?.hasRequiredRole ?? check?.hasRequiredRole) && (member ? member.blockReason !== "manual" : true)),
+    reason: member?.blockReason ?? "not_member",
+    avatarUrl: typeof meta.avatar_url === "string" ? meta.avatar_url : null,
   };
 }
 
@@ -140,77 +218,4 @@ export async function listPendingMembers() {
     .eq("access_status", "pending")
     .order("created_at", { ascending: true });
   return data ?? [];
-}
-
-export type ClubRoleRow = {
-  id: string;
-  nick: string;
-  publicCode: string;
-  access: LiveMember["access"];
-  roles: string[];
-};
-
-function nickOf(
-  ident?: { provider_uid?: string | null; username?: string | null; display_name?: string | null; guild_nick?: string | null } | null,
-  discord?: { guild_nick?: string | null; global_name?: string | null; username?: string | null } | null,
-  fallback = "",
-) {
-  return (
-    discord?.guild_nick ||
-    discord?.global_name ||
-    discord?.username ||
-    ident?.guild_nick ||
-    ident?.username ||
-    ident?.display_name ||
-    fallback
-  );
-}
-
-export async function listClubMembers(): Promise<ClubRoleRow[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  const { data: members } = await db
-    .from("members")
-    .select("id, public_code, access_status")
-    .order("created_at", { ascending: true });
-  if (!members?.length) return [];
-  const ids = members.map((row) => row.id);
-  const [{ data: idents }, { data: roles }] = await Promise.all([
-    db.from("identities").select("member_id, provider_uid, username, display_name, guild_nick").in("member_id", ids),
-    db.from("member_roles").select("member_id, role_id").in("member_id", ids),
-  ]);
-  const discordIds = [...new Set((idents ?? []).map((row) => row.provider_uid).filter(Boolean))];
-  const { data: discord } = discordIds.length
-    ? await db.from("discord_members").select("discord_id, guild_nick, global_name, username").in("discord_id", discordIds)
-    : { data: [] as { discord_id: string; guild_nick: string | null; global_name: string | null; username: string | null }[] };
-  const identByMember = new Map((idents ?? []).map((row) => [row.member_id, row]));
-  const discordById = new Map((discord ?? []).map((row) => [row.discord_id, row]));
-  const rolesByMember = new Map<string, string[]>();
-  for (const row of roles ?? []) {
-    const list = rolesByMember.get(row.member_id) ?? [];
-    list.push(row.role_id);
-    rolesByMember.set(row.member_id, list);
-  }
-  return members.map((row) => {
-    const ident = identByMember.get(row.id);
-    const snap = ident?.provider_uid ? discordById.get(ident.provider_uid) : undefined;
-    return {
-      id: row.id,
-      nick: nickOf(ident, snap, row.public_code),
-      publicCode: row.public_code,
-      access: row.access_status === "active" ? "active" : row.access_status === "blocked" ? "blocked" : "pending",
-      roles: rolesByMember.get(row.id) ?? ["member"],
-    };
-  });
-}
-
-export async function setMemberAdmin(memberId: string, on: boolean) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
-  if (on) {
-    const { error } = await db.from("member_roles").upsert({ member_id: memberId, role_id: "admin" });
-    return { error: error?.message };
-  }
-  const { error } = await db.from("member_roles").delete().eq("member_id", memberId).eq("role_id", "admin");
-  return { error: error?.message };
 }

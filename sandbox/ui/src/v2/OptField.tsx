@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isOwnMark, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
+import { formatDayLabel } from "../schedule/formatDate";
 import { daysInMonth, levelAllowed, seatsOf, stampSeat, type Occupancy } from "../schedule/plan";
 import { columnFill, pctLabel } from "../schedule/analytics";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
@@ -76,11 +77,7 @@ function slotSpan(half: number, hourShift = 0) {
 }
 
 function tipDate(year: number, monthIndex: number, day: number, lang: string) {
-  const loc = lang.startsWith("en") ? "en-US" : "ru-RU";
-  const date = new Date(year, monthIndex, day);
-  const weekday = date.toLocaleDateString(loc, { weekday: "short" }).replace(".", "");
-  const rest = date.toLocaleDateString(loc, { day: "numeric", month: "short" }).replace(".", "");
-  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${rest}`;
+  return formatDayLabel(year, monthIndex, day, lang);
 }
 
 function tablesLabel(count: number, lang: string) {

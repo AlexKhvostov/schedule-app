@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
 import { ME, markKey, vipOf, type Mark } from "../schedule/marks";
-import { emptyMonth, patchSeat, type Occupancy } from "../schedule/plan";
+import { emptyMonth, type Occupancy } from "../schedule/plan";
+import { monthShort, monthTitle, weekdayLabelsMonFirst } from "../schedule/formatDate";
 import { readCet } from "../schedule/cet";
 import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
 import { fieldFill, columnFill } from "../schedule/analytics";
@@ -17,17 +18,17 @@ import { OverwriteConfirm } from "./OverwriteConfirm";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { showV2Toast } from "./V2Toast";
-import { gridsForCalendar, limitsWithMyMarks, myHoursMatrix, myTimeline } from "./myShifts";
+import { gridsWithMySlots, limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, savePrefs } from "./prefs";
-import { centerPos, fitFloat, useWindowPos } from "./windowPos";
+import { centerPos, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
 import { saveMemberTables, loadPublicNames } from "../data/people";
 import { listLimitMarks, listSchedulePlayers, markFromPlayer, type SchedulePlayer } from "../data/players";
 import { loadMyPlays } from "../data/plays";
 import { accessKey, loadScheduleAccess } from "../data/scheduleAccess";
-import { loadMonthGrids, placeSlot, removeSlot, removeForeignSlots, replaceForeignSlots, subscribeOccupancy } from "../data/slots";
+import { applyOwnSlots, loadMemberOccupiedSlots, loadMonthGrids, removeForeignSlots, subscribeOccupancy, ymRange } from "../data/slots";
 import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
 import { notifyMarkRemoved, slotWhenLabel } from "../data/notifyMark";
 import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
@@ -43,21 +44,6 @@ type Props = {
   canActAs?: boolean;
   onKindChange?: (kind: "nitro" | "regular") => void;
 };
-
-function monthTitle(date: Date, lang: string) {
-  const raw = date.toLocaleDateString(lang.startsWith("en") ? "en-US" : "ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
-  return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/\sг\.?$/i, "");
-}
-
-function monthShort(index: number, lang: string) {
-  const raw = new Date(2026, index, 1).toLocaleDateString(lang.startsWith("en") ? "en-US" : "ru-RU", {
-    month: "short",
-  });
-  return raw.replace(/\./g, "").replace(/\sг\.?$/i, "");
-}
 
 function isClubCode(value?: string | null) {
   return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
@@ -119,179 +105,217 @@ function heatFill(value: number, max: number, tone: "day" | "cell"): CSSProperti
   };
 }
 
-function MarkPlanDock({
+function BarMark({
   me,
   tables,
-  x,
-  y,
-  z,
-  onMove,
-  onFocus,
   onBump,
   onDraft,
-  onClose,
   canActAs,
   players,
   selfId,
   actingId,
   onActAs,
   countTables = false,
+  showEdit = false,
+  editOn = false,
+  onToggleEdit,
+  showBusyToggle = false,
+  busyOn = false,
+  onToggleBusy,
 }: {
   me: Mark;
   tables: string;
-  x: number;
-  y: number;
-  z?: number;
-  onMove: (x: number, y: number) => void;
-  onFocus?: () => void;
   onBump: (delta: number) => void;
   onDraft: (value: string) => void;
-  onClose: () => void;
   canActAs?: boolean;
   players: SchedulePlayer[];
   selfId?: string;
   actingId?: string;
   onActAs: (id: string) => void;
   countTables?: boolean;
+  showEdit?: boolean;
+  editOn?: boolean;
+  onToggleEdit?: () => void;
+  showBusyToggle?: boolean;
+  busyOn?: boolean;
+  onToggleBusy?: () => void;
 }) {
   const { t } = useTranslation();
-  const drag = useRef<{ ox: number; oy: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const hitRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [whoOpen, setWhoOpen] = useState(false);
+  const [menuBox, setMenuBox] = useState<{ top: number; left: number; maxH: number } | null>(null);
   const n = Number(tables) || me.tables;
-  const isOther = Boolean(canActAs && actingId && selfId && actingId !== selfId);
+  const isOther = Boolean(actingId && selfId && actingId !== selfId);
   const shown = [...players].sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 
   useEffect(() => {
-    if (!whoOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!boxRef.current?.contains(event.target as Node)) setWhoOpen(false);
+    if (!whoOpen) {
+      setMenuBox(null);
+      return;
+    }
+    const place = () => {
+      const rect = (hitRef.current ?? boxRef.current)?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(280, window.innerWidth - 16);
+      const top = Math.round(rect.bottom + 6);
+      let left = Math.round(rect.left);
+      if (left + width > window.innerWidth - 8) {
+        left = Math.round(Math.max(8, rect.right - width));
+      }
+      const maxH = Math.max(160, Math.min(440, window.innerHeight - top - 12));
+      setMenuBox({ top, left, maxH });
     };
+    place();
+    const close = (event: MouseEvent) => {
+      const node = event.target as Node;
+      if (boxRef.current?.contains(node) || menuRef.current?.contains(node)) return;
+      setWhoOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setWhoOpen(false);
+    };
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
     window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [whoOpen]);
 
-  const startDrag = (event: PointerEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest("button, input, .v2-mark-dock-who-menu")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { ox: event.clientX - x, oy: event.clientY - y };
-  };
+  const slot = (
+    <span className="v2-mark-sample">
+      <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} showTables={countTables} />
+    </span>
+  );
 
-  return createPortal(
+  return (
     <div
       ref={boxRef}
-      className={`v2-mark-dock${isOther ? " is-proxy" : ""}`}
-      style={{
-        left: fitFloat(x, y).x,
-        top: fitFloat(x, y).y,
-        zIndex: z ?? 50,
-      }}
-      role="dialog"
-      aria-label={isOther ? t("schedule.editDockAs", { nick: me.discord }) : t("schedule.editDockTitle")}
-      onPointerDown={(event) => {
-        onFocus?.();
-        startDrag(event);
-      }}
-      onPointerMove={(event: PointerEvent<HTMLElement>) => {
-        if (!drag.current) return;
-        const next = fitFloat(event.clientX - drag.current.ox, event.clientY - drag.current.oy);
-        onMove(next.x, next.y);
-      }}
-      onPointerUp={() => {
-        drag.current = null;
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-      }}
+      className={`v2-bar-pack v2-bar-mark${isOther ? " is-proxy" : ""}${countTables ? " is-tables" : ""}${editOn ? " is-edit" : ""}`}
+      title={isOther ? t("schedule.actAsWarn") : me.t}
     >
-      <div className="v2-mark-dock-tools">
-        <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
-        {canActAs ? (
-          <button
-            type="button"
-            className={`v2-mark-dock-mark${isOther ? " is-other" : ""}`}
-            title={isOther ? t("schedule.actAsWarn") : t("schedule.actAsLabel")}
-            aria-expanded={whoOpen}
-            onClick={() => setWhoOpen((value) => !value)}
-          >
-            <span className="v2-mark-sample">
-              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} showTables={countTables} />
-            </span>
-            {isOther ? <small>{t("schedule.actAsForeign")}</small> : null}
-          </button>
-        ) : (
-          <span className="v2-mark-dock-mark">
-            <span className="v2-mark-sample">
-              <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={n} showTables={countTables} />
-            </span>
-          </span>
-        )}
-        {countTables ? (
-          <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
-            <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
-              <i className="fa-solid fa-minus" />
-            </button>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={30}
-              value={tables}
-              onChange={(event) => onDraft(event.target.value)}
-            />
-            <button type="button" aria-label="+1" onClick={() => onBump(1)}>
-              <i className="fa-solid fa-plus" />
-            </button>
-          </div>
-        ) : null}
-        <button type="button" className="v2-mark-dock-done" onClick={onClose}>
-          {t("schedule.editDockDone")}
+      {canActAs ? (
+        <button
+          ref={hitRef}
+          type="button"
+          className={`v2-bar-mark-hit${isOther ? " is-other" : ""}`}
+          title={isOther ? t("schedule.actAsWarn") : t("schedule.actAsLabel")}
+          aria-label={me.t}
+          aria-expanded={whoOpen}
+          onClick={() => setWhoOpen((value) => !value)}
+        >
+          {slot}
         </button>
-      </div>
-      {whoOpen ? (
-        <div className="v2-mark-dock-who-menu">
-          <ul>
-            {shown.length ? (
-              shown.map((row) => {
-                const names = whoLines(row);
-                return (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      className={row.id === actingId ? "is-on" : ""}
-                      onClick={() => {
-                        onActAs(row.id);
-                        setWhoOpen(false);
-                      }}
-                    >
-                      <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
-                      <span className="v2-mark-sample">
-                        <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
-                      </span>
-                      <span className="v2-mark-dock-who-copy">
-                        <b>{names.title}</b>
-                        {names.sub ? <small>{names.sub}</small> : null}
-                      </span>
-                      {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
-                    </button>
-                  </li>
-                );
-              })
-            ) : (
-              <li className="is-empty">{t("schedule.actAsEmpty")}</li>
-            )}
-          </ul>
+      ) : (
+        <span className="v2-bar-mark-hit">{slot}</span>
+      )}
+      {showEdit ? (
+        <button
+          type="button"
+          className={`v2-bar-mark-edit${editOn ? " is-on" : ""}`}
+          title={t("schedule.editMode")}
+          aria-pressed={editOn}
+          onClick={onToggleEdit}
+        >
+          <i className="fa-solid fa-pencil" />
+        </button>
+      ) : null}
+      {showBusyToggle ? (
+        <button
+          type="button"
+          className={`v2-bar-mark-busy${busyOn ? " is-on" : ""}`}
+          style={{ ["--busy-mark" as string]: me.bg } as CSSProperties}
+          title={t("schedule.busyGlowHint")}
+          aria-pressed={busyOn}
+          aria-label={t("schedule.busyGlow")}
+          onClick={onToggleBusy}
+        >
+          <span className="v2-bar-mark-busy-knob" aria-hidden />
+        </button>
+      ) : null}
+      {isOther ? (
+        <span className="v2-bar-mark-alert">
+          <i className="fa-solid fa-triangle-exclamation" title={t("schedule.actAsWarn")} aria-hidden />
+          {selfId ? (
+            <button
+              type="button"
+              className="v2-bar-mark-reset"
+              title={t("schedule.actAsReset")}
+              aria-label={t("schedule.actAsReset")}
+              onClick={() => onActAs(selfId)}
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+      {countTables ? (
+        <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
+          <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
+            <i className="fa-solid fa-minus" />
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={30}
+            value={tables}
+            onChange={(event) => onDraft(event.target.value)}
+          />
+          <button type="button" aria-label="+1" onClick={() => onBump(1)}>
+            <i className="fa-solid fa-plus" />
+          </button>
         </div>
       ) : null}
-    </div>,
-    document.body,
-  );
-}
-
-function weekdayLabels(lang: string) {
-  const loc = lang.startsWith("en") ? "en-US" : "ru-RU";
-  return Array.from({ length: 7 }, (_, i) =>
-    new Date(2026, 5, 1 + i).toLocaleDateString(loc, { weekday: "short" }).replace(".", ""),
+      {whoOpen && menuBox
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="v2-mark-dock-who-menu v2-bar-mark-who"
+              style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxH }}
+            >
+              <ul>
+                {shown.length ? (
+                  shown.map((row) => {
+                    const names = whoLines(row);
+                    return (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          className={row.id === actingId ? "is-on" : ""}
+                          onClick={() => {
+                            onActAs(row.id);
+                            setWhoOpen(false);
+                          }}
+                        >
+                          <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
+                          <span className="v2-mark-sample">
+                            <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
+                          </span>
+                          <span className="v2-mark-dock-who-copy">
+                            <b>{names.title}</b>
+                            {names.sub ? <small>{names.sub}</small> : null}
+                          </span>
+                          {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
+                        </button>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <li className="is-empty">{t("schedule.actAsEmpty")}</li>
+                )}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
   );
 }
 
@@ -324,7 +348,7 @@ function HoursPanel({
   while (cells.length % 7) cells.push(null);
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  const wdays = weekdayLabels(i18n.language);
+  const wdays = weekdayLabelsMonFirst(i18n.language);
 
   return (
     <V2Float
@@ -409,15 +433,17 @@ function HoursPanel({
   );
 }
 
+type SeatDiff = {
+  day: number;
+  half: number;
+  level: number;
+  placed: boolean;
+  tables: number;
+  undone: Occupancy[number][number][number];
+};
+
 function seatDiffs(prev: Occupancy, next: Occupancy) {
-  const out: {
-    day: number;
-    half: number;
-    level: number;
-    placed: boolean;
-    tables: number;
-    undone: Occupancy[number][number][number];
-  }[] = [];
+  const out: SeatDiff[] = [];
   for (let dayIdx = 0; dayIdx < next.length; dayIdx += 1) {
     for (let half = 0; half < 48; half += 1) {
       const before = prev[dayIdx]?.[half] ?? [];
@@ -465,9 +491,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [hidePastDays, setHidePastDays] = useState(false);
   const [showTip, setShowTip] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
+  const [editByButton, setEditByButton] = useState(true);
   const [editPulse, setEditPulse] = useState(boot.editPulse);
+  const [busyHint, setBusyHint] = useState(boot.busyHint);
+  const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
+  const [mineRemote, setMineRemote] = useState<(string[] | null)[][] | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
-  const [markOpen, setMarkOpen] = useState(false);
   const [tablesDraft, setTablesDraft] = useState("11");
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
@@ -483,7 +512,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [showPeople, setShowPeople] = useState(false);
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [allowOverwrite, setAllowOverwrite] = useState(false);
-  const [allowReplace, setAllowReplace] = useState(false);
+  const [allowActAs, setAllowActAs] = useState(false);
   const [countTables, setCountTables] = useState(false);
   const [overwriteAsk, setOverwriteAsk] = useState<OverwriteAsk | null>(null);
   const [overwriteBusy, setOverwriteBusy] = useState(false);
@@ -495,8 +524,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [calPos, setCalPos] = useWindowPos("calendar", () => centerPos(640, 480));
   const [settingsPos, setSettingsPos] = useWindowPos("settings", () => centerPos(300, 360));
   const [userPos, setUserPos] = useWindowPos("user-card", () => centerPos(360, 320));
-  const [markPos, setMarkPos] = useWindowPos("mark-dock", () => centerPos(280, 56));
-  const [front, setFront] = useState<"fill" | "people" | "hours" | "calendar" | "settings" | "user" | "mark">("fill");
+  const [front, setFront] = useState<"fill" | "people" | "hours" | "calendar" | "settings" | "user">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
   const limitsRef = useRef<HTMLDivElement>(null);
   const kindRef = useRef<HTMLDivElement>(null);
@@ -506,46 +534,61 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const loadGen = useRef(0);
   const gridsRef = useRef(grids);
   const inflight = useRef(0);
+  const busyGen = useRef(0);
   const quietUntil = useRef(0);
   const refreshTimer = useRef(0);
+  const liveDebounce = useRef(0);
+  const dirtyLive = useRef(false);
   const tablesSaveTimer = useRef(0);
   gridsRef.current = grids;
   const sessionNick = readSession()?.nick ?? "";
   const selfId = memberId ?? memberOfSession(loadMembers(), { memberId, nick: sessionNick })?.id;
   actingRef.current = actingId || selfId;
+  const selfIdRef = useRef(selfId);
+  selfIdRef.current = selfId;
   const [playLimits, setPlayLimits] = useState<string[]>(() =>
     winamaxPlayLimits({ memberId: actingRef.current, nick: sessionNick }),
   );
-  const fetchLimits = useMemo(() => {
-    const set = new Set([...limits, ...playLimits]);
-    return LIMIT_OPTIONS.filter((item) => set.has(item));
-  }, [limits, playLimits]);
-  const fetchKey = fetchLimits.join("|");
+  const paintOn = !editByButton || canEdit;
+  const mayActAs = canActAs || allowActAs;
+  const canRemoveForeign = canActAs || allowOverwrite;
+  const editGlow = editByButton && canEdit;
+  const showBusy = isKit && busyHint;
+  const fetchKey = limits.join("|");
   const loadStamp = `${year}-${monthIndex}-${kind}-${fetchKey}`;
   const viewStamp = `${year}-${monthIndex}-${kind}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
   const shownGrids = useMemo(() => {
     if (!gridLoading) return grids;
     if (readyStamp.startsWith(`${viewStamp}-`)) return grids;
-    return Object.fromEntries((fetchLimits.length ? fetchLimits : limits).map((limit) => [limit, emptyMonth(year, monthIndex)]));
-  }, [gridLoading, grids, fetchLimits, limits, year, monthIndex, readyStamp, viewStamp]);
+    return Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
+  }, [gridLoading, grids, limits, year, monthIndex, readyStamp, viewStamp]);
 
   const pullGrids = useCallback(
     (stamp: string) => {
       const gen = loadGen.current;
-      return loadMonthGrids(year, monthIndex, kind, fetchLimits).then((next) => {
+      return loadMonthGrids(year, monthIndex, kind, limits).then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (next) setGrids(next);
+        if (!next) {
+          setReadyStamp(stamp);
+          return;
+        }
+        if (next.error) {
+          showV2Toast("err", t("schedule.toastLoadError"));
+          setReadyStamp(stamp);
+          return;
+        }
+        setGrids(next.grids);
         setReadyStamp(stamp);
       });
     },
-    [year, monthIndex, kind, fetchLimits],
+    [year, monthIndex, kind, limits, t],
   );
 
   useEffect(() => {
     setPlayLimits(winamaxPlayLimits({ memberId: actingId || selfId, nick: me.discord || sessionNick }));
-  }, [actingId, selfId, me.discord, sessionNick, canEdit, markOpen]);
+  }, [actingId, selfId, me.discord, sessionNick, canEdit]);
 
   useEffect(() => {
     const id = actingId || selfId;
@@ -564,27 +607,37 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [actingId, selfId]);
 
   useEffect(() => {
-    const blank = Object.fromEntries(fetchLimits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
+    const blank = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
     if (!isLiveData()) {
       setGrids(blank);
       setReadyStamp(loadStamp);
       return;
     }
     const gen = ++loadGen.current;
-    void loadMonthGrids(year, monthIndex, kind, fetchLimits)
+    void loadMonthGrids(year, monthIndex, kind, limits)
       .then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (next) setGrids(next);
-        else setGrids(blank);
+        if (!next) {
+          setGrids(blank);
+          setReadyStamp(loadStamp);
+          return;
+        }
+        if (next.error) {
+          showV2Toast("err", t("schedule.toastLoadError"));
+          setReadyStamp(loadStamp);
+          return;
+        }
+        setGrids(next.grids);
         setReadyStamp(loadStamp);
       })
       .catch(() => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
+        showV2Toast("err", t("schedule.toastLoadError"));
         setReadyStamp(loadStamp);
       });
-  }, [year, monthIndex, kind, fetchKey]);
+  }, [year, monthIndex, kind, fetchKey, t]);
 
   useEffect(() => {
     const applySelf = (mark: Mark, id?: string) => {
@@ -609,6 +662,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             bg: member.markBg,
             fg: member.markFg,
             tables: member.tables,
+            memberId: member.id,
           },
           member.id,
         );
@@ -629,14 +683,77 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     }), row.id);
   }, [memberId, sessionNick]);
 
+  const busyWhoId = actingId || selfId;
+  const busyDays = new Date(year, monthIndex + 1, 0).getDate();
+  const pullBusy = useCallback(
+    (who: string | undefined) => {
+      if (!isLiveData()) {
+        setBusyRemote(undefined);
+        setMineRemote(undefined);
+        return Promise.resolve();
+      }
+      if (!who) return Promise.resolve();
+      const gen = ++busyGen.current;
+      return loadMemberOccupiedSlots(year, monthIndex, kind, who).then((rows) => {
+        if (gen !== busyGen.current) return;
+        if (!rows) return;
+        const map = occupiedFromSlots(rows, busyDays);
+        if (who === actingRef.current) setBusyRemote(map);
+        if (who === selfIdRef.current) setMineRemote(map);
+      });
+    },
+    [year, monthIndex, kind, busyDays],
+  );
+
+  const refreshBusy = useCallback(() => {
+    void pullBusy(actingRef.current);
+    if (selfIdRef.current && selfIdRef.current !== actingRef.current) void pullBusy(selfIdRef.current);
+  }, [pullBusy]);
+
+  useEffect(() => {
+    void pullBusy(selfId);
+  }, [selfId, pullBusy]);
+
+  useEffect(() => {
+    if (busyWhoId && busyWhoId !== selfId) void pullBusy(busyWhoId);
+  }, [busyWhoId, selfId, pullBusy]);
+
   useEffect(() => {
     if (!isLiveData()) return;
-    return subscribeOccupancy(() => {
-      if (inflight.current > 0) return;
-      if (Date.now() < quietUntil.current) return;
-      void pullGrids(loadStamp);
+    const { from, to } = ymRange(year, monthIndex);
+    const catchUp = (delay: number) => {
+      window.clearTimeout(refreshTimer.current);
+      refreshTimer.current = window.setTimeout(() => {
+        if (inflight.current > 0) return;
+        if (!dirtyLive.current) return;
+        dirtyLive.current = false;
+        void pullGrids(loadStamp);
+        refreshBusy();
+      }, delay);
+    };
+    return subscribeOccupancy((change) => {
+      if (change.slotDate && (change.slotDate < from || change.slotDate > to)) return;
+      if (change.memberId && change.memberId === actingRef.current) {
+        refreshBusy();
+        return;
+      }
+      dirtyLive.current = true;
+      if (inflight.current > 0 || Date.now() < quietUntil.current) {
+        catchUp(Math.max(250, quietUntil.current - Date.now()));
+        return;
+      }
+      window.clearTimeout(liveDebounce.current);
+      liveDebounce.current = window.setTimeout(() => {
+        if (inflight.current > 0 || Date.now() < quietUntil.current) {
+          catchUp(Math.max(250, quietUntil.current - Date.now()));
+          return;
+        }
+        dirtyLive.current = false;
+        void pullGrids(loadStamp);
+        refreshBusy();
+      }, 250);
     });
-  }, [loadStamp, pullGrids]);
+  }, [year, monthIndex, loadStamp, pullGrids, refreshBusy]);
 
   useEffect(() => {
     let live = true;
@@ -644,8 +761,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       void loadScheduleSettings().then((next) => {
         if (!live) return;
         setAllowOverwrite(next.allowOverwriteMarks);
-        setAllowReplace(next.allowReplaceMarks);
+        setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
+        setEditByButton(next.editByButton);
       });
     };
     apply();
@@ -659,14 +777,17 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   useEffect(() => {
     return () => {
       window.clearTimeout(refreshTimer.current);
+      window.clearTimeout(liveDebounce.current);
       window.clearTimeout(tablesSaveTimer.current);
     };
   }, []);
 
   useEffect(() => {
+    if (!showHours && !showAnalytics && !showPeople && !showMine && !showBusy) return;
+    setCetTick(readCet());
     const id = window.setInterval(() => setCetTick(readCet()), 15000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [showHours, showAnalytics, showPeople, showMine, showBusy]);
 
   useEffect(() => {
     if (!limitsOpen && !kindOpen && !monthOpen && !searchOpen) return;
@@ -694,22 +815,31 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [limitsOpen, kindOpen, monthOpen, searchOpen]);
 
   useEffect(() => {
-    if (!canEdit) {
-      setMarkOpen(false);
-      setActingId(selfId);
-      setMe(selfMarkRef.current);
-      setTablesDraft(String(selfMarkRef.current.tables));
-    }
-  }, [canEdit, selfId]);
+    if (editByButton) setCanEdit(false);
+  }, [editByButton]);
+
+  useEffect(() => {
+    if (!editByButton || canEdit) return;
+    setActingId(selfId);
+    setMe(selfMarkRef.current);
+    setTablesDraft(String(selfMarkRef.current.tables));
+  }, [canEdit, selfId, editByButton]);
+
+  useEffect(() => {
+    if (mayActAs) return;
+    if (!selfId) return;
+    setActingId(selfId);
+    setMe(selfMarkRef.current);
+    setTablesDraft(String(selfMarkRef.current.tables));
+  }, [mayActAs, selfId]);
 
   useEffect(() => {
     void listSchedulePlayers().then(setPlayers);
   }, []);
 
   useEffect(() => {
-    if (!markOpen) return;
     setTablesDraft(String(me.tables));
-  }, [markOpen, me.tables]);
+  }, [me.tables]);
 
   useEffect(() => {
     const onDoc = (event: MouseEvent) => {
@@ -735,6 +865,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [visibleGrids]);
 
   useEffect(() => {
+    if (!paintOn && !showPeople && !mayActAs) return;
     let alive = true;
     void listLimitMarks(kind, limits).then((rows) => {
       if (alive) setLimitMarks(rows);
@@ -742,10 +873,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return () => {
       alive = false;
     };
-  }, [kind, limits]);
+  }, [kind, limits, paintOn, showPeople, mayActAs]);
 
   const clubPlayerIds = useMemo(() => new Set(players.map((row) => row.id)), [players]);
   const roster = useMemo(() => {
+    if (!showPeople) return [];
     const rows = faceRoster(
       rosterFromGrids(
         limits
@@ -760,7 +892,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     );
     if (!isLiveData() || !clubPlayerIds.size) return rows;
     return rows.filter((row) => !row.mark.memberId || clubPlayerIds.has(row.mark.memberId));
-  }, [shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
+  }, [showPeople, shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
+
+  const peopleIdsKey = useMemo(() => {
+    if (!showPeople) return "";
+    return [...new Set(roster.map((row) => row.mark.memberId).filter((id): id is string => Boolean(id)))].sort().join(",");
+  }, [showPeople, roster]);
 
   useEffect(() => {
     if (!showPeople) {
@@ -768,7 +905,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       return;
     }
     if (!isLiveData()) return;
-    const ids = [...new Set(roster.map((row) => row.mark.memberId).filter((id): id is string => Boolean(id)))];
+    const ids = peopleIdsKey ? peopleIdsKey.split(",") : [];
     let alive = true;
     void loadPublicNames(ids).then((next) => {
       if (alive) setPublicNames(next);
@@ -776,10 +913,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return () => {
       alive = false;
     };
-  }, [showPeople, roster]);
+  }, [showPeople, peopleIdsKey]);
   const fillByLimit = useMemo(
-    () =>
-      limits.flatMap((limit) => {
+    () => {
+      if (!showAnalytics) return [];
+      return limits.flatMap((limit) => {
         const grid = shownGrids[limit];
         if (!grid) return [];
         return [
@@ -789,19 +927,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             cols: columnFill(shownGrids, [limit], capacity, year, monthIndex),
           },
         ];
-      }),
-    [shownGrids, limits, year, monthIndex, cetTick, capacity],
+      });
+    },
+    [showAnalytics, shownGrids, limits, year, monthIndex, cetTick, capacity],
   );
-  const allGrids = useMemo(() => gridsForCalendar(shownGrids, year, monthIndex), [shownGrids, year, monthIndex]);
+  const mineGrids = useMemo(
+    () => gridsWithMySlots(shownGrids, mineRemote, selfMark, year, monthIndex),
+    [shownGrids, mineRemote, selfMark, year, monthIndex],
+  );
+  const hoursGrids = useMemo(
+    () => gridsWithMySlots(shownGrids, busyRemote, me, year, monthIndex),
+    [shownGrids, busyRemote, me, year, monthIndex],
+  );
   const dockLimits = useMemo(() => {
-    const marked = limitsWithMyMarks(shownGrids, me);
+    const marked = limitsWithMyMarks(hoursGrids, me);
     const source = playLimits.length ? playLimits : marked.length ? marked : limits;
     const set = new Set([...source, ...marked]);
     return LIMIT_OPTIONS.filter((limit) => set.has(limit));
-  }, [playLimits, shownGrids, me, limits]);
+  }, [playLimits, hoursGrids, me, limits]);
   const hoursMatrix = useMemo(
-    () => myHoursMatrix(shownGrids, me, dockLimits, { year, monthIndex, cet: cetTick }),
-    [shownGrids, me, dockLimits, year, monthIndex, cetTick],
+    () => (showHours ? myHoursMatrix(hoursGrids, me, dockLimits, { year, monthIndex, cet: cetTick }) : null),
+    [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
   );
   const actPlayers = useMemo(() => {
     const known = new Map(players.map((row) => [row.id, row]));
@@ -830,8 +976,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return rows.sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
   }, [limitMarks, players]);
   const busyMap = useMemo(
-    () => (isKit && canEdit ? myTimeline(allGrids, me) : undefined),
-    [isKit, canEdit, allGrids, me],
+    () => (showBusy ? mergeOccupiedLimits(busyRemote, grids, me, { year, monthIndex, cet: cetTick }) : undefined),
+    [showBusy, busyRemote, grids, me, year, monthIndex, cetTick],
   );
 
   const applyActAs = (id: string) => {
@@ -856,66 +1002,91 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     setTablesDraft(String(mark.tables));
   };
 
+  const writeDiffs = useCallback(
+    async (limit: string, diffs: SeatDiff[]) => {
+      const selfWrite = selfIdRef.current;
+      const brushWrite = actingRef.current;
+      const place = diffs.filter((diff) => diff.placed).map((diff) => ({
+        day: diff.day,
+        half: diff.half,
+        level: diff.level,
+        tables: diff.tables,
+      }));
+      const remove = diffs.filter((diff) => !diff.placed).map((diff) => ({
+        day: diff.day,
+        half: diff.half,
+        level: diff.level,
+      }));
+      if (remove.length && selfWrite) {
+        const { error } = await applyOwnSlots({
+          memberId: selfWrite,
+          limit,
+          variant: kind,
+          year,
+          monthIndex,
+          place: [],
+          remove,
+        });
+        if (error) return error;
+      }
+      if (place.length && brushWrite) {
+        const { error } = await applyOwnSlots({
+          memberId: brushWrite,
+          limit,
+          variant: kind,
+          year,
+          monthIndex,
+          place,
+          remove: [],
+        });
+        if (error) return error;
+      }
+      return undefined;
+    },
+    [kind, year, monthIndex],
+  );
+
   const onGridChange = useCallback(
     (limit: string, next: Occupancy) => {
       const prevGrid = gridsRef.current[limit] ?? [];
       const diffs = seatDiffs(prevGrid, next);
       setGrids((prev) => ({ ...prev, [limit]: next }));
       if (!diffs.length) return;
-      const writeId = actingRef.current;
       if (isLiveData() && diffs.some((diff) => diff.placed) && !accessRef.current.has(accessKey(kind, limit))) {
         setGrids((prev) => ({ ...prev, [limit]: prevGrid }));
         showV2Toast("err", t("schedule.toastNoAccess"));
         return;
       }
       showV2Toast(diffs[0].placed ? "ok" : "off", t(diffs[0].placed ? "schedule.toastPlaced" : "schedule.toastRemoved"));
-      if (!isLiveData() || !writeId) return;
+      if (!isLiveData() || (!selfIdRef.current && !actingRef.current)) return;
       window.clearTimeout(refreshTimer.current);
+      window.clearTimeout(liveDebounce.current);
       loadGen.current += 1;
       quietUntil.current = Date.now() + 800;
-      for (const diff of diffs) {
-        const payload = {
-          memberId: writeId,
-          limit,
-          variant: kind,
-          year,
-          monthIndex,
-          day: diff.day,
-          half: diff.half,
-          level: diff.level,
-          tables: diff.tables,
-        };
-        inflight.current += 1;
-        void (diff.placed ? placeSlot(payload) : removeSlot(payload))
-          .then(({ error }) => {
-            inflight.current = Math.max(0, inflight.current - 1);
-            if (error) {
-              setGrids((curr) => {
-                const grid = curr[limit];
-                if (!grid) return curr;
-                return { ...curr, [limit]: patchSeat(grid, diff.day - 1, diff.half, diff.level, diff.undone) };
-              });
-              showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
-              return;
-            }
-          })
-          .catch(() => {
-            inflight.current = Math.max(0, inflight.current - 1);
-            setGrids((curr) => {
-              const grid = curr[limit];
-              if (!grid) return curr;
-              return { ...curr, [limit]: patchSeat(grid, diff.day - 1, diff.half, diff.level, diff.undone) };
-            });
-            showV2Toast("err", t("schedule.toastSaveError"));
-          });
-      }
+      inflight.current += 1;
+      void writeDiffs(limit, diffs)
+        .then((error) => {
+          inflight.current = Math.max(0, inflight.current - 1);
+          if (error) {
+            setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+            showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
+            return;
+          }
+          refreshBusy();
+        })
+        .catch(() => {
+          inflight.current = Math.max(0, inflight.current - 1);
+          setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+          showV2Toast("err", t("schedule.toastSaveError"));
+        });
     },
-    [kind, monthIndex, year, t],
+    [kind, t, writeDiffs, refreshBusy],
   );
 
-  const confirmOverwrite = () => {
+  const confirmOverwrite = (action: "wipe" | "empty" = "wipe") => {
     const ask = overwriteAsk;
     if (!ask || overwriteBusy) return;
+    const chosen = action === "empty" ? (ask.empty ?? ask.next) : ask.next;
     const pingOwners = () => {
       void notifyMarkRemoved({
         owners: ask.people
@@ -923,35 +1094,46 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           .map((row) => ({ id: row.memberId as string, name: row.discord, tag: row.tag })),
         actorMemberId: selfId || me.memberId,
         actorName: sessionNick || me.discord || me.t || "",
-        kind: ask.kind,
+        kind: ask.kind === "place" ? "replace" : "remove",
         when: slotWhenLabel(ask.slots),
         limit: formatLimit(ask.limit),
         lang: i18n.language,
       });
     };
+    const toastKey =
+      action === "empty"
+        ? ask.kind === "place"
+          ? "schedule.toastPlaced"
+          : "schedule.toastRemoved"
+        : ask.kind === "place"
+          ? "schedule.toastReplaced"
+          : "schedule.toastRemoved";
     if (!isLiveData()) {
-      setGrids((prev) => ({ ...prev, [ask.limit]: ask.next }));
+      setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
       setOverwriteAsk(null);
-      showV2Toast("off", t(ask.kind === "replace" ? "schedule.toastReplaced" : "schedule.toastRemoved"));
+      showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
+      return;
+    }
+    if (ask.kind === "place" && !accessRef.current.has(accessKey(kind, ask.limit))) {
+      showV2Toast("err", t("schedule.toastNoAccess"));
+      setOverwriteAsk(null);
       return;
     }
     setOverwriteBusy(true);
-    const run =
-      ask.kind === "replace"
-        ? replaceForeignSlots({
-            memberId: me.memberId || selfId,
-            limit: ask.limit,
-            variant: kind,
-            slots: ask.slots,
-            tables: me.tables,
-          })
-        : removeForeignSlots({
-            limit: ask.limit,
-            variant: kind,
-            slots: ask.slots,
-          });
-    void run
-      .then(({ error }) => {
+    const prevGrid = gridsRef.current[ask.limit] ?? [];
+    const diffs = seatDiffs(prevGrid, chosen);
+    void (async () => {
+      if (action === "wipe" && ask.slots.length) {
+        const { error } = await removeForeignSlots({
+          limit: ask.limit,
+          variant: kind,
+          slots: ask.slots,
+        });
+        if (error) return error;
+      }
+      return writeDiffs(ask.limit, diffs);
+    })()
+      .then((error) => {
         setOverwriteBusy(false);
         setOverwriteAsk(null);
         if (error) {
@@ -959,17 +1141,16 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             "err",
             error.includes("overwrite-off")
               ? t("schedule.overwrite.off")
-              : error.includes("replace-off")
-                ? t("schedule.overwrite.replaceOff")
-                : t("schedule.toastSaveError"),
+              : t("schedule.toastSaveError"),
           );
           return;
         }
-        pingOwners();
-        showV2Toast("off", t(ask.kind === "replace" ? "schedule.toastReplaced" : "schedule.toastRemoved"));
+        if (action === "wipe") pingOwners();
+        showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
         loadGen.current += 1;
         quietUntil.current = Date.now() + 800;
-        setGrids((prev) => ({ ...prev, [ask.limit]: ask.next }));
+        setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
+        refreshBusy();
       })
       .catch(() => {
         setOverwriteBusy(false);
@@ -1018,10 +1199,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   };
 
   const toggleEdit = () => {
-    const on = !canEdit;
-    setCanEdit(on);
-    setMarkOpen(on);
-    if (on) setFront("mark");
+    setCanEdit((on) => !on);
     setToolsOpen(false);
   };
 
@@ -1081,22 +1259,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         setToolsOpen(false);
       },
     },
-    {
-      key: "edit",
-      icon: "fa-solid fa-pencil",
-      title: t("schedule.editMode"),
-      on: canEdit,
-      run: toggleEdit,
-    },
-  ] as const;
+  ];
 
   const zOf = (id: typeof front) => (front === id ? 56 : 48);
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <section
-        className={`v2-sched-bar flex h-10 shrink-0 items-center border-b${canEdit ? " is-edit" : ""}${editPulse ? "" : " is-quiet"}`}
-        style={{ borderColor: canEdit ? "transparent" : undefined }}
+        className={`v2-sched-bar flex h-10 shrink-0 items-center border-b${editGlow ? " is-edit" : ""}${editGlow && editPulse ? "" : " is-quiet"}`}
+        style={{ borderColor: editGlow ? "transparent" : undefined }}
       >
         <div className="v2-filters">
         <button type="button" className="v2-ctrl w-8 v2-month-shift" onClick={() => shiftMonth(-1)} aria-label="prev">
@@ -1121,7 +1292,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setSearchOpen(false);
             }}
           >
-            <span className="v2-month-full">{monthTitle(cursor, i18n.language)}</span>
+            <span className="v2-month-full">{monthTitle(year, monthIndex, i18n.language)}</span>
             <span className="v2-month-short">
               {monthShort(monthIndex, i18n.language)} {year}
             </span>
@@ -1310,13 +1481,40 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           ))}
         </datalist>
         </div>
+        <BarMark
+          me={me}
+          tables={tablesDraft}
+          onBump={bumpTables}
+          onDraft={(value) => {
+            setTablesDraft(value);
+            if (!value.trim()) return;
+            const n = Number(value);
+            if (Number.isFinite(n)) applyTables(n);
+          }}
+          canActAs={mayActAs && paintOn}
+          players={actPlayers}
+          selfId={selfId}
+          actingId={actingId || selfId}
+          onActAs={applyActAs}
+          countTables={countTables}
+          showEdit={editByButton}
+          editOn={canEdit}
+          onToggleEdit={toggleEdit}
+          showBusyToggle={isKit}
+          busyOn={busyHint}
+          onToggleBusy={() => {
+            const next = !busyHint;
+            setBusyHint(next);
+            savePrefs({ ...loadPrefs(), busyHint: next });
+          }}
+        />
         <div className="v2-tools" ref={toolsRef}>
           <div className="v2-bar-pack v2-tools-pack">
             {tools.map((item) => (
               <button
                 key={item.key}
                 type="button"
-                className={`v2-ctrl w-8${item.on ? " is-on" : ""}${item.key === "edit" ? " is-edit" : ""}`}
+                className={`v2-ctrl w-8${item.on ? " is-on" : ""}`}
                 title={item.title}
                 aria-pressed={item.on}
                 onClick={item.run}
@@ -1328,7 +1526,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <div className="v2-tools-fold">
             <button
               type="button"
-              className={`v2-tools-fold-hit${toolsOpen ? " is-on" : ""}${canEdit ? " is-edit" : ""}`}
+              className={`v2-tools-fold-hit${toolsOpen ? " is-on" : ""}`}
               title={t("schedule.tools")}
               aria-label={t("schedule.toolsMenu")}
               aria-expanded={toolsOpen}
@@ -1348,7 +1546,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   <button
                     key={item.key}
                     type="button"
-                    className={`${item.on ? "is-on" : ""}${item.key === "edit" ? " is-edit" : ""}`}
+                    className={item.on ? "is-on" : ""}
                     onClick={item.run}
                   >
                     <i className={item.icon} />
@@ -1367,22 +1565,23 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           year={year}
           monthIndex={monthIndex}
           me={me}
+          self={selfMark}
           showTables={countTables && !hideTables}
           countTables={countTables}
           dimPast={dimPast}
           hidePastDays={hidePastDays}
           showTip={showTip}
-          canEdit={canEdit && !gridLoading}
-          quietEdit={!editPulse}
+          canEdit={paintOn && !gridLoading}
+          quietEdit={!editGlow || !editPulse}
           focus={focus}
           limits={limits}
           capacity={capacity}
           grids={shownGrids}
           hourLoad={hourLoad}
           onGridChange={onGridChange}
-          allowOverwrite={allowOverwrite}
-          allowReplace={allowReplace}
+          canRemoveForeign={canRemoveForeign}
           onOverwriteAsk={setOverwriteAsk}
+          onForeignKept={() => showV2Toast("off", t("schedule.toastForeignKept"))}
           skin={skin}
           busy={busyMap}
         />
@@ -1400,9 +1599,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2MyCalendar
             year={year}
             monthIndex={monthIndex}
-            title={monthTitle(cursor, i18n.language)}
+            title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
-            grids={gridsForCalendar(shownGrids, year, monthIndex)}
+            grids={mineGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
             x={calPos.x}
             y={calPos.y}
@@ -1441,35 +1640,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onClose={() => setShowSettings(false)}
           />
         )}
-        {markOpen ? (
-          <MarkPlanDock
-            me={me}
-            tables={tablesDraft}
-            x={markPos.x}
-            y={markPos.y}
-            z={zOf("mark")}
-            onMove={setMarkPos}
-            onFocus={() => setFront("mark")}
-            onBump={bumpTables}
-            onDraft={(value) => {
-              setTablesDraft(value);
-              if (!value.trim()) return;
-              const n = Number(value);
-              if (Number.isFinite(n)) applyTables(n);
-            }}
-            onClose={() => {
-              setMarkOpen(false);
-              setCanEdit(false);
-            }}
-            canActAs={canActAs}
-            players={actPlayers}
-            selfId={selfId}
-            actingId={actingId || selfId}
-            onActAs={applyActAs}
-            countTables={countTables}
-          />
-        ) : null}
-        {showHours ? (
+        {showHours && hoursMatrix ? (
           <HoursPanel
             matrix={hoursMatrix}
             year={year}
@@ -1637,7 +1808,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2UserCard
             row={peek}
             givenName={peek.mark.memberId ? publicNames.get(peek.mark.memberId) : undefined}
-            monthLabel={monthTitle(cursor, i18n.language)}
+            monthLabel={monthTitle(year, monthIndex, i18n.language)}
             x={userPos.x}
             y={userPos.y}
             z={zOf("user")}
@@ -1652,14 +1823,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               <OverwriteConfirm
                 kind={overwriteAsk.kind}
                 people={overwriteAsk.people}
-                painter={{ tag: me.t, bg: me.bg, fg: me.fg }}
                 limitLabel={formatLimit(overwriteAsk.limit)}
                 busy={overwriteBusy}
                 onCancel={() => {
                   if (overwriteBusy) return;
                   setOverwriteAsk(null);
                 }}
-                onConfirm={confirmOverwrite}
+                onConfirm={() => confirmOverwrite("wipe")}
+                onEmpty={overwriteAsk.empty ? () => confirmOverwrite("empty") : undefined}
               />,
               document.body,
             )

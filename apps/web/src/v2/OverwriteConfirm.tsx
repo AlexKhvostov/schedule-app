@@ -7,13 +7,13 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { loadTheme } from "./theme";
 
 type Props = {
-  kind: "remove" | "replace";
+  kind: "remove" | "place";
   people: OverwritePerson[];
-  painter?: { tag: string; bg: string; fg: string };
   limitLabel?: string;
   busy?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  onEmpty?: () => void;
 };
 
 function initials(nick: string, tag: string) {
@@ -29,12 +29,21 @@ function ownerLine(row: OverwritePerson) {
   return [handle, row.room].filter(Boolean).join(" · ");
 }
 
-export function OverwriteConfirm({ kind, people, painter, limitLabel, busy, onCancel, onConfirm }: Props) {
+function ActionCopy({ title, hint }: { title: string; hint: string }) {
+  return (
+    <span className="v2-alarm-act-copy">
+      <b>{title}</b>
+      <small>{hint}</small>
+    </span>
+  );
+}
+
+export function OverwriteConfirm({ kind, people, limitLabel, busy, onCancel, onConfirm, onEmpty }: Props) {
   const { t } = useTranslation();
   const theme = loadTheme();
-  const replace = kind === "replace";
+  const place = kind === "place";
+  const soft = Boolean(onEmpty);
   const owners = people.filter((row) => row.discord || row.tag);
-  const sample = owners[0];
   const when = slotWhenLabel(owners.flatMap((row) => row.slots));
   const kicker = [limitLabel, when].filter(Boolean).join(" · ");
 
@@ -49,14 +58,14 @@ export function OverwriteConfirm({ kind, people, painter, limitLabel, busy, onCa
         if (event.target === event.currentTarget) onCancel();
       }}
     >
-      <div className={`v2-alarm${replace ? " is-swap" : ""}`}>
+      <div className={`v2-alarm${place ? " is-swap" : ""}`}>
         <header className="v2-alarm-head">
           <span className="v2-alarm-ico" aria-hidden>
-            <i className={`fa-solid ${replace ? "fa-right-left" : "fa-xmark"}`} />
+            <i className={`fa-solid ${place ? "fa-right-left" : "fa-xmark"}`} />
           </span>
           <div className="v2-alarm-titles">
             <span className="v2-alarm-kicker">{kicker || "\u00a0"}</span>
-            <h2 id="v2-overwrite-title">{t(replace ? "schedule.overwrite.titleReplace" : "schedule.overwrite.titleRemove")}</h2>
+            <h2 id="v2-overwrite-title">{t(place ? "schedule.overwrite.titlePlace" : "schedule.overwrite.titleRemove")}</h2>
           </div>
         </header>
 
@@ -77,44 +86,32 @@ export function OverwriteConfirm({ kind, people, painter, limitLabel, busy, onCa
           ))}
         </ul>
 
-        <ol className="v2-alarm-flow">
-          <li>
-            <span className="v2-alarm-flow-slot">
-              <ScheduleSlot letters={sample?.tag} bg={sample?.bg} fg={sample?.fg} showTables={false} />
-            </span>
-            <b>{t("schedule.overwrite.flowRemove")}</b>
-          </li>
-          <li className="v2-alarm-flow-arrow" aria-hidden>
-            <span />
-          </li>
-          <li>
-            <span className="v2-alarm-flow-slot">
-              {replace ? (
-                <ScheduleSlot letters={painter?.tag} bg={painter?.bg} fg={painter?.fg} showTables={false} />
-              ) : (
-                <ScheduleSlot showTables={false} />
-              )}
-            </span>
-            <b>{t(replace ? "schedule.overwrite.flowPlace" : "schedule.overwrite.flowEmpty")}</b>
-          </li>
-          <li className="v2-alarm-flow-arrow" aria-hidden>
-            <span />
-          </li>
-          <li>
-            <span className="v2-alarm-flow-ico" aria-hidden>
-              <i className="fa-solid fa-bell" />
-            </span>
-            <b>{t("schedule.overwrite.flowNotify")}</b>
-          </li>
-        </ol>
-
-        <div className="v2-alarm-actions">
+        <div className="v2-alarm-actions is-stack">
           <button type="button" className="v2-alarm-no" disabled={busy} onClick={onCancel}>
             {t("schedule.overwrite.cancel")}
           </button>
+          {soft ? (
+            <button type="button" className="v2-alarm-alt" disabled={busy} onClick={onEmpty}>
+              <i className={`fa-solid ${place ? "fa-border-none" : "fa-user"}`} aria-hidden />
+              <ActionCopy
+                title={t(place ? "schedule.overwrite.confirmEmpty" : "schedule.overwrite.confirmOwn")}
+                hint={t("schedule.overwrite.confirmOwnHint")}
+              />
+            </button>
+          ) : null}
           <button type="button" className="v2-alarm-go" disabled={busy} onClick={onConfirm}>
             <span className="v2-alarm-go-spin" hidden={!busy} aria-hidden />
-            {t(replace ? "schedule.overwrite.confirmReplace" : "schedule.overwrite.confirmRemove")}
+            <i className={`fa-solid ${place ? "fa-right-left" : "fa-eraser"}`} aria-hidden />
+            <ActionCopy
+              title={t(
+                place
+                  ? "schedule.overwrite.confirmPlace"
+                  : soft
+                    ? "schedule.overwrite.confirmRemoveAll"
+                    : "schedule.overwrite.confirmRemove",
+              )}
+              hint={t("schedule.overwrite.confirmGoHint")}
+            />
           </button>
         </div>
       </div>

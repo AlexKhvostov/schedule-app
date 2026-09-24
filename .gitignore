@@ -25,3 +25,6 @@ Thumbs.db
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Temporary Superdesign drafts
+.superdesign/tmp/

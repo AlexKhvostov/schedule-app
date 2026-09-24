@@ -18,6 +18,7 @@ import {
   type CapacityMap,
   type HourCaps,
 } from "../schedule/capacity";
+import { weekdayShort } from "../schedule/formatDate";
 import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
 import { MembersAdmin } from "./MembersAdmin";
 import { V2Root } from "./V2Root";
@@ -119,13 +120,10 @@ export function V2Admin({ capacity, hourLoad, isRoot, variant, onVariantChange, 
   const paintRef = useRef<(CapRange & { cap: number }) | null>(null);
   const baselineRef = useRef<MatrixRow[]>([]);
   const profile = profileOf(capacity, limit);
-  const weekLabels = useMemo(() => {
-    const loc = i18n.language.startsWith("en") ? "en-US" : "ru-RU";
-    return WEEK_ORDER.map((id) => {
-      const date = new Date(2026, 5, id === 0 ? 7 : id);
-      return { id, label: date.toLocaleDateString(loc, { weekday: "short" }).replace(".", "") };
-    });
-  }, [i18n.language]);
+  const weekLabels = useMemo(
+    () => WEEK_ORDER.map((id) => ({ id, label: weekdayShort(id, i18n.language) })),
+    [i18n.language],
+  );
 
   useEffect(() => {
     const stop = () => {

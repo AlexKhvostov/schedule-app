@@ -7,40 +7,48 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { isLiveData } from "../data/config";
 import { refreshGuildRoster } from "../data/guild";
 import {
+  createClubCard,
+  createRedPartyProfiles,
+  blockClubProfile,
+  dismissJoinRequest,
   discordPrimary,
   hasRoot,
-  isPlayerAccess,
   listAdminPeople,
+  loadClubRequests,
   peopleRank,
   personTitle,
+  restoreClubCard,
+  reopenJoinRequest,
   saveMemberDistanceId,
   saveMemberMark,
-  setDiscordAccess,
   type AdminPerson,
   type ClubAccess,
+  type ClubRequest,
 } from "../data/people";
 import { loadMemberRoomNicks, type MemberRoomNick } from "../data/plays";
-import { loadScheduleAccessMap, saveScheduleAccess, type ScheduleAccessKey } from "../data/scheduleAccess";
+import { loadClubPeopleSettings, saveSelfCreateCard, subscribeClubPeopleSettings } from "../data/clubSettings";
 import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
-import { LIMIT_OPTIONS, formatLimit } from "../schedule/capacity";
 import { roomName } from "../schedule/rooms";
 import { bestInk, cssToHex, parseMarkHex } from "../schedule/markCatalog";
 import { hueOfBg, lettersBlocked, type ClubMember } from "../schedule/members";
 import { AdminPersonCard } from "./AdminPersonCard";
 import { ScheduleSlot, ScheduleSlotStrip } from "./ScheduleSlot";
 import { PersonChip } from "./PersonAvatar";
+import { catalogRoles, RolePick, RolePills } from "./RolePills";
 import { readSession } from "./session";
 import { loadTheme } from "./theme";
 import { showV2Toast } from "./V2Toast";
 import { V2SaveButton } from "./V2SaveButton";
+import { MembersRoleSettings } from "./members/MembersRoleSettings";
+import { MembersSystemSettings } from "./members/MembersSystemSettings";
+import { DiscordSnapshotModal } from "./members/DiscordSnapshotModal";
 
-type StatusFilter = "club" | "member" | "admin" | "staff" | "closed" | "all" | "root" | "bot";
+type StatusFilter = "all" | "active" | "blocked" | "left" | "root" | "bot";
 type SortKey = "access" | "nick" | "joined" | "color";
+type PeopleTab = "profiles" | "requests" | "roles" | "discord" | "settings";
 
 type RowDraft = {
   access: ClubAccess;
-  nitro: string[];
-  regular: string[];
   distanceId: string;
 };
 
@@ -52,19 +60,9 @@ function discordLine(row: AdminPerson) {
   return `@${row.username}${extra}`;
 }
 
-function limitsOf(keys: ScheduleAccessKey[] | undefined, variant: "nitro" | "regular") {
-  return (keys ?? [])
-    .filter((row) => row.variant === variant)
-    .map((row) => row.limit)
-    .sort((a, b) => Number(a) - Number(b));
-}
-
-function savedDraft(row: AdminPerson, accessMap: Map<string, ScheduleAccessKey[]>): RowDraft {
-  const keys = row.memberId ? accessMap.get(row.memberId) : undefined;
+function savedDraft(row: AdminPerson): RowDraft {
   return {
     access: row.access,
-    nitro: limitsOf(keys, "nitro"),
-    regular: limitsOf(keys, "regular"),
     distanceId: row.distanceExtId ?? "",
   };
 }
@@ -72,8 +70,6 @@ function savedDraft(row: AdminPerson, accessMap: Map<string, ScheduleAccessKey[]
 function sameDraft(a: RowDraft, b: RowDraft) {
   return (
     a.access === b.access &&
-    a.nitro.join() === b.nitro.join() &&
-    a.regular.join() === b.regular.join() &&
     a.distanceId.trim() === b.distanceId.trim()
   );
 }
@@ -81,96 +77,6 @@ function sameDraft(a: RowDraft, b: RowDraft) {
 function markHue(row: AdminPerson) {
   if (!row.markTag) return 1000;
   return hueOfBg(row.markBg);
-}
-
-function LimitPick({
-  values,
-  disabled,
-  label,
-  onChange,
-}: {
-  values: string[];
-  disabled?: boolean;
-  label: string;
-  onChange: (next: string[]) => void;
-}) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const el = btnRef.current;
-      if (!el) return;
-      const box = el.getBoundingClientRect();
-      setPos({
-        top: Math.min(box.bottom + 4, window.innerHeight - 228),
-        left: Math.min(box.left, window.innerWidth - 220),
-      });
-    };
-    place();
-    const onDoc = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (btnRef.current?.contains(target) || popRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const hide = () => setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
-    };
-  }, [open]);
-
-  const summary = values.length
-    ? `${values.slice(0, 3).map((limit) => formatLimit(limit)).join(" · ")}${values.length > 3 ? ` +${values.length - 3}` : ""}`
-    : "—";
-
-  return (
-    <div className="v2-mem-pick">
-      <button
-        ref={btnRef}
-        type="button"
-        className={`v2-ctrl v2-mem-pick-btn${open ? " is-open" : ""}`}
-        disabled={disabled}
-        title={label}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span>{summary}</span>
-        <i className="fa-solid fa-angle-down" />
-      </button>
-      {open && !disabled
-        ? createPortal(
-            <div ref={popRef} className={`v2-mem-pick-pop theme-${loadTheme()}`} style={{ top: pos.top, left: pos.left }}>
-              <b>{label}</b>
-              <div className="v2-mem-pick-grid">
-                {LIMIT_OPTIONS.map((limit) => {
-                  const on = values.includes(limit);
-                  return (
-                    <button
-                      key={limit}
-                      type="button"
-                      className={on ? "is-on" : undefined}
-                      onClick={() =>
-                        onChange(on ? values.filter((item) => item !== limit) : [...values, limit].sort((a, b) => Number(a) - Number(b)))
-                      }
-                    >
-                      {formatLimit(limit)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
-  );
 }
 
 function roomNickLines(memberId: string | null, map: Map<string, MemberRoomNick[]>) {
@@ -253,9 +159,9 @@ function asMarkMember(row: AdminPerson): ClubMember {
     room: row.username,
     email: row.email ?? "",
     limits: [],
-    status: row.access === "closed" ? "pending" : "active",
-    appAccess: row.access !== "closed",
-    isAdmin: row.access === "admin",
+    status: row.accessStatus === "active" ? "active" : "pending",
+    appAccess: row.accessStatus === "active",
+    isAdmin: false,
     vipNitro: 0,
     vipRegular: 0,
     distance: 0,
@@ -479,33 +385,41 @@ export function MembersAdmin() {
   const { t } = useTranslation();
   const selfMemberId = readSession()?.memberId;
   const [list, setList] = useState<AdminPerson[]>([]);
-  const [accessMap, setAccessMap] = useState<Map<string, ScheduleAccessKey[]>>(new Map());
+  const [asks, setAsks] = useState<ClubRequest[]>([]);
   const [roomNicks, setRoomNicks] = useState<Map<string, MemberRoomNick[]>>(new Map());
   const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
   const [busyLoad, setBusyLoad] = useState(true);
   const [busyGuild, setBusyGuild] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [nickQ, setNickQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("club");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("access");
   const [showBots, setShowBots] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [markFor, setMarkFor] = useState<string | null>(null);
   const [profileFor, setProfileFor] = useState<string | null>(null);
+  const [discordFor, setDiscordFor] = useState<string | null>(null);
+  const [showRequestHistory, setShowRequestHistory] = useState(false);
+  const [activeTab, setActiveTab] = useState<PeopleTab>("profiles");
+  const [snapshotRedPartyOnly, setSnapshotRedPartyOnly] = useState(true);
   const [countTables, setCountTables] = useState(false);
+  const [selfCreate, setSelfCreate] = useState(false);
+  const [selfCreateSaving, setSelfCreateSaving] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const reload = async () => {
     if (!isLiveData()) {
       setList([]);
-      setAccessMap(new Map());
+      setAsks([]);
       setRoomNicks(new Map());
       setBusyLoad(false);
       return;
     }
-    const people = await listAdminPeople();
+    const [people, requests] = await Promise.all([listAdminPeople(), loadClubRequests()]);
     const memberIds = people.map((row) => row.memberId).filter((id): id is string => Boolean(id));
-    const [map, nicks] = await Promise.all([loadScheduleAccessMap(memberIds), loadMemberRoomNicks(memberIds)]);
+    const nicks = await loadMemberRoomNicks(memberIds);
     setList(people);
-    setAccessMap(map);
+    setAsks(requests);
     setRoomNicks(nicks);
     setBusyLoad(false);
   };
@@ -529,6 +443,21 @@ export function MembersAdmin() {
     };
   }, []);
 
+  useEffect(() => {
+    let live = true;
+    const apply = () => {
+      void loadClubPeopleSettings().then((next) => {
+        if (live) setSelfCreate(next.selfCreateCard);
+      });
+    };
+    apply();
+    const off = subscribeClubPeopleSettings(apply);
+    return () => {
+      live = false;
+      off();
+    };
+  }, []);
+
   const pullDiscord = async () => {
     if (busyGuild) return;
     setBusyGuild(true);
@@ -540,10 +469,10 @@ export function MembersAdmin() {
   };
 
   const setAccess = async (row: AdminPerson, access: ClubAccess) => {
-    if (hasRoot(row) && access === "closed") return;
-    if (row.memberId && row.memberId === selfMemberId && access === "closed") return;
+    if (!row.memberId || hasRoot(row)) return;
+    if (row.memberId === selfMemberId && access === "closed") return;
     setBusyId(row.discordId);
-    const result = await setDiscordAccess(row.discordId, access);
+    const result = access === "closed" ? await blockClubProfile(row.memberId) : await restoreClubCard(row.memberId);
     if (result.error) {
       showV2Toast("err", t("admin.people.saveErr"));
       setBusyId("");
@@ -551,16 +480,52 @@ export function MembersAdmin() {
     }
     await reload();
     setBusyId("");
-    showV2Toast(access === "closed" ? "off" : "ok", t(`admin.people.accessToast.${access}`));
+    showV2Toast(access === "closed" ? "off" : "ok", t("admin.saved"));
   };
 
-  const shownOf = (row: AdminPerson) => drafts[row.discordId] ?? savedDraft(row, accessMap);
+  const makeCard = async (discordId: string) => {
+    setBusyId(discordId);
+    const result = await createClubCard(discordId);
+    if (result.error) {
+      showV2Toast("err", t("admin.people.saveErr"));
+      setBusyId("");
+      return;
+    }
+    await reload();
+    setBusyId("");
+    showV2Toast("ok", t("admin.people.cardCreated"));
+  };
+
+  const restoreCard = async (memberId: string, discordId: string) => {
+    setBusyId(discordId);
+    const result = await restoreClubCard(memberId);
+    if (result.error) {
+      showV2Toast("err", t("admin.people.saveErr"));
+      setBusyId("");
+      return;
+    }
+    await reload();
+    setBusyId("");
+    showV2Toast("ok", t("admin.people.cardRestored"));
+  };
+
+  const bulkCreate = async () => {
+    if (bulkBusy) return;
+    setBulkBusy(true);
+    const result = await createRedPartyProfiles();
+    if (result.error) showV2Toast("err", t("admin.people.saveErr"));
+    else showV2Toast("ok", t("admin.people.bulkCreated", { n: result.count }));
+    await reload();
+    setBulkBusy(false);
+  };
+
+  const shownOf = (row: AdminPerson) => drafts[row.discordId] ?? savedDraft(row);
 
   const patchRow = (row: AdminPerson, part: Partial<RowDraft>) => {
     const next = { ...shownOf(row), ...part };
     setDrafts((prev) => {
       const copy = { ...prev };
-      if (sameDraft(next, savedDraft(row, accessMap))) delete copy[row.discordId];
+      if (sameDraft(next, savedDraft(row))) delete copy[row.discordId];
       else copy[row.discordId] = next;
       return copy;
     });
@@ -568,54 +533,29 @@ export function MembersAdmin() {
 
   const saveRow = async (row: AdminPerson) => {
     const draft = shownOf(row);
-    const saved = savedDraft(row, accessMap);
+    const saved = savedDraft(row);
     if (sameDraft(draft, saved)) return;
     if (hasRoot(row) && draft.access === "closed") return;
     if (row.memberId === selfMemberId && draft.access === "closed") return;
     setBusyId(row.discordId);
-    if (draft.access !== row.access) {
-      const result = await setDiscordAccess(row.discordId, draft.access);
-      if (result.error) {
-        showV2Toast("err", t("admin.people.saveErr"));
+    const memberId = row.memberId;
+    if (draft.distanceId.trim() !== (row.distanceExtId ?? "").trim()) {
+      const distance = await saveMemberDistanceId(memberId, draft.distanceId, row.discordId);
+      if (distance.error === "duplicate") {
+        showV2Toast("err", t("admin.people.distanceIdDup"));
         setBusyId("");
         return;
       }
-    }
-    let memberId = row.memberId;
-    if (!memberId && draft.access !== "closed") {
-      const people = await listAdminPeople();
-      memberId = people.find((item) => item.discordId === row.discordId)?.memberId ?? null;
-    }
-    if (memberId) {
-      const keys: ScheduleAccessKey[] = [
-        ...draft.nitro.map((limit) => ({ variant: "nitro" as const, limit })),
-        ...draft.regular.map((limit) => ({ variant: "regular" as const, limit })),
-      ];
-      const accessResult = await saveScheduleAccess(memberId, keys);
-      if (accessResult.error) {
+      if (distance.error === "bad-shape") {
+        showV2Toast("err", t("admin.people.distanceIdBad"));
+        setBusyId("");
+        return;
+      }
+      if (distance.error) {
         showV2Toast("err", t("admin.people.saveErr"));
         setBusyId("");
         await reload();
         return;
-      }
-      if (draft.distanceId.trim() !== (row.distanceExtId ?? "").trim()) {
-        const distance = await saveMemberDistanceId(memberId, draft.distanceId);
-        if (distance.error === "duplicate") {
-          showV2Toast("err", t("admin.people.distanceIdDup"));
-          setBusyId("");
-          return;
-        }
-        if (distance.error === "bad-shape") {
-          showV2Toast("err", t("admin.people.distanceIdBad"));
-          setBusyId("");
-          return;
-        }
-        if (distance.error) {
-          showV2Toast("err", t("admin.people.saveErr"));
-          setBusyId("");
-          await reload();
-          return;
-        }
       }
     }
     setDrafts((prev) => {
@@ -629,33 +569,53 @@ export function MembersAdmin() {
   };
 
   const people = useMemo(() => {
-    if (statusFilter === "bot" || showBots) return list;
-    return list.filter((row) => !row.bot);
+    const profiles = list.filter((row) => Boolean(row.memberId));
+    if (statusFilter === "bot" || showBots) return profiles;
+    return profiles.filter((row) => !row.bot);
   }, [list, showBots, statusFilter]);
   const counts = useMemo(() => {
-    const humans = list.filter((row) => !row.bot);
-    const closed = humans.filter((row) => row.access === "closed").length;
-    const member = humans.filter((row) => row.access === "member").length;
-    const admin = humans.filter((row) => row.access === "admin").length;
-    const staff = humans.filter((row) => row.access === "staff").length;
+    const profiles = list.filter((row) => Boolean(row.memberId));
+    const humans = profiles.filter((row) => !row.bot);
+    const active = humans.filter((row) => row.accessStatus === "active").length;
+    const blocked = humans.filter((row) => row.accessStatus === "blocked").length;
     const root = humans.filter((row) => hasRoot(row)).length;
-    const bot = list.filter((row) => row.bot).length;
-    return { all: humans.length + bot, club: member + admin, closed, member, admin, staff, root, bot };
+    const left = humans.filter((row) => Boolean(row.memberId) && !row.onGuild).length;
+    const bot = profiles.filter((row) => row.bot).length;
+    return { all: humans.length + bot, active, blocked, root, bot, left };
   }, [list]);
+  const rolePicked = useMemo(() => new Set(roleFilter), [roleFilter]);
+  const roleCatalog = useMemo(() => {
+    const all = catalogRoles(list);
+    const here = catalogRoles(people);
+    const nById = new Map(here.map((row) => [row.role.id, row.n]));
+    return all.map((row) => ({ ...row, n: nById.get(row.role.id) ?? 0 }));
+  }, [list, people]);
+  const toggleRole = (id: string) => {
+    setRoleFilter((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
 
   const rows = useMemo(() => {
     const q = nickQ.trim().toLowerCase();
     const copy = people.filter((row) => {
       if (statusFilter === "bot" && !row.bot) return false;
       if (row.bot && statusFilter !== "all" && statusFilter !== "bot") return false;
-      if (statusFilter === "club" && !isPlayerAccess(row.access)) return false;
-      if (statusFilter === "closed" && row.access !== "closed") return false;
-      if (statusFilter === "member" && row.access !== "member") return false;
-      if (statusFilter === "admin" && row.access !== "admin") return false;
-      if (statusFilter === "staff" && row.access !== "staff") return false;
+      if (statusFilter === "active" && row.accessStatus !== "active") return false;
+      if (statusFilter === "blocked" && row.accessStatus !== "blocked") return false;
+      if (statusFilter === "left" && !(row.memberId && !row.onGuild)) return false;
       if (statusFilter === "root" && !hasRoot(row)) return false;
+      if (rolePicked.size && !row.discordRoles.some((role) => rolePicked.has(role.id))) return false;
       if (!q) return true;
-      return [discordPrimary(row), row.username, row.globalName, row.nick, row.discordId, row.publicCode, row.displayName, row.distanceExtId]
+      return [
+        discordPrimary(row),
+        row.username,
+        row.globalName,
+        row.nick,
+        row.discordId,
+        row.publicCode,
+        row.displayName,
+        row.distanceExtId,
+        ...row.discordRoles.map((role) => role.name),
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -668,29 +628,30 @@ export function MembersAdmin() {
       return peopleRank(a) - peopleRank(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
     });
     return copy;
-  }, [people, nickQ, statusFilter, sort]);
+  }, [people, nickQ, statusFilter, sort, rolePicked]);
 
   const editing = list.find((row) => (row.memberId ?? row.discordId) === markFor) ?? null;
   const profile = list.find((row) => row.discordId === profileFor) ?? null;
+  const discordPerson = list.find((row) => row.discordId === discordFor) ?? null;
+  const shownAsks = showRequestHistory ? asks : asks.filter((ask) => ask.status === "open");
+  const bulkEligible = list.filter(
+    (row) =>
+      row.onGuild &&
+      !row.bot &&
+      !row.memberId &&
+      row.discordRoles.some((role) => role.id === "1208022351652986891"),
+  ).length;
+  const snapshotRows = list.filter(
+    (row) =>
+      (showBots || !row.bot) &&
+      (!snapshotRedPartyOnly || row.discordRoles.some((role) => role.id === "1208022351652986891")),
+  );
 
   return (
     <div className="v2-people-pad">
       <div className="v2-people-bar">
         <h2>{t("nav.adminPeople")}</h2>
-        {isLiveData() ? (
-          <button
-            type="button"
-            className="v2-guild-refresh"
-            disabled={busyGuild}
-            title={t("admin.people.refreshHint")}
-            onClick={() => void pullDiscord()}
-          >
-            <i className={`fa-solid fa-rotate${busyGuild ? " fa-spin" : ""}`} />
-            {busyGuild ? t("admin.people.refreshDiscordBusy") : t("admin.people.refreshDiscord")}
-          </button>
-        ) : null}
       </div>
-
       {!isLiveData() ? (
         <div className="v2-guild-empty mt-6">
           <i className="fa-brands fa-discord" />
@@ -699,17 +660,60 @@ export function MembersAdmin() {
         </div>
       ) : (
         <>
+          <nav className="v2-people-tabs" aria-label={t("admin.people.tabsLabel")}>
+            {([
+              ["profiles", "fa-address-card", t("admin.people.tabProfiles"), people.length],
+              ["requests", "fa-inbox", t("admin.people.tabRequests"), asks.filter((ask) => ask.status === "open").length],
+              ["roles", "fa-shield-halved", t("admin.people.tabRoles"), null],
+              ["discord", "fa-brands fa-discord", t("admin.people.tabDiscord"), snapshotRows.length],
+              ["settings", "fa-sliders", t("admin.people.tabSettings"), null],
+            ] as [PeopleTab, string, string, number | null][]).map(([key, icon, label, count]) => (
+              <button
+                key={key}
+                type="button"
+                className={activeTab === key ? "is-on" : undefined}
+                aria-current={activeTab === key ? "page" : undefined}
+                onClick={() => setActiveTab(key)}
+              >
+                <i className={icon.startsWith("fa-brands") ? icon : `fa-solid ${icon}`} />
+                <span>{label}</span>
+                {count !== null ? <small>{count}</small> : null}
+              </button>
+            ))}
+          </nav>
+
+          <div className="v2-people-stack">
+          {activeTab === "profiles" ? (
+          <section className="v2-people-section v2-profiles-section">
+            <header className="v2-people-section-head">
+              <span className="v2-people-section-icon"><i className="fa-solid fa-address-card" /></span>
+              <span>
+                <b>{t("admin.people.profilesTitle")}</b>
+                <small>{t("admin.people.profilesLead")}</small>
+              </span>
+              <span className="v2-section-count">{people.length}</span>
+            </header>
           <div className="v2-mem-filters">
             <NickFilter value={nickQ} onChange={setNickQ} people={people} />
             <CompactField label={t("admin.people.colAccess")}>
               <NativeSelect className="w-full" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                {(["club", "member", "admin", "staff", "closed", "all", "root", "bot"] as const).map((key) => (
+                {(["all", "active", "blocked", "left", "root", "bot"] as const).map((key) => (
                   <option key={key} value={key}>
                     {t(`admin.people.accessFilter.${key}`)} · {counts[key]}
                   </option>
                 ))}
               </NativeSelect>
             </CompactField>
+            <div className="v2-field">
+              <span>{t("admin.people.colRoles")}</span>
+              <RolePick
+                roles={roleCatalog}
+                picked={rolePicked}
+                onToggle={toggleRole}
+                label={t("admin.people.colRoles")}
+                emptyLabel={t("admin.people.filterRolesAll")}
+              />
+            </div>
             <CompactField label={t("admin.people.sortLabel")}>
               <NativeSelect className="w-full" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
                 {(["access", "nick", "color", "joined"] as SortKey[]).map((key) => (
@@ -732,8 +736,7 @@ export function MembersAdmin() {
                 <col className="v2-mem-col-person" />
                 <col className="v2-mem-col-mark" />
                 <col className="v2-mem-col-status" />
-                <col className="v2-mem-col-access" />
-                <col className="v2-mem-col-access" />
+                <col className="v2-mem-col-roles" />
                 <col className="v2-mem-col-dist" />
                 <col className="v2-mem-col-save" />
               </colgroup>
@@ -742,14 +745,7 @@ export function MembersAdmin() {
                   <th>{t("admin.people.colPerson")}</th>
                   <th className="v2-mem-h-mark">{t("admin.people.colMark")}</th>
                   <th>{t("admin.people.colAccess")}</th>
-                  <th className="v2-mem-h-access" title={t("admin.people.colNitroHint")}>
-                    <b>{t("admin.people.colNitro")}</b>
-                    <small>{t("admin.people.colScheduleAccess")}</small>
-                  </th>
-                  <th className="v2-mem-h-access" title={t("admin.people.colRegularHint")}>
-                    <b>{t("admin.people.colRegular")}</b>
-                    <small>{t("admin.people.colScheduleAccess")}</small>
-                  </th>
+                  <th title={t("admin.people.colRolesHint")}>{t("admin.people.colRoles")}</th>
                   <th className="v2-mem-h-dist" title={t("admin.people.distanceIdHint")}>
                     {t("admin.people.colDist")}
                   </th>
@@ -759,17 +755,17 @@ export function MembersAdmin() {
               <tbody>
                 {rows.map((row) => {
                   const draft = shownOf(row);
-                  const dirty = !sameDraft(draft, savedDraft(row, accessMap));
+                  const dirty = !sameDraft(draft, savedDraft(row));
                   const closedLocked = hasRoot(row) || row.memberId === selfMemberId;
-                  const limitsLocked = row.bot || (!row.memberId && draft.access === "closed");
+                  const rowLocked = row.bot || !row.memberId;
                   return (
-                    <tr key={row.discordId} className={row.access === "closed" || row.bot ? "is-dim" : undefined}>
+                    <tr key={row.discordId} className={row.accessStatus !== "active" || row.bot || (row.memberId && !row.onGuild) ? "is-dim" : undefined}>
                       <td>
                         <PersonTip row={row} rooms={roomNickLines(row.memberId, roomNicks)}>
                           <PersonChip
                             src={row.avatarUrl}
                             name={discordPrimary(row)}
-                            sub={`${discordLine(row)}${row.bot ? ` · ${t("admin.people.access.bot")}` : ""}`}
+                            sub={`${discordLine(row)}${row.bot ? ` · ${t("admin.people.access.bot")}` : ""}${row.memberId && !row.onGuild ? ` · ${t("admin.people.leftGuild")}` : ""}`}
                             onClick={() => setProfileFor(row.discordId)}
                           />
                         </PersonTip>
@@ -794,44 +790,42 @@ export function MembersAdmin() {
                       <td>
                         {row.bot ? (
                           <i className="v2-club-bot">{t("admin.people.access.bot")}</i>
-                        ) : (
+                        ) : row.memberId ? (
                           <span className="v2-mem-status-cell">
-                            <NativeSelect
-                              className="v2-mem-status w-full"
-                              value={draft.access}
-                              disabled={busyId === row.discordId}
-                              onChange={(event) => {
-                                const next = event.target.value as ClubAccess;
-                                if (next === "closed" && closedLocked) return;
-                                patchRow(row, { access: next });
-                              }}
-                            >
-                              <option value="closed" disabled={closedLocked}>
-                                {t("admin.people.access.closed")}
-                              </option>
-                              <option value="member">{t("admin.people.access.member")}</option>
-                              <option value="admin">{t("admin.people.access.admin")}</option>
-                              <option value="staff">{t("admin.people.access.staff")}</option>
-                            </NativeSelect>
-                            {hasRoot(row) ? <i className="v2-club-root">{t("admin.root.roleRoot")}</i> : null}
+                            <span className="v2-mem-status-line">
+                              <b className={`v2-profile-state is-${row.accessStatus ?? "blocked"}`}>
+                                {row.accessStatus === "active" ? t("admin.people.profileActive") : t("admin.people.profileBlocked")}
+                              </b>
+                              {!closedLocked ? (
+                                <button
+                                  type="button"
+                                  className="v2-ctrl v2-status-action"
+                                  disabled={busyId === row.discordId || (row.accessStatus !== "active" && !row.onGuild)}
+                                  onClick={() => void setAccess(row, row.accessStatus === "active" ? "closed" : "member")}
+                                >
+                                  {row.accessStatus === "active" ? t("admin.people.blockProfile") : t("admin.people.restoreCard")}
+                                </button>
+                              ) : null}
+                            </span>
+                            <span className="v2-mem-status-notes">
+                              {hasRoot(row) ? <i className="v2-club-root">{t("admin.root.roleRoot")}</i> : null}
+                              {row.onGuild ? null : <i className="v2-club-left">{t("admin.people.leftGuild")}</i>}
+                              {row.blockReason ? <small>{t(`admin.people.blockReason.${row.blockReason}`)}</small> : null}
+                            </span>
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="v2-ctrl v2-mem-create"
+                            disabled={busyId === row.discordId}
+                            onClick={() => void makeCard(row.discordId)}
+                          >
+                            {t("admin.people.createCard")}
+                          </button>
                         )}
                       </td>
                       <td>
-                        <LimitPick
-                          label={t("admin.people.colNitroHint")}
-                          values={draft.nitro}
-                          disabled={limitsLocked || busyId === row.discordId}
-                          onChange={(nitro) => patchRow(row, { nitro })}
-                        />
-                      </td>
-                      <td>
-                        <LimitPick
-                          label={t("admin.people.colRegularHint")}
-                          values={draft.regular}
-                          disabled={limitsLocked || busyId === row.discordId}
-                          onChange={(regular) => patchRow(row, { regular })}
-                        />
+                        <RolePills roles={row.accessDiscordRoles} max={99} />
                       </td>
                       <td>
                         <Input
@@ -840,7 +834,7 @@ export function MembersAdmin() {
                           inputMode="numeric"
                           maxLength={12}
                           placeholder="—"
-                          disabled={limitsLocked || busyId === row.discordId}
+                          disabled={rowLocked || busyId === row.discordId}
                           title={t("admin.people.distanceIdHint")}
                           aria-label={t("admin.people.distanceId")}
                           onChange={(event) =>
@@ -862,7 +856,7 @@ export function MembersAdmin() {
                 })}
                 {!rows.length && !busyLoad && (
                   <tr>
-                    <td colSpan={7} className="v2-muted py-4 text-center text-[12px]">
+                    <td colSpan={6} className="v2-muted py-4 text-center text-[12px]">
                       {list.length ? t("admin.people.empty") : t("admin.people.noSnapshot")}
                     </td>
                   </tr>
@@ -870,6 +864,151 @@ export function MembersAdmin() {
               </tbody>
             </table>
           </div>
+          </section>
+          ) : null}
+
+          {activeTab === "requests" ? (
+          <section className="v2-people-section v2-requests-section">
+            <header className="v2-people-section-head">
+              <span className="v2-people-section-icon"><i className="fa-solid fa-inbox" /></span>
+              <span>
+                <b>{t("admin.people.asksTitle", { n: asks.filter((ask) => ask.status === "open").length })}</b>
+                <small>{t("admin.people.requestsLead")}</small>
+              </span>
+            </header>
+            <div className="v2-people-asks">
+              <div className="v2-requests-tools">
+                <label className="v2-mem-check">
+                  <input type="checkbox" checked={showRequestHistory} onChange={(event) => setShowRequestHistory(event.target.checked)} />
+                  <span>{t("admin.people.requestsHistory")}</span>
+                </label>
+                <button
+                  type="button"
+                  className="v2-ctrl v2-primary-action"
+                  disabled={bulkBusy || bulkEligible === 0}
+                  onClick={() => void bulkCreate()}
+                >
+                  <i className={`fa-solid fa-users-gear${bulkBusy ? " fa-spin" : ""}`} />
+                  {t("admin.people.bulkCreateShort")}
+                  <span className="v2-action-count">{bulkEligible}</span>
+                </button>
+              </div>
+              {shownAsks.map((ask) => (
+                <div key={ask.id} className="v2-people-ask">
+                  <span>
+                    {ask.displayName || ask.username || ask.discordId}
+                    <i>{ask.kind === "restore" ? t("admin.people.askRestore") : t("admin.people.askJoin")} · {ask.status}</i>
+                  </span>
+                  {ask.status !== "open" ? null : ask.kind === "restore" && ask.memberId ? (
+                    <button type="button" className="v2-ctrl v2-primary-action" disabled={busyId === ask.discordId} onClick={() => void restoreCard(ask.memberId as string, ask.discordId)}>
+                      {t("admin.people.restoreCard")}
+                    </button>
+                  ) : (
+                    <button type="button" className="v2-ctrl v2-primary-action" disabled={busyId === ask.discordId} onClick={() => void makeCard(ask.discordId)}>
+                      {t("admin.people.createCard")}
+                    </button>
+                  )}
+                  {ask.status === "open" ? <button
+                    type="button"
+                    className="v2-ctrl"
+                    title={t("admin.people.askDismiss")}
+                    onClick={() => {
+                      void dismissJoinRequest(ask.id).then(() => reload());
+                    }}
+                  >
+                    {t("admin.people.askDismiss")}
+                  </button> : ask.status === "dismissed" ? (
+                    <button type="button" className="v2-ctrl" onClick={() => void reopenJoinRequest(ask.id).then(() => reload())}>
+                      {t("admin.people.requestReopen")}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {!shownAsks.length ? <span className="v2-muted text-[12px]">{t("admin.people.requestsEmpty")}</span> : null}
+            </div>
+          </section>
+          ) : null}
+
+          {activeTab === "discord" ? (
+          <section className="v2-people-section v2-discord-snapshot">
+            <header className="v2-people-section-head">
+              <span className="v2-people-section-icon"><i className="fa-brands fa-discord" /></span>
+              <span>
+                <b>{t("admin.people.snapshotTitle")}</b>
+                <small>{t("admin.people.snapshotLead", { n: snapshotRows.length })}</small>
+              </span>
+            </header>
+            <div className="v2-snapshot-tools">
+              <label className="v2-mem-check">
+                <input
+                  type="checkbox"
+                  checked={snapshotRedPartyOnly}
+                  onChange={(event) => setSnapshotRedPartyOnly(event.target.checked)}
+                />
+                <span>{t("admin.people.snapshotRedPartyOnly")}</span>
+              </label>
+              <button
+                type="button"
+                className="v2-ctrl v2-discord-refresh"
+                disabled={busyGuild}
+                title={t("admin.people.refreshHint")}
+                onClick={() => void pullDiscord()}
+              >
+                <i className={`fa-solid fa-rotate${busyGuild ? " fa-spin" : ""}`} />
+                {busyGuild ? t("admin.people.refreshDiscordBusy") : t("admin.people.refreshDiscord")}
+              </button>
+            </div>
+            <div className="v2-snapshot-list">
+              {snapshotRows.map((row) => (
+                <button key={row.discordId} type="button" onClick={() => setDiscordFor(row.discordId)}>
+                  <PersonChip
+                    src={row.avatarUrl}
+                    name={discordPrimary(row)}
+                    sub={`@${row.username} · ${row.onGuild ? t("admin.people.onServer") : t("admin.people.leftGuild")}`}
+                  />
+                  <span className="v2-snapshot-meta">
+                    <RolePills roles={row.discordRoles} max={4} />
+                    <small>
+                      {row.discordId}
+                      {row.joinedAt ? ` · ${t("admin.people.snapshotJoined")}: ${new Date(row.joinedAt).toLocaleDateString()}` : ""}
+                    </small>
+                  </span>
+                  <span
+                    className={`v2-snapshot-redparty${row.discordRoles.some((role) => role.id === "1208022351652986891") ? " is-on" : " is-off"}`}
+                    title={t("admin.people.snapshotRedPartyRole")}
+                  >
+                    <i className={`fa-solid ${row.discordRoles.some((role) => role.id === "1208022351652986891") ? "fa-square-check" : "fa-square-xmark"}`} />
+                    RedParty
+                  </span>
+                  <span className={`v2-snapshot-action${row.memberId ? " is-done" : " is-create"}`}>
+                    <i className={`fa-solid ${row.memberId ? "fa-circle-check" : "fa-user-plus"}`} />
+                    {row.memberId ? t("admin.people.profileExists") : t("admin.people.createCard")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+          ) : null}
+
+          {activeTab === "roles" ? <MembersRoleSettings /> : null}
+          {activeTab === "settings" ? (
+            <MembersSystemSettings
+              selfCreate={selfCreate}
+              saving={selfCreateSaving}
+              onChange={(next) => {
+                setSelfCreate(next);
+                setSelfCreateSaving(true);
+                void saveSelfCreateCard(next).then((result) => {
+                  setSelfCreateSaving(false);
+                  if (result.error) {
+                    setSelfCreate(!next);
+                    showV2Toast("err", t("admin.people.saveErr"));
+                  } else showV2Toast("ok", t("admin.saved"));
+                });
+              }}
+            />
+          ) : null}
+        </div>
         </>
       )}
 
@@ -901,9 +1040,18 @@ export function MembersAdmin() {
           busy={busyId === profile.discordId}
           onClose={() => setProfileFor(null)}
           onAccess={(access) => void setAccess(profile, access)}
+          onCreateCard={() => void makeCard(profile.discordId)}
           onMark={() => setMarkFor(profile.memberId ?? profile.discordId)}
           onReload={() => void reload()}
           countTables={countTables}
+        />
+      )}
+      {discordPerson && (
+        <DiscordSnapshotModal
+          person={discordPerson}
+          busy={busyId === discordPerson.discordId}
+          onClose={() => setDiscordFor(null)}
+          onCreate={() => void makeCard(discordPerson.discordId)}
         />
       )}
     </div>

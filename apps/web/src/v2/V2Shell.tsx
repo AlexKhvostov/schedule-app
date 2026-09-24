@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
@@ -13,7 +13,9 @@ import { setAppLanguage } from "../i18n";
 import { V2Schedule } from "./V2Schedule";
 import { V2Priorities } from "./V2Priorities";
 import { V2Admin } from "./V2Admin";
+import { V2Distances } from "./V2Distances";
 import { V2Cabinet } from "./V2Cabinet";
+import { V2Home } from "./V2Home";
 import { V2Wait } from "./V2Wait";
 import { V2Guild } from "./V2Guild";
 import { writeSession, type Session } from "./session";
@@ -59,26 +61,43 @@ function V2HeaderClock() {
 
 type StaffItem = { key: string; label: string; icon: string; hint?: string };
 
-function bootPage(canGrid: boolean, isRoot: boolean, access: Session["access"]) {
+function bootPage(isRoot: boolean, permissions: string[] = []) {
+  const allowed = new Set(permissions);
+  const can = (permission: string) => isRoot || allowed.has(permission);
   if (typeof window !== "undefined") {
     const hash = window.location.hash;
     if (isRoot && hash === "#blocks") return "blocks";
     if (isRoot && hash === "#uikit") return "uikit";
     if (isRoot && hash === "#guild") return "guild";
     if (isRoot && hash === "#admin-root") return "admin-root";
-    if (hash === "#admin-schedule") return "admin-schedule";
-    if (hash === "#admin" || hash === "#admin-people") return "admin-people";
+    if (can("schedule.manage") && hash === "#admin-schedule") return "admin-schedule";
+    if (can("distances") && hash === "#admin-distance") return "admin-distance";
+    if (can("admin.people") && (hash === "#admin" || hash === "#admin-people")) return "admin-people";
+    if (can("schedule") && hash === "#schedule") return "schedule";
+    if (can("priorities") && hash === "#priorities") return "priorities";
+    if (can("profile") && hash === "#cabinet") return "cabinet";
   }
-  return canGrid ? "schedule" : access === "profile" ? "cabinet" : "wait";
+  return "home";
 }
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
   const { t, i18n } = useTranslation();
   const nick = session.nick;
-  const canGrid = session.access === "active";
+  const permissions = session.permissions ?? [];
   const isRoot = session.role === "root";
-  const isAdmin = isRoot || session.role === "admin";
-  const [page, setPage] = useState(() => bootPage(canGrid, isRoot, session.access));
+  const menuPermissions = useMemo(
+    () => (!isLiveData() && !isRoot ? [...new Set([...permissions, "profile", "schedule", "priorities"])] : permissions),
+    [isRoot, permissions],
+  );
+  const can = (permission: string) => isRoot || menuPermissions.includes(permission);
+  const canGrid = session.access === "active" && can("schedule");
+  const canProfile = can("profile");
+  const canPriorities = session.access === "active" && can("priorities");
+  const canPeople = can("admin.people");
+  const canDistances = can("distances");
+  const canScheduleAdmin = can("schedule.manage");
+  const isAdmin = canPeople || canDistances || canScheduleAdmin;
+  const [page, setPage] = useState(() => bootPage(isRoot, menuPermissions));
   const [menuOpen, setMenuOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
@@ -102,10 +121,15 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
     setAdminOpen(false);
     if (typeof window === "undefined") return;
     const hashes: Record<string, string> = {
+      home: "home",
+      schedule: "schedule",
+      priorities: "priorities",
+      cabinet: "cabinet",
       uikit: "uikit",
       blocks: "blocks",
       guild: "guild",
       "admin-people": "admin",
+      "admin-distance": "admin-distance",
       "admin-schedule": "admin-schedule",
       "admin-root": "admin-root",
     };
@@ -114,16 +138,16 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
     else if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
   };
 
-  const pages: StaffItem[] = canGrid
-    ? [
-        { key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" },
-        { key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" },
-      ]
-    : [];
+  const pages: StaffItem[] = [
+    { key: "home", label: t("nav.home"), icon: "fa-house" },
+    ...(canGrid ? [{ key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" }] : []),
+    ...(canPriorities ? [{ key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" }] : []),
+  ];
 
   const clubItems: StaffItem[] = [
-    { key: "admin-people", label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") },
-    { key: "admin-schedule", label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") },
+    ...(canPeople ? [{ key: "admin-people", label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") }] : []),
+    ...(canDistances ? [{ key: "admin-distance", label: t("nav.adminDistance"), icon: "fa-chart-column", hint: t("nav.adminDistanceHint") }] : []),
+    ...(canScheduleAdmin ? [{ key: "admin-schedule", label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") }] : []),
   ];
   const rootItems: StaffItem[] = isRoot
     ? [
@@ -136,8 +160,17 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const staffOn = page.startsWith("admin") || page === "uikit" || page === "blocks" || page === "guild";
 
   useEffect(() => {
-    if (session.access === "active" && page === "wait") setPage("schedule");
-  }, [session.access, page]);
+    if (page === "wait" && session.access === "active") setPage("home");
+    if (page === "cabinet" && !canProfile) setPage("home");
+    if (page === "schedule" && !canGrid) setPage("home");
+    if (page === "priorities" && !canPriorities) setPage("home");
+  }, [session.access, page, canProfile, canGrid, canPriorities]);
+
+  useEffect(() => {
+    const sync = () => setPage(bootPage(isRoot, menuPermissions));
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, [isRoot, menuPermissions]);
 
   useEffect(() => {
     if (isLiveData()) {
@@ -300,11 +333,13 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                       <b>{nick}</b>
                       <small>{t(isRoot ? "account.roleRoot" : isAdmin ? "account.roleAdmin" : session.role === "staff" ? "account.roleStaff" : "account.roleMember")}</small>
                     </div>
+                    {canProfile ? (
                     <button type="button" className={`v2-account-cab${page === "cabinet" ? " is-on" : ""}`} onClick={() => goPage("cabinet")}>
                       <i className="fa-solid fa-id-card" />
                       <span>{t("nav.cabinet")}</span>
                       <i className="fa-solid fa-angle-right" />
                     </button>
+                    ) : null}
                     <div className="v2-account-prefs">
                       <div className="v2-account-pref">
                         <span>{t("account.theme")}</span>
@@ -353,8 +388,9 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage("cabinet")} />}
-          {page === "cabinet" && (
+          {page === "home" && <V2Home nick={nick} />}
+          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : "home")} />}
+          {canProfile && page === "cabinet" && (
             <div className="v2-cab-stage min-h-0 flex-1 overflow-auto">
               <V2Cabinet
                 session={session}
@@ -396,9 +432,14 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
               <V2BlocksKit />
             </div>
           )}
-          {canGrid && page === "priorities" && <V2Priorities />}
+          {canPriorities && page === "priorities" && <V2Priorities />}
           {isRoot && page === "guild" && <V2Guild />}
-          {isAdmin && page.startsWith("admin") && (
+          {canDistances && page === "admin-distance" && (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <V2Distances />
+            </div>
+          )}
+          {((page === "admin-people" && canPeople) || (page === "admin-schedule" && canScheduleAdmin) || (page === "admin-root" && isRoot)) && (
             <div className="min-h-0 flex-1 overflow-auto">
               <V2Admin
                 isRoot={isRoot}

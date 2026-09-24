@@ -2,9 +2,10 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
-import { isOwnMark, type Mark } from "../schedule/marks";
+import { isSelfSeat, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
-import { daysInMonth, levelAllowed, seatsOf, shownLevels, stampSeat, type Occupancy } from "../schedule/plan";
+import { formatDayLabel } from "../schedule/formatDate";
+import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
@@ -16,6 +17,7 @@ type Props = {
   year: number;
   monthIndex: number;
   me: Mark;
+  self?: Mark;
   showTables: boolean;
   countTables?: boolean;
   dimPast: boolean;
@@ -30,10 +32,10 @@ type Props = {
   hourLoad?: HourLoadMap;
   onGridChange: (limit: string, next: Occupancy) => void;
   skin?: "classic" | "theme";
-  busy?: (string | null)[][];
-  allowOverwrite?: boolean;
-  allowReplace?: boolean;
+  busy?: (string[] | null)[][];
+  canRemoveForeign?: boolean;
   onOverwriteAsk?: (ask: OverwriteAsk) => void;
+  onForeignKept?: () => void;
 };
 
 export type OverwriteSlot = { date: string; half: number; level: number };
@@ -52,12 +54,13 @@ export type OverwritePerson = {
 };
 
 export type OverwriteAsk = {
-  kind: "remove" | "replace";
+  kind: "remove" | "place";
   limit: string;
   people: OverwritePerson[];
   memberIds: string[];
   slots: OverwriteSlot[];
   next: Occupancy;
+  empty?: Occupancy;
 };
 
 type SlotHit = {
@@ -69,7 +72,7 @@ type SlotHit = {
   level: number;
   limit: string;
   lane: string;
-  busyLimit?: string;
+  busyLimits?: string[];
   x: number;
   y: number;
 };
@@ -103,11 +106,7 @@ function slotSpan(half: number, hourShift = 0) {
 }
 
 function tipDate(year: number, monthIndex: number, day: number, lang: string) {
-  const loc = lang.startsWith("en") ? "en-US" : "ru-RU";
-  const date = new Date(year, monthIndex, day);
-  const weekday = date.toLocaleDateString(loc, { weekday: "short" }).replace(".", "");
-  const rest = date.toLocaleDateString(loc, { day: "numeric", month: "short" }).replace(".", "");
-  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${rest}`;
+  return formatDayLabel(year, monthIndex, day, lang);
 }
 
 function tablesLabel(count: number, lang: string) {
@@ -139,6 +138,13 @@ function ownerKey(mark: Mark) {
   return mark.memberId || mark.discord || mark.t || "mark";
 }
 
+function writeSeat(item: Occupancy[number][number] | undefined, level: number, next: Mark | null) {
+  const seats = seatsOf(item, Math.max(level + 1, 2));
+  const out = seats.slice();
+  out[level] = next;
+  return out;
+}
+
 function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
   const discord = showNick(mark.discord) || showNick(mark.guildNick) || showNick(mark.globalName) || showNick(mark.username) || mark.t.trim() || "—";
   const username = showNick(mark.username);
@@ -157,7 +163,12 @@ function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
 }
 
 function markQuery(focus: string) {
-  return focus.trim().toUpperCase();
+  return focus.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+}
+
+function findHitCss(q: string) {
+  if (!q) return "";
+  return `.v2-opt.is-find[data-opt-find="${q}"] .v2-opt-cell.is-on[data-mark="${q}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
 }
 
 function nowAlongTrack(half: number, progress: number) {
@@ -215,7 +226,7 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     level: Number(el.dataset.level),
     limit: el.dataset.limit ?? "",
     lane: el.dataset.lane ?? "",
-    busyLimit: el.dataset.busy || undefined,
+    busyLimits: (el.dataset.busy || "").split(",").filter(Boolean),
     x,
     y,
   };
@@ -243,6 +254,17 @@ function halfOnLane(origin: SlotHit, clientX: number) {
     }
   }
   return best;
+}
+
+function hitOnLane(origin: SlotHit, half: number): SlotHit | null {
+  const el = laneCells(origin).find((cell) => Number(cell.dataset.half) === half);
+  if (!el) return null;
+  return {
+    ...origin,
+    cell: el,
+    half,
+    hour: Number(el.dataset.h),
+  };
 }
 
 function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode: "place" | "remove") {
@@ -440,7 +462,8 @@ const OptCell = memo(function OptCell({
   muted,
   hit,
   nowPct,
-  busyLimit,
+  busyLimits,
+  busyHalf,
 }: {
   dayIdx: number;
   day: number;
@@ -455,12 +478,14 @@ const OptCell = memo(function OptCell({
   showTables: boolean;
   past: boolean;
   locked: boolean;
-  muted: boolean;
-  hit: boolean;
+  muted?: boolean;
+  hit?: boolean;
   nowPct?: number;
-  busyLimit?: string;
+  busyLimits?: string[];
+  busyHalf?: boolean;
 }) {
   const on = Boolean(bg);
+  const mark = tag?.trim().toUpperCase() || undefined;
   return (
     <div
       role="gridcell"
@@ -472,8 +497,9 @@ const OptCell = memo(function OptCell({
       data-level={level}
       data-limit={limit}
       data-lane={lane}
-      data-busy={busyLimit || undefined}
-      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}`}
+      data-mark={mark}
+      data-busy={busyLimits?.length ? busyLimits.join(",") : undefined}
+      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}`}
       style={
         {
           "--mark": bg,
@@ -506,7 +532,6 @@ const OptBody = memo(function OptBody({
   showTables,
   dimPast,
   hidePastDays,
-  focus,
   limits,
   capacity,
   grids,
@@ -522,17 +547,15 @@ const OptBody = memo(function OptBody({
   dimPast: boolean;
   hidePastDays?: boolean;
   skin?: "classic" | "theme";
-  focus: string;
   limits: string[];
   capacity: CapacityMap;
   grids: Record<string, Occupancy>;
   days: { d: number; wd: string; weekend: boolean }[];
   cet: CetStamp;
   todayRef: RefObject<HTMLDivElement | null>;
-  busy?: (string | null)[][];
+  busy?: (string[] | null)[][];
 }) {
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
-  const q = markQuery(focus);
 
   return (
     <>
@@ -597,14 +620,14 @@ const OptBody = memo(function OptBody({
                           const locked = !levelAllowed(half, level, limitHours);
                           const mark = seatsOf(row[half], level + 1)[level];
                           const useMat = skin === "theme";
-                          const past = dimPast && isPastSlot(year, monthIndex, day.d, half, cet);
+                          const gone = isPastSlot(year, monthIndex, day.d, half, cet);
+                          const past = dimPast && gone;
                           const nowPct =
                             !useMat && dimPast && today && half === cet.half
                               ? Math.min(100, Math.max(0, cet.slotProgress * 100))
                               : undefined;
-                          const focused = Boolean(q && mark && mark.t.toUpperCase() === q);
-                          const other = busy?.[dayIdx]?.[half];
-                          const busyLimit = other && other !== limit ? other : undefined;
+                          const mine = gone || locked ? undefined : busy?.[dayIdx]?.[half];
+                          const hidden = mine?.filter((item) => !limits.includes(item));
                           return (
                             <OptCell
                               key={half}
@@ -621,10 +644,9 @@ const OptBody = memo(function OptBody({
                               showTables={showTables}
                               past={past}
                               locked={locked}
-                              muted={Boolean(q && mark && !focused)}
-                              hit={focused}
                               nowPct={nowPct}
-                              busyLimit={busyLimit}
+                              busyLimits={hidden}
+                              busyHalf={Boolean(hidden?.length)}
                             />
                           );
                         })}
@@ -634,20 +656,6 @@ const OptBody = memo(function OptBody({
                 if (skin !== "theme") return lanes;
                 return (
                   <div key={limit} className="v2-opt-limit">
-                    {busy
-                      ? Array.from({ length: SLOT_COUNT }, (_, half) => {
-                          const other = busy[dayIdx]?.[half];
-                          if (!other || other === limit) return null;
-                          return (
-                            <span
-                              key={half}
-                              className="v2-opt-busy"
-                              style={{ ["--busy-half" as string]: half } as CSSProperties}
-                              aria-hidden
-                            />
-                          );
-                        })
-                      : null}
                     {lanes}
                   </div>
                 );
@@ -745,12 +753,11 @@ function OptTip({
         setHover(null);
       },
       show: (hit, rest, force) => {
-        if (!showTip && !hit.busyLimit && !force) {
+        if (!showTip && !hit.busyLimits?.length && !force) {
           restRef.current = null;
           setHover(null);
           return;
         }
-        if (!rest && restRef.current) return;
         restRef.current = rest ?? null;
         setHover(hit);
       },
@@ -837,9 +844,9 @@ function OptTip({
           </small>
         ) : null}
       </div>
-      {hover.busyLimit && hover.busyLimit !== hover.limit ? (
+      {hover.busyLimits?.length ? (
         <div className="v2-opt-tip-note">
-          <strong>{t("v2.tip.busy", { limit: formatLimit(hover.busyLimit) })}</strong>
+          <strong>{t("v2.tip.busy", { limit: hover.busyLimits.map((item) => formatLimit(item)).join(", ") })}</strong>
           <p>{t("v2.tip.busyHint")}</p>
         </div>
       ) : mark ? (
@@ -883,6 +890,7 @@ export const OptField = memo(function OptField({
   year,
   monthIndex,
   me,
+  self,
   showTables,
   countTables = false,
   dimPast,
@@ -898,9 +906,9 @@ export const OptField = memo(function OptField({
   onGridChange,
   skin = "classic",
   busy,
-  allowOverwrite = false,
-  allowReplace = false,
+  canRemoveForeign = false,
   onOverwriteAsk,
+  onForeignKept,
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
@@ -908,6 +916,7 @@ export const OptField = memo(function OptField({
     year,
     monthIndex,
     me,
+    self,
     capacity,
     grids,
     onGridChange,
@@ -915,14 +924,15 @@ export const OptField = memo(function OptField({
     canEdit,
     skin,
     busy,
-    allowOverwrite,
-    allowReplace,
+    canRemoveForeign,
     onOverwriteAsk,
+    onForeignKept,
   });
   propsRef.current = {
     year,
     monthIndex,
     me,
+    self,
     capacity,
     grids,
     onGridChange,
@@ -930,9 +940,9 @@ export const OptField = memo(function OptField({
     canEdit,
     skin,
     busy,
-    allowOverwrite,
-    allowReplace,
+    canRemoveForeign,
     onOverwriteAsk,
+    onForeignKept,
   };
   const dragRef = useRef<{
     pointerId: number;
@@ -1032,66 +1042,119 @@ export const OptField = memo(function OptField({
     if (!p.canEdit) return;
     const now = readCet();
     const grid = p.grids[origin.limit];
-    if (!grid) return;
+    if (!grid?.[origin.dayIdx]) return;
     const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
     const from = Math.min(origin.half, endHalf);
     const to = Math.max(origin.half, endHalf);
-    const originMark = seatsOf(grid[origin.dayIdx]?.[origin.half], origin.level + 1)[origin.level];
-    const originOwn = Boolean(originMark && isOwnMark(originMark, p.me));
-    const originForeign = Boolean(originMark && !isOwnMark(originMark, p.me));
-    const isRange = from !== to;
-    const wantReplace = Boolean(p.allowReplace && isRange && !originOwn);
-    const removeForeign = Boolean(
-      !wantReplace && mode === "remove" && originForeign && (p.allowOverwrite || p.allowReplace),
-    );
-    const stampMode: "place" | "remove" = wantReplace ? "place" : mode;
-    const displaced = new Map<string, OverwritePerson>();
-    const memberIds = new Set<string>();
-    const slots: OverwriteAsk["slots"] = [];
+    const self = p.self ?? p.me;
+    const brush = p.me;
+    const brushIsSelf = isSelfSeat(brush, self);
+    const canForeign = Boolean(p.canRemoveForeign);
     const date = `${p.year}-${String(p.monthIndex + 1).padStart(2, "0")}-${String(origin.day).padStart(2, "0")}`;
-    let changed = false;
-    const next = grid.map((row, r) => {
-      if (r !== origin.dayIdx) return row;
-      return row.map((item, half) => {
+
+    const walk = (wipeForeign: boolean) => {
+      const displaced = new Map<string, OverwritePerson>();
+      const memberIds = new Set<string>();
+      const slots: OverwriteAsk["slots"] = [];
+      let changed = false;
+      let keptForeign = false;
+      const nextRow = grid[origin.dayIdx].map((item, half) => {
         if (half < from || half > to) return item;
         if (isPastSlot(p.year, p.monthIndex, origin.day, half, now)) return item;
+        if (!levelAllowed(half, origin.level, hoursCaps) && mode === "place") return item;
         const before = seatsOf(item, origin.level + 1)[origin.level];
-        const stamped = stampSeat(item, p.me, half, origin.level, stampMode, hoursCaps, removeForeign, wantReplace);
-        const after = stamped[origin.level];
-        if ((before?.t ?? "") !== (after?.t ?? "")) changed = true;
-        const beforeForeign = Boolean(before && !isOwnMark(before, p.me));
-        if (wantReplace) {
-          const afterOwn = Boolean(after && isOwnMark(after, p.me));
-          const wasOwn = Boolean(before && isOwnMark(before, p.me));
-          if (afterOwn && !wasOwn) slots.push({ date, half, level: origin.level });
+        if (mode === "remove") {
+          if (!before) return item;
+          if (isSelfSeat(before, self)) {
+            changed = true;
+            return writeSeat(item, origin.level, null);
+          }
+          if (wipeForeign && canForeign) {
+            const slot = { date, half, level: origin.level };
+            slots.push(slot);
+            const owner = packOwner(before);
+            const prev = displaced.get(owner.key);
+            if (prev) prev.slots.push(slot);
+            else displaced.set(owner.key, { ...owner, slots: [slot] });
+            if (before.memberId) memberIds.add(before.memberId);
+            changed = true;
+            return writeSeat(item, origin.level, null);
+          }
+          keptForeign = true;
+          return item;
         }
-        if ((removeForeign || wantReplace) && beforeForeign && before) {
+        if (!before) {
+          changed = true;
+          return writeSeat(item, origin.level, { ...brush });
+        }
+        if (isSelfSeat(before, self)) return item;
+        if (wipeForeign && canForeign && brushIsSelf) {
           const slot = { date, half, level: origin.level };
-          if (removeForeign) slots.push(slot);
+          slots.push(slot);
           const owner = packOwner(before);
           const prev = displaced.get(owner.key);
           if (prev) prev.slots.push(slot);
           else displaced.set(owner.key, { ...owner, slots: [slot] });
           if (before.memberId) memberIds.add(before.memberId);
+          changed = true;
+          return writeSeat(item, origin.level, { ...brush });
         }
-        return stamped;
+        keptForeign = true;
+        return item;
       });
-    });
-    if (!changed) return;
-    if (removeForeign || (wantReplace && displaced.size)) {
-      if (displaced.size && p.onOverwriteAsk) {
-        p.onOverwriteAsk({
-          kind: wantReplace ? "replace" : "remove",
-          limit: origin.limit,
-          people: [...displaced.values()],
-          memberIds: [...memberIds],
-          slots,
-          next,
-        });
-      }
+      const next = changed ? grid.map((row, r) => (r === origin.dayIdx ? nextRow : row)) : grid;
+      return { next, displaced, memberIds, slots, changed, keptForeign };
+    };
+
+    const emptyPass = walk(false);
+    const wipePass = walk(true);
+
+    if (mode === "place" && !brushIsSelf) {
+      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      if (emptyPass.keptForeign) p.onForeignKept?.();
       return;
     }
-    p.onGridChange(origin.limit, next);
+
+    if (mode === "place") {
+      if (!wipePass.displaced.size) {
+        if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+        return;
+      }
+      if (!canForeign) {
+        if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+        p.onForeignKept?.();
+        return;
+      }
+      p.onOverwriteAsk?.({
+        kind: "place",
+        limit: origin.limit,
+        people: [...wipePass.displaced.values()],
+        memberIds: [...wipePass.memberIds],
+        slots: wipePass.slots,
+        next: wipePass.next,
+        empty: emptyPass.changed ? emptyPass.next : undefined,
+      });
+      return;
+    }
+
+    if (!wipePass.displaced.size) {
+      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      return;
+    }
+    if (!canForeign) {
+      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      p.onForeignKept?.();
+      return;
+    }
+    p.onOverwriteAsk?.({
+      kind: "remove",
+      limit: origin.limit,
+      people: [...wipePass.displaced.values()],
+      memberIds: [...wipePass.memberIds],
+      slots: wipePass.slots,
+      next: wipePass.next,
+      empty: emptyPass.changed ? emptyPass.next : undefined,
+    });
   };
 
   const inspectHit = (hit: SlotHit, rest: TipPoint) => {
@@ -1099,7 +1162,7 @@ export const OptField = memo(function OptField({
     const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
     const mark = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1)[hit.level];
-    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
+    if (hit.busyLimits?.length) {
       tipApi.current.show(hit, rest);
       return;
     }
@@ -1135,11 +1198,11 @@ export const OptField = memo(function OptField({
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
     const seats = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1);
     const mark = seats[hit.level];
-    const own = isOwnMark(mark, p.me);
+    const own = isSelfSeat(mark, p.self ?? p.me);
     let mode: "place" | "remove" | "look" = "look";
     if (p.canEdit && !past) {
       if (own) mode = "remove";
-      else if (mark && (p.allowOverwrite || p.allowReplace)) mode = "remove";
+      else if (mark && p.canRemoveForeign) mode = "remove";
       else if (!mark && !locked) mode = "place";
     }
     dragRef.current = {
@@ -1168,11 +1231,12 @@ export const OptField = memo(function OptField({
     const endHalf = halfOnLane(drag.origin, event.clientX);
     if (endHalf === drag.endHalf) return;
     drag.endHalf = endHalf;
-    const paint =
-      drag.mode === "remove" && drag.foreign && propsRef.current.allowReplace && endHalf !== drag.origin.half
-        ? "place"
-        : drag.mode;
-    showPick(drag.origin, drag.origin.half, endHalf, paint);
+    const root = rootRef.current;
+    if (root) {
+      const cursor = hitOnLane(drag.origin, endHalf);
+      if (cursor) applyNav(root, cursor);
+    }
+    showPick(drag.origin, drag.origin.half, endHalf, drag.mode);
   }, []);
 
   const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -1193,7 +1257,7 @@ export const OptField = memo(function OptField({
     tipApi.current.show(
       hit,
       { x: event.clientX, y: event.clientY },
-      propsRef.current.allowOverwrite || propsRef.current.allowReplace,
+      propsRef.current.canRemoveForeign,
     );
   }, []);
 
@@ -1208,9 +1272,10 @@ export const OptField = memo(function OptField({
       return;
     }
     applyNav(root, hit);
-    if (hit.busyLimit && hit.busyLimit !== hit.limit) {
-      const located = hitFromEvent(event.target, root, true);
-      if (located) tipApi.current.show(located);
+    if (hit.busyLimits?.length) {
+      tipApi.current.show({ ...hit, x: event.clientX + 12, y: event.clientY + 10 });
+    } else {
+      tipApi.current.hide();
     }
   }, []);
 
@@ -1222,14 +1287,17 @@ export const OptField = memo(function OptField({
   }, []);
 
   const loadWash = loadGradient(hourLoad?.[limits[0] ?? "50"]);
+  const q = markQuery(focus);
 
   return (
     <section
       ref={rootRef}
-      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}${quietEdit ? " is-quiet" : ""}${skin === "theme" ? " is-kit" : ""}`}
+      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}${quietEdit ? " is-quiet" : ""}${skin === "theme" ? " is-kit" : ""}${q ? " is-find" : ""}`}
+      data-opt-find={q || undefined}
       style={
         {
           ["--opt-load" as string]: loadWash,
+          ["--busy-mark" as string]: me.bg || undefined,
           ...(skin === "theme" ? {} : lookToVars(slotLook)),
         } as CSSProperties
       }
@@ -1241,6 +1309,7 @@ export const OptField = memo(function OptField({
       onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
     >
+      {q ? <style>{findHitCss(q)}</style> : null}
       <div className="v2-opt-sheet" ref={daysRef}>
         <div className="v2-opt-board">
         <div className="v2-opt-hours">
@@ -1281,7 +1350,6 @@ export const OptField = memo(function OptField({
               showTables={showTables}
               dimPast={dimPast}
               hidePastDays={hidePastDays}
-              focus={focus}
               limits={limits}
               capacity={capacity}
               grids={grids}

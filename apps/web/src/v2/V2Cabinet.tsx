@@ -51,6 +51,8 @@ type ProfileDraft = {
   extraUtc: number;
 };
 
+type CabinetTab = "profile" | "game" | "payments" | "account";
+
 function packProfile(row: ClubMember | undefined, nick: string): ProfileDraft {
   return {
     name: row?.name || nick,
@@ -198,6 +200,7 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const limitsRef = useRef<HTMLDivElement>(null);
   const [channel, setChannel] = useState<NotifyChannel>("discord");
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>("discord");
+  const [activeTab, setActiveTab] = useState<CabinetTab>("profile");
 
   useEffect(() => {
     if (!live || !session.memberId) return;
@@ -438,6 +441,11 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const vipRegular = live ? card?.vipRegular : mine?.vipRegular;
   const prefsDirty = prefs.limits.join() !== savedPrefs.limits.join() || prefs.kind !== savedPrefs.kind;
   const profileDirty = !sameJson(profile, savedProfile);
+  const gameDirty = prefsDirty || !sameJson(plays, savedPlays);
+  const accountDirty =
+    channel !== savedChannel ||
+    !sameJson({ ...login, password: "" }, { ...savedLogin, password: "" }) ||
+    Boolean(login.password);
   const roles = discord?.roles.length
     ? discord.roles
     : (mine?.discordRoles ?? []).map((name) => ({ id: name, name, color: null as string | null }));
@@ -453,13 +461,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
 
   return (
     <div className="v2-cab">
-      <section className="v2-block v2-cab-card is-discord">
-        <div className="v2-cab-head">
-          <h2>Discord</h2>
-        </div>
-        <div className="v2-cab-body">
-        <div className="v2-cab-spread">
-          <div className="v2-cab-idline">
+      <section className="v2-block v2-cab-card v2-cab-overview">
+        <div className="v2-cab-overview-main">
+          <div className="v2-cab-idline v2-cab-overview-person">
             {discordAva ? (
               <img className="v2-cab-ava" src={discordAva} alt="" />
             ) : (
@@ -469,85 +473,91 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
             )}
             <div className="v2-cab-idcopy">
               <b>{discordNick || "—"}</b>
-              <TipLabel text={t("cabinet.assignedNick")} hint={t("cabinet.assignedNickHint")} />
+              <span>{discordUser ? `@${discordUser}` : t("cabinet.assignedNick")}</span>
+              <i className={`v2-cab-status is-${session.access}`}>{t(`cabinet.status.${session.access}`)}</i>
             </div>
           </div>
-          <div className="v2-cab-facts">
+          <div className="v2-cab-facts v2-cab-overview-discord">
             <Fact label={t("cabinet.guildNick")} hint={t("cabinet.guildNickHint")}>
               {dash(guildNick)}
             </Fact>
             <Fact label={t("cabinet.discordName")} hint={t("cabinet.discordNameHint")}>
               {dash(discordName)}
             </Fact>
-            <Fact label={t("cabinet.discordUser")} hint={t("cabinet.discordUserHint")}>
-              {discordUser ? `@${discordUser}` : "—"}
-            </Fact>
-          </div>
-          <div className="v2-cab-facts is-end">
             <Fact label={t("cabinet.discordServer")} hint={t("cabinet.discordServerHint")}>
               {guildName || t("cabinet.discordServerFallback")}
             </Fact>
             <Fact label={t("cabinet.discordJoined")} hint={t("cabinet.discordJoinedHint")}>
               {dayLabel(discordJoined, lang)}
             </Fact>
-            <Fact label={t("cabinet.discordRoles")} hint={t("cabinet.discordRolesHint")}>
-              {roles.length ? (
-                <span className="v2-cab-pills">
-                  {roles.map((role) => (
-                    <span
-                      key={role.id}
-                      className="v2-access-pill"
-                      style={role.color ? { color: role.color, background: `color-mix(in srgb, ${role.color} 16%, transparent)` } : undefined}
-                    >
-                      {role.name}
-                    </span>
-                  ))}
-                </span>
-              ) : live && !discord ? (
-                t("cabinet.discordNeedSync")
-              ) : (
-                "—"
-              )}
-            </Fact>
           </div>
-        </div>
-        </div>
-      </section>
-
-      <section className="v2-block v2-cab-card is-club">
-        <div className="v2-cab-head">
-          <h2>{t("cabinet.rpTitle")}</h2>
-        </div>
-        <div className="v2-cab-body">
-        <div className="v2-cab-spread">
-          <div className="v2-cab-idline is-mark">
-            <span className="v2-mark-chip">
-              <ScheduleSlot letters={letters} bg={markBg} fg={markFg} />
-            </span>
-            <div className="v2-cab-idcopy">
-              <b>{letters || t("cabinet.markNone")}</b>
-              <TipLabel text={t("cabinet.markTitle")} hint={t("cabinet.markHint")} />
+          <div className="v2-cab-overview-club">
+            <div className="v2-cab-idline is-mark">
+              <span className="v2-mark-chip">
+                <ScheduleSlot letters={letters} bg={markBg} fg={markFg} />
+              </span>
+              <div className="v2-cab-idcopy">
+                <b>{t("cabinet.rpTitle")}</b>
+                <TipLabel text={letters || t("cabinet.markNone")} hint={t("cabinet.markHint")} />
+              </div>
             </div>
+            <div className="v2-cab-facts">
+              <Fact label={t("cabinet.roomNick")} hint={t("cabinet.roomNickHint")}>
+                {roomNick}
+              </Fact>
+              <Fact label={t("cabinet.joined")} hint={t("cabinet.joinedHint")}>
+                {dayLabel(clubJoined, lang)}
+              </Fact>
+              <Fact label={t("cabinet.communityTitle")} hint={t("cabinet.communityHint")}>
+                {community ? t(`cabinet.community.${community}`) : "—"}
+              </Fact>
+              {live ? null : <Fact label={t("cabinet.poolShare")}>{`${mine?.poolShare ?? 80}%`}</Fact>}
+            </div>
+            <PermanentPriority nitro={vipNitro} regular={vipRegular} hideEmpty />
           </div>
-          <div className="v2-cab-facts">
-            <Fact label={t("cabinet.roomNick")} hint={t("cabinet.roomNickHint")}>
-              {roomNick}
-            </Fact>
-            <Fact label={t("cabinet.joined")} hint={t("cabinet.joinedHint")}>
-              {dayLabel(clubJoined, lang)}
-            </Fact>
-            {live ? null : <Fact label={t("cabinet.poolShare")}>{`${mine?.poolShare ?? 80}%`}</Fact>}
-          </div>
-          <div className="v2-cab-facts is-end">
-            <Fact label={t("cabinet.communityTitle")} hint={t("cabinet.communityHint")}>
-              {community ? t(`cabinet.community.${community}`) : "—"}
-            </Fact>
-          </div>
-          <PermanentPriority nitro={vipNitro} regular={vipRegular} hideEmpty />
         </div>
+        <div className="v2-cab-overview-roles">
+          <TipLabel text={t("cabinet.discordRoles")} hint={t("cabinet.discordRolesHint")} />
+          {roles.length ? (
+            <span className="v2-cab-pills">
+              {roles.map((role) => (
+                <span
+                  key={role.id}
+                  className="v2-access-pill"
+                  style={role.color ? { color: role.color, background: `color-mix(in srgb, ${role.color} 16%, transparent)` } : undefined}
+                >
+                  {role.name}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <small>{live && !discord ? t("cabinet.discordNeedSync") : "—"}</small>
+          )}
         </div>
       </section>
 
+      <nav className="v2-cab-tabs" aria-label={t("cabinet.tabsLabel")}>
+        {([
+          ["profile", "fa-user", profileDirty],
+          ["game", "fa-spade", gameDirty],
+          ["payments", "fa-wallet", false],
+          ["account", "fa-shield-halved", accountDirty],
+        ] as const).map(([tab, icon, dirty]) => (
+          <button
+            key={tab}
+            type="button"
+            className={activeTab === tab ? "is-on" : undefined}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onClick={() => setActiveTab(tab)}
+          >
+            <i className={`fa-solid ${icon}`} aria-hidden />
+            <span>{t(`cabinet.tab.${tab}`)}</span>
+            {dirty ? <small title={t("cabinet.unsaved")} /> : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="v2-cab-tab-panel" hidden={activeTab !== "profile"}>
       <section className="v2-block v2-cab-card">
         <div className="v2-cab-head">
           <h2>{t("cabinet.who")}</h2>
@@ -606,7 +616,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         />
         </div>
       </section>
+      </div>
 
+      <div className="v2-cab-tab-panel" hidden={activeTab !== "account"}>
       <section className="v2-block v2-cab-card is-notify">
         <div className="v2-cab-head">
           <h2>{t("cabinet.notifyTitle")}</h2>
@@ -648,7 +660,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         onBindGoogle={bindGoogle}
         onUnbindGoogle={unbindGoogle}
       />
+      </div>
 
+      <div className="v2-cab-tab-panel" hidden={activeTab !== "game"}>
       <CabinetPlaysPanel
         plays={plays}
         savedPlays={savedPlays}
@@ -660,7 +674,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         onPersist={persistPlays}
         onCancel={() => setPlays(clonePlays(savedPlays))}
       />
+      </div>
 
+      <div className="v2-cab-tab-panel" hidden={activeTab !== "payments"}>
       <PayMethodsPanel
         memberId={session.memberId}
         canEdit={canEditCard}
@@ -670,7 +686,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         onDemoSave={(next) => writeMember({ pays: next })}
         onSaved={ping}
       />
+      </div>
 
+      <div className="v2-cab-tab-panel" hidden={activeTab !== "game"}>
       <section className="v2-block v2-cab-card">
         <div className="v2-cab-head">
           <h2>{t("cabinet.filterTitle")}</h2>
@@ -729,10 +747,13 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         />
         </div>
       </section>
+      </div>
 
+      <div className="v2-cab-tab-panel is-actions" hidden={activeTab !== "account"}>
       <button type="button" className="v2-cab-out" onClick={onLogout}>
         {t("login.logout")}
       </button>
+      </div>
     </div>
   );
 }

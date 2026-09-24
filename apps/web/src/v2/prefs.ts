@@ -9,6 +9,7 @@ export type SchedulePrefs = {
   pin: string;
   editPulse: boolean;
   showExtraTz: boolean;
+  busyHint: boolean;
 };
 
 export const PREFS_EVENT = "v2-schedule-prefs";
@@ -20,6 +21,7 @@ export const DEFAULT_PREFS: SchedulePrefs = {
   pin: "",
   editPulse: true,
   showExtraTz: true,
+  busyHint: false,
 };
 
 function ym(date: Date) {
@@ -39,6 +41,7 @@ export function loadPrefs(): SchedulePrefs {
       pin: "",
       editPulse: parsed.editPulse !== false,
       showExtraTz: parsed.showExtraTz !== false,
+      busyHint: parsed.busyHint === true,
     };
   } catch {
     return { ...DEFAULT_PREFS };
