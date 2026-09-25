@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
@@ -10,24 +10,25 @@ import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
 import { loadPrefs } from "./prefs";
 import { setAppLanguage } from "../i18n";
-import { V2Schedule } from "./V2Schedule";
-import { V2Priorities } from "./V2Priorities";
-import { V2Admin } from "./V2Admin";
-import { V2Distances } from "./V2Distances";
-import { V2DistanceBook } from "./V2DistanceBook";
-import { V2Cabinet } from "./V2Cabinet";
 import { V2Home } from "./V2Home";
 import { V2Wait } from "./V2Wait";
-import { V2Guild } from "./V2Guild";
 import { writeSession, type Session } from "./session";
-import { V2ShadcnKit } from "./V2ShadcnKit";
-import { V2BlocksKit } from "./V2BlocksKit";
 import { PersonAvatar } from "./PersonAvatar";
 import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/compact-menu";
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
 import "./v2.css";
+
+const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
+const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
+const V2Admin = lazy(() => import("./V2Admin").then((module) => ({ default: module.V2Admin })));
+const V2Distances = lazy(() => import("./V2Distances").then((module) => ({ default: module.V2Distances })));
+const V2DistanceBook = lazy(() => import("./V2DistanceBook").then((module) => ({ default: module.V2DistanceBook })));
+const V2Cabinet = lazy(() => import("./V2Cabinet").then((module) => ({ default: module.V2Cabinet })));
+const V2Guild = lazy(() => import("./V2Guild").then((module) => ({ default: module.V2Guild })));
+const V2ShadcnKit = lazy(() => import("./V2ShadcnKit").then((module) => ({ default: module.V2ShadcnKit })));
+const V2BlocksKit = lazy(() => import("./V2BlocksKit").then((module) => ({ default: module.V2BlocksKit })));
 
 type Props = {
   session: Session;
@@ -392,6 +393,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+          <Suspense fallback={<div className="min-h-0 flex-1" aria-busy="true" />}>
           {page === "home" && <V2Home nick={nick} />}
           {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : "home")} />}
           {canProfile && page === "cabinet" && (
@@ -477,6 +479,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
               />
             </div>
           )}
+          </Suspense>
         </div>
         <footer className="v2-app-foot">Red Party</footer>
       </div>

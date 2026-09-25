@@ -13,28 +13,40 @@ function json(body: unknown, status = 200) {
 }
 
 async function discord<T>(token: string, path: string, init?: { method?: string; body?: unknown }) {
-  const res = await fetch(`https://discord.com/api/v10${path}`, {
-    method: init?.method ?? "GET",
-    headers: {
-      Authorization: `Bot ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "RedPartySchedule (https://github.com/AlexKhvostov/schedule-app, 1.0)",
-    },
-    body: init?.body ? JSON.stringify(init.body) : undefined,
-  });
-  const text = await res.text();
-  let parsed: unknown = null;
-  try {
-    parsed = text ? JSON.parse(text) : null;
-  } catch {
-    parsed = { message: text };
-  }
-  if (!res.ok) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await fetch(`https://discord.com/api/v10${path}`, {
+      method: init?.method ?? "GET",
+      headers: {
+        Authorization: `Bot ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "RedPartySchedule (https://github.com/AlexKhvostov/schedule-app, 1.0)",
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let parsed: unknown = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = { message: text };
+    }
+    if (res.ok) return { data: parsed as T, status: res.status };
+
     const message =
       typeof parsed === "object" && parsed && "message" in parsed ? String((parsed as { message: string }).message) : text;
-    return { error: message || `discord ${res.status}`, status: res.status };
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt === 2) return { error: message || `discord ${res.status}`, status: res.status };
+
+    const retryAfter =
+      typeof parsed === "object" && parsed && "retry_after" in parsed
+        ? Number((parsed as { retry_after?: unknown }).retry_after)
+        : Number.NaN;
+    const delayMs = Number.isFinite(retryAfter)
+      ? Math.min(2000, Math.max(100, retryAfter * 1000))
+      : 250 * 2 ** attempt;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  return { data: parsed as T, status: res.status };
+  return { error: "discord retry exhausted", status: 503 };
 }
 
 async function botToken(admin: ReturnType<typeof createClient>, bot: string, fallback: string) {
@@ -47,12 +59,12 @@ async function dm(token: string, uid: string, content: string) {
     method: "POST",
     body: { recipient_id: uid },
   });
-  if (channel.error || !channel.data?.id) return false;
+  if (channel.error || !channel.data?.id) return { ok: false, error: `dm-channel-${channel.status}` };
   const msg = await discord(token, `/channels/${channel.data.id}/messages`, {
     method: "POST",
     body: { content },
   });
-  return !msg.error;
+  return msg.error ? { ok: false, error: `dm-message-${msg.status}` } : { ok: true as const };
 }
 
 function mention(uid: string | undefined, name: string) {
@@ -65,7 +77,68 @@ function markOf(tag: string, who: string) {
   return chip ? `**${chip}** · ${who}` : who;
 }
 
+type RemovalEvent = {
+  event_id: string;
+  member_id: string;
+  slot_date: string;
+  half: number;
+  level: number;
+  limit_id: string;
+  variant_id: string;
+};
+
+function clock(half: number) {
+  const wrapped = ((half % 48) + 48) % 48;
+  return `${String(Math.floor(wrapped / 2)).padStart(2, "0")}:${wrapped % 2 ? "30" : "00"}`;
+}
+
+function eventLabel(rows: RemovalEvent[]) {
+  const first = rows[0];
+  if (!first) return "";
+  const halves = rows.map((row) => row.half);
+  const from = Math.min(...halves);
+  const to = Math.max(...halves) + 1;
+  const [, month, day] = first.slot_date.split("-");
+  const kinds = [...new Set(rows.map((row) => `${row.variant_id} ${row.limit_id}`))].join(", ");
+  return `${kinds} · ${day}.${month} ${clock(from)}–${clock(to)} CET`;
+}
+
+type DeliveryStatus = "delivered" | "partial" | "failed" | "skipped";
+
+async function recordDelivery(
+  admin: ReturnType<typeof createClient>,
+  eventIds: string[],
+  result: {
+    status: DeliveryStatus;
+    channelSent: boolean;
+    dmSent: number;
+    dmFailed: number;
+    errors: string[];
+  },
+) {
+  if (!eventIds.length) return null;
+  const { error } = await admin
+    .from("occupancy_event_notifications")
+    .update({
+      delivery_status: result.status,
+      channel_sent: result.channelSent,
+      dm_sent: result.dmSent,
+      dm_failed: result.dmFailed,
+      completed_at: new Date().toISOString(),
+      last_error: result.errors.length ? { codes: result.errors } : null,
+    })
+    .in("event_id", eventIds);
+  return error?.message ?? null;
+}
+
+function logDelivery(level: "info" | "error", event: string, data: Record<string, unknown>) {
+  const line = JSON.stringify({ event, ...data });
+  if (level === "error") console.error(line);
+  else console.info(line);
+}
+
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method" }, 405);
 
@@ -80,7 +153,8 @@ Deno.serve(async (req) => {
   if (authError || !auth.user) return json({ error: "unauthorized" }, 401);
 
   const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const admin = adminKey ? createClient(url, adminKey) : supabase;
+  if (!adminKey) return json({ error: "not-configured" }, 503);
+  const admin = createClient(url, adminKey, { auth: { persistSession: false } });
 
   const { data: club } = await admin
     .from("bot_settings")
@@ -89,47 +163,69 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!club?.notify_mark_removed) return json({ sent: 0, skipped: "off" });
 
-  const body = (await req.json().catch(() => null)) as {
-    owners?: unknown;
-    memberIds?: unknown;
-    actorMemberId?: unknown;
-    actorName?: unknown;
-    ownerNames?: unknown;
-    kind?: unknown;
-    when?: unknown;
-    limit?: unknown;
-    lang?: unknown;
-  } | null;
+  const body = (await req.json().catch(() => null)) as { lang?: unknown } | null;
+  const { data: actor } = await admin
+    .from("members")
+    .select("id,public_code,mark_tag")
+    .eq("auth_user_id", auth.user.id)
+    .eq("access_status", "active")
+    .maybeSingle();
+  if (!actor) return json({ error: "forbidden" }, 403);
 
-  const actorId = String(body?.actorMemberId ?? "").trim();
-  const owners: { id: string; name: string; tag: string }[] = [];
-  if (Array.isArray(body?.owners)) {
-    for (const row of body.owners) {
-      if (!row || typeof row !== "object") continue;
-      const id = String((row as { id?: unknown }).id ?? "").trim();
-      if (!id || id === actorId) continue;
-      const name = String((row as { name?: unknown }).name ?? "").trim();
-      const tag = String((row as { tag?: unknown }).tag ?? "").trim();
-      if (!owners.some((item) => item.id === id)) owners.push({ id, name, tag });
-    }
-  } else {
-    const ids = [...new Set((Array.isArray(body?.memberIds) ? body.memberIds : []).map((id) => String(id).trim()).filter(Boolean))];
-    const names = Array.isArray(body?.ownerNames) ? body.ownerNames.map((name) => String(name).trim()) : [];
-    ids.forEach((id, index) => {
-      if (id && id !== actorId && !owners.some((item) => item.id === id)) owners.push({ id, name: names[index] || "", tag: "" });
-    });
+  const { data: claimed, error: claimError } = await admin.rpc("claim_recent_removal_notifications", {
+    p_actor: actor.id,
+  });
+  if (claimError) return json({ error: "claim", detail: claimError.message }, 500);
+  const events = (claimed ?? []) as RemovalEvent[];
+  if (!events.length) {
+    logDelivery("info", "removal_notification_skipped", { requestId, reason: "no-events" });
+    return json({ sent: 0, skipped: "no-events", requestId });
   }
-  if (!owners.length) return json({ sent: 0 });
+  const eventIds = events.map((row) => row.event_id);
+
+  const ownerIds = [...new Set(events.map((row) => row.member_id))];
+  const involved = [...new Set([...ownerIds, actor.id])];
+  const [{ data: members }, { data: idents }] = await Promise.all([
+    admin.from("members").select("id,public_code,mark_tag").in("id", involved),
+    admin
+      .from("identities")
+      .select("member_id,provider_uid,username,display_name,guild_nick")
+      .in("member_id", involved)
+      .eq("provider", "discord"),
+  ]);
+  const memberById = new Map((members ?? []).map((row) => [row.id, row]));
+  const identByMember = new Map((idents ?? []).map((row) => [row.member_id, row]));
+  const owners = ownerIds.map((id) => {
+    const member = memberById.get(id);
+    const ident = identByMember.get(id);
+    return {
+      id,
+      name: ident?.guild_nick || ident?.display_name || ident?.username || member?.public_code || "—",
+      tag: member?.mark_tag || "",
+    };
+  });
+  const actorIdent = identByMember.get(actor.id);
+  const actorName =
+    actorIdent?.guild_nick || actorIdent?.display_name || actorIdent?.username || actor.public_code || "—";
 
   const token = await botToken(admin, "discord", Deno.env.get("DISCORD_BOT_TOKEN")?.trim() ?? "");
-  if (!token) return json({ error: "not-configured" }, 503);
+  if (!token) {
+    const auditError = await recordDelivery(admin, eventIds, {
+      status: "failed",
+      channelSent: false,
+      dmSent: 0,
+      dmFailed: 0,
+      errors: ["bot-token-missing"],
+    });
+    logDelivery("error", "removal_notification_failed", {
+      requestId,
+      eventCount: events.length,
+      reason: "bot-token-missing",
+      auditWriteFailed: Boolean(auditError),
+    });
+    return json({ error: "not-configured", requestId }, 503);
+  }
 
-  const involved = [...owners.map((row) => row.id), ...(actorId ? [actorId] : [])];
-  const { data: idents } = await admin
-    .from("identities")
-    .select("member_id, provider, provider_uid")
-    .in("member_id", involved)
-    .eq("provider", "discord");
   const uidByMember = new Map<string, string>();
   for (const row of idents ?? []) {
     const uid = String(row.provider_uid ?? "").trim();
@@ -137,11 +233,8 @@ Deno.serve(async (req) => {
   }
 
   const en = String(body?.lang ?? "").startsWith("en");
-  const when = String(body?.when ?? "").trim();
-  const limit = String(body?.limit ?? "").trim();
-  const slot = [limit, when].filter(Boolean).join(" · ");
-  const actorName = String(body?.actorName ?? "").trim() || (en ? "the club" : "клуб");
-  const actorWho = mention(uidByMember.get(actorId), actorName);
+  const slot = eventLabel(events);
+  const actorWho = mention(uidByMember.get(actor.id), actorName);
   const marksLabel = owners.map((row) => markOf(row.tag, mention(uidByMember.get(row.id), row.name))).join(", ");
   const ownersLabel = owners.map((row) => row.name).filter(Boolean).join(", ") || (en ? "a player" : "игрок");
   const tagsLabel = owners.map((row) => row.tag.trim().toUpperCase()).filter(Boolean).join(", ");
@@ -160,24 +253,64 @@ Deno.serve(async (req) => {
 
   const noticeChat = String(club.notice_chat ?? "").trim();
   let channel = 0;
+  const errors: string[] = [];
+  let attempted = 0;
   if (noticeChat) {
+    attempted += 1;
     const posted = await discord(token, `/channels/${noticeChat}/messages`, {
       method: "POST",
-      body: { content: channelLines.join("\n") },
+      body: {
+        content: channelLines.join("\n"),
+        allowed_mentions: { parse: [], users: involved.map((id) => uidByMember.get(id)).filter(Boolean) },
+      },
     });
     if (!posted.error) channel = 1;
+    else errors.push(`channel-message-${posted.status}`);
   }
 
   let sent = 0;
   for (const owner of owners) {
     const uid = uidByMember.get(owner.id);
     if (!uid) continue;
-    if (await dm(token, uid, ownerDm)) sent += 1;
+    attempted += 1;
+    const delivered = await dm(token, uid, ownerDm);
+    if (delivered.ok) sent += 1;
+    else errors.push(delivered.error);
   }
-  if (actorId) {
-    const uid = uidByMember.get(actorId);
-    if (uid && (await dm(token, uid, actorDm))) sent += 1;
+  if (actor.id) {
+    const uid = uidByMember.get(actor.id);
+    if (uid) {
+      attempted += 1;
+      const delivered = await dm(token, uid, actorDm);
+      if (delivered.ok) sent += 1;
+      else errors.push(delivered.error);
+    }
   }
 
-  return json({ sent, channel });
+  const successes = sent + channel;
+  const status: DeliveryStatus = !attempted
+    ? "skipped"
+    : errors.length
+      ? successes
+        ? "partial"
+        : "failed"
+      : "delivered";
+  const auditError = await recordDelivery(admin, eventIds, {
+    status,
+    channelSent: channel === 1,
+    dmSent: sent,
+    dmFailed: errors.filter((code) => code.startsWith("dm-")).length,
+    errors,
+  });
+  logDelivery(auditError ? "error" : status === "failed" || status === "partial" ? "error" : "info", "removal_notification_completed", {
+    requestId,
+    status,
+    eventCount: events.length,
+    channelSent: channel === 1,
+    dmSent: sent,
+    dmFailed: errors.filter((code) => code.startsWith("dm-")).length,
+    auditWriteFailed: Boolean(auditError),
+  });
+
+  return json({ sent, channel, failed: errors.length, status, requestId });
 });

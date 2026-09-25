@@ -17,6 +17,12 @@
 
 После миграции в Table Editor видны `members`, `schedule_kinds`, `occupancy`. Первый вход через Discord создаёт участника со статусом `pending`.
 
+Контракты прав доступа проверяются на отдельной мигрированной тестовой БД:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/security_contracts.sql
+```
+
 ## Бот Discord (только root)
 
 Токен бота в git и в браузер не кладём. В Edge Function Secrets проекта:

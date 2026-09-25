@@ -20,6 +20,7 @@ type Props = {
   onShowTip: (value: boolean) => void;
   onEditPulse: (value: boolean) => void;
   onShowLocalTime: (value: boolean) => void;
+  onResetDemo?: () => void;
   onClose: () => void;
 };
 
@@ -42,6 +43,7 @@ export function V2Settings({
   onShowTip,
   onEditPulse,
   onShowLocalTime,
+  onResetDemo,
   onClose,
 }: Props) {
   const { t } = useTranslation();
@@ -116,6 +118,15 @@ export function V2Settings({
             <span className={`v2-settings-switch${row.on ? " is-on" : ""}`} aria-hidden />
           </button>
         ))}
+        {onResetDemo ? (
+          <button type="button" className="v2-settings-reset" onClick={onResetDemo}>
+            <span className="v2-settings-ico"><i className="fa-solid fa-rotate-left" /></span>
+            <span className="v2-settings-copy">
+              <b>{t("schedule.demoReset")}</b>
+              <small>{t("schedule.demoResetHint")}</small>
+            </span>
+          </button>
+        ) : null}
       </div>
     </V2Float>
   );

@@ -15,8 +15,6 @@ import {
   hasRoot,
   listAdminPeople,
   loadClubRequests,
-  peopleRank,
-  personTitle,
   restoreClubCard,
   reopenJoinRequest,
   saveMemberDistanceId,
@@ -30,7 +28,7 @@ import { loadClubPeopleSettings, saveSelfCreateCard, subscribeClubPeopleSettings
 import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
 import { roomName } from "../schedule/rooms";
 import { bestInk, cssToHex, parseMarkHex } from "../schedule/markCatalog";
-import { hueOfBg, lettersBlocked, type ClubMember } from "../schedule/members";
+import { lettersBlocked, type ClubMember } from "../schedule/members";
 import { AdminPersonCard } from "./AdminPersonCard";
 import { ScheduleSlot, ScheduleSlotStrip } from "./ScheduleSlot";
 import { PersonChip } from "./PersonAvatar";
@@ -42,48 +40,21 @@ import { V2SaveButton } from "./V2SaveButton";
 import { MembersRoleSettings } from "./members/MembersRoleSettings";
 import { MembersSystemSettings } from "./members/MembersSystemSettings";
 import { DiscordSnapshotModal } from "./members/DiscordSnapshotModal";
+import {
+  asMarkMember,
+  discordLine,
+  filterAndSortPeople,
+  peopleCounts,
+  roomNickLines,
+  sameDraft,
+  savedDraft,
+  visibleProfiles,
+  type RowDraft,
+  type SortKey,
+  type StatusFilter,
+} from "./membersAdminModel";
 
-type StatusFilter = "all" | "active" | "blocked" | "left" | "root" | "bot";
-type SortKey = "access" | "nick" | "joined" | "color";
 type PeopleTab = "profiles" | "requests" | "roles" | "discord" | "settings";
-
-type RowDraft = {
-  access: ClubAccess;
-  distanceId: string;
-};
-
-function discordLine(row: AdminPerson) {
-  const extra =
-    row.globalName && row.globalName !== discordPrimary(row) && row.globalName !== row.username
-      ? ` · ${row.globalName}`
-      : "";
-  return `@${row.username}${extra}`;
-}
-
-function savedDraft(row: AdminPerson): RowDraft {
-  return {
-    access: row.access,
-    distanceId: row.distanceExtId ?? "",
-  };
-}
-
-function sameDraft(a: RowDraft, b: RowDraft) {
-  return (
-    a.access === b.access &&
-    a.distanceId.trim() === b.distanceId.trim()
-  );
-}
-
-function markHue(row: AdminPerson) {
-  if (!row.markTag) return 1000;
-  return hueOfBg(row.markBg);
-}
-
-function roomNickLines(memberId: string | null, map: Map<string, MemberRoomNick[]>) {
-  const have = memberId ? map.get(memberId) ?? [] : [];
-  if (!have.some((row) => row.roomId === "winamax")) return [{ roomId: "winamax", nick: "" }, ...have];
-  return [...have].sort((a, b) => Number(b.roomId === "winamax") - Number(a.roomId === "winamax"));
-}
 
 function PersonTip({
   row,
@@ -148,25 +119,6 @@ function PersonTip({
         : null}
     </div>
   );
-}
-
-function asMarkMember(row: AdminPerson): ClubMember {
-  return {
-    id: row.memberId ?? row.discordId,
-    name: row.displayName ?? "",
-    discord: personTitle(row),
-    discordId: row.discordId,
-    room: row.username,
-    email: row.email ?? "",
-    limits: [],
-    status: row.accessStatus === "active" ? "active" : "pending",
-    appAccess: row.accessStatus === "active",
-    isAdmin: false,
-    vipNitro: 0,
-    vipRegular: 0,
-    distance: 0,
-    mark: { colorId: -1, t: row.markTag ?? "", bg: row.markBg, fg: row.markFg },
-  };
 }
 
 function ColorWell({
@@ -568,21 +520,8 @@ export function MembersAdmin() {
     showV2Toast("ok", t("admin.saved"));
   };
 
-  const people = useMemo(() => {
-    const profiles = list.filter((row) => Boolean(row.memberId));
-    if (statusFilter === "bot" || showBots) return profiles;
-    return profiles.filter((row) => !row.bot);
-  }, [list, showBots, statusFilter]);
-  const counts = useMemo(() => {
-    const profiles = list.filter((row) => Boolean(row.memberId));
-    const humans = profiles.filter((row) => !row.bot);
-    const active = humans.filter((row) => row.accessStatus === "active").length;
-    const blocked = humans.filter((row) => row.accessStatus === "blocked").length;
-    const root = humans.filter((row) => hasRoot(row)).length;
-    const left = humans.filter((row) => Boolean(row.memberId) && !row.onGuild).length;
-    const bot = profiles.filter((row) => row.bot).length;
-    return { all: humans.length + bot, active, blocked, root, bot, left };
-  }, [list]);
+  const people = useMemo(() => visibleProfiles(list, statusFilter, showBots), [list, showBots, statusFilter]);
+  const counts = useMemo(() => peopleCounts(list), [list]);
   const rolePicked = useMemo(() => new Set(roleFilter), [roleFilter]);
   const roleCatalog = useMemo(() => {
     const all = catalogRoles(list);
@@ -594,41 +533,10 @@ export function MembersAdmin() {
     setRoleFilter((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const rows = useMemo(() => {
-    const q = nickQ.trim().toLowerCase();
-    const copy = people.filter((row) => {
-      if (statusFilter === "bot" && !row.bot) return false;
-      if (row.bot && statusFilter !== "all" && statusFilter !== "bot") return false;
-      if (statusFilter === "active" && row.accessStatus !== "active") return false;
-      if (statusFilter === "blocked" && row.accessStatus !== "blocked") return false;
-      if (statusFilter === "left" && !(row.memberId && !row.onGuild)) return false;
-      if (statusFilter === "root" && !hasRoot(row)) return false;
-      if (rolePicked.size && !row.discordRoles.some((role) => rolePicked.has(role.id))) return false;
-      if (!q) return true;
-      return [
-        discordPrimary(row),
-        row.username,
-        row.globalName,
-        row.nick,
-        row.discordId,
-        row.publicCode,
-        row.displayName,
-        row.distanceExtId,
-        ...row.discordRoles.map((role) => role.name),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
-    });
-    copy.sort((a, b) => {
-      if (sort === "joined") return (a.joinedAt ?? "").localeCompare(b.joinedAt ?? "");
-      if (sort === "nick") return discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-      if (sort === "color") return markHue(a) - markHue(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-      return peopleRank(a) - peopleRank(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-    });
-    return copy;
-  }, [people, nickQ, statusFilter, sort, rolePicked]);
+  const rows = useMemo(
+    () => filterAndSortPeople(people, nickQ, statusFilter, sort, rolePicked),
+    [people, nickQ, statusFilter, sort, rolePicked],
+  );
 
   const editing = list.find((row) => (row.memberId ?? row.discordId) === markFor) ?? null;
   const profile = list.find((row) => row.discordId === profileFor) ?? null;

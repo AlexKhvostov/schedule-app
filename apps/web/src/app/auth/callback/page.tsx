@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/data/client";
+import { markFreshDiscordLogin } from "@/data/auth";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -11,8 +12,13 @@ export default function AuthCallbackPage() {
     const run = async () => {
       const db = getSupabase();
       const code = new URLSearchParams(window.location.search).get("code");
-      if (db && code) await db.auth.exchangeCodeForSession(code);
-      else if (db) await db.auth.getSession();
+      if (db && code) {
+        const { data, error } = await db.auth.exchangeCodeForSession(code);
+        if (!error && data.session) markFreshDiscordLogin();
+      } else if (db) {
+        const { data } = await db.auth.getSession();
+        if (data.session) markFreshDiscordLogin();
+      }
       router.replace("/");
     };
     void run();

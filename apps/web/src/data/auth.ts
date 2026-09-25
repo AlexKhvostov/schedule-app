@@ -2,6 +2,8 @@ import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import type { AppRole, AuthVia, Session } from "../v2/session";
 
+const FRESH_DISCORD_LOGIN_KEY = "v2-fresh-discord-login";
+
 export type LiveMember = {
   id: string;
   publicCode: string;
@@ -38,6 +40,51 @@ type DiscordCheck = {
   error?: string;
 };
 
+function discordIdOf(user: {
+  identities?: Array<{ provider?: string; id?: string; identity_data?: Record<string, unknown> }>;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const identity = user.identities?.find((item) => item.provider === "discord");
+  return String(
+    identity?.identity_data?.provider_id ??
+      identity?.identity_data?.sub ??
+      identity?.id ??
+      user.user_metadata?.provider_id ??
+      "",
+  );
+}
+
+export function markFreshDiscordLogin() {
+  if (typeof sessionStorage !== "undefined") sessionStorage.setItem(FRESH_DISCORD_LOGIN_KEY, "1");
+}
+
+function takeFreshDiscordLogin() {
+  if (typeof sessionStorage === "undefined") return false;
+  const fresh = sessionStorage.getItem(FRESH_DISCORD_LOGIN_KEY) === "1";
+  sessionStorage.removeItem(FRESH_DISCORD_LOGIN_KEY);
+  return fresh;
+}
+
+async function checkDiscordSnapshot(user: Parameters<typeof discordIdOf>[0]): Promise<DiscordCheck | null> {
+  const db = getSupabase();
+  const discordId = discordIdOf(user);
+  if (!db || !discordId) return null;
+  const [{ data: member }, { data: settings }] = await Promise.all([
+    db.from("discord_members").select("present,roles").eq("discord_id", discordId).maybeSingle(),
+    db.from("club_settings").select("required_discord_role_id").eq("id", true).maybeSingle(),
+  ]);
+  const roles = Array.isArray(member?.roles) ? member.roles : [];
+  const requiredRoleId = settings?.required_discord_role_id;
+  return {
+    present: Boolean(member?.present),
+    hasRequiredRole: Boolean(
+      member?.present &&
+        requiredRoleId &&
+        roles.some((role) => typeof role === "object" && role !== null && "id" in role && role.id === requiredRoleId),
+    ),
+  };
+}
+
 export async function checkMyDiscordMember(): Promise<DiscordCheck | null> {
   const db = getSupabase();
   if (!db) return null;
@@ -70,15 +117,13 @@ export async function sendPasswordReset(email: string) {
   return { error: error?.message ?? null };
 }
 
-export async function loadLiveMember(): Promise<LiveMember | null> {
+async function loadLiveMemberForAuthUser(authUserId: string): Promise<LiveMember | null> {
   const db = getSupabase();
   if (!db) return null;
-  const { data: auth } = await db.auth.getUser();
-  if (!auth.user) return null;
   const { data: member } = await db
     .from("members")
     .select("id, public_code, access_status, mark_tag, mark_bg, mark_fg, tables")
-    .eq("auth_user_id", auth.user.id)
+    .eq("auth_user_id", authUserId)
     .maybeSingle();
   if (!member) return null;
   const { data: ident } = await db
@@ -129,6 +174,14 @@ export async function loadLiveMember(): Promise<LiveMember | null> {
   };
 }
 
+export async function loadLiveMember(): Promise<LiveMember | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data: auth } = await db.auth.getUser();
+  if (!auth.user) return null;
+  return loadLiveMemberForAuthUser(auth.user.id);
+}
+
 export function liveToSession(member: LiveMember): Session {
   return {
     nick: member.nick,
@@ -160,13 +213,19 @@ export type LiveEntry =
 export async function loadLiveEntry(): Promise<LiveEntry> {
   const db = getSupabase();
   if (!db) return { kind: "none" };
+  // A signed-out visitor can be detected locally; no remote auth check is needed.
+  const { data: stored } = await db.auth.getSession();
+  if (!stored.session) return { kind: "none" };
   const { data: auth } = await db.auth.getUser();
   if (!auth.user) return { kind: "none" };
-  const check = await checkMyDiscordMember();
-  let member = await loadLiveMember();
+  const snapshot = () => checkDiscordSnapshot(auth.user);
+  const check = takeFreshDiscordLogin()
+    ? await checkMyDiscordMember().then((result) => (result?.error ? snapshot() : result))
+    : await snapshot();
+  let member = await loadLiveMemberForAuthUser(auth.user.id);
   if (!member && check?.present && check.hasRequiredRole) {
     await db.rpc("self_create_profile");
-    member = await loadLiveMember();
+    member = await loadLiveMemberForAuthUser(auth.user.id);
   }
   if (member?.access === "active") return { kind: "member", session: liveToSession(member) };
   const meta = auth.user.user_metadata ?? {};

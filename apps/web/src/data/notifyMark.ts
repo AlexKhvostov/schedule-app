@@ -18,28 +18,10 @@ export function slotWhenLabel(slots: { date: string; half: number }[]) {
   return `${day}.${month} ${span} CET`;
 }
 
-export async function notifyMarkRemoved(input: {
-  owners: { id: string; name: string; tag?: string }[];
-  actorMemberId?: string;
-  actorName: string;
-  kind: "remove" | "replace";
-  when: string;
-  limit: string;
-  lang: string;
-}) {
+export async function notifyMarkRemoved(lang: string) {
   const db = getSupabase();
   if (!db) return;
-  const owners = input.owners.filter((row) => row.id);
-  if (!owners.length) return;
   await db.functions.invoke("notify-mark-removed", {
-    body: {
-      owners,
-      actorMemberId: input.actorMemberId ?? "",
-      actorName: input.actorName,
-      kind: input.kind,
-      when: input.when,
-      limit: input.limit,
-      lang: input.lang,
-    },
+    body: { lang },
   });
 }

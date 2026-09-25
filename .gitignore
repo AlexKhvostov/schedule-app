@@ -11,6 +11,11 @@ references/**
 node_modules/
 .pnpm-store/
 .next/
+.next-*/
+.next-*.log
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/.auth/
 out/
 dist/
 .turbo/

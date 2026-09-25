@@ -99,66 +99,16 @@ export async function loadRoomNicks(memberIds: string[], roomSlug = "winamax"): 
 export async function saveMyPlays(memberId: string, plays: RoomPlay[]) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const, plays: [] as RoomPlay[] };
-
-  const { data: roomRows, error: roomErr } = await db.from("rooms").select("id, slug");
-  if (roomErr) return { error: roomErr.message, plays: [] as RoomPlay[] };
-  const roomIdBySlug = new Map((roomRows ?? []).map((row) => [row.slug as string, row.id as string]));
-
-  const { data: existing, error: existingErr } = await db.from("players").select("id, room_id").eq("member_id", memberId);
-  if (existingErr) return { error: existingErr.message, plays: [] as RoomPlay[] };
-  const playerByRoom = new Map((existing ?? []).map((row) => [row.room_id as string, row.id as string]));
-  const keepIds = new Set<string>();
-
-  for (const raw of plays) {
+  const payload = plays.map((raw) => {
     const play = normalizePlay(raw);
-    const roomId = roomIdBySlug.get(play.roomId);
-    if (!roomId) return { error: `unknown-room:${play.roomId}`, plays: [] as RoomPlay[] };
-
-    let playerId = playerByRoom.get(roomId);
-    if (!playerId) {
-      const { data, error } = await db
-        .from("players")
-        .upsert({ member_id: memberId, room_id: roomId }, { onConflict: "member_id,room_id" })
-        .select("id")
-        .single();
-      if (error || !data?.id) return { error: error?.message ?? "player-upsert", plays: [] as RoomPlay[] };
-      playerId = data.id as string;
-      playerByRoom.set(roomId, playerId);
-    }
-    keepIds.add(playerId);
-
-    const limitRows = [
-      ...limitsOfKind(play, "nitro").map((limitId) => ({ player_id: playerId, variant_id: "nitro", limit_id: limitId })),
-      ...limitsOfKind(play, "regular").map((limitId) => ({ player_id: playerId, variant_id: "regular", limit_id: limitId })),
-    ];
-    const { error: delErr } = await db.from("player_limits").delete().eq("player_id", playerId);
-    if (delErr) return { error: delErr.message, plays: [] as RoomPlay[] };
-    if (limitRows.length) {
-      const { error: insErr } = await db.from("player_limits").insert(limitRows);
-      if (insErr) return { error: insErr.message, plays: [] as RoomPlay[] };
-    }
-
-    const nick = play.nick.trim();
-    if (nick) {
-      const { data: latest } = await db
-        .from("player_nicks")
-        .select("nick")
-        .eq("player_id", playerId)
-        .order("at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest?.nick !== nick) {
-        const { error: nickErr } = await db.from("player_nicks").insert({ player_id: playerId, nick });
-        if (nickErr) return { error: nickErr.message, plays: [] as RoomPlay[] };
-      }
-    }
-  }
-
-  for (const row of existing ?? []) {
-    if (keepIds.has(row.id as string)) continue;
-    const { error } = await db.from("players").delete().eq("id", row.id);
-    if (error) return { error: error.message, plays: [] as RoomPlay[] };
-  }
-
+    return {
+      roomId: play.roomId,
+      nick: play.nick.trim(),
+      nitroLimits: limitsOfKind(play, "nitro"),
+      regularLimits: limitsOfKind(play, "regular"),
+    };
+  });
+  const { error } = await db.rpc("save_member_plays", { p_member_id: memberId, p_plays: payload });
+  if (error) return { error: error.message, plays: [] as RoomPlay[] };
   return { error: null, plays: await loadMyPlays(memberId) };
 }

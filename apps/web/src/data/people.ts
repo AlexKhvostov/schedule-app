@@ -168,15 +168,37 @@ export type ClubRequest = {
 export async function listAdminPeople(): Promise<AdminPerson[]> {
   const db = getSupabase();
   if (!db) return [];
-  const [{ data: discord }, { data: members }, { data: idents }, { data: roles }, { data: profiles }, { data: distMap }, { data: roleCatalog }] = await Promise.all([
-    db.from("discord_members").select("discord_id, username, global_name, guild_nick, avatar_url, bot, joined_at, roles, present"),
-    db.from("members").select("id, public_code, access_status, block_reason, community_status, guarantor_id, mark_tag, mark_bg, mark_fg, tables, grid_priority, vip_nitro, vip_regular, distance_ext_id, auth_user_id, created_at, approved_at"),
-    db.from("identities").select("member_id, provider, provider_uid, username, display_name, guild_nick, avatar_url, guild_present, discord_roles"),
-    db.from("member_roles").select("member_id, role_id"),
-    db.from("profiles").select("member_id, display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt, notify_channel"),
-    db.from("discord_distance_ids").select("discord_id, distance_ext_id"),
-    db.from("discord_guild_roles").select("role_id,position,display_order,admin_visible"),
-  ]);
+  const { data, error } = await db.rpc("admin_people_snapshot");
+  if (error || !data) return [];
+  const snapshot = data as {
+    discord: DiscordRow[];
+    members: MemberRow[];
+    identities: IdentRow[];
+    member_roles: { member_id: string; role_id: string }[];
+    profiles: {
+      member_id: string;
+      display_name: string | null;
+      email: string | null;
+      phone: string | null;
+      city: string | null;
+      country: string | null;
+      birthday: string | null;
+      show_extra_tz: boolean;
+      extra_utc: number;
+      telegram: string | null;
+      contact_alt: string | null;
+      notify_channel: string | null;
+    }[];
+    distance_map: { discord_id: string; distance_ext_id: string }[];
+    role_catalog: { role_id: string; position: number; display_order: number | null; admin_visible: boolean }[];
+  };
+  const discord = snapshot.discord ?? [];
+  const members = snapshot.members ?? [];
+  const idents = snapshot.identities ?? [];
+  const roles = snapshot.member_roles ?? [];
+  const profiles = snapshot.profiles ?? [];
+  const distMap = snapshot.distance_map ?? [];
+  const roleCatalog = snapshot.role_catalog ?? [];
   const roleOrder = new Map(
     ((roleCatalog ?? []) as { role_id: string; position: number; display_order: number | null; admin_visible: boolean }[]).map((row) => [
       row.role_id,

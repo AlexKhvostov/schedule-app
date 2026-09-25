@@ -1,6 +1,6 @@
 import { defaultCapacity, emptyProfile, normalizeHours, type CapacityMap, type HourCaps } from "../schedule/capacity";
 import { getSupabase } from "./client";
-import { kindIdOf, loadKinds } from "./kinds";
+import { loadKinds } from "./kinds";
 
 function arr(hours: number[] | null | undefined): HourCaps {
   return normalizeHours(hours ?? undefined);
@@ -41,32 +41,6 @@ export async function loadCapacityLive(variant: "nitro" | "regular"): Promise<Ca
 export async function saveCapacityLive(variant: "nitro" | "regular", map: CapacityMap) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
-  for (const [limit, profile] of Object.entries(map)) {
-    const kindId = await kindIdOf(limit, variant);
-    if (!kindId) continue;
-    const { error: flagError } = await db.from("capacity_flags").upsert({
-      kind_id: kindId,
-      equalize: profile.equalize,
-      week_on: profile.weekOn,
-      month_on: profile.monthOn,
-    });
-    if (flagError) return { error: flagError.message };
-    await db.from("capacity_rules").delete().eq("kind_id", kindId);
-    const rows: {
-      kind_id: string;
-      layer: string;
-      day_of_month: number | null;
-      weekday: number | null;
-      hours: number[];
-    }[] = [{ kind_id: kindId, layer: "base", day_of_month: null, weekday: null, hours: profile.hours }];
-    for (const [day, hours] of Object.entries(profile.days)) {
-      rows.push({ kind_id: kindId, layer: "month", day_of_month: Number(day), weekday: null, hours });
-    }
-    for (const [weekday, hours] of Object.entries(profile.weekdays)) {
-      rows.push({ kind_id: kindId, layer: "week", day_of_month: null, weekday: Number(weekday), hours });
-    }
-    const { error } = await db.from("capacity_rules").insert(rows);
-    if (error) return { error: error.message };
-  }
-  return {};
+  const { error } = await db.rpc("save_capacity_profiles", { p_variant: variant, p_profiles: map });
+  return { error: error?.message };
 }

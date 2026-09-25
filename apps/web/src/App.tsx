@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import "./i18n";
 import { findInvite } from "./v2/invites";
 import { clearSession, readSession, roleFor, takeInviteToken, writeSession, type Session } from "./v2/session";
@@ -8,11 +8,14 @@ import { cursorFromPrefs } from "./v2/prefs";
 import { loadMembers } from "./schedule/members";
 import { V2Login } from "./v2/V2Login";
 import { V2JoinGate } from "./v2/V2JoinGate";
-import { V2Shell } from "./v2/V2Shell";
+import { V2BootScreen } from "./v2/V2BootScreen";
 import { liveAuthReady, loadLiveEntry, signOutLive } from "./data/auth";
 import { getSupabase } from "./data/client";
+import { disableDevSandbox } from "./data/config";
 import "./v2/theme";
 import "./v2/v2.css";
+
+const V2Shell = lazy(() => import("./v2/V2Shell").then((module) => ({ default: module.V2Shell })));
 
 function bootLocalSession(): Session | null {
   if (typeof window === "undefined") return null;
@@ -67,8 +70,16 @@ export function App() {
       setBooting(false);
     };
     void apply();
-    const { data } = db.auth.onAuthStateChange(() => {
-      void apply();
+    const { data } = db.auth.onAuthStateChange((event) => {
+      // INITIAL_SESSION and TOKEN_REFRESHED are already covered by the first
+      // apply and must not repeat the application/Discord access checks.
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") void apply();
+      if (event === "SIGNED_OUT") {
+        clearSession();
+        setSession(null);
+        setGate(null);
+        setBooting(false);
+      }
     });
     return () => {
       data.subscription.unsubscribe();
@@ -76,7 +87,7 @@ export function App() {
   }, [live]);
 
   if (booting) {
-    return <div className="v2-stage" aria-busy="true" />;
+    return <V2BootScreen />;
   }
 
   if (gate) {
@@ -101,16 +112,19 @@ export function App() {
   }
 
   return (
-    <V2Shell
-      session={session}
-      cursor={cursor}
-      onCursorChange={setCursor}
-      onSession={setSession}
-      onLogout={() => {
-        void signOutLive();
-        clearSession();
-        setSession(null);
-      }}
-    />
+    <Suspense fallback={<V2BootScreen />}>
+      <V2Shell
+        session={session}
+        cursor={cursor}
+        onCursorChange={setCursor}
+        onSession={setSession}
+        onLogout={() => {
+          void signOutLive();
+          clearSession();
+          disableDevSandbox();
+          setSession(null);
+        }}
+      />
+    </Suspense>
   );
 }

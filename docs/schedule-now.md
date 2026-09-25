@@ -1,5 +1,7 @@
 # Сейчас в расписании
 
+> Исторический снимок на 22 сентября 2026. Текущее состояние проекта описано в [current-state.md](current-state.md), действующие правила интерфейса — в [schedule-ux.md](schedule-ux.md).
+
 Короткий статус на **22 сентября 2026**. Живой экран — `apps/web` (Vercel, ветка `main`). Песочница `sandbox/ui` — та же картинка локально.
 
 Канон экрана — издание **next**. Как кликать, протягивать и что рисуется на клетке — [schedule-ux.md](schedule-ux.md), раздел **Работа с метками**. Вход Discord и схема — [discord-now.md](discord-now.md), [database.md](database.md). К чему не возвращаемся — [decisions.md](decisions.md).

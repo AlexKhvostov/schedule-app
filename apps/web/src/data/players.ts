@@ -1,9 +1,8 @@
-import { getSupabase } from "./client";
-import { isLiveData } from "./config";
 import { MARK_CATALOG, MARK_FG_DEFAULT } from "../schedule/markCatalog";
 import { ME, asVip, type Mark } from "../schedule/marks";
 import { limitsOfKind, loadMembers } from "../schedule/members";
-import { loadRoomNicks } from "./plays";
+import { getSupabase } from "./client";
+import { isLiveData } from "./config";
 
 export type SchedulePlayer = {
   id: string;
@@ -20,6 +19,27 @@ export type SchedulePlayer = {
   guildNick?: string;
 };
 
+type DirectoryRow = {
+  member_id: string;
+  public_code: string;
+  mark_tag: string | null;
+  mark_bg: string | null;
+  mark_fg: string | null;
+  tables: number | null;
+  grid_priority: number | null;
+  vip_nitro: number | null;
+  vip_regular: number | null;
+  username: string | null;
+  display_name: string | null;
+  guild_nick: string | null;
+  avatar_url: string | null;
+  discord_username: string | null;
+  discord_global_name: string | null;
+  discord_guild_nick: string | null;
+  discord_avatar_url: string | null;
+  room_nick: string | null;
+};
+
 export function markFromPlayer(row: SchedulePlayer): Mark {
   return {
     t: row.markTag,
@@ -32,20 +52,58 @@ export function markFromPlayer(row: SchedulePlayer): Mark {
   };
 }
 
-function nickOf(
-  ident?: { provider_uid?: string | null; username?: string | null; display_name?: string | null; guild_nick?: string | null } | null,
-  discord?: { guild_nick?: string | null; global_name?: string | null; username?: string | null } | null,
-  fallback = "",
-) {
+function nickOf(row: DirectoryRow) {
   return (
-    discord?.guild_nick ||
-    discord?.global_name ||
-    discord?.username ||
-    ident?.guild_nick ||
-    ident?.username ||
-    ident?.display_name ||
-    fallback
+    row.discord_guild_nick ||
+    row.discord_global_name ||
+    row.discord_username ||
+    row.guild_nick ||
+    row.display_name ||
+    row.username ||
+    row.public_code ||
+    ""
   );
+}
+
+function playerOf(row: DirectoryRow): SchedulePlayer {
+  return {
+    id: row.member_id,
+    nick: nickOf(row),
+    publicCode: row.public_code,
+    roomNick: row.room_nick ?? "",
+    markTag: (row.mark_tag ?? "").trim(),
+    markBg: row.mark_bg || ME.bg,
+    markFg: row.mark_fg || MARK_FG_DEFAULT,
+    tables: Math.min(30, Math.max(1, row.tables ?? 1)),
+    avatarUrl: row.discord_avatar_url || row.avatar_url || "",
+    username: row.discord_username || row.username || "",
+    globalName: row.discord_global_name || row.display_name || "",
+    guildNick: row.discord_guild_nick || row.guild_nick || "",
+  };
+}
+
+function markOf(row: DirectoryRow): Mark {
+  const player = playerOf(row);
+  return {
+    ...markFromPlayer(player),
+    avatarUrl: player.avatarUrl,
+    username: player.username,
+    globalName: player.globalName,
+    guildNick: player.guildNick,
+    priority: typeof row.grid_priority === "number" && row.grid_priority > 0 ? row.grid_priority : null,
+    vipNitro: asVip(row.vip_nitro) || null,
+    vipRegular: asVip(row.vip_regular) || null,
+  };
+}
+
+async function loadDirectory(variant?: "nitro" | "regular", limits?: string[]) {
+  const db = getSupabase();
+  if (!db) return [];
+  const { data, error } = await db.rpc("schedule_player_directory", {
+    p_variant: variant ?? null,
+    p_limit_ids: limits ?? null,
+  });
+  return error ? [] : ((data ?? []) as DirectoryRow[]);
 }
 
 function demoPlayers(): SchedulePlayer[] {
@@ -68,68 +126,9 @@ function demoPlayers(): SchedulePlayer[] {
     .sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 }
 
-async function clubPlayerIds(ids: string[]): Promise<Set<string>> {
-  const db = getSupabase();
-  if (!db || !ids.length) return new Set();
-  const { data } = await db.from("member_roles").select("member_id, role_id").in("member_id", ids);
-  const set = new Set<string>();
-  for (const row of data ?? []) {
-    if (row.role_id === "member" || row.role_id === "admin") set.add(String(row.member_id));
-  }
-  return set;
-}
-
-async function listLivePlayers(): Promise<SchedulePlayer[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  const { data: members } = await db
-    .from("members")
-    .select("id, public_code, mark_tag, mark_bg, mark_fg, tables")
-    .eq("access_status", "active")
-    .order("created_at", { ascending: true });
-  if (!members?.length) return [];
-  const allowed = await clubPlayerIds(members.map((row) => row.id));
-  const playable = members.filter((row) => allowed.has(row.id));
-  if (!playable.length) return [];
-  const ids = playable.map((row) => row.id);
-  const { data: idents } = await db
-    .from("identities")
-    .select("member_id, provider_uid, username, display_name, guild_nick, avatar_url")
-    .in("member_id", ids);
-  const discordIds = [...new Set((idents ?? []).map((row) => row.provider_uid).filter(Boolean))];
-  const [{ data: discord }, nicks] = await Promise.all([
-    discordIds.length
-      ? db.from("discord_members").select("discord_id, guild_nick, global_name, username, avatar_url").in("discord_id", discordIds)
-      : Promise.resolve({ data: [] as { discord_id: string; guild_nick: string | null; global_name: string | null; username: string | null; avatar_url: string | null }[] }),
-    loadRoomNicks(ids),
-  ]);
-  const identByMember = new Map((idents ?? []).map((row) => [row.member_id, row]));
-  const discordById = new Map((discord ?? []).map((row) => [row.discord_id, row]));
-  return playable
-    .map((row) => {
-      const ident = identByMember.get(row.id);
-      const snap = ident?.provider_uid ? discordById.get(ident.provider_uid) : undefined;
-      return {
-        id: row.id,
-        nick: nickOf(ident, snap),
-        publicCode: row.public_code,
-        roomNick: nicks.get(row.id) ?? "",
-        markTag: (row.mark_tag ?? "").trim(),
-        markBg: row.mark_bg || ME.bg,
-        markFg: row.mark_fg || MARK_FG_DEFAULT,
-        tables: Math.min(30, Math.max(1, row.tables ?? 11)),
-        avatarUrl: snap?.avatar_url || ident?.avatar_url || "",
-        username: snap?.username || ident?.username || "",
-        globalName: snap?.global_name || ident?.display_name || "",
-        guildNick: snap?.guild_nick || ident?.guild_nick || "",
-      };
-    })
-    .sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
-}
-
 export async function listSchedulePlayers(): Promise<SchedulePlayer[]> {
-  if (isLiveData()) return listLivePlayers();
-  return demoPlayers();
+  if (!isLiveData()) return demoPlayers();
+  return (await loadDirectory()).map(playerOf);
 }
 
 function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] {
@@ -158,74 +157,8 @@ function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] 
     }));
 }
 
-async function marksForMembers(ids: string[]): Promise<Mark[]> {
-  const unique = [...new Set(ids.filter(Boolean))];
-  if (!unique.length) return [];
-  const db = getSupabase();
-  if (!db) return [];
-  const allowed = await clubPlayerIds(unique);
-  const playable = unique.filter((id) => allowed.has(id));
-  if (!playable.length) return [];
-  const [{ data: members }, { data: idents }, nicks] = await Promise.all([
-    db
-      .from("members")
-      .select("id, mark_tag, mark_bg, mark_fg, tables, grid_priority, vip_nitro, vip_regular")
-      .eq("access_status", "active")
-      .in("id", playable),
-    db
-      .from("identities")
-      .select("member_id, provider_uid, username, display_name, guild_nick, avatar_url")
-      .in("member_id", playable),
-    loadRoomNicks(playable),
-  ]);
-  if (!members?.length) return [];
-  const discordIds = [...new Set((idents ?? []).map((row) => row.provider_uid).filter(Boolean))];
-  const { data: discord } = discordIds.length
-    ? await db
-        .from("discord_members")
-        .select("discord_id, guild_nick, global_name, username, avatar_url")
-        .in("discord_id", discordIds)
-    : { data: [] as { discord_id: string; guild_nick: string | null; global_name: string | null; username: string | null; avatar_url: string | null }[] };
-  const identByMember = new Map((idents ?? []).map((row) => [row.member_id, row]));
-  const discordById = new Map((discord ?? []).map((row) => [row.discord_id, row]));
-  return members.map((row) => {
-    const ident = identByMember.get(row.id);
-    const snap = ident?.provider_uid ? discordById.get(ident.provider_uid) : undefined;
-    return {
-      t: (row.mark_tag ?? "").trim(),
-      discord: nickOf(ident, snap),
-      room: nicks.get(row.id) ?? "",
-      bg: row.mark_bg || ME.bg,
-      fg: row.mark_fg || MARK_FG_DEFAULT,
-      tables: Math.min(30, Math.max(1, row.tables ?? 11)),
-      memberId: row.id,
-      avatarUrl: snap?.avatar_url || ident?.avatar_url || "",
-      username: snap?.username || ident?.username || "",
-      globalName: snap?.global_name || ident?.display_name || "",
-      guildNick: snap?.guild_nick || ident?.guild_nick || "",
-      priority: typeof row.grid_priority === "number" && row.grid_priority > 0 ? row.grid_priority : null,
-      vipNitro: asVip(row.vip_nitro) || null,
-      vipRegular: asVip(row.vip_regular) || null,
-    };
-  });
-}
-
 export async function listLimitMarks(variant: "nitro" | "regular", limits: string[]): Promise<Mark[]> {
   if (!limits.length) return [];
   if (!isLiveData()) return demoLimitMarks(variant, limits);
-  const db = getSupabase();
-  if (!db) return [];
-  const { data: room } = await db.from("rooms").select("id").eq("slug", "winamax").maybeSingle();
-  if (!room?.id) return [];
-  const { data: players } = await db.from("players").select("id, member_id").eq("room_id", room.id);
-  if (!players?.length) return [];
-  const byPlayer = new Map(players.map((row) => [row.id, row.member_id as string]));
-  const { data: rows } = await db
-    .from("player_limits")
-    .select("player_id")
-    .eq("variant_id", variant)
-    .in("limit_id", limits)
-    .in("player_id", [...byPlayer.keys()]);
-  const memberIds = [...new Set((rows ?? []).map((row) => byPlayer.get(row.player_id)).filter(Boolean))] as string[];
-  return marksForMembers(memberIds);
+  return (await loadDirectory(variant, limits)).map(markOf);
 }

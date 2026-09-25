@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isSelfSeat, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
-import { formatDayLabel } from "../schedule/formatDate";
 import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
@@ -12,6 +11,22 @@ import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
+import {
+  displayNick,
+  findHitCss,
+  markQuery,
+  nowHeadLeft,
+  nowLineLeft,
+  packOwner,
+  slotSpan,
+  tablesLabel,
+  tipDate,
+  writeSeat,
+  type OverwriteAsk,
+  type OverwritePerson,
+} from "./optFieldModel";
+
+export type { OverwriteAsk, OverwritePerson, OverwriteSlot } from "./optFieldModel";
 
 type Props = {
   year: number;
@@ -36,31 +51,6 @@ type Props = {
   canRemoveForeign?: boolean;
   onOverwriteAsk?: (ask: OverwriteAsk) => void;
   onForeignKept?: () => void;
-};
-
-export type OverwriteSlot = { date: string; half: number; level: number };
-
-export type OverwritePerson = {
-  key: string;
-  memberId?: string;
-  tag: string;
-  bg: string;
-  fg: string;
-  avatarUrl?: string;
-  discord: string;
-  username?: string;
-  room: string;
-  slots: OverwriteSlot[];
-};
-
-export type OverwriteAsk = {
-  kind: "remove" | "place";
-  limit: string;
-  people: OverwritePerson[];
-  memberIds: string[];
-  slots: OverwriteSlot[];
-  next: Occupancy;
-  empty?: Occupancy;
 };
 
 type SlotHit = {
@@ -96,98 +86,6 @@ type TipApi = {
   show: (hit: SlotHit, rest?: TipPoint, force?: boolean) => void;
   hide: () => void;
 };
-
-function slotSpan(half: number, hourShift = 0) {
-  const start = (Math.floor(half / 2) * 60 + (half % 2 ? 30 : 0) + hourShift * 60 + 24 * 60) % (24 * 60);
-  const end = (start + 30) % (24 * 60);
-  const fmt = (mins: number) =>
-    `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-  return `${fmt(start)} – ${fmt(end)}`;
-}
-
-function tipDate(year: number, monthIndex: number, day: number, lang: string) {
-  return formatDayLabel(year, monthIndex, day, lang);
-}
-
-function tablesLabel(count: number, lang: string) {
-  if (lang.startsWith("en")) return count === 1 ? "1 table" : `${count} tables`;
-  const ten = count % 10;
-  const hundred = count % 100;
-  if (ten === 1 && hundred !== 11) return `${count} стол`;
-  if (ten >= 2 && ten <= 4 && (hundred < 12 || hundred > 14)) return `${count} стола`;
-  return `${count} столов`;
-}
-
-function isClubCode(value?: string | null) {
-  return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
-}
-
-function displayNick(value?: string | null) {
-  const text = value?.trim() ?? "";
-  if (!text || isClubCode(text)) return "—";
-  return text;
-}
-
-function showNick(value?: string | null) {
-  const text = value?.trim() ?? "";
-  if (!text || isClubCode(text)) return "";
-  return text;
-}
-
-function ownerKey(mark: Mark) {
-  return mark.memberId || mark.discord || mark.t || "mark";
-}
-
-function writeSeat(item: Occupancy[number][number] | undefined, level: number, next: Mark | null) {
-  const seats = seatsOf(item, Math.max(level + 1, 2));
-  const out = seats.slice();
-  out[level] = next;
-  return out;
-}
-
-function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
-  const discord = showNick(mark.discord) || showNick(mark.guildNick) || showNick(mark.globalName) || showNick(mark.username) || mark.t.trim() || "—";
-  const username = showNick(mark.username);
-  const room = showNick(mark.room);
-  return {
-    key: ownerKey(mark),
-    memberId: mark.memberId,
-    tag: mark.t,
-    bg: mark.bg,
-    fg: mark.fg,
-    avatarUrl: mark.avatarUrl,
-    discord,
-    username: username && username.toLowerCase() !== discord.replace(/^@/, "").toLowerCase() ? username : "",
-    room,
-  };
-}
-
-function markQuery(focus: string) {
-  return focus.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-}
-
-function findHitCss(q: string) {
-  if (!q) return "";
-  return `.v2-opt.is-find[data-opt-find="${q}"] .v2-opt-cell.is-on[data-mark="${q}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
-}
-
-function nowAlongTrack(half: number, progress: number) {
-  const t = Math.min(SLOT_COUNT, Math.max(0, half + Math.min(1, Math.max(0, progress))));
-  const cell = Math.min(SLOT_COUNT - 1, Math.floor(t));
-  const frac = t - cell;
-  return `var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${cell + frac} / ${SLOT_COUNT} + ${cell} * var(--opt-gap)`;
-}
-
-function nowHeadLeft(half: number, progress: number) {
-  const t = Math.min(SLOT_COUNT, Math.max(0, half + Math.min(1, Math.max(0, progress))));
-  const cell = Math.min(SLOT_COUNT - 1, Math.floor(t));
-  const frac = t - cell;
-  return `calc(var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${cell + frac} / ${SLOT_COUNT} + ${cell} * var(--opt-gap))`;
-}
-
-function nowLineLeft(half: number, progress: number) {
-  return `calc(${nowAlongTrack(half, progress)})`;
-}
 
 function levelsOf(
   capacity: CapacityMap,

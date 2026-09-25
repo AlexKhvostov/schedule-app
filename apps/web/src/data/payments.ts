@@ -126,56 +126,18 @@ export async function savePays(memberId: string, pays: PayMethod[]) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const, pays: [] as PayMethod[] };
   const next = ensurePresetPays(pays);
-  const { data: existing, error: readErr } = await db.from("payment_methods").select("id").eq("member_id", memberId);
-  if (readErr) return { error: readErr.message, pays: [] as PayMethod[] };
-  const keep = new Set(next.filter((row) => isDbId(row.id)).map((row) => row.id));
-  const drop = ((existing ?? []) as { id: string }[]).map((row) => row.id).filter((id) => !keep.has(id));
-  if (drop.length) {
-    const { error } = await db.from("payment_methods").delete().in("id", drop);
-    if (error) return { error: error.message, pays: [] as PayMethod[] };
-  }
-  if (keep.size) {
-    const { error } = await db.from("payment_methods").update({ is_primary: false }).eq("member_id", memberId);
-    if (error) return { error: error.message, pays: [] as PayMethod[] };
-  }
-  const saved: PayMethod[] = [];
-  for (let i = 0; i < next.length; i++) {
-    const row = next[i];
-    const body = {
-      member_id: memberId,
-      kind: row.kind ?? "custom",
-      title: row.title,
-      details: row.details,
-      comment: row.comment,
-      is_primary: false,
-      sort_n: i,
-    };
-    if (isDbId(row.id)) {
-      const { data, error } = await db
-        .from("payment_methods")
-        .update(body)
-        .eq("id", row.id)
-        .select("id, kind, title, details, comment, is_primary, sort_n")
-        .maybeSingle();
-      if (error || !data) return { error: error?.message ?? "not-saved", pays: [] as PayMethod[] };
-      saved.push(asPay(data as PayRow));
-    } else {
-      const { data, error } = await db
-        .from("payment_methods")
-        .insert(body)
-        .select("id, kind, title, details, comment, is_primary, sort_n")
-        .maybeSingle();
-      if (error || !data) return { error: error?.message ?? "not-saved", pays: [] as PayMethod[] };
-      saved.push(asPay(data as PayRow));
-    }
-  }
-  const primary = saved.find((_, index) => next[index]?.primary) ?? saved.find((row) => row.kind === "usdt_trc20") ?? saved[0];
-  if (primary) {
-    const { error } = await db.from("payment_methods").update({ is_primary: true }).eq("id", primary.id);
-    if (error) return { error: error.message, pays: [] as PayMethod[] };
-    return { error: null, pays: ensurePresetPays(saved.map((row) => ({ ...row, primary: row.id === primary.id }))) };
-  }
-  return { error: null, pays: ensurePresetPays(saved) };
+  const rows = next.map((row, sort) => ({
+    id: isDbId(row.id) ? row.id : null,
+    kind: row.kind ?? "custom",
+    title: row.title,
+    details: row.details,
+    comment: row.comment,
+    primary: row.primary,
+    sort,
+  }));
+  const { data, error } = await db.rpc("save_payment_methods", { p_member_id: memberId, p_rows: rows });
+  if (error || !data) return { error: error?.message ?? "not-saved", pays: [] as PayMethod[] };
+  return { error: null, pays: ensurePresetPays((data as PayRow[]).map(asPay)) };
 }
 
 export function blankPay(primary = false): PayMethod {
