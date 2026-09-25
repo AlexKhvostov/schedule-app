@@ -112,13 +112,17 @@ on conflict (role_id) do update set
   present = true,
   synced_at = excluded.synced_at;
 
-insert into discord_role_permissions (role_id, permission_code) values
+insert into discord_role_permissions (role_id, permission_code)
+select seed.role_id, seed.permission_code
+from (values
   ('1208022351652986891', 'profile'),
   ('1208019567251820604', 'profile'),
   ('1208019567251820604', 'admin.people'),
   ('1208019567251820604', 'priorities'),
   ('1208019567251820604', 'distances'),
   ('1208022278088949770', 'schedule')
+) as seed(role_id, permission_code)
+join discord_guild_roles role on role.role_id = seed.role_id
 on conflict do nothing;
 
 insert into discord_role_schedule_limits (role_id, variant_id, limit_id)
@@ -127,6 +131,10 @@ from variants v
 cross join limits l
 where v.id in ('nitro', 'regular')
   and l.id in ('50', '100')
+  and exists (
+    select 1 from discord_guild_roles role
+    where role.role_id = '1208022278088949770'
+  )
 on conflict do nothing;
 
 alter table discord_sync_runs enable row level security;

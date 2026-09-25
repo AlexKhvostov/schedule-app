@@ -3,7 +3,9 @@ values ('schedule.manage', 'Управление расписанием', 'admin
 on conflict (code) do update set title = excluded.title, section = excluded.section, sort = excluded.sort;
 
 insert into discord_role_permissions (role_id, permission_code)
-values ('1208019567251820604', 'schedule.manage')
+select role.role_id, 'schedule.manage'
+from discord_guild_roles role
+where role.role_id = '1208019567251820604'
 on conflict do nothing;
 
 create or replace function member_access_context()
