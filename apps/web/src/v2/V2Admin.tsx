@@ -377,7 +377,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
           </button>
           <button
             type="button"
-            className={`v2-settings-row${editByButton ? " is-on" : ""}`}
+            className={`v2-settings-row${!editByButton ? " is-on" : ""}`}
             disabled={editByButtonSaving}
             title={t("admin.control.editByButtonHint")}
             onClick={() => {
@@ -402,7 +402,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
               <b>{t("admin.control.editByButton")}</b>
               <small>{t("admin.control.editByButtonHint")}</small>
             </span>
-            <span className={`v2-settings-switch${editByButton ? " is-on" : ""}`} aria-hidden />
+            <span className={`v2-settings-switch${!editByButton ? " is-on" : ""}`} aria-hidden />
           </button>
         </div>
       </section>

@@ -11,6 +11,7 @@ import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { heatFill, rowInitials, whoLines } from "./schedulePresentation";
 import { V2Float } from "./V2Float";
+import { scheduleZoomPercent } from "./scheduleZoom";
 
 export function BarMark({
   me,
@@ -66,12 +67,16 @@ export function BarMark({
       const rect = (hitRef.current ?? boxRef.current)?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(280, window.innerWidth - 16);
-      const top = Math.round(rect.bottom + 6);
+      const roomBelow = window.innerHeight - rect.bottom - 12;
+      const placeAbove = roomBelow < 180;
+      const maxH = placeAbove
+        ? Math.max(160, Math.min(440, rect.top - 14))
+        : Math.max(160, Math.min(440, roomBelow));
+      const top = Math.round(placeAbove ? Math.max(8, rect.top - maxH - 6) : rect.bottom + 6);
       let left = Math.round(rect.left);
       if (left + width > window.innerWidth - 8) {
         left = Math.round(Math.max(8, rect.right - width));
       }
-      const maxH = Math.max(160, Math.min(440, window.innerHeight - top - 12));
       setMenuBox({ top, left, maxH });
     };
     place();
@@ -223,6 +228,69 @@ export function BarMark({
           )
         : null}
     </div>
+  );
+}
+
+export function MobileScheduleDock({
+  cellWidth,
+  fitWidth,
+  editEnabled,
+  editOn,
+  onZoomOut,
+  onFit,
+  onZoomIn,
+  onToggleEdit,
+  ...markProps
+}: Omit<Parameters<typeof BarMark>[0], "showEdit" | "editOn" | "onToggleEdit"> & {
+  cellWidth: number;
+  fitWidth: number;
+  editEnabled: boolean;
+  editOn: boolean;
+  onZoomOut: () => void;
+  onFit: () => void;
+  onZoomIn: () => void;
+  onToggleEdit: () => void;
+}) {
+  const { t } = useTranslation();
+  const fitOn = Math.abs(cellWidth - fitWidth) < 0.02;
+  const zoomPercent = scheduleZoomPercent(cellWidth);
+  const fitLabel = t("schedule.zoomFit", { percent: scheduleZoomPercent(fitWidth) });
+
+  return (
+    <aside className={`v2-mobile-schedule-dock${editOn ? " is-edit" : ""}`} aria-label={t("schedule.mobileTools")}>
+      <div className="v2-mobile-edit-row">
+        <BarMark {...markProps} showEdit={false} editOn={editOn} />
+        <button
+          type="button"
+          className="v2-mobile-edit"
+          disabled={!editOn && !editEnabled}
+          aria-pressed={editOn}
+          aria-label={editOn ? t("schedule.editDone") : t("schedule.edit")}
+          title={!editOn && !editEnabled ? t("schedule.zoomToEdit") : editOn ? t("schedule.editDone") : t("schedule.edit")}
+          onClick={onToggleEdit}
+        >
+          <i className={`fa-solid ${editOn ? "fa-check" : "fa-pencil"}`} />
+        </button>
+      </div>
+      <div className="v2-mobile-zoom" aria-label={t("schedule.zoomControls")}>
+        <button type="button" onClick={onZoomOut} disabled={editOn} aria-label={t("schedule.zoomOut")}>
+          <i className="fa-solid fa-minus" />
+        </button>
+        <button
+          type="button"
+          className={fitOn ? "is-on" : ""}
+          onClick={onFit}
+          disabled={editOn}
+          aria-label={fitLabel}
+          title={fitLabel}
+        >
+          {zoomPercent}%
+        </button>
+        <button type="button" onClick={onZoomIn} disabled={editOn} aria-label={t("schedule.zoomIn")}>
+          <i className="fa-solid fa-plus" />
+        </button>
+      </div>
+    </aside>
   );
 }
 

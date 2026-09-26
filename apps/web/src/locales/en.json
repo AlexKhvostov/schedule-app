@@ -82,19 +82,50 @@
   },
   "home": {
     "hello": "Welcome, {{nick}}",
-    "lead": "Red Party club. Schedule, people, and what matters today.",
-    "fact": {
-      "profiles": "active profiles",
-      "onServer": "on the Discord server",
-      "scheduleRoles": "roles with schedule"
+    "eyebrow": "Your Red Party portal",
+    "lead": "Your club workspace starts here: keep your details and playing preferences current, plan your time, and stay in touch with the community.",
+    "primary": {
+      "cabinet": "Open profile",
+      "schedule": "Open schedule",
+      "priorities": "View priorities"
     },
+    "sign": {
+      "title": "Players · schedule · volume",
+      "lead": "Everything needed for club life"
+    },
+    "portal": {
+      "eyebrow": "Service overview",
+      "title": "Your club workspace",
+      "lead": "The key areas are gathered in one place. Access depends on your Discord role.",
+      "profile": {
+        "title": "Profile and settings",
+        "lead": "Contacts, screen name and stakes, notifications, and payment details."
+      },
+      "schedule": {
+        "title": "Schedule",
+        "lead": "Plan playing shifts by stake and review your personal calendar."
+      },
+      "community": {
+        "title": "Community",
+        "lead": "See player order for selected stakes and shared club parameters."
+      },
+      "distance": {
+        "title": "My volume",
+        "lead": "Your personal exports and played-volume metrics will appear here."
+      }
+    },
+    "open": "Open section",
+    "restricted": "Unavailable for role",
+    "soon": "Coming soon",
     "news": {
       "title": "News",
-      "empty": "Nothing yet. Club news will show up here."
+      "caption": "Club life",
+      "empty": "Important Red Party announcements and updates will appear here."
     },
     "events": {
       "title": "Events",
-      "empty": "Nothing yet. Upcoming events will show up here."
+      "caption": "Club operations",
+      "empty": "Upcoming meetings, deadlines, and club events will appear here."
     }
   },
   "priorities": {
@@ -199,6 +230,14 @@
     "coverage100": "100 · 100%"
   },
   "schedule": {
+    "edit": "Edit",
+    "editDone": "Done",
+    "mobileTools": "Schedule tools",
+    "zoomControls": "Schedule zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomFit": "Fit the day — {{percent}}%",
+    "zoomToEdit": "Zoom in to edit the grid",
     "month": "Month",
     "limit": "Limit",
     "kind": "Kind",
@@ -631,15 +670,15 @@
     "control": {
       "kicker": "grid",
       "title": "Schedule control",
-      "lead": "Rules for the grid: other people’s marks, placing for someone else, tables, and how editing starts. Off means the rule is not in use.",
+      "lead": "Grid rules: other people’s marks, placing for someone else, tables, and always-on desktop editing.",
       "overwrite": "Everyone can remove other people’s marks",
       "overwriteHint": "A player removes a foreign mark after a warning. Admins always can. Own marks clear immediately. The owner is notified.",
       "actAs": "Everyone can place a mark for someone else",
       "actAsHint": "A player picker appears on the mark pack. Place only into empty seats. Admins always can.",
       "tables": "Work with tables",
       "tablesHint": "When on, the edit dock sets a table count and it is stored on the mark. Off means tables are unused.",
-      "editByButton": "Edit with the pencil",
-      "editByButtonHint": "On: the pencil and the red glow; the grid is view-only until they press it. Off: people can place and remove marks any time, with no glow and no pencil."
+      "editByButton": "Always edit on desktop",
+      "editByButtonHint": "On: desktop users place marks immediately. Off: they press the pencil first. On phones, editing is always enabled separately after zooming in."
     },
     "root": {
       "kicker": "root",

@@ -24,6 +24,58 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
   await expect(editableCell).not.toHaveClass(/is-on/);
 });
 
+test("mobile schedule starts safe and only edits at a readable zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.locator("button.v2-home-action", { hasText: "Расписание" }).click();
+
+  const dock = page.getByRole("complementary", { name: "Инструменты расписания" });
+  await expect(dock).toBeVisible();
+  await expect.poll(async () => page.locator(".v2-opt-help-bar").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+  await expect.poll(async () => page.locator(".v2-opt-sheet").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+  await expect(page.locator(".v2-opt")).toHaveClass(/is-compact-hours/);
+  await expect(page.locator('.v2-opt-hour[data-h="0"] .v2-opt-hour-short')).toHaveText("0");
+  await expect(page.locator('.v2-opt-hour[data-h="0"] .v2-opt-hour-full')).toBeHidden();
+  await expect(page.locator('.v2-opt-hour[data-h="0"] small')).toBeHidden();
+  const foreign = page.locator('[data-slot].is-on:not([data-mark="YO"])').first();
+  await foreign.dispatchEvent("pointerdown", { pointerId: 17, pointerType: "touch", button: 0, clientX: 120, clientY: 220 });
+  await foreign.dispatchEvent("pointerup", { pointerId: 17, pointerType: "touch", button: 0, clientX: 120, clientY: 220 });
+  const slotTip = page.locator(".v2-opt-tip");
+  await expect(slotTip).toBeVisible();
+  await foreign.dispatchEvent("pointerover", { pointerId: 17, pointerType: "touch", clientX: 120, clientY: 220 });
+  await foreign.dispatchEvent("pointerleave", { pointerId: 17, pointerType: "touch", clientX: 120, clientY: 220 });
+  await page.waitForTimeout(250);
+  await expect(slotTip).toBeVisible();
+  const edit = dock.getByRole("button", { name: "Редактировать" });
+  await expect(edit).toBeDisabled();
+  await expect(edit).toHaveAttribute("title", "Увеличьте поле для редактирования");
+
+  const fitZoom = dock.getByRole("button", { name: /Вписать сутки/ });
+  const initialFitLabel = await fitZoom.textContent();
+  const fitActionLabel = await fitZoom.getAttribute("aria-label");
+  const zoomIn = dock.getByRole("button", { name: "Увеличить масштаб" });
+  await zoomIn.click();
+  await expect(fitZoom).toHaveAttribute("aria-label", fitActionLabel ?? "");
+  await dock.getByRole("button", { name: "Уменьшить масштаб" }).click();
+  await expect(fitZoom).toHaveText(initialFitLabel ?? "");
+  for (let i = 0; i < 8; i += 1) await zoomIn.click();
+  await expect(edit).toBeEnabled();
+  await edit.click();
+  await expect(dock.getByRole("button", { name: "Готово" })).toHaveAttribute("aria-pressed", "true");
+  await expect(zoomIn).toBeDisabled();
+
+  const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const lane = await candidate.getAttribute("data-lane");
+  const half = await candidate.getAttribute("data-half");
+  const editableCell = page.locator(`[data-slot][data-lane="${lane}"][data-half="${half}"]`);
+  await editableCell.click();
+  await expect(editableCell).toHaveClass(/is-on/);
+  await dock.getByRole("button", { name: "Готово" }).click();
+  await expect(zoomIn).toBeEnabled();
+});
+
 test("development environment selector separates demo, working and production", async ({ page }) => {
   await page.goto("/");
 
@@ -99,4 +151,16 @@ test("language choice survives navigation", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+});
+
+test("brand logo returns to the home portal", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await expect(page.locator(".v2-nav-link", { hasText: "Главная" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Расписание", exact: true }).click();
+  await page.getByRole("button", { name: "Главная", exact: true }).click();
+
+  await expect(page.getByText("Добро пожаловать, you")).toBeVisible();
 });

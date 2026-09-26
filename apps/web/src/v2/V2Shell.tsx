@@ -142,7 +142,6 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   };
 
   const pages: StaffItem[] = [
-    { key: "home", label: t("nav.home"), icon: "fa-house" },
     ...(canGrid ? [{ key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" }] : []),
     ...(canPriorities ? [{ key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" }] : []),
   ];
@@ -234,10 +233,16 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
       >
         <header className="v2-top">
           <div className="v2-top-start">
-            <div className="v2-brand">
+            <button
+              type="button"
+              className={`v2-brand${page === "home" ? " is-home" : ""}`}
+              aria-label={t("nav.home")}
+              title={t("nav.home")}
+              onClick={() => goPage("home")}
+            >
               <span className="v2-brand-mark v2-mono">RP</span>
               <span className="v2-brand-name">Red Party</span>
-            </div>
+            </button>
             <nav className="v2-nav" aria-label={t("nav.menu")}>
               {pages.map((item) => (
                 <button
@@ -394,7 +399,9 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
           <Suspense fallback={<div className="min-h-0 flex-1" aria-busy="true" />}>
-          {page === "home" && <V2Home nick={nick} />}
+          {page === "home" && (
+            <V2Home nick={nick} canProfile={canProfile} canSchedule={canGrid} canPriorities={canPriorities} onNavigate={goPage} />
+          )}
           {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : "home")} />}
           {canProfile && page === "cabinet" && (
             <div className="v2-cab-stage min-h-0 flex-1 overflow-auto">

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type MutableRefObject, type PointerEvent, type RefObject } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type MutableRefObject, type PointerEvent, type ReactNode, type RefObject, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
@@ -11,6 +11,7 @@ import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
+import { clampScheduleCellWidth, fitScheduleCellWidth, scheduleCellStride, scheduleZoomScrollLeft } from "./scheduleZoom";
 import {
   displayNick,
   findHitCss,
@@ -51,6 +52,11 @@ type Props = {
   canRemoveForeign?: boolean;
   onOverwriteAsk?: (ask: OverwriteAsk) => void;
   onForeignKept?: () => void;
+  cellWidth?: number;
+  zoomEnabled?: boolean;
+  onCellWidthChange?: (value: number) => void;
+  onFitWidthChange?: (value: number) => void;
+  footerTools?: ReactNode;
 };
 
 type SlotHit = {
@@ -572,22 +578,26 @@ const HELP_GROUPS = [
   { id: "screen", items: ["search", "settings"] as const },
 ];
 
-const OptHelp = memo(function OptHelp({ countTables = false }: { countTables?: boolean }) {
+const OptHelp = memo(function OptHelp({ countTables = false, tools }: { countTables?: boolean; tools?: ReactNode }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
-    <section className={`v2-opt-help${open ? " is-open" : ""}`}>
-      <button
-        type="button"
-        className="v2-opt-help-toggle"
-        aria-expanded={open}
-        aria-controls="v2-opt-help-body"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <i className="fa-regular fa-circle-question" aria-hidden />
-        <span>{t("v2.help.title")}</span>
-        <i className={`fa-solid fa-angle-down${open ? " is-open" : ""}`} aria-hidden />
-      </button>
+    <section className={`v2-opt-help${open ? " is-open" : ""}${tools ? " has-tools" : ""}`}>
+      <div className="v2-opt-help-bar">
+        <button
+          type="button"
+          className="v2-opt-help-toggle"
+          aria-expanded={open}
+          aria-controls="v2-opt-help-body"
+          aria-label={t("v2.help.title")}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <i className="fa-regular fa-circle-question" aria-hidden />
+          <span>{t("v2.help.title")}</span>
+          <i className={`fa-solid fa-angle-down${open ? " is-open" : ""}`} aria-hidden />
+        </button>
+        {tools ? <div className="v2-opt-help-tools">{tools}</div> : null}
+      </div>
       {open ? (
         <div className="v2-opt-help-body" id="v2-opt-help-body">
           <p className="v2-opt-help-lead">{t("v2.help.lead")}</p>
@@ -807,6 +817,11 @@ export const OptField = memo(function OptField({
   canRemoveForeign = false,
   onOverwriteAsk,
   onForeignKept,
+  cellWidth = 20,
+  zoomEnabled = false,
+  onCellWidthChange,
+  onFitWidthChange,
+  footerTools,
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
@@ -855,6 +870,8 @@ export const OptField = memo(function OptField({
   const tipApi = useRef<TipApi>({ show: () => {}, hide: () => {} });
   const [cet, setCet] = useState<CetStamp>(() => readCet());
   const daysRef = useRef<HTMLDivElement>(null);
+  const fixedWidthRef = useRef(70);
+  const pinchRef = useRef<{ distance: number; width: number; contentHalf: number; focalX: number } | null>(null);
   const todayRef = useRef<HTMLDivElement>(null);
   const days = useMemo(
     () => daysInMonth(year, monthIndex, i18n.language),
@@ -869,6 +886,21 @@ export const OptField = memo(function OptField({
     window.addEventListener(SLOT_LOOK_EVENT, sync);
     return () => window.removeEventListener(SLOT_LOOK_EVENT, sync);
   }, []);
+
+  useLayoutEffect(() => {
+    const scroller = daysRef.current;
+    if (!scroller || !onFitWidthChange) return;
+    const report = () => {
+      const gutter = scroller.querySelector<HTMLElement>(".v2-opt-hours .v2-opt-gutter");
+      const fixedWidth = Math.max(70, gutter?.getBoundingClientRect().width ?? 0);
+      fixedWidthRef.current = fixedWidth;
+      onFitWidthChange(fitScheduleCellWidth(scroller.clientWidth, fixedWidth));
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [onFitWidthChange]);
 
   useEffect(() => {
     const sync = () => setCet(readCet());
@@ -1160,6 +1192,7 @@ export const OptField = memo(function OptField({
   }, []);
 
   const onPointerOver = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return;
     if (dragRef.current && dragRef.current.mode !== "look") return;
     const root = rootRef.current;
     if (!root) return;
@@ -1177,11 +1210,49 @@ export const OptField = memo(function OptField({
     }
   }, []);
 
-  const onPointerLeave = useCallback(() => {
+  const onPointerLeave = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return;
     if (dragRef.current && dragRef.current.mode !== "look") return;
     const root = rootRef.current;
     if (root) applyNav(root, null);
     tipApi.current.hide();
+  }, []);
+
+  const onTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
+    if (!zoomEnabled || event.touches.length !== 2) return;
+    const scroller = daysRef.current;
+    if (!scroller) return;
+    const [a, b] = [event.touches[0], event.touches[1]];
+    const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const box = scroller.getBoundingClientRect();
+    const focalX = (a.clientX + b.clientX) / 2 - box.left;
+    const fixed = fixedWidthRef.current;
+    pinchRef.current = {
+      distance,
+      width: cellWidth,
+      contentHalf: Math.max(0, (scroller.scrollLeft + focalX - fixed) / scheduleCellStride(cellWidth)),
+      focalX,
+    };
+    tipApi.current.hide();
+    event.preventDefault();
+  }, [cellWidth, zoomEnabled]);
+
+  const onTouchMove = useCallback((event: TouchEvent<HTMLElement>) => {
+    const pinch = pinchRef.current;
+    if (!pinch || event.touches.length !== 2 || !onCellWidthChange) return;
+    const [a, b] = [event.touches[0], event.touches[1]];
+    const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const next = clampScheduleCellWidth(pinch.width * (distance / Math.max(1, pinch.distance)));
+    onCellWidthChange(next);
+    const scroller = daysRef.current;
+    if (scroller) {
+      scroller.scrollLeft = scheduleZoomScrollLeft(pinch.contentHalf, next, fixedWidthRef.current, pinch.focalX);
+    }
+    event.preventDefault();
+  }, [onCellWidthChange]);
+
+  const onTouchEnd = useCallback((event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length < 2) pinchRef.current = null;
   }, []);
 
   const loadWash = loadGradient(hourLoad?.[limits[0] ?? "50"]);
@@ -1190,12 +1261,19 @@ export const OptField = memo(function OptField({
   return (
     <section
       ref={rootRef}
-      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}${quietEdit ? " is-quiet" : ""}${skin === "theme" ? " is-kit" : ""}${q ? " is-find" : ""}`}
+      className={`v2-opt flex min-h-0 flex-1 flex-col overflow-hidden${canEdit ? " is-edit" : ""}${quietEdit ? " is-quiet" : ""}${skin === "theme" ? " is-kit" : ""}${q ? " is-find" : ""}${cellWidth < 10 ? " is-overview" : ""}${cellWidth < 16 ? " is-compact-hours" : ""}`}
       data-opt-find={q || undefined}
       style={
         {
           ["--opt-load" as string]: loadWash,
           ["--busy-mark" as string]: me.bg || undefined,
+          ["--opt-cell-w" as string]: `${cellWidth}px`,
+          ["--opt-cell-h" as string]: `${cellWidth}px`,
+          ["--opt-day-w" as string]: `${Math.max(26, Math.min(32, 24 + cellWidth * 0.4))}px`,
+          ["--opt-gap" as string]: `${cellWidth * 0.15}px`,
+          ["--opt-row-pad" as string]: `${Math.max(1, cellWidth * 0.2)}px`,
+          ["--opt-lane-gap" as string]: `${Math.max(0.6, cellWidth * 0.2)}px`,
+          ["--opt-track-pad-y" as string]: `${Math.max(0.5, cellWidth * 0.1)}px`,
           ...(skin === "theme" ? {} : lookToVars(slotLook)),
         } as CSSProperties
       }
@@ -1206,6 +1284,10 @@ export const OptField = memo(function OptField({
       onContextMenu={onContextMenu}
       onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
     >
       {q ? <style>{findHitCss(q)}</style> : null}
       <div className="v2-opt-sheet" ref={daysRef}>
@@ -1225,7 +1307,8 @@ export const OptField = memo(function OptField({
                   return (
                     <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${h * 2 + 1} / span 2` }}>
                       <b>
-                        {h}–{h + 1}
+                        <span className="v2-opt-hour-full">{h}–{h + 1}</span>
+                        <span className="v2-opt-hour-short">{h}</span>
                       </b>
                       {clock.showLocal ? (
                         <small title={clock.label}>
@@ -1264,8 +1347,8 @@ export const OptField = memo(function OptField({
           </div>
         </div>
         </div>
-        <OptHelp countTables={countTables} />
       </div>
+      <OptHelp countTables={countTables} tools={footerTools} />
       <OptTip
         year={year}
         monthIndex={monthIndex}

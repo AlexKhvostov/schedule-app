@@ -19,7 +19,7 @@ import { V2UserCard } from "./V2UserCard";
 import { OverwriteConfirm } from "./OverwriteConfirm";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
-import { BarMark, HoursPanel } from "./SchedulePanels";
+import { BarMark, HoursPanel, MobileScheduleDock } from "./SchedulePanels";
 import { showV2Toast } from "./V2Toast";
 import { gridsWithMySlots, limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
@@ -37,6 +37,7 @@ import { notifyMarkRemoved } from "../data/notifyMark";
 import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
 import { readSession } from "./session";
 import { decorateDemoRoster, rowInitials, seatDiffs, showNick, type SeatDiff } from "./schedulePresentation";
+import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
 
 type Props = {
   cursor: Date;
@@ -74,6 +75,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [hidePastDays, setHidePastDays] = useState(false);
   const [showTip, setShowTip] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
+  const [touchLayout, setTouchLayout] = useState(false);
+  const [mobileEditOn, setMobileEditOn] = useState(false);
+  const [mobileCellWidth, setMobileCellWidth] = useState(20);
+  const [mobileFitWidth, setMobileFitWidth] = useState(6);
+  const mobileZoomReady = useRef(false);
   const [editByButton, setEditByButton] = useState(true);
   const [editPulse, setEditPulse] = useState(boot.editPulse);
   const [busyHint, setBusyHint] = useState(boot.busyHint);
@@ -132,10 +138,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [playLimits, setPlayLimits] = useState<string[]>(() =>
     winamaxPlayLimits({ memberId: actingRef.current, nick: sessionNick }),
   );
-  const paintOn = !editByButton || canEdit;
+  const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const mayActAs = canActAs || allowActAs;
   const canRemoveForeign = canActAs || allowOverwrite;
-  const editGlow = editByButton && canEdit;
+  const editGlow = touchLayout ? mobileEditOn : editByButton && canEdit;
+  const mobileEditEnabled = scheduleZoomCanEdit(mobileCellWidth);
   const showBusy = isKit && busyHint;
   const fetchKey = limits.join("|");
   const loadStamp = `${year}-${monthIndex}-${kind}-${fetchKey}`;
@@ -340,6 +347,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       }, 250);
     });
   }, [year, monthIndex, loadStamp, pullGrids, refreshBusy]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 720px), (pointer: coarse) and (hover: none)");
+    const sync = () => setTouchLayout(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!touchLayout) {
+      setMobileEditOn(false);
+      mobileZoomReady.current = false;
+      return;
+    }
+    setCanEdit(false);
+  }, [touchLayout]);
+
+  useEffect(() => {
+    setMobileEditOn(false);
+  }, [year, monthIndex, kind, fetchKey]);
 
   useEffect(() => {
     let live = true;
@@ -776,9 +804,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   };
 
   const toggleEdit = () => {
+    if (touchLayout) {
+      if (!mobileEditOn && !mobileEditEnabled) return;
+      setMobileEditOn((on) => !on);
+      setToolsOpen(false);
+      return;
+    }
     setCanEdit((on) => !on);
     setToolsOpen(false);
   };
+
+  const updateMobileFitWidth = useCallback((value: number) => {
+    setMobileFitWidth(value);
+    if (!touchLayout || mobileZoomReady.current) return;
+    mobileZoomReady.current = true;
+    setMobileCellWidth(value);
+  }, [touchLayout]);
 
   const tools = [
     {
@@ -839,6 +880,41 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   ];
 
   const zOf = (id: typeof front) => (front === id ? 56 : 48);
+
+  const mobileScheduleTools = touchLayout ? (
+    <MobileScheduleDock
+      me={me}
+      tables={tablesDraft}
+      onBump={bumpTables}
+      onDraft={(value) => {
+        setTablesDraft(value);
+        if (!value.trim()) return;
+        const n = Number(value);
+        if (Number.isFinite(n)) applyTables(n);
+      }}
+      canActAs={mayActAs && mobileEditOn}
+      players={actPlayers}
+      selfId={selfId}
+      actingId={actingId || selfId}
+      onActAs={applyActAs}
+      countTables={countTables}
+      showBusyToggle={isKit}
+      busyOn={busyHint}
+      onToggleBusy={() => {
+        const next = !busyHint;
+        setBusyHint(next);
+        savePrefs({ ...loadPrefs(), busyHint: next });
+      }}
+      cellWidth={mobileCellWidth}
+      fitWidth={mobileFitWidth}
+      editEnabled={mobileEditEnabled}
+      editOn={mobileEditOn}
+      onZoomOut={() => setMobileCellWidth((value) => stepScheduleCellWidth(value, -1, mobileFitWidth))}
+      onFit={() => setMobileCellWidth(mobileFitWidth)}
+      onZoomIn={() => setMobileCellWidth((value) => stepScheduleCellWidth(value, 1, mobileFitWidth))}
+      onToggleEdit={toggleEdit}
+    />
+  ) : undefined;
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
@@ -1058,7 +1134,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           ))}
         </datalist>
         </div>
-        <BarMark
+        {!touchLayout ? <BarMark
           me={me}
           tables={tablesDraft}
           onBump={bumpTables}
@@ -1084,7 +1160,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             setBusyHint(next);
             savePrefs({ ...loadPrefs(), busyHint: next });
           }}
-        />
+        /> : null}
         <div className="v2-tools" ref={toolsRef}>
           <div className="v2-bar-pack v2-tools-pack">
             {tools.map((item) => (
@@ -1161,6 +1237,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           onForeignKept={() => showV2Toast("off", t("schedule.toastForeignKept"))}
           skin={skin}
           busy={busyMap}
+          cellWidth={touchLayout ? mobileCellWidth : 20}
+          zoomEnabled={touchLayout && !mobileEditOn}
+          onCellWidthChange={touchLayout ? setMobileCellWidth : undefined}
+          onFitWidthChange={updateMobileFitWidth}
+          footerTools={mobileScheduleTools}
         />
         {gridLoading ? (
           <div className="v2-sched-load">
