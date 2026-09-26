@@ -30,6 +30,8 @@ export type PayMethod = {
 export type NickStamp = {
   nick: string;
   at: string;
+  source?: "manual" | "distance";
+  distanceMonth?: string | null;
 };
 
 export type RoomPlay = {

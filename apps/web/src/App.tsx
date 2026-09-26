@@ -40,10 +40,13 @@ function bootLocalSession(): Session | null {
 
 export function App() {
   const live = liveAuthReady();
+  const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<Session | null>(() => (live ? null : bootLocalSession()));
   const [gate, setGate] = useState<Extract<Awaited<ReturnType<typeof loadLiveEntry>>, { kind: "gate" }> | null>(null);
   const [cursor, setCursor] = useState(() => cursorFromPrefs());
   const [booting, setBooting] = useState(live);
+
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     if (!live) return;
@@ -86,7 +89,7 @@ export function App() {
     };
   }, [live]);
 
-  if (booting) {
+  if (!hydrated || booting) {
     return <V2BootScreen />;
   }
 

@@ -24,6 +24,17 @@ function formatStamp(iso: string) {
   return date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function NickHistoryRow({ stamp }: { stamp: RoomPlay["nickHistory"][number] }) {
+  const { t } = useTranslation();
+  return (
+    <li className={`v2-cab-history-row is-${stamp.source ?? "manual"}`}>
+      <b>{stamp.nick}</b>
+      <span>{formatStamp(stamp.at)}</span>
+      <small>{stamp.source === "distance" ? t("cabinet.nickSourceDistance", { month: stamp.distanceMonth ?? "—" }) : t("cabinet.nickSourceManual")}</small>
+    </li>
+  );
+}
+
 export function CabinetPlaysPanel({
   plays,
   savedPlays,
@@ -154,10 +165,7 @@ export function CabinetPlaysPanel({
                   {activePlay.nickHistory.length ? (
                     <ul className="v2-cab-history">
                       {activePlay.nickHistory.slice(0, 5).map((stamp, index) => (
-                        <li key={`${stamp.nick}-${stamp.at}-${index}`}>
-                          <b>{stamp.nick}</b>
-                          <span>{formatStamp(stamp.at)}</span>
-                        </li>
+                        <NickHistoryRow key={`${stamp.nick}-${stamp.at}-${index}`} stamp={stamp} />
                       ))}
                     </ul>
                   ) : (
@@ -241,10 +249,7 @@ export function CabinetPlaysPanel({
             </div>
             <ul className="v2-cab-history">
               {activePlay.nickHistory.map((stamp, index) => (
-                <li key={`${stamp.nick}-${stamp.at}-${index}`}>
-                  <b>{stamp.nick}</b>
-                  <span>{formatStamp(stamp.at)}</span>
-                </li>
+                <NickHistoryRow key={`${stamp.nick}-${stamp.at}-${index}`} stamp={stamp} />
               ))}
             </ul>
             <button type="button" className="v2-cab-ghost" onClick={() => setNickHistOpen(false)}>

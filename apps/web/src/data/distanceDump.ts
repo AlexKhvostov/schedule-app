@@ -155,7 +155,10 @@ export function parseDistanceCsv(text: string, fileName: string): DistanceDump &
   for (const slice of slices) {
     const key = `${slice.playerId}|${slice.variant}|${slice.limitId}`;
     const prev = merged.get(key);
-    if (prev) prev.tournaments += slice.tournaments;
+    if (prev) {
+      prev.tournaments += slice.tournaments;
+      if (slice.nick) prev.nick = slice.nick;
+    }
     else merged.set(key, { ...slice });
   }
 
@@ -302,6 +305,146 @@ export type DistanceWriteResult = {
   unknown: number;
 };
 
+export type HistoricalDistanceFact = {
+  distance_ext_id: string;
+  discord_id: string;
+  game_nick: string;
+  month_start: string;
+  part: number;
+  limit_id: string;
+  hands: number;
+};
+
+export type HistoricalDistanceDump = {
+  fileName: string;
+  facts: HistoricalDistanceFact[];
+  people: { playerId: string; discordId: string; nick: string; total: number }[];
+  months: string[];
+  parts: number[];
+  limits: string[];
+  skippedMissingId: number;
+  missingDiscord: number;
+  error?: "empty" | "shape" | "value";
+};
+
+function parseCsvRows(text: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"') {
+      if (quoted && text[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.length)) rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += char;
+  }
+  row.push(cell);
+  if (row.some((value) => value.length)) rows.push(row);
+  return rows;
+}
+
+const HISTORICAL_MONTHS: Record<string, number> = {
+  "янв.": 1, "февр.": 2, "мар.": 3, "апр.": 4, мая: 5, "июн.": 6,
+  "июл.": 7, "авг.": 8, "сент.": 9, "окт.": 10, "нояб.": 11, "дек.": 12,
+};
+
+function historicalMonth(raw: string) {
+  const value = raw.replace(/[\u00a0\u202f]/g, " ").trim().toLowerCase();
+  const match = /^([а-я.]+)\s+(\d{2})\s*г\.$/u.exec(value);
+  const month = match ? HISTORICAL_MONTHS[match[1]] : 0;
+  if (!match || !month) return null;
+  return `${2000 + Number(match[2])}-${String(month).padStart(2, "0")}-01`;
+}
+
+function historicalId(raw: string) {
+  return raw.replace(/\s/g, "").replace(/[,.]00$/, "");
+}
+
+export function parseHistoricalDistanceCsv(text: string, fileName: string): HistoricalDistanceDump {
+  const rows = parseCsvRows(text.replace(/^\uFEFF/, ""));
+  const empty = { fileName, facts: [], people: [], months: [], parts: [], limits: [], skippedMissingId: 0, missingDiscord: 0 };
+  if (rows.length < 5) return { ...empty, error: "empty" };
+  const width = rows[0].length;
+  if (width < 5 || rows.some((row) => row.length !== width)) return { ...empty, error: "shape" };
+  const [dates, parts, limits, labels, ...data] = rows;
+  if (labels[0].trim().toLowerCase() !== "playerid" || labels[3].trim().toLowerCase() !== "nickname wnmx") {
+    return { ...empty, error: "shape" };
+  }
+  const facts: HistoricalDistanceFact[] = [];
+  const people = new Map<string, { playerId: string; discordId: string; nick: string; total: number }>();
+  let skippedMissingId = 0;
+  let missingDiscord = 0;
+  try {
+    for (const row of data) {
+      const playerId = historicalId(row[0]);
+      if (!/^\d{1,12}$/.test(playerId)) {
+        skippedMissingId += 1;
+        continue;
+      }
+      const discordId = row[1].trim();
+      if (!discordId) missingDiscord += 1;
+      if (discordId && !/^\d{15,22}$/.test(discordId)) throw new Error("discord");
+      const nick = row[3].trim();
+      const person = { playerId, discordId, nick, total: 0 };
+      for (let column = 4; column < width; column += 1) {
+        const rawHands = row[column].replace(/[\s\u00a0\u202f]/g, "");
+        if (!rawHands) continue;
+        if (!/^\d+$/.test(rawHands)) throw new Error("hands");
+        const hands = Number(rawHands);
+        if (!hands) continue;
+        const monthStart = historicalMonth(dates[column]);
+        const part = Number(parts[column].trim());
+        const limitId = limits[column].trim();
+        if (!monthStart || !Number.isInteger(part) || part < 1 || !(limitId in LIMIT_RANK)) throw new Error("header");
+        facts.push({ distance_ext_id: playerId, discord_id: discordId, game_nick: nick, month_start: monthStart, part, limit_id: limitId, hands });
+        person.total += hands;
+      }
+      people.set(playerId, person);
+    }
+  } catch {
+    return { ...empty, skippedMissingId, missingDiscord, error: "value" };
+  }
+  return {
+    fileName,
+    facts,
+    people: [...people.values()].sort((a, b) => b.total - a.total || a.nick.localeCompare(b.nick)),
+    months: [...new Set(facts.map((row) => row.month_start))].sort(),
+    parts: [...new Set(facts.map((row) => row.part))].sort((a, b) => a - b),
+    limits: sortDistanceLimits([...new Set(facts.map((row) => row.limit_id))]),
+    skippedMissingId,
+    missingDiscord,
+    error: facts.length ? undefined : "empty",
+  };
+}
+
+export async function saveHistoricalDistanceDump(input: {
+  roomSlug: string;
+  variantId: DistanceVariant;
+  rows: HistoricalDistanceFact[];
+}) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const, result: null };
+  const { data, error } = await db.rpc("save_historical_distance_dump", {
+    p_room_slug: input.roomSlug,
+    p_variant_id: input.variantId,
+    p_rows: input.rows,
+  });
+  if (error) return { error: error.message ?? error.code ?? "save", result: null };
+  return { error: null, result: data as DistanceWriteResult & { nick_updated: number } };
+}
+
 export function dumpSliceKey(ext: string, variant: string, limitId: string) {
   return `${ext}|${variant}|${limitId}`;
 }
@@ -379,24 +522,27 @@ export async function loadDistancePeopleFlags(): Promise<DistancePeopleFlags> {
   return { redPartyIds, cardIds, byExt, ready: true };
 }
 
-export async function loadExistingDistanceKeys(monthStart: string, entryKind: string, part: number) {
+export async function loadExistingDistanceKeys(monthStart: string, entryKind: string, part: number, roomSlug = "winamax") {
   const empty = new Map<string, number>();
   const db = getSupabase();
   if (!db || !monthStart) return empty;
   const { data } = await db
-    .from("distances")
-    .select("distance_ext_id, variant_id, limit_id, hands")
+    .from("distance_entries")
+    .select("distance_ext_id, variant_id, distance_values(limit_id, tournaments), rooms!inner(slug)")
     .eq("month_start", monthStart)
-    .eq("entry_kind", entryKind)
-    .eq("part", part);
+    .eq("part", part)
+    .eq("rooms.slug", roomSlug);
   const keys = new Map<string, number>();
   for (const row of data ?? []) {
-    keys.set(dumpSliceKey(String(row.distance_ext_id), String(row.variant_id), String(row.limit_id)), Number(row.hands) || 0);
+    for (const value of row.distance_values ?? []) {
+      keys.set(dumpSliceKey(String(row.distance_ext_id), String(row.variant_id), String(value.limit_id)), Number(value.tournaments) || 0);
+    }
   }
   return keys;
 }
 
 export async function saveDistanceDump(input: {
+  roomSlug: string;
   monthStart: string;
   entryKind: string;
   part: number;
@@ -407,7 +553,7 @@ export async function saveDistanceDump(input: {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const, result: null };
   const { data, error } = await db.rpc("save_distance_dump", {
-    p_room_slug: "winamax",
+    p_room_slug: input.roomSlug,
     p_month_start: input.monthStart,
     p_entry_kind: input.entryKind,
     p_part: input.part,
@@ -430,7 +576,7 @@ export async function saveDistanceDump(input: {
 export async function countDistanceRows(monthStart?: string) {
   const db = getSupabase();
   if (!db) return 0;
-  let query = db.from("distances").select("id", { count: "exact", head: true });
+  let query = db.from("distance_entries").select("id", { count: "exact", head: true });
   if (monthStart) query = query.eq("month_start", monthStart);
   const { count } = await query;
   return count ?? 0;

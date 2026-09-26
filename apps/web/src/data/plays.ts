@@ -7,7 +7,7 @@ import {
 
 type RoomSlug = { slug: string };
 type LimitRow = { variant_id: string; limit_id: string };
-type NickRow = { nick: string; at: string };
+type NickRow = { nick: string; at: string; source: "manual" | "distance" | null; distance_month: string | null };
 type PlayerRow = {
   id: string;
   rooms: RoomSlug | RoomSlug[] | null;
@@ -35,7 +35,7 @@ function asPlay(row: PlayerRow): RoomPlay | null {
     nitroLimits: nitro,
     regularLimits: regular,
     kinds: [],
-    nickHistory: nicks.map((stamp) => ({ nick: stamp.nick, at: stamp.at })),
+    nickHistory: nicks.map((stamp) => ({ nick: stamp.nick, at: stamp.at, source: stamp.source ?? "manual", distanceMonth: stamp.distance_month })),
   });
 }
 
@@ -44,7 +44,7 @@ export async function loadMyPlays(memberId: string): Promise<RoomPlay[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("players")
-    .select("id, rooms(slug), player_limits(variant_id, limit_id), player_nicks(nick, at)")
+    .select("id, rooms(slug), player_limits(variant_id, limit_id), player_nicks(nick, at, source, distance_month)")
     .eq("member_id", memberId);
   if (error || !data?.length) return [];
   return (data as PlayerRow[]).map(asPlay).filter((row): row is RoomPlay => Boolean(row));
@@ -63,7 +63,7 @@ export async function loadMemberRoomNicks(memberIds: string[]): Promise<Map<stri
   if (!ids.length) return map;
   const db = getSupabase();
   if (!db) return map;
-  const { data } = await db.from("players").select("member_id, rooms(slug), player_nicks(nick, at)").in("member_id", ids);
+  const { data } = await db.from("players").select("member_id, rooms(slug), player_nicks(nick, at, source, distance_month)").in("member_id", ids);
   for (const row of (data as (PlayerRow & { member_id: string })[] | null) ?? []) {
     const roomId = roomSlugOf(row.rooms);
     if (!roomId) continue;

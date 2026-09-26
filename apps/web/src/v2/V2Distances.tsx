@@ -3,8 +3,10 @@ import { useTranslation } from "react-i18next";
 import { CompactField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { formatLimit } from "../schedule/capacity";
+import { ROOM_OPTIONS } from "../schedule/rooms";
 import { showV2Toast } from "./V2Toast";
 import { V2SaveButton } from "./V2SaveButton";
+import { HistoricalDistanceImport } from "./HistoricalDistanceImport";
 import {
   dumpLabelFromName,
   dumpPreviewCsv,
@@ -84,9 +86,9 @@ export function V2Distances() {
     ready: false,
   });
   const [monthStart, setMonthStart] = useState("");
+  const [roomSlug, setRoomSlug] = useState("winamax");
   const [part, setPart] = useState(1);
-  const [entryKind, setEntryKind] = useState<"primary" | "correction">("primary");
-  const [batchLabel, setBatchLabel] = useState("");
+  const entryKind = "primary";
   const [note, setNote] = useState("");
   const [existing, setExisting] = useState<Map<string, number>>(new Map());
   const [writeBusy, setWriteBusy] = useState(false);
@@ -114,13 +116,13 @@ export function V2Distances() {
       return;
     }
     let live = true;
-    void loadExistingDistanceKeys(monthStart, entryKind, part).then((next) => {
+    void loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug).then((next) => {
       if (live) setExisting(next);
     });
     return () => {
       live = false;
     };
-  }, [dump, monthStart, entryKind, part]);
+  }, [dump, monthStart, entryKind, part, roomSlug]);
 
   useEffect(() => {
     let live = true;
@@ -153,8 +155,6 @@ export function V2Distances() {
     setKind("all");
     setMonthStart(parsed.monthStart ?? "");
     setPart(1);
-    setEntryKind("primary");
-    setBatchLabel(dumpLabelFromName(parsed.fileName));
     setNote("");
     setWriteResult(null);
     setWriteError(null);
@@ -217,10 +217,11 @@ export function V2Distances() {
     setWriteBusy(true);
     setWriteError(null);
     const saved = await saveDistanceDump({
+      roomSlug,
       monthStart,
       entryKind,
       part,
-      batchLabel,
+      batchLabel: dumpLabelFromName(dump?.fileName ?? "distance.csv"),
       note,
       rows: plan.payload,
     });
@@ -231,7 +232,7 @@ export function V2Distances() {
       return;
     }
     setWriteResult(saved.result);
-    const next = await loadExistingDistanceKeys(monthStart, entryKind, part);
+    const next = await loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug);
     setExisting(next);
     const nextFlags = await loadDistancePeopleFlags();
     setFlags(nextFlags);
@@ -256,7 +257,7 @@ export function V2Distances() {
     showV2Toast("ok", t("admin.distance.wipeDone", { n: result.deleted }));
     setWriteResult(null);
     if (monthStart) {
-      const next = await loadExistingDistanceKeys(monthStart, entryKind, part);
+      const next = await loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug);
       setExisting(next);
     }
     setDbTick((n) => n + 1);
@@ -511,6 +512,11 @@ export function V2Distances() {
             </header>
             <div className="v2-dist-pane-body">
               <div className="v2-dist-write-grid">
+                <CompactField label={t("admin.distance.room")}>
+                  <select className="v2-ctrl w-full px-2" value={roomSlug} onChange={(event) => { setRoomSlug(event.target.value); setWriteResult(null); }}>
+                    {ROOM_OPTIONS.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                  </select>
+                </CompactField>
                 <CompactField label={t("admin.distance.month")}>
                   <Input
                     type="month"
@@ -534,24 +540,9 @@ export function V2Distances() {
                     }}
                   />
                 </CompactField>
-                <div className="v2-field">
-                  <span>{t("admin.distance.entryKind")}</span>
-                  <div className="v2-club-seg" role="group" aria-label={t("admin.distance.entryKind")}>
-                    {(["primary", "correction"] as const).map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={entryKind === key ? "is-on is-member" : undefined}
-                        onClick={() => {
-                          setEntryKind(key);
-                          setWriteResult(null);
-                        }}
-                      >
-                        {t(`admin.distance.entry.${key}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <CompactField className="is-wide" label={t("admin.distance.note")}>
+                  <Input value={note} placeholder={t("admin.distance.noteHint")} onChange={(event) => setNote(event.target.value)} />
+                </CompactField>
               </div>
               {plan ? (
                 <div className="v2-dist-write-facts">
@@ -581,14 +572,6 @@ export function V2Distances() {
                   </span>
                 </summary>
                 <div className="v2-dist-more-body">
-                  <div className="v2-dist-write-grid">
-                    <CompactField label={t("admin.distance.label")}>
-                      <Input value={batchLabel} placeholder={t("admin.distance.labelHint")} onChange={(event) => setBatchLabel(event.target.value)} />
-                    </CompactField>
-                    <CompactField className="is-wide" label={t("admin.distance.note")}>
-                      <Input value={note} placeholder={t("admin.distance.noteHint")} onChange={(event) => setNote(event.target.value)} />
-                    </CompactField>
-                  </div>
                   {plan ? (
                     <div className="v2-dist-write-facts">
                       <span>{t("admin.distance.writeCells", { n: plan.cells })}</span>
@@ -640,6 +623,7 @@ export function V2Distances() {
             </div>
           </div>
         </section>
+        <HistoricalDistanceImport />
       </div>
     </div>
   );

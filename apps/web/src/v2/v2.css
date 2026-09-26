@@ -2684,6 +2684,19 @@ img.v2-cab-ava {
   padding-top: 2px;
 }
 
+.v2-cab-history-row {
+  border-inline-start: 3px solid var(--primary);
+}
+
+.v2-cab-history-row.is-distance {
+  border-inline-start-color: var(--warning, #d97706);
+}
+
+.v2-cab-history-row small {
+  color: var(--cab-muted);
+  font-size: 10px;
+}
+
 .v2-cab-room-pane.is-nick .v2-cab-ghost {
   justify-self: start;
   width: max-content;
@@ -13129,6 +13142,144 @@ img.v2-people-ava {
   font-size: 12px;
 }
 
+.v2-distance-id {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.v2-distance-id.is-missing {
+  color: var(--warning);
+}
+
+.v2-dbook-add-row td,
+.v2-dbook-leaf .v2-muted {
+  padding: 8px 14px;
+}
+
+.v2-dbook-add-row button,
+.v2-dbook-leaf .v2-muted button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.v2-dbook-leaf .v2-muted {
+  text-align: left;
+}
+
+.v2-dbook-leaf .v2-muted > span {
+  margin-right: 12px;
+}
+
+.v2-distance-editor {
+  display: grid;
+  gap: 8px;
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+[role="dialog"].v2-distance-dialog {
+  max-width: 680px;
+  padding: 12px;
+}
+
+.v2-distance-dialog > div:first-child { margin-bottom: 8px; }
+.v2-distance-dialog > div:last-child { margin-top: 10px; }
+
+.v2-distance-editor-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.v2-distance-editor-person dl {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px 14px;
+  margin: 0;
+  text-align: right;
+}
+
+.v2-distance-editor-person dl div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.v2-distance-editor-person dt {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.v2-distance-editor-person dd {
+  margin: 0;
+  font: 11px var(--font-mono), monospace;
+}
+
+.v2-distance-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.v2-distance-editor-values {
+  display: grid;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.v2-distance-editor-values > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.v2-distance-editor-values p {
+  margin: 0;
+  text-align: right;
+  color: var(--muted-foreground);
+}
+
+.v2-distance-editor-audit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.v2-distance-editor-validation {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 0 0;
+  color: var(--warning);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  [role="dialog"].v2-distance-dialog { max-width: 100%; padding: 10px; }
+  .v2-distance-editor-person { align-items: flex-start; }
+  .v2-distance-editor-person dl { justify-content: flex-start; text-align: left; }
+  .v2-distance-editor-person dl div { justify-content: flex-start; }
+  .v2-distance-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-distance-editor-values > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-dbook-load-error { align-items: stretch; flex-direction: column; }
+}
+
 .v2-dist-block-head b {
   color: var(--muted-foreground);
   font-size: 10px;
@@ -13506,6 +13657,55 @@ img.v2-people-ava {
   max-height: min(68vh, 640px);
 }
 
+.v2-history-import {
+  order: 20;
+}
+
+.v2-history-table-wrap {
+  max-height: 440px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.v2-history-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+}
+
+.v2-history-stat {
+  display: grid;
+  min-height: 70px;
+  align-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 42%, var(--card));
+}
+
+.v2-history-stat b {
+  color: var(--title);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-history-stat span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.v2-history-stat.is-ok {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.v2-history-stat.is-warn {
+  border-color: color-mix(in srgb, #d97706 55%, var(--border));
+  background: color-mix(in srgb, #d97706 8%, var(--card));
+}
+
 .v2-dist-table {
   width: max-content;
   min-width: 100%;
@@ -13666,6 +13866,26 @@ img.v2-people-ava {
 .v2-dbook-tools .v2-field {
   flex: 0 1 200px;
 }
+
+.v2-dbook-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 38%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--destructive) 8%, var(--card));
+}
+
+.v2-dbook-load-error div {
+  display: grid;
+  gap: 2px;
+}
+
+.v2-dbook-load-error b { font-size: 12px; }
+.v2-dbook-load-error small { color: var(--muted-foreground); font-size: 10px; }
 
 .v2-dbook-checks {
   display: flex;
