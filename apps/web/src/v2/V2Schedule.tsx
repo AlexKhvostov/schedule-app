@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
@@ -31,7 +31,18 @@ import { saveMemberTables, loadPublicNames } from "../data/people";
 import { listLimitMarks, listSchedulePlayers, markFromPlayer, type SchedulePlayer } from "../data/players";
 import { loadMyPlays } from "../data/plays";
 import { accessKey, loadScheduleAccess } from "../data/scheduleAccess";
-import { applyOwnSlots, loadMemberOccupiedSlots, loadMonthGrids, removeForeignSlots, subscribeOccupancy, ymRange } from "../data/slots";
+import {
+  applyOwnSlots,
+  gridsForVariant,
+  loadMemberOccupiedSlots,
+  loadMultiMonthGrids,
+  monthGridKey,
+  removeForeignSlots,
+  replaceVariantGrids,
+  subscribeOccupancy,
+  ymRange,
+  type MonthGridStore,
+} from "../data/slots";
 import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
 import { notifyMarkRemoved } from "../data/notifyMark";
 import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
@@ -56,8 +67,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
   const boot = loadPrefs();
-  const [grids, setGrids] = useState<Record<string, Occupancy>>(() =>
-    Object.fromEntries(boot.limits.map((limit) => [limit, emptyMonth(year, monthIndex)])),
+  const [gridStore, setGridStore] = useState<MonthGridStore>(() =>
+    Object.fromEntries(boot.kinds.flatMap((variant) =>
+      boot.limits.map((limit) => [monthGridKey(variant, limit), emptyMonth(year, monthIndex)]),
+    )),
   );
   const [readyStamp, setReadyStamp] = useState("");
   const [showMine, setShowMine] = useState(false);
@@ -89,6 +102,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [tablesDraft, setTablesDraft] = useState("11");
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
+  const [kinds, setKinds] = useState(boot.kinds);
   const [kind, setKind] = useState(boot.kinds[0]);
   const [kindOpen, setKindOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
@@ -121,7 +135,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const toolsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const loadGen = useRef(0);
-  const gridsRef = useRef(grids);
   const inflight = useRef(0);
   const busyGen = useRef(0);
   const quietUntil = useRef(0);
@@ -129,6 +142,25 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const liveDebounce = useRef(0);
   const dirtyLive = useRef(false);
   const tablesSaveTimer = useRef(0);
+  const grids = useMemo(() => {
+    const stored = gridsForVariant(gridStore, kind, limits);
+    return Object.fromEntries(limits.map((limit) => [
+      limit,
+      stored[limit] ?? emptyMonth(year, monthIndex),
+    ]));
+  }, [gridStore, kind, limits, year, monthIndex]);
+  const gridsRef = useRef(grids);
+  const setGrids = useCallback((value: SetStateAction<Record<string, Occupancy>>) => {
+    setGridStore((store) => {
+      const stored = gridsForVariant(store, kind, limits);
+      const current = Object.fromEntries(limits.map((limit) => [
+        limit,
+        stored[limit] ?? emptyMonth(year, monthIndex),
+      ]));
+      const next = typeof value === "function" ? value(current) : value;
+      return replaceVariantGrids(store, kind, next);
+    });
+  }, [kind, limits, year, monthIndex]);
   gridsRef.current = grids;
   const sessionNick = readSession()?.nick ?? "";
   const selfId = memberId ?? memberOfSession(loadMembers(), { memberId, nick: sessionNick })?.id;
@@ -145,8 +177,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const mobileEditEnabled = scheduleZoomCanEdit(mobileCellWidth);
   const showBusy = isKit && busyHint;
   const fetchKey = limits.join("|");
-  const loadStamp = `${year}-${monthIndex}-${kind}-${fetchKey}`;
-  const viewStamp = `${year}-${monthIndex}-${kind}`;
+  const kindKey = kinds.join("+");
+  const loadStamp = `${year}-${monthIndex}-${kindKey}-${fetchKey}`;
+  const viewStamp = `${year}-${monthIndex}-${kindKey}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
   const shownGrids = useMemo(() => {
     if (!gridLoading) return grids;
@@ -157,23 +190,18 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const pullGrids = useCallback(
     (stamp: string) => {
       const gen = loadGen.current;
-      return loadMonthGrids(year, monthIndex, kind, limits).then((next) => {
+      return loadMultiMonthGrids(year, monthIndex, kinds, limits).then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (!next) {
-          setReadyStamp(stamp);
-          return;
-        }
-        if (next.error) {
+        setGridStore((store) => next.loaded.reduce((result, variant) =>
+          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, limits)), store));
+        if (Object.keys(next.errors).length) {
           showV2Toast("err", t("schedule.toastLoadError"));
-          setReadyStamp(stamp);
-          return;
         }
-        setGrids(next.grids);
         setReadyStamp(stamp);
       });
     },
-    [year, monthIndex, kind, limits, t],
+    [year, monthIndex, kinds, limits, t],
   );
 
   useEffect(() => {
@@ -197,31 +225,24 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [actingId, selfId]);
 
   useEffect(() => {
-    const blank = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
     if (!isLiveData()) {
-      setGrids(Object.fromEntries(limits.map((limit) => [
-        limit,
-        loadDemoSchedule(year, monthIndex, kind, limit, () => demoMonthPlan(year, monthIndex, kind, limit)),
-      ])));
+      setGridStore(Object.fromEntries(kinds.flatMap((variant) => limits.map((limit) => [
+        monthGridKey(variant, limit),
+        loadDemoSchedule(year, monthIndex, variant, limit, () => demoMonthPlan(year, monthIndex, variant, limit)),
+      ]))));
       setReadyStamp(loadStamp);
       return;
     }
     const gen = ++loadGen.current;
-    void loadMonthGrids(year, monthIndex, kind, limits)
+    void loadMultiMonthGrids(year, monthIndex, kinds, limits)
       .then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (!next) {
-          setGrids(blank);
-          setReadyStamp(loadStamp);
-          return;
-        }
-        if (next.error) {
+        setGridStore((store) => next.loaded.reduce((result, variant) =>
+          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, limits)), store));
+        if (Object.keys(next.errors).length) {
           showV2Toast("err", t("schedule.toastLoadError"));
-          setReadyStamp(loadStamp);
-          return;
         }
-        setGrids(next.grids);
         setReadyStamp(loadStamp);
       })
       .catch(() => {
@@ -230,7 +251,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         showV2Toast("err", t("schedule.toastLoadError"));
         setReadyStamp(loadStamp);
       });
-  }, [year, monthIndex, kind, fetchKey, t]);
+  }, [year, monthIndex, kindKey, fetchKey, t]);
 
   useEffect(() => {
     const applySelf = (mark: Mark, id?: string) => {
@@ -1047,6 +1068,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   type="button"
                   className={kind === value ? "is-on" : ""}
                   onClick={() => {
+                    setKinds([value]);
                     setKind(value);
                     setKindOpen(false);
                     savePrefs({ ...loadPrefs(), kinds: [value] });
@@ -1315,6 +1337,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onResetPrefs={() => {
               const next = resetSchedulePrefs();
               setLimits(next.limits);
+              setKinds(next.kinds);
               setKind(next.kinds[0]);
               setEditPulse(next.editPulse);
               setShowExtraTz(next.showExtraTz);
@@ -1327,10 +1350,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             }}
             onResetDemo={!isLiveData() ? () => {
               resetDemoSchedules();
-              setGrids(Object.fromEntries(limits.map((limit) => [
-                limit,
-                demoMonthPlan(year, monthIndex, kind, limit),
-              ])));
+              setGridStore(Object.fromEntries(kinds.flatMap((variant) => limits.map((limit) => [
+                monthGridKey(variant, limit),
+                demoMonthPlan(year, monthIndex, variant, limit),
+              ]))));
               showV2Toast("ok", t("schedule.demoResetDone"));
             } : undefined}
             onClose={() => setShowSettings(false)}
