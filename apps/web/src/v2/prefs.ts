@@ -1,12 +1,14 @@
 import { LIMIT_OPTIONS } from "../schedule/capacity";
 
 const KEY = "v2-schedule-prefs";
-export const SCHEDULE_PREFS_VERSION = 2;
+export const SCHEDULE_PREFS_VERSION = 3;
+export const SCHEDULE_KINDS = ["nitro", "regular"] as const;
+export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
 export type SchedulePrefs = {
   version: typeof SCHEDULE_PREFS_VERSION;
   limits: string[];
-  kind: "nitro" | "regular";
+  kinds: ScheduleKind[];
   month: "now" | "pin";
   pin: string;
   editPulse: boolean;
@@ -23,7 +25,7 @@ export const PREFS_EVENT = "v2-schedule-prefs";
 export const DEFAULT_PREFS: SchedulePrefs = {
   version: SCHEDULE_PREFS_VERSION,
   limits: ["50"],
-  kind: "nitro",
+  kinds: ["nitro"],
   month: "now",
   pin: "",
   editPulse: true,
@@ -40,11 +42,22 @@ function ym(date: Date) {
 }
 
 function defaults(): SchedulePrefs {
-  return { ...DEFAULT_PREFS, limits: [...DEFAULT_PREFS.limits] };
+  return { ...DEFAULT_PREFS, limits: [...DEFAULT_PREFS.limits], kinds: [...DEFAULT_PREFS.kinds] };
 }
 
 function booleanOr(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
+}
+
+export function normalizeScheduleKinds(value: unknown, legacyKind?: unknown): ScheduleKind[] {
+  const selected = new Set(
+    (Array.isArray(value) ? value : []).filter((item): item is ScheduleKind =>
+      SCHEDULE_KINDS.includes(item as ScheduleKind),
+    ),
+  );
+  if (!selected.size && SCHEDULE_KINDS.includes(legacyKind as ScheduleKind)) selected.add(legacyKind as ScheduleKind);
+  const kinds = SCHEDULE_KINDS.filter((kind) => selected.has(kind));
+  return kinds.length ? kinds : [...DEFAULT_PREFS.kinds];
 }
 
 export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
@@ -57,7 +70,7 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
   return {
     version: SCHEDULE_PREFS_VERSION,
     limits: limits.length ? limits : [...DEFAULT_PREFS.limits],
-    kind: parsed.kind === "regular" ? "regular" : "nitro",
+    kinds: normalizeScheduleKinds(parsed.kinds, parsed.kind),
     // Pinned months were retired: the selected month always boots from the current month.
     month: "now",
     pin: "",

@@ -89,7 +89,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [tablesDraft, setTablesDraft] = useState("11");
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
-  const [kind, setKind] = useState(boot.kind);
+  const [kind, setKind] = useState(boot.kinds[0]);
   const [kindOpen, setKindOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [pickYear, setPickYear] = useState(year);
@@ -1049,7 +1049,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   onClick={() => {
                     setKind(value);
                     setKindOpen(false);
-                    savePrefs({ ...loadPrefs(), kind: value });
+                    savePrefs({ ...loadPrefs(), kinds: [value] });
                     onKindChange?.(value);
                   }}
                 >
@@ -1315,7 +1315,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onResetPrefs={() => {
               const next = resetSchedulePrefs();
               setLimits(next.limits);
-              setKind(next.kind);
+              setKind(next.kinds[0]);
               setEditPulse(next.editPulse);
               setShowExtraTz(next.showExtraTz);
               setBusyHint(next.busyHint);
@@ -1323,7 +1323,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setHidePastDays(next.hidePastDays);
               setHideTables(next.hideTables);
               setShowTip(next.showTip);
-              onKindChange?.(next.kind);
+              onKindChange?.(next.kinds[0]);
             }}
             onResetDemo={!isLiveData() ? () => {
               resetDemoSchedules();

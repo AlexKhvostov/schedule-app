@@ -90,7 +90,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const [slotTheme, setSlotTheme] = useState(() => (typeof window === "undefined" ? null : loadSlotTheme()));
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminCapacity, setAdminCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
-  const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kind));
+  const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
   const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
@@ -177,7 +177,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
 
   useEffect(() => {
     if (!isLiveData()) return;
-    void loadCapacityLive(loadPrefs().kind).then((next) => {
+    void loadCapacityLive(loadPrefs().kinds[0]).then((next) => {
       if (next) {
         setCapacity(next);
         setAdminCapacity(next);
@@ -460,7 +460,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                 onCapacityChange={(next) => {
                   setAdminCapacity(next);
                   saveCapacity(next);
-                  if (adminVariant === loadPrefs().kind) setCapacity(next);
+                  if (adminVariant === loadPrefs().kinds[0]) setCapacity(next);
                   if (isLiveData()) void saveCapacityLive(adminVariant, next);
                 }}
                 onHourLoadChange={(next) => {
