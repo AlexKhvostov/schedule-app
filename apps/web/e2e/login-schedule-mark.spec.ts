@@ -121,12 +121,16 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   await expect(page.locator(".v2-opt-head .v2-opt-hour")).toHaveCount(8);
   await expect(page.locator('.v2-opt-head [data-h="18"]')).toHaveAttribute("data-work-gap", "before");
   await expect(firstLane.locator('[data-half="36"]')).toHaveAttribute("data-work-gap", "before");
-  const gapSpacer = firstLane.locator('[data-work-gap="spacer"]');
-  await expect(gapSpacer).toHaveCount(1);
-  const gapBox = await gapSpacer.boundingBox();
-  expect(gapBox?.width).toBeGreaterThanOrEqual(12);
-  expect(gapBox?.height).toBeGreaterThanOrEqual(16);
-  await expect(gapSpacer).toHaveCSS("background-image", /repeating-linear-gradient/);
+  await expect(firstLane.locator('[data-work-gap="spacer"]')).toHaveCount(0);
+  const firstDay = page.locator(".v2-opt-block").first();
+  const dayLanes = firstDay.locator(".v2-opt-lanes");
+  const gapOverlay = dayLanes.locator('[data-work-gap="overlay"]');
+  await expect(gapOverlay).toHaveCount(1);
+  const [dayBox, gapBox] = await Promise.all([dayLanes.boundingBox(), gapOverlay.boundingBox()]);
+  expect(dayBox && gapBox).toBeTruthy();
+  expect(Math.abs(gapBox!.height - dayBox!.height)).toBeLessThanOrEqual(1);
+  expect(gapBox!.width).toBeGreaterThanOrEqual(12);
+  await expect(gapOverlay).toHaveCSS("background-image", "none");
 
   await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
   await page.getByTitle("Редактирование").click();

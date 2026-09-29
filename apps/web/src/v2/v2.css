@@ -9924,51 +9924,46 @@ textarea.v2-ctrl.v2-cab-area {
   pointer-events: none;
 }
 
-.v2-opt-work-gap {
-  position: relative;
+.v2-opt-work-breaks {
+  position: absolute;
+  inset: 0 auto 0 0;
   z-index: 5;
-  align-self: stretch;
-  width: 100%;
-  height: calc(var(--opt-cell-h, 20px) + var(--opt-track-pad-y, 2px) + var(--opt-track-pad-y, 2px));
-  margin-block: calc(0px - var(--opt-track-pad-y, 2px));
-  overflow: hidden;
-  font-style: normal;
-  border-inline: 2px solid color-mix(in srgb, var(--primary) 82%, #fff);
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--primary) 78%, var(--background)) 0 3px,
-    color-mix(in srgb, var(--foreground) 42%, var(--background)) 3px 6px
-  );
-  box-shadow:
-    inset 1px 0 color-mix(in srgb, #fff 30%, transparent),
-    inset -1px 0 color-mix(in srgb, #fff 30%, transparent),
-    0 0 9px color-mix(in srgb, var(--primary) 58%, transparent);
+  display: grid;
+  box-sizing: content-box;
+  width: max-content;
+  min-width: max-content;
+  padding-inline: var(--opt-pad-l) var(--opt-pad-r);
+  grid-template-columns: var(--opt-grid-template, repeat(var(--opt-visible-slots, 48), var(--opt-cell-w)));
+  column-gap: var(--opt-gap);
+  align-items: stretch;
   pointer-events: none;
 }
 
-.v2-opt-head .v2-opt-work-gap {
-  height: calc(var(--opt-cell-h, 20px) + 5px + var(--opt-track-pad-y, 2px) + var(--opt-track-pad-y, 2px));
+.v2-opt-work-break {
+  position: relative;
+  grid-row: 1;
+  align-self: stretch;
+  width: 100%;
+  min-height: 100%;
+  font-style: normal;
 }
 
-.v2-opt-work-gap::before {
+.v2-opt-work-break::before {
   content: "";
   position: absolute;
-  inset: 0 50%;
-  width: 2px;
-  background: color-mix(in srgb, #fff 76%, var(--primary));
-  box-shadow: 0 0 5px color-mix(in srgb, #fff 48%, transparent);
-  transform: translateX(-50%);
-}
-
-.v2-opt-work-gap::after {
-  content: "×";
-  position: absolute;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   left: 50%;
-  color: #fff;
-  font: 800 9px/1 "JetBrains Mono", ui-monospace, monospace;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
-  transform: translate(-50%, -54%);
+  width: 3px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--muted-foreground) 70%, var(--border)) 0 6px,
+    transparent 6px 9px
+  );
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--background) 56%, transparent);
+  opacity: 0.9;
+  transform: translateX(-50%);
 }
 
 .v2-opt-hour b {

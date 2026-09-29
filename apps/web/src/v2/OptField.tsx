@@ -162,16 +162,21 @@ function workGridColumn(visibleHalves: number[], half: number) {
   return index + gaps + 1;
 }
 
-function WorkGapTracks({ visibleHalves }: { visibleHalves: number[] }) {
-  return visibleHalves.map((half) => workGapBefore(visibleHalves, half) ? (
-    <i
-      key={`work-gap-${half}`}
-      className="v2-opt-work-gap"
-      data-work-gap="spacer"
-      style={{ gridColumn: workGridColumn(visibleHalves, half) - 1 }}
-      aria-hidden
-    />
-  ) : null);
+function WorkGapOverlay({ visibleHalves }: { visibleHalves: number[] }) {
+  const gaps = visibleHalves.filter((half) => workGapBefore(visibleHalves, half));
+  if (!gaps.length) return null;
+  return (
+    <div className="v2-opt-work-breaks" aria-hidden>
+      {gaps.map((half) => (
+        <i
+          key={`work-gap-${half}`}
+          className="v2-opt-work-break"
+          data-work-gap="overlay"
+          style={{ gridColumn: workGridColumn(visibleHalves, half) - 1 }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function halfOnLane(origin: SlotHit, clientX: number) {
@@ -555,6 +560,7 @@ const OptBody = memo(function OptBody({
               </div>
             </div>
             <div className="v2-opt-lanes">
+              <WorkGapOverlay visibleHalves={visibleHalves} />
               {today && nowVisible && <OptNowLine />}
               {groups.map((group) => (
                 <div key={group.variant} className="v2-opt-kind" data-variant={group.variant}>
@@ -573,7 +579,6 @@ const OptBody = memo(function OptBody({
                           tone={limitTone(rowInfo.limit)}
                           label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
                         >
-                          {!ghost && <WorkGapTracks visibleHalves={visibleHalves} />}
                           {ghost
                             ? null
                             : visibleHalves.map((half) => {
@@ -1394,7 +1399,7 @@ export const OptField = memo(function OptField({
           <div className="v2-opt-lanes">
             <div className="v2-opt-lane">
               <div className="v2-opt-track v2-opt-head v2-mono relative">
-                <WorkGapTracks visibleHalves={visibleHalves} />
+                <WorkGapOverlay visibleHalves={visibleHalves} />
                 {hours.map((segment, index) => {
                   const h = segment.hour;
                   const local = (h + clock.offset + 24) % 24;
