@@ -125,6 +125,8 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   await expect(gapSpacer).toHaveCount(1);
   const gapBox = await gapSpacer.boundingBox();
   expect(gapBox?.width).toBeGreaterThanOrEqual(12);
+  expect(gapBox?.height).toBeGreaterThanOrEqual(16);
+  await expect(gapSpacer).toHaveCSS("background-image", /repeating-linear-gradient/);
 
   await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
   await page.getByTitle("Редактирование").click();
@@ -192,8 +194,19 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
   const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
   expect(cellBox && frameBox).toBeTruthy();
   await expect(candidate).toHaveClass(/is-hover/);
+  await expect(candidate).toHaveCSS("filter", /brightness\(1\.55\)/);
   expect(Math.abs((frameBox!.x + frameBox!.width / 2) - (cellBox!.x + cellBox!.width / 2))).toBeLessThan(3);
   expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(cellBox!.y);
+
+  const unavailable = page.locator(`[data-slot][data-day="${day}"][data-lane="${lane}"][data-half="${half}"]`);
+  await unavailable.evaluate((node) => node.classList.add("is-lock"));
+  await page.mouse.move(0, 0);
+  await unavailable.hover();
+  await expect(unavailable).not.toHaveClass(/is-hover/);
+  await expect(frame).toBeHidden();
+
+  await unavailable.evaluate((node) => node.classList.remove("is-lock"));
+  await unavailable.hover();
 
   const [startBox, endBox] = await Promise.all([candidate.boundingBox(), target.boundingBox()]);
   expect(startBox && endBox).toBeTruthy();

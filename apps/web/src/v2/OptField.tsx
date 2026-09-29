@@ -321,6 +321,7 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const row = String(hit.dayIdx);
   const lane = hit.lane;
   const late = hit.half % 2 === 1;
+  const hoverable = !hit.cell.classList.contains("is-lock");
   if (kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
     if (!editing || (!mem.frame?.hidden && mem.col === slot)) return;
   } else if (!kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
@@ -332,10 +333,11 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
     nextBlock?.classList.add("is-hot");
     mem.block = nextBlock;
   }
-  if (mem.cell !== hit.cell) {
+  const nextCell = hoverable ? hit.cell : null;
+  if (mem.cell !== nextCell) {
     mem.cell?.classList.remove("is-hover");
-    hit.cell.classList.add("is-hover");
-    mem.cell = hit.cell;
+    nextCell?.classList.add("is-hover");
+    mem.cell = nextCell;
   }
   if (!kit) {
     const nextLane = nextBlock?.querySelector(`[data-lane="${lane}"]`) ?? null;
@@ -367,7 +369,7 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.row = row;
   root.dataset.lane = lane;
   root.dataset.half = slot;
-  if (editing) placeFrame(root, mem, hit, slotSpan(hit.half));
+  if (editing && hoverable) placeFrame(root, mem, hit, slotSpan(hit.half));
   else hideFrame(mem);
 }
 

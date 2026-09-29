@@ -9926,50 +9926,49 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-work-gap {
   position: relative;
-  z-index: 3;
+  z-index: 5;
   align-self: stretch;
   width: 100%;
-  min-height: 100%;
+  height: calc(var(--opt-cell-h, 20px) + var(--opt-track-pad-y, 2px) + var(--opt-track-pad-y, 2px));
+  margin-block: calc(0px - var(--opt-track-pad-y, 2px));
   overflow: hidden;
-  border-inline: 2px solid color-mix(in srgb, var(--primary) 92%, var(--foreground));
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--primary) 48%, var(--background)),
-      color-mix(in srgb, var(--primary) 24%, var(--background)) 48%,
-      color-mix(in srgb, var(--primary) 48%, var(--background))
-    );
+  font-style: normal;
+  border-inline: 2px solid color-mix(in srgb, var(--primary) 82%, #fff);
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 78%, var(--background)) 0 3px,
+    color-mix(in srgb, var(--foreground) 42%, var(--background)) 3px 6px
+  );
   box-shadow:
-    inset 1px 0 color-mix(in srgb, #fff 18%, transparent),
-    inset -1px 0 color-mix(in srgb, #fff 18%, transparent),
-    0 0 7px color-mix(in srgb, var(--primary) 34%, transparent);
+    inset 1px 0 color-mix(in srgb, #fff 30%, transparent),
+    inset -1px 0 color-mix(in srgb, #fff 30%, transparent),
+    0 0 9px color-mix(in srgb, var(--primary) 58%, transparent);
   pointer-events: none;
+}
+
+.v2-opt-head .v2-opt-work-gap {
+  height: calc(var(--opt-cell-h, 20px) + 5px + var(--opt-track-pad-y, 2px) + var(--opt-track-pad-y, 2px));
 }
 
 .v2-opt-work-gap::before {
   content: "";
   position: absolute;
-  inset: -4px 1px;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0 3px,
-    color-mix(in srgb, var(--primary) 94%, #fff) 3px 5px,
-    transparent 5px 8px
-  );
-  opacity: 1;
+  inset: 0 50%;
+  width: 2px;
+  background: color-mix(in srgb, #fff 76%, var(--primary));
+  box-shadow: 0 0 5px color-mix(in srgb, #fff 48%, transparent);
+  transform: translateX(-50%);
 }
 
 .v2-opt-work-gap::after {
-  content: "";
+  content: "×";
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 5px;
-  height: 5px;
-  border-right: 2px solid color-mix(in srgb, var(--primary) 88%, #fff);
-  border-bottom: 2px solid color-mix(in srgb, var(--primary) 88%, #fff);
-  transform: translate(-62%, -50%) rotate(-45deg);
-  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--primary) 70%, transparent));
+  color: #fff;
+  font: 800 9px/1 "JetBrains Mono", ui-monospace, monospace;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
+  transform: translate(-50%, -54%);
 }
 
 .v2-opt-hour b {
@@ -10397,14 +10396,14 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-cell.is-hover {
   z-index: 7;
-  filter: brightness(1.3) saturate(1.08);
+  filter: brightness(1.55) saturate(1.16);
   box-shadow:
-    inset 0 0 11px color-mix(in srgb, var(--ring) 38%, transparent),
-    0 0 10px color-mix(in srgb, var(--ring) 30%, transparent);
+    inset 0 0 14px color-mix(in srgb, var(--ring) 54%, transparent),
+    0 0 12px color-mix(in srgb, var(--ring) 42%, transparent);
 }
 
 .v2-opt-cell.is-hover:not(.is-on):not(.is-lock) {
-  background: color-mix(in srgb, var(--ring) 20%, var(--slot-future-bg, var(--slot-cell, var(--background))));
+  background: color-mix(in srgb, var(--ring) 36%, var(--slot-future-bg, var(--slot-cell, var(--background))));
 }
 
 .v2-opt-face {
