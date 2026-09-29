@@ -15,8 +15,8 @@ describe("opt field presentation model", () => {
   });
 
   it("keeps owner identity formatting in one place", () => {
-    const owner = packOwner({ t: "AX", discord: "RP-123ABC", guildNick: "Alex", username: "alex", room: "PokerNick", bg: "#000", fg: "#fff", tables: 1 });
-    expect(owner).toMatchObject({ discord: "Alex", username: "", room: "PokerNick" });
+    const owner = packOwner({ t: "AX", discord: "fallback", guildNick: "Server Alex", username: "alex", room: "PokerNick", bg: "#000", fg: "#fff", tables: 1 });
+    expect(owner).toMatchObject({ discord: "Server Alex", username: "alex", room: "PokerNick" });
   });
 
   it("formats table counts and clamps timeline progress", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ME } from "../schedule/marks";
 import { emptyMonth } from "../schedule/plan";
-import { heatFill, rowInitials, seatDiffs, showNick } from "./schedulePresentation";
+import { heatFill, rowInitials, seatDiffs, showNick, whoLines } from "./schedulePresentation";
 
 describe("schedule presentation helpers", () => {
   it("does not expose internal club codes as nicknames", () => {
@@ -13,6 +13,23 @@ describe("schedule presentation helpers", () => {
     expect(rowInitials("John Doe", "JD")).toBe("JD");
     expect(rowInitials("Player", "PX")).toBe("PX");
     expect(rowInitials("", "")).toBe("?");
+  });
+
+  it("uses the Discord server nickname as the primary visible name", () => {
+    const lines = whoLines({
+      id: "1",
+      nick: "fallback",
+      publicCode: "RP-1",
+      roomNick: "PokerNick",
+      markTag: "SA",
+      markBg: "#000",
+      markFg: "#fff",
+      tables: 1,
+      guildNick: "Server Alex",
+      globalName: "Alex Global",
+      username: "alex",
+    });
+    expect(lines).toEqual({ title: "Server Alex", sub: "Alex Global · @alex" });
   });
 
   it("clamps heat intensity", () => {

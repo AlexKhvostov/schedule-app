@@ -4,6 +4,10 @@ export function formatLimit(limit: string) {
   return `${limit.replace(".", ",")} €`;
 }
 
+export function formatVariantLimit(kind: "nitro" | "regular", limit: string) {
+  return `${kind === "nitro" ? "N" : "E"}${limit}`;
+}
+
 export const MAX_CAP = 6;
 
 export type HourCaps = number[];

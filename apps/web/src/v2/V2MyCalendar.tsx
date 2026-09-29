@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type Point
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
-import { LIMIT_OPTIONS, formatLimit, limitTone } from "../schedule/capacity";
+import { LIMIT_OPTIONS, formatVariantLimit, limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { formatDayLong } from "../schedule/formatDate";
 import { downloadCalendarJpeg } from "./calendarJpeg";
@@ -16,6 +16,7 @@ type Props = {
   monthIndex: number;
   title: string;
   tag: string;
+  kind: "nitro" | "regular";
   grids: Record<string, Occupancy>;
   today: number | null;
   x: number;
@@ -95,7 +96,7 @@ function useFitScale(ref: RefObject<HTMLElement | null>) {
   return box;
 }
 
-export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
+export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
   const { t, i18n } = useTranslation();
   const mineRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ ox: number; oy: number } | null>(null);
@@ -143,7 +144,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
         ) : null}
       </div>
       <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-        {formatLimit(hover.limit)}
+        {formatVariantLimit(kind, hover.limit)}
       </div>
     </div>
   ) : null;
@@ -276,7 +277,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
                           </span>
                         )}
                         <span className="v2-chip-face">
-                          {len >= 6 ? `NL ${run.limit}` : run.limit}
+                          {len >= 4 ? formatVariantLimit(kind, run.limit) : kind === "nitro" ? "N" : "E"}
                         </span>
                       </button>
                     );
@@ -293,7 +294,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
             {usedLimits.map((limit) => (
               <span key={limit} className="v2-mine-legend">
                 <i style={{ background: mineTone(limit) }} />
-                {formatLimit(limit)}
+                {formatVariantLimit(kind, limit)}
               </span>
             ))}
           </div>
@@ -309,6 +310,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
                 monthIndex,
                 title,
                 tag,
+                kind,
                 days,
                 runs,
                 usedLimits,

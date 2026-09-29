@@ -77,10 +77,10 @@ export function writeSeat(item: Occupancy[number][number] | undefined, level: nu
 
 export function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
   const discord =
-    visibleNick(mark.discord) ||
     visibleNick(mark.guildNick) ||
     visibleNick(mark.globalName) ||
     visibleNick(mark.username) ||
+    visibleNick(mark.discord) ||
     mark.t.trim() ||
     "—";
   const username = visibleNick(mark.username);

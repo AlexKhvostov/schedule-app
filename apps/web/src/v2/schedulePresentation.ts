@@ -67,8 +67,8 @@ export function whoLines(row: SchedulePlayer) {
   const server = showNick(row.guildNick);
   const handle = showNick(row.username) ? `@${row.username}` : "";
   const discord = showNick(row.globalName) || handle || showNick(row.nick);
-  const title = discord || server || "—";
-  const extra = [server, handle].filter((value) => {
+  const title = server || discord || "—";
+  const extra = [discord, handle].filter((value) => {
     if (!value) return false;
     const bare = value.replace(/^@/, "");
     return bare.toLowerCase() !== title.replace(/^@/, "").toLowerCase();

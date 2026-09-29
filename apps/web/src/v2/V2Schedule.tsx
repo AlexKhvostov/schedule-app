@@ -1230,6 +1230,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           canEdit={paintOn && !gridLoading}
           quietEdit={!editGlow || !editPulse}
           focus={focus}
+          kind={kind}
           limits={limits}
           capacity={capacity}
           grids={shownGrids}
@@ -1262,6 +1263,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             monthIndex={monthIndex}
             title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
+            kind={kind}
             grids={mineGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
             x={calPos.x}

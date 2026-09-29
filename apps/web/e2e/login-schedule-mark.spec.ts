@@ -6,9 +6,7 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await expect(page.getByText("Добро пожаловать, you")).toBeVisible();
-
-  await page.getByRole("button", { name: "Расписание" }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
   await page.getByTitle("Редактирование").click();
   const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
   await expect(candidate).toBeVisible();
@@ -28,8 +26,6 @@ test("schedule filters stay above the timeline and display preferences survive r
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByRole("button", { name: "Расписание" }).click();
-
   const limit = page.locator(".v2-limit-hit");
   await limit.click();
   await expect(page.locator(".v2-limit-wrap .v2-bar-menu")).toBeVisible();
@@ -59,7 +55,6 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByRole("button", { name: "Расписание" }).click();
   await page.getByTitle("Редактирование").click();
 
   const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
@@ -95,8 +90,6 @@ test("mobile schedule starts safe and only edits at a readable zoom", async ({ p
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.locator("button.v2-home-action", { hasText: "Расписание" }).click();
-
   const dock = page.getByRole("complementary", { name: "Инструменты расписания" });
   await expect(dock).toBeVisible();
   await expect.poll(async () => page.locator(".v2-opt-help-bar").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
@@ -157,7 +150,6 @@ test("foreign mark warning keeps safe and destructive actions in fixed positions
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByRole("button", { name: "Расписание" }).click();
   await page.getByTitle("Редактирование").click();
 
   const foreign = page.locator('[data-slot].is-on:not(.is-past):not([data-mark="YO"])').first();
@@ -189,7 +181,6 @@ test("demo schedule persists after switching test users", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByRole("button", { name: "Расписание" }).click();
   await page.getByTitle("Редактирование").click();
 
   const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
@@ -206,8 +197,7 @@ test("demo schedule persists after switching test users", async ({ page }) => {
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.locator(".v2-dev-login select").selectOption("RP-104");
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByRole("button", { name: "Расписание" }).click();
-
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
   await expect(page.locator(sharedCell)).toHaveAttribute("data-mark", "YO");
 });
 
@@ -219,14 +209,39 @@ test("language choice survives navigation", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
-test("brand logo returns to the home portal", async ({ page }) => {
+test("active player starts on schedule and the brand returns there", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
 
-  await expect(page.locator(".v2-nav-link", { hasText: "Главная" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Расписание", exact: true }).click();
-  await page.getByRole("button", { name: "Главная", exact: true }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.getByRole("button", { name: "Приоритеты", exact: true }).click();
+  await page.locator(".v2-brand").click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+});
 
-  await expect(page.getByText("Добро пожаловать, you")).toBeVisible();
+test("schedule uses N and E tournament labels instead of NL", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  const label = page.locator(".v2-opt-hours .v2-opt-gutter-nls .v2-opt-lab");
+  await expect(label).toHaveText("N");
+  await expect(page.getByText("NL", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Nitro", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await expect(label).toHaveText("E");
+});
+
+test("cabinet hides payment details and default schedule settings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+
+  await expect(page.getByRole("button", { name: "Реквизиты" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Игра" }).click();
+  await expect(page.getByRole("heading", { name: "Расписание по умолчанию" })).toHaveCount(0);
 });

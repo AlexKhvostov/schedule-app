@@ -9,7 +9,6 @@ test.describe("live Discord session", () => {
   test("authenticated member can open schedule", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Вход" })).not.toBeVisible();
-    await page.getByRole("button", { name: "Расписание" }).click();
     await expect(page.locator('[role="gridcell"]').first()).toBeVisible();
   });
 });

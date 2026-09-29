@@ -1,4 +1,4 @@
-import { limitTonePaint } from "../schedule/capacity";
+import { formatVariantLimit, limitTonePaint } from "../schedule/capacity";
 import type { ShiftRun } from "./myShifts";
 
 const SLOT_COUNT = 48;
@@ -41,6 +41,7 @@ type Opts = {
   monthIndex: number;
   title: string;
   tag: string;
+  kind: "nitro" | "regular";
   days: Day[];
   runs: ShiftRun[];
   usedLimits: string[];
@@ -85,7 +86,7 @@ function runPast(day: number, end: number, today: number | null, nowAt: number) 
 
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { title, tag, days, runs, usedLimits, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
+  const { title, tag, kind, days, runs, usedLimits, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
   const height = PAD + TITLE_H + HOUR_H + days.length * ROW_H + FOOT_H + PAD;
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * DPR;
@@ -228,7 +229,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
       ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(len >= 6 ? `NL ${run.limit}` : run.limit, x + w / 2, y + ROW_H / 2);
+      ctx.fillText(len >= 6 ? formatVariantLimit(kind, run.limit) : run.limit, x + w / 2, y + ROW_H / 2);
       ctx.restore();
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
@@ -254,8 +255,9 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = paint.muted;
-    ctx.fillText(`NL ${limit}`, legendX + 14, footY);
-    legendX += ctx.measureText(`NL ${limit}`).width + 28;
+    const label = formatVariantLimit(kind, limit);
+    ctx.fillText(label, legendX + 14, footY);
+    legendX += ctx.measureText(label).width + 28;
   }
 
   await new Promise<void>((resolve, reject) => {

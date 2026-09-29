@@ -65,7 +65,7 @@ export function SlotDayPreview() {
             <div className="v2-opt-gutter">
               <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
               <div className="v2-opt-gutter-nls">
-                <div className="v2-opt-nl v2-opt-lab">NL</div>
+                <div className="v2-opt-nl v2-opt-lab">N</div>
               </div>
             </div>
             <div className="v2-opt-lanes">
@@ -107,8 +107,8 @@ export function SlotDayPreview() {
                   </div>
                   <div className="v2-opt-gutter-nls">
                     <div className="v2-opt-gutter-limit">
-                      <OptNlChip label="50·1" tone={limitTone("50")} />
-                      <OptNlChip label="50·2" tone={limitTone("50")} />
+                      <OptNlChip label="N50·1" tone={limitTone("50")} />
+                      <OptNlChip label="N50·2" tone={limitTone("50")} />
                     </div>
                   </div>
                 </div>

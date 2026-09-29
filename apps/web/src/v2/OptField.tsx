@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isSelfSeat, type Mark } from "../schedule/marks";
-import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
+import { hoursOf, lanesForDay, formatLimit, formatVariantLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
 import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
@@ -43,6 +43,7 @@ type Props = {
   canEdit: boolean;
   quietEdit?: boolean;
   focus: string;
+  kind: "nitro" | "regular";
   limits: string[];
   capacity: CapacityMap;
   grids: Record<string, Occupancy>;
@@ -438,6 +439,7 @@ const OptBody = memo(function OptBody({
   showTables,
   dimPast,
   hidePastDays,
+  kind,
   limits,
   capacity,
   grids,
@@ -452,6 +454,7 @@ const OptBody = memo(function OptBody({
   showTables: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
+  kind: "nitro" | "regular";
   skin?: "classic" | "theme";
   limits: string[];
   capacity: CapacityMap;
@@ -491,7 +494,7 @@ const OptBody = memo(function OptBody({
                       key={`${dayIdx}-${limit}-${level}`}
                       tone={limitTone(limit)}
                       ghost={ghost}
-                      label={`${limit}${named > 1 ? `·${level + 1}` : ""}`}
+                      label={`${formatVariantLimit(kind, limit)}${named > 1 ? `·${level + 1}` : ""}`}
                     />
                   ));
                   if (skin !== "theme") return chips;
@@ -809,6 +812,7 @@ export const OptField = memo(function OptField({
   canEdit,
   quietEdit,
   focus,
+  kind,
   limits,
   capacity,
   grids,
@@ -1298,7 +1302,7 @@ export const OptField = memo(function OptField({
           <div className="v2-opt-gutter">
             <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
             <div className="v2-opt-gutter-nls">
-              <div className="v2-opt-nl v2-opt-lab">NL</div>
+              <div className="v2-opt-nl v2-opt-lab">{kind === "nitro" ? "N" : "E"}</div>
             </div>
           </div>
           <div className="v2-opt-lanes">
@@ -1333,6 +1337,7 @@ export const OptField = memo(function OptField({
               showTables={showTables}
               dimPast={dimPast}
               hidePastDays={hidePastDays}
+              kind={kind}
               limits={limits}
               capacity={capacity}
               grids={grids}
