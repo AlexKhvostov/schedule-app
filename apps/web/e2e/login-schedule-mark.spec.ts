@@ -176,14 +176,14 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   }).toEqual({ left: 12, right: 312 });
 });
 
-test("schedule cursor follows one half-hour and drag shows the full range", async ({ page }) => {
+test("schedule time hint works in view mode and drag shows the full range", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await page.getByTitle("Редактирование").click();
 
   const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
   await expect(candidate).toBeVisible();
+  await expect(page.locator(".v2-opt")).not.toHaveClass(/is-edit/);
   const half = Number(await candidate.getAttribute("data-half"));
   const day = await candidate.getAttribute("data-day");
   const lane = await candidate.getAttribute("data-lane");
@@ -211,6 +211,9 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
 
   await unavailable.evaluate((node) => node.classList.remove("is-lock"));
   await unavailable.hover();
+  await page.getByTitle("Редактирование").click();
+  await expect(page.locator(".v2-opt")).toHaveClass(/is-edit/);
+  await candidate.hover();
 
   const [startBox, endBox] = await Promise.all([candidate.boundingBox(), target.boundingBox()]);
   expect(startBox && endBox).toBeTruthy();

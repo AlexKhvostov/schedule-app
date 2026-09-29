@@ -303,7 +303,6 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
 
 function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const kit = root.classList.contains("is-kit");
-  const editing = root.classList.contains("is-edit");
   const mem = navOf(root);
   if (!hit) {
     if (!root.dataset.row && !mem.block && !mem.hour) return;
@@ -327,9 +326,13 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const lane = hit.lane;
   const late = hit.half % 2 === 1;
   const hoverable = !hit.cell.classList.contains("is-lock");
-  if (kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
-    if (!editing || (!mem.frame?.hidden && mem.col === slot)) return;
-  } else if (!kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
+  if (
+    root.dataset.half === slot
+    && root.dataset.row === row
+    && root.dataset.lane === lane
+    && !mem.frame?.hidden
+    && mem.col === slot
+  ) {
     return;
   }
   const nextBlock = hit.cell.closest(".v2-opt-block");
@@ -374,7 +377,7 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.row = row;
   root.dataset.lane = lane;
   root.dataset.half = slot;
-  if (editing && hoverable) placeFrame(root, mem, hit, slotSpan(hit.half));
+  if (hoverable) placeFrame(root, mem, hit, slotSpan(hit.half));
   else hideFrame(mem);
 }
 
