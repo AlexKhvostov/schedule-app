@@ -9425,6 +9425,23 @@ textarea.v2-ctrl.v2-cab-area {
   gap: 3px;
 }
 
+.v2-opt-kind,
+.v2-opt-gutter-kind {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: none;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--opt-lane-gap, 3px);
+}
+
+.v2-opt-kind + .v2-opt-kind,
+.v2-opt-gutter-kind + .v2-opt-gutter-kind {
+  padding-top: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+}
+
 .v2-opt-hours .v2-opt-gutter-nls,
 .v2-opt-hours .v2-opt-gutter-limit {
   gap: 0;

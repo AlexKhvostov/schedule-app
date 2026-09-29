@@ -220,7 +220,7 @@ test("active player starts on schedule and the brand returns there", async ({ pa
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 });
 
-test("schedule uses N and E tournament labels instead of NL", async ({ page }) => {
+test("schedule can show Nitro and Regular together with distinct N/E rows", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
@@ -231,7 +231,28 @@ test("schedule uses N and E tournament labels instead of NL", async ({ page }) =
 
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
   await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
-  await expect(label).toHaveText("E");
+  await expect(label).toHaveText("N/E");
+  await expect(page.locator('.v2-opt-gutter-kind[data-variant="nitro"] .v2-limit-chip', { hasText: "N50" }).first()).toBeVisible();
+  await expect(page.locator('.v2-opt-gutter-kind[data-variant="regular"] .v2-limit-chip', { hasText: "E50" }).first()).toBeVisible();
+  await expect(page.locator('[data-slot][data-variant="nitro"][data-limit="50"]').first()).toBeVisible();
+  await expect(page.locator('[data-slot][data-variant="regular"][data-limit="50"]').first()).toBeVisible();
+
+  await page.getByTitle("Редактирование").click();
+  const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const day = await regularCell.getAttribute("data-day");
+  const half = await regularCell.getAttribute("data-half");
+  const level = await regularCell.getAttribute("data-level");
+  const regularTarget = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
+  const nitroCell = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
+  const nitroWasOn = await nitroCell.evaluate((node) => node.classList.contains("is-on"));
+  await regularTarget.click();
+  await expect(regularTarget).toHaveClass(/is-on/);
+  if (nitroWasOn) await expect(nitroCell).toHaveClass(/is-on/);
+  else await expect(nitroCell).not.toHaveClass(/is-on/);
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Nitro · Regular", exact: true })).toBeVisible();
+  await expect(label).toHaveText("N/E");
 });
 
 test("cabinet hides payment details and default schedule settings", async ({ page }) => {

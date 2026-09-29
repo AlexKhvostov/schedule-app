@@ -1,6 +1,8 @@
 import { formatDayLabel } from "../schedule/formatDate";
+import { formatVariantLimit } from "../schedule/capacity";
 import type { Mark } from "../schedule/marks";
 import { seatsOf, type Occupancy } from "../schedule/plan";
+import type { ScheduleVariant } from "../data/slots";
 
 export type OverwriteSlot = { date: string; half: number; level: number };
 
@@ -19,6 +21,7 @@ export type OverwritePerson = {
 
 export type OverwriteAsk = {
   kind: "remove" | "place";
+  variant: ScheduleVariant;
   limit: string;
   people: OverwritePerson[];
   memberIds: string[];
@@ -28,6 +31,18 @@ export type OverwriteAsk = {
 };
 
 const SLOT_COUNT = 48;
+
+export function scheduleKindGroups(variants: ScheduleVariant[], limits: string[]) {
+  return [...new Set(variants)].map((variant) => ({
+    variant,
+    shortLabel: variant === "nitro" ? "N" : "E",
+    rows: limits.map((limit) => ({
+      key: `${variant}:${limit}`,
+      limit,
+      label: formatVariantLimit(variant, limit),
+    })),
+  }));
+}
 
 export function slotSpan(half: number, hourShift = 0) {
   return slotRangeSpan(half, half, hourShift);

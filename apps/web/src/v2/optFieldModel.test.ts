@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayNick, markQuery, nowHeadLeft, packOwner, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
+import { displayNick, markQuery, nowHeadLeft, packOwner, scheduleKindGroups, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
 
 describe("opt field presentation model", () => {
   it("formats wrapped half-hour spans", () => {
@@ -24,5 +24,26 @@ describe("opt field presentation model", () => {
     expect(tablesLabel(3, "ru")).toBe("3 стола");
     expect(tablesLabel(11, "ru")).toBe("11 столов");
     expect(nowHeadLeft(48, 2)).toContain("/ 48");
+  });
+
+  it("groups rows by variant before limit and keeps equal limits distinct", () => {
+    expect(scheduleKindGroups(["nitro", "regular"], ["50", "100"])).toEqual([
+      {
+        variant: "nitro",
+        shortLabel: "N",
+        rows: [
+          { key: "nitro:50", limit: "50", label: "N50" },
+          { key: "nitro:100", limit: "100", label: "N100" },
+        ],
+      },
+      {
+        variant: "regular",
+        shortLabel: "E",
+        rows: [
+          { key: "regular:50", limit: "50", label: "E50" },
+          { key: "regular:100", limit: "100", label: "E100" },
+        ],
+      },
+    ]);
   });
 });

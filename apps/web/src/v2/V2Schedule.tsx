@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
@@ -149,19 +149,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       stored[limit] ?? emptyMonth(year, monthIndex),
     ]));
   }, [gridStore, kind, limits, year, monthIndex]);
-  const gridsRef = useRef(grids);
-  const setGrids = useCallback((value: SetStateAction<Record<string, Occupancy>>) => {
-    setGridStore((store) => {
-      const stored = gridsForVariant(store, kind, limits);
-      const current = Object.fromEntries(limits.map((limit) => [
-        limit,
-        stored[limit] ?? emptyMonth(year, monthIndex),
-      ]));
-      const next = typeof value === "function" ? value(current) : value;
-      return replaceVariantGrids(store, kind, next);
-    });
-  }, [kind, limits, year, monthIndex]);
-  gridsRef.current = grids;
+  const gridStoreRef = useRef(gridStore);
+  gridStoreRef.current = gridStore;
   const sessionNick = readSession()?.nick ?? "";
   const selfId = memberId ?? memberOfSession(loadMembers(), { memberId, nick: sessionNick })?.id;
   actingRef.current = actingId || selfId;
@@ -181,11 +170,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const loadStamp = `${year}-${monthIndex}-${kindKey}-${fetchKey}`;
   const viewStamp = `${year}-${monthIndex}-${kindKey}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
+  const shownGridStore = useMemo(() => {
+    if (!gridLoading || readyStamp.startsWith(`${viewStamp}-`)) return gridStore;
+    return Object.fromEntries(kinds.flatMap((variant) => limits.map((limit) => [
+      monthGridKey(variant, limit),
+      emptyMonth(year, monthIndex),
+    ])));
+  }, [gridLoading, readyStamp, viewStamp, gridStore, kinds, limits, year, monthIndex]);
   const shownGrids = useMemo(() => {
-    if (!gridLoading) return grids;
-    if (readyStamp.startsWith(`${viewStamp}-`)) return grids;
-    return Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
-  }, [gridLoading, grids, limits, year, monthIndex, readyStamp, viewStamp]);
+    const stored = gridsForVariant(shownGridStore, kind, limits);
+    return Object.fromEntries(limits.map((limit) => [
+      limit,
+      stored[limit] ?? emptyMonth(year, monthIndex),
+    ]));
+  }, [shownGridStore, kind, limits, year, monthIndex]);
 
   const pullGrids = useCallback(
     (stamp: string) => {
@@ -637,7 +635,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   };
 
   const writeDiffs = useCallback(
-    async (limit: string, diffs: SeatDiff[]) => {
+    async (variant: "nitro" | "regular", limit: string, diffs: SeatDiff[]) => {
       const selfWrite = selfIdRef.current;
       const brushWrite = actingRef.current;
       const place = diffs.filter((diff) => diff.placed).map((diff) => ({
@@ -655,7 +653,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         const { error } = await applyOwnSlots({
           memberId: selfWrite,
           limit,
-          variant: kind,
+          variant,
           year,
           monthIndex,
           place: [],
@@ -667,7 +665,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         const { error } = await applyOwnSlots({
           memberId: brushWrite,
           limit,
-          variant: kind,
+          variant,
           year,
           monthIndex,
           place,
@@ -677,18 +675,19 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       }
       return undefined;
     },
-    [kind, year, monthIndex],
+    [year, monthIndex],
   );
 
   const onGridChange = useCallback(
-    (limit: string, next: Occupancy) => {
-      const prevGrid = gridsRef.current[limit] ?? [];
+    (variant: "nitro" | "regular", limit: string, next: Occupancy) => {
+      const key = monthGridKey(variant, limit);
+      const prevGrid = gridStoreRef.current[key] ?? [];
       const diffs = seatDiffs(prevGrid, next);
-      setGrids((prev) => ({ ...prev, [limit]: next }));
-      if (!isLiveData()) saveDemoSchedule(year, monthIndex, kind, limit, next);
+      setGridStore((store) => ({ ...store, [key]: next }));
+      if (!isLiveData()) saveDemoSchedule(year, monthIndex, variant, limit, next);
       if (!diffs.length) return;
-      if (isLiveData() && diffs.some((diff) => diff.placed) && !accessRef.current.has(accessKey(kind, limit))) {
-        setGrids((prev) => ({ ...prev, [limit]: prevGrid }));
+      if (isLiveData() && diffs.some((diff) => diff.placed) && !accessRef.current.has(accessKey(variant, limit))) {
+        setGridStore((store) => ({ ...store, [key]: prevGrid }));
         showV2Toast("err", t("schedule.toastNoAccess"));
         return;
       }
@@ -699,11 +698,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       loadGen.current += 1;
       quietUntil.current = Date.now() + 800;
       inflight.current += 1;
-      void writeDiffs(limit, diffs)
+      void writeDiffs(variant, limit, diffs)
         .then((error) => {
           inflight.current = Math.max(0, inflight.current - 1);
           if (error) {
-            setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+            setGridStore((store) => ({ ...store, [key]: prevGrid }));
             showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
             return;
           }
@@ -711,11 +710,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         })
         .catch(() => {
           inflight.current = Math.max(0, inflight.current - 1);
-          setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+          setGridStore((store) => ({ ...store, [key]: prevGrid }));
           showV2Toast("err", t("schedule.toastSaveError"));
         });
     },
-    [kind, t, writeDiffs, refreshBusy],
+    [year, monthIndex, t, writeDiffs, refreshBusy],
   );
 
   const confirmOverwrite = (action: "wipe" | "empty" = "wipe") => {
@@ -734,30 +733,30 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           ? "schedule.toastReplaced"
           : "schedule.toastRemoved";
     if (!isLiveData()) {
-      setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
-      saveDemoSchedule(year, monthIndex, kind, ask.limit, chosen);
+      setGridStore((store) => ({ ...store, [monthGridKey(ask.variant, ask.limit)]: chosen }));
+      saveDemoSchedule(year, monthIndex, ask.variant, ask.limit, chosen);
       setOverwriteAsk(null);
       showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
       return;
     }
-    if (ask.kind === "place" && !accessRef.current.has(accessKey(kind, ask.limit))) {
+    if (ask.kind === "place" && !accessRef.current.has(accessKey(ask.variant, ask.limit))) {
       showV2Toast("err", t("schedule.toastNoAccess"));
       setOverwriteAsk(null);
       return;
     }
     setOverwriteBusy(true);
-    const prevGrid = gridsRef.current[ask.limit] ?? [];
+    const prevGrid = gridStoreRef.current[monthGridKey(ask.variant, ask.limit)] ?? [];
     const diffs = seatDiffs(prevGrid, chosen);
     void (async () => {
       if (action === "wipe" && ask.slots.length) {
         const { error } = await removeForeignSlots({
           limit: ask.limit,
-          variant: kind,
+          variant: ask.variant,
           slots: ask.slots,
         });
         if (error) return error;
       }
-      return writeDiffs(ask.limit, diffs);
+      return writeDiffs(ask.variant, ask.limit, diffs);
     })()
       .then((error) => {
         setOverwriteBusy(false);
@@ -775,7 +774,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
         loadGen.current += 1;
         quietUntil.current = Date.now() + 800;
-        setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
+        setGridStore((store) => ({ ...store, [monthGridKey(ask.variant, ask.limit)]: chosen }));
         refreshBusy();
       })
       .catch(() => {
@@ -793,7 +792,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       savePrefs({ ...loadPrefs(), limits: next });
       return next;
     });
-    setGrids((prev) => (prev[value] ? prev : { ...prev, [value]: emptyMonth(year, monthIndex) }));
+    setGridStore((store) => {
+      let next = store;
+      for (const variant of kinds) {
+        const key = monthGridKey(variant, value);
+        if (!next[key]) next = { ...next, [key]: emptyMonth(year, monthIndex) };
+      }
+      return next;
+    });
+  };
+
+  const toggleKind = (value: "nitro" | "regular") => {
+    setKinds((current) => {
+      const next = current.includes(value)
+        ? current.length === 1 ? current : current.filter((item) => item !== value)
+        : (["nitro", "regular"] as const).filter((item) => current.includes(item) || item === value);
+      const primary = next.includes(kind) ? kind : next[0];
+      setKind(primary);
+      savePrefs({ ...loadPrefs(), kinds: next });
+      onKindChange?.(primary);
+      return next;
+    });
   };
 
   const shiftMonth = (delta: number) => onCursorChange(new Date(year, monthIndex + delta, 1));
@@ -1052,7 +1071,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setMonthOpen(false);
             }}
           >
-            {kind === "nitro" ? "Nitro" : "Regular"}
+            {kinds.map((variant) => variant === "nitro" ? "Nitro" : "Regular").join(" · ")}
             <i className="fa-solid fa-angle-down v2-muted ml-2" />
           </button>
           {kindOpen && (
@@ -1066,15 +1085,13 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                 <button
                   key={value}
                   type="button"
-                  className={kind === value ? "is-on" : ""}
+                  className={kinds.includes(value) ? "is-on" : ""}
+                  aria-pressed={kinds.includes(value)}
                   onClick={() => {
-                    setKinds([value]);
-                    setKind(value);
-                    setKindOpen(false);
-                    savePrefs({ ...loadPrefs(), kinds: [value] });
-                    onKindChange?.(value);
+                    toggleKind(value);
                   }}
                 >
+                  <i className={`fa-solid ${kinds.includes(value) ? "fa-check-square" : "fa-square"}`} />
                   {label}
                 </button>
               ))}
@@ -1252,10 +1269,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           canEdit={paintOn && !gridLoading}
           quietEdit={!editGlow || !editPulse}
           focus={focus}
-          kind={kind}
+          kinds={kinds}
           limits={limits}
           capacity={capacity}
-          grids={shownGrids}
+          grids={shownGridStore}
           hourLoad={hourLoad}
           onGridChange={onGridChange}
           canRemoveForeign={canRemoveForeign}

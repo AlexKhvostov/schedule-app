@@ -3,8 +3,9 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isPastDay, isPastSlot, readCet, type CetStamp } from "../schedule/cet";
 import { isSelfSeat, type Mark } from "../schedule/marks";
-import { hoursOf, lanesForDay, formatLimit, formatVariantLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
+import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
 import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
+import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../data/slots";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
@@ -19,6 +20,7 @@ import {
   nowHeadLeft,
   nowLineLeft,
   packOwner,
+  scheduleKindGroups,
   slotRangeSpan,
   slotSpan,
   tablesLabel,
@@ -43,12 +45,12 @@ type Props = {
   canEdit: boolean;
   quietEdit?: boolean;
   focus: string;
-  kind: "nitro" | "regular";
+  kinds: ScheduleVariant[];
   limits: string[];
   capacity: CapacityMap;
-  grids: Record<string, Occupancy>;
+  grids: MonthGridStore;
   hourLoad?: HourLoadMap;
-  onGridChange: (limit: string, next: Occupancy) => void;
+  onGridChange: (variant: ScheduleVariant, limit: string, next: Occupancy) => void;
   skin?: "classic" | "theme";
   busy?: (string[] | null)[][];
   canRemoveForeign?: boolean;
@@ -68,6 +70,7 @@ type SlotHit = {
   half: number;
   hour: number;
   level: number;
+  variant: ScheduleVariant;
   limit: string;
   lane: string;
   busyLimits?: string[];
@@ -130,6 +133,7 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     half: Number(el.dataset.half),
     hour: Number(el.dataset.h),
     level: Number(el.dataset.level),
+    variant: el.dataset.variant === "regular" ? "regular" : "nitro",
     limit: el.dataset.limit ?? "",
     lane: el.dataset.lane ?? "",
     busyLimits: (el.dataset.busy || "").split(",").filter(Boolean),
@@ -357,6 +361,7 @@ const OptCell = memo(function OptCell({
   day,
   half,
   level,
+  variant,
   limit,
   lane,
   tag,
@@ -376,6 +381,7 @@ const OptCell = memo(function OptCell({
   day: number;
   half: number;
   level: number;
+  variant: ScheduleVariant;
   limit: string;
   lane: string;
   tag?: string;
@@ -402,6 +408,7 @@ const OptCell = memo(function OptCell({
       data-half={half}
       data-h={Math.floor(half / 2)}
       data-level={level}
+      data-variant={variant}
       data-limit={limit}
       data-lane={lane}
       data-mark={mark}
@@ -439,7 +446,7 @@ const OptBody = memo(function OptBody({
   showTables,
   dimPast,
   hidePastDays,
-  kind,
+  kinds,
   limits,
   capacity,
   grids,
@@ -454,17 +461,18 @@ const OptBody = memo(function OptBody({
   showTables: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
-  kind: "nitro" | "regular";
+  kinds: ScheduleVariant[];
   skin?: "classic" | "theme";
   limits: string[];
   capacity: CapacityMap;
-  grids: Record<string, Occupancy>;
+  grids: MonthGridStore;
   days: { d: number; wd: string; weekend: boolean }[];
   cet: CetStamp;
   todayRef: RefObject<HTMLDivElement | null>;
   busy?: (string[] | null)[][];
 }) {
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
+  const groups = scheduleKindGroups(kinds, limits);
 
   return (
     <>
@@ -486,89 +494,99 @@ const OptBody = memo(function OptBody({
                 <small>{day.wd}</small>
               </div>
               <div className="v2-opt-gutter-nls">
-                {limits.map((limit) => {
-                  const { levels } = levelsOf(capacity, limit, day.d, year, monthIndex, grids[limit]?.[dayIdx]);
-                  const named = levels.filter((row) => !row.ghost).length;
-                  const chips = levels.map(({ level, ghost }) => (
-                    <OptNlChip
-                      key={`${dayIdx}-${limit}-${level}`}
-                      tone={limitTone(limit)}
-                      ghost={ghost}
-                      label={`${formatVariantLimit(kind, limit)}${named > 1 ? `·${level + 1}` : ""}`}
-                    />
-                  ));
-                  if (skin !== "theme") return chips;
-                  return (
-                    <div key={limit} className="v2-opt-gutter-limit">
-                      {chips}
-                    </div>
-                  );
-                })}
+                {groups.map((group) => (
+                  <div key={group.variant} className="v2-opt-gutter-kind" data-variant={group.variant}>
+                    {group.rows.map((rowInfo) => {
+                      const grid = grids[monthGridKey(group.variant, rowInfo.limit)];
+                      const { levels } = levelsOf(capacity, rowInfo.limit, day.d, year, monthIndex, grid?.[dayIdx]);
+                      const named = levels.filter((row) => !row.ghost).length;
+                      const chips = levels.map(({ level, ghost }) => (
+                        <OptNlChip
+                          key={`${dayIdx}-${rowInfo.key}-${level}`}
+                          tone={limitTone(rowInfo.limit)}
+                          ghost={ghost}
+                          label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
+                        />
+                      ));
+                      if (skin !== "theme") return chips;
+                      return (
+                        <div key={rowInfo.key} className="v2-opt-gutter-limit">
+                          {chips}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
             <div className="v2-opt-lanes">
               {today && <OptNowLine />}
-              {limits.map((limit) => {
-                const row = grids[limit]?.[dayIdx] ?? [];
-                const { hours: limitHours, levels } = levelsOf(capacity, limit, day.d, year, monthIndex, row);
-                const named = levels.filter((item) => !item.ghost).length;
-                const lanes = levels.map(({ level, ghost }) => {
-                  const lane = `${dayIdx}-${limit}-${level}`;
-                  return (
-                    <OptLevelLane
-                      key={lane}
-                      laneKey={lane}
-                      showNl={false}
-                      ghost={ghost}
-                      tone={limitTone(limit)}
-                      label={`${limit}${named > 1 ? `·${level + 1}` : ""}`}
-                    >
-                        {ghost
-                          ? null
-                          : Array.from({ length: SLOT_COUNT }, (_, half) => {
-                          const locked = !levelAllowed(half, level, limitHours);
-                          const mark = seatsOf(row[half], level + 1)[level];
-                          const useMat = skin === "theme";
-                          const gone = isPastSlot(year, monthIndex, day.d, half, cet);
-                          const past = dimPast && gone;
-                          const nowPct =
-                            !useMat && dimPast && today && half === cet.half
-                              ? Math.min(100, Math.max(0, cet.slotProgress * 100))
-                              : undefined;
-                          const mine = gone || locked ? undefined : busy?.[dayIdx]?.[half];
-                          const hidden = mine?.filter((item) => !limits.includes(item));
-                          return (
-                            <OptCell
-                              key={half}
-                              dayIdx={dayIdx}
-                              day={day.d}
-                              half={half}
-                              level={level}
-                              limit={limit}
-                              lane={lane}
-                              tag={mark?.t}
-                              tables={mark?.tables}
-                              bg={mark?.bg}
-                              fg={mark?.fg}
-                              showTables={showTables}
-                              past={past}
-                              locked={locked}
-                              nowPct={nowPct}
-                              busyLimits={hidden}
-                              busyHalf={Boolean(hidden?.length)}
-                            />
-                          );
-                        })}
-                    </OptLevelLane>
-                  );
-                });
-                if (skin !== "theme") return lanes;
-                return (
-                  <div key={limit} className="v2-opt-limit">
-                    {lanes}
-                  </div>
-                );
-              })}
+              {groups.map((group) => (
+                <div key={group.variant} className="v2-opt-kind" data-variant={group.variant}>
+                  {group.rows.map((rowInfo) => {
+                    const row = grids[monthGridKey(group.variant, rowInfo.limit)]?.[dayIdx] ?? [];
+                    const { hours: limitHours, levels } = levelsOf(capacity, rowInfo.limit, day.d, year, monthIndex, row);
+                    const named = levels.filter((item) => !item.ghost).length;
+                    const lanes = levels.map(({ level, ghost }) => {
+                      const lane = `${dayIdx}-${group.variant}-${rowInfo.limit}-${level}`;
+                      return (
+                        <OptLevelLane
+                          key={lane}
+                          laneKey={lane}
+                          showNl={false}
+                          ghost={ghost}
+                          tone={limitTone(rowInfo.limit)}
+                          label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
+                        >
+                          {ghost
+                            ? null
+                            : Array.from({ length: SLOT_COUNT }, (_, half) => {
+                              const locked = !levelAllowed(half, level, limitHours);
+                              const mark = seatsOf(row[half], level + 1)[level];
+                              const useMat = skin === "theme";
+                              const gone = isPastSlot(year, monthIndex, day.d, half, cet);
+                              const past = dimPast && gone;
+                              const nowPct =
+                                !useMat && dimPast && today && half === cet.half
+                                  ? Math.min(100, Math.max(0, cet.slotProgress * 100))
+                                  : undefined;
+                              const mine = gone || locked ? undefined : busy?.[dayIdx]?.[half];
+                              const hidden = mine?.filter((item) => !limits.includes(item));
+                              return (
+                                <OptCell
+                                  key={half}
+                                  dayIdx={dayIdx}
+                                  day={day.d}
+                                  half={half}
+                                  level={level}
+                                  variant={group.variant}
+                                  limit={rowInfo.limit}
+                                  lane={lane}
+                                  tag={mark?.t}
+                                  tables={mark?.tables}
+                                  bg={mark?.bg}
+                                  fg={mark?.fg}
+                                  showTables={showTables}
+                                  past={past}
+                                  locked={locked}
+                                  nowPct={nowPct}
+                                  busyLimits={hidden}
+                                  busyHalf={Boolean(hidden?.length)}
+                                />
+                              );
+                            })}
+                        </OptLevelLane>
+                      );
+                    });
+                    if (skin !== "theme") return lanes;
+                    return (
+                      <div key={rowInfo.key} className="v2-opt-limit">
+                        {lanes}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -639,7 +657,7 @@ function OptTip({
 }: {
   year: number;
   monthIndex: number;
-  grids: Record<string, Occupancy>;
+  grids: MonthGridStore;
   capacity: CapacityMap;
   showTip: boolean;
   countTables?: boolean;
@@ -735,7 +753,10 @@ function OptTip({
   if (!hover) return null;
   const hoursCaps = hoursOf(capacity, hover.limit, hover.day, weekdayOf(year, monthIndex, hover.day));
   const locked = !levelAllowed(hover.half, hover.level, hoursCaps);
-  const mark = seatsOf(grids[hover.limit]?.[hover.dayIdx]?.[hover.half], hover.level + 1)[hover.level];
+  const mark = seatsOf(
+    grids[monthGridKey(hover.variant, hover.limit)]?.[hover.dayIdx]?.[hover.half],
+    hover.level + 1,
+  )[hover.level];
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
 
   return createPortal(
@@ -812,7 +833,7 @@ export const OptField = memo(function OptField({
   canEdit,
   quietEdit,
   focus,
-  kind,
+  kinds,
   limits,
   capacity,
   grids,
@@ -977,7 +998,7 @@ export const OptField = memo(function OptField({
     const p = propsRef.current;
     if (!p.canEdit) return;
     const now = readCet();
-    const grid = p.grids[origin.limit];
+    const grid = p.grids[monthGridKey(origin.variant, origin.limit)];
     if (!grid?.[origin.dayIdx]) return;
     const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
     const from = Math.min(origin.half, endHalf);
@@ -1046,23 +1067,24 @@ export const OptField = memo(function OptField({
     const wipePass = walk(true);
 
     if (mode === "place" && !brushIsSelf) {
-      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      if (emptyPass.changed) p.onGridChange(origin.variant, origin.limit, emptyPass.next);
       if (emptyPass.keptForeign) p.onForeignKept?.();
       return;
     }
 
     if (mode === "place") {
       if (!wipePass.displaced.size) {
-        if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+        if (emptyPass.changed) p.onGridChange(origin.variant, origin.limit, emptyPass.next);
         return;
       }
       if (!canForeign) {
-        if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+        if (emptyPass.changed) p.onGridChange(origin.variant, origin.limit, emptyPass.next);
         p.onForeignKept?.();
         return;
       }
       p.onOverwriteAsk?.({
         kind: "place",
+        variant: origin.variant,
         limit: origin.limit,
         people: [...wipePass.displaced.values()],
         memberIds: [...wipePass.memberIds],
@@ -1074,16 +1096,17 @@ export const OptField = memo(function OptField({
     }
 
     if (!wipePass.displaced.size) {
-      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      if (emptyPass.changed) p.onGridChange(origin.variant, origin.limit, emptyPass.next);
       return;
     }
     if (!canForeign) {
-      if (emptyPass.changed) p.onGridChange(origin.limit, emptyPass.next);
+      if (emptyPass.changed) p.onGridChange(origin.variant, origin.limit, emptyPass.next);
       p.onForeignKept?.();
       return;
     }
     p.onOverwriteAsk?.({
       kind: "remove",
+      variant: origin.variant,
       limit: origin.limit,
       people: [...wipePass.displaced.values()],
       memberIds: [...wipePass.memberIds],
@@ -1097,7 +1120,10 @@ export const OptField = memo(function OptField({
     const p = propsRef.current;
     const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
-    const mark = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1)[hit.level];
+    const mark = seatsOf(
+      p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],
+      hit.level + 1,
+    )[hit.level];
     if (hit.busyLimits?.length) {
       tipApi.current.show(hit, rest);
       return;
@@ -1132,7 +1158,10 @@ export const OptField = memo(function OptField({
     const past = isPastSlot(p.year, p.monthIndex, hit.day, hit.half, now);
     const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
-    const seats = seatsOf(p.grids[hit.limit]?.[hit.dayIdx]?.[hit.half], hit.level + 1);
+    const seats = seatsOf(
+      p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],
+      hit.level + 1,
+    );
     const mark = seats[hit.level];
     const own = isSelfSeat(mark, p.self ?? p.me);
     let mode: "place" | "remove" | "look" = "look";
@@ -1302,7 +1331,7 @@ export const OptField = memo(function OptField({
           <div className="v2-opt-gutter">
             <div className="v2-opt-day v2-opt-lab">{t("v2.day")}</div>
             <div className="v2-opt-gutter-nls">
-              <div className="v2-opt-nl v2-opt-lab">{kind === "nitro" ? "N" : "E"}</div>
+              <div className="v2-opt-nl v2-opt-lab">{kinds.map((variant) => variant === "nitro" ? "N" : "E").join("/")}</div>
             </div>
           </div>
           <div className="v2-opt-lanes">
@@ -1337,7 +1366,7 @@ export const OptField = memo(function OptField({
               showTables={showTables}
               dimPast={dimPast}
               hidePastDays={hidePastDays}
-              kind={kind}
+              kinds={kinds}
               limits={limits}
               capacity={capacity}
               grids={grids}
