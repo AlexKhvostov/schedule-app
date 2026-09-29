@@ -253,6 +253,60 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   await page.reload();
   await expect(page.getByRole("button", { name: "Nitro · Regular", exact: true })).toBeVisible();
   await expect(label).toHaveText("N/E");
+  const persistedRegular = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
+  const persistedNitro = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
+  await expect(persistedRegular).toHaveClass(/is-on/);
+  if (nitroWasOn) await expect(persistedNitro).toHaveClass(/is-on/);
+  else await expect(persistedNitro).not.toHaveClass(/is-on/);
+
+  await page.getByTitle("Редактирование").click();
+  await persistedRegular.click();
+  await expect(persistedRegular).not.toHaveClass(/is-on/);
+  if (nitroWasOn) await expect(persistedNitro).toHaveClass(/is-on/);
+  else await expect(persistedNitro).not.toHaveClass(/is-on/);
+
+  const pair = await page.locator('[data-slot][data-variant="regular"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').evaluateAll((nodes) => {
+    const rows = nodes.map((node) => ({
+      day: node.getAttribute("data-day")!,
+      half: Number(node.getAttribute("data-half")),
+      level: node.getAttribute("data-level")!,
+      lane: node.getAttribute("data-lane")!,
+    }));
+    return rows.find((row) => rows.some((other) => other.lane === row.lane && other.half === row.half + 1)) ?? null;
+  });
+  expect(pair).toBeTruthy();
+  const dragStart = page.locator(`[data-slot][data-variant="regular"][data-lane="${pair!.lane}"][data-half="${pair!.half}"]`);
+  const dragEnd = page.locator(`[data-slot][data-variant="regular"][data-lane="${pair!.lane}"][data-half="${pair!.half + 1}"]`);
+  const nitroPair = [pair!.half, pair!.half + 1].map((slot) =>
+    page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${pair!.day}"][data-half="${slot}"][data-level="${pair!.level}"]`),
+  );
+  const nitroPairState = await Promise.all(nitroPair.map((cell) => cell.evaluate((node) => node.classList.contains("is-on"))));
+  const [startBox, endBox] = await Promise.all([dragStart.boundingBox(), dragEnd.boundingBox()]);
+  expect(startBox && endBox).toBeTruthy();
+  await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
+  await page.mouse.up();
+  await expect(dragStart).toHaveClass(/is-on/);
+  await expect(dragEnd).toHaveClass(/is-on/);
+  for (let index = 0; index < nitroPair.length; index += 1) {
+    if (nitroPairState[index]) await expect(nitroPair[index]).toHaveClass(/is-on/);
+    else await expect(nitroPair[index]).not.toHaveClass(/is-on/);
+  }
+
+  const foreignRegular = page.locator('[data-slot][data-variant="regular"][data-limit="50"].is-on:not(.is-past):not([data-mark="YO"])').first();
+  const foreignDay = await foreignRegular.getAttribute("data-day");
+  const foreignHalf = await foreignRegular.getAttribute("data-half");
+  const foreignLevel = await foreignRegular.getAttribute("data-level");
+  const foreignRegularTarget = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${foreignDay}"][data-half="${foreignHalf}"][data-level="${foreignLevel}"]`);
+  const foreignNitro = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${foreignDay}"][data-half="${foreignHalf}"][data-level="${foreignLevel}"]`);
+  const foreignNitroWasOn = await foreignNitro.evaluate((node) => node.classList.contains("is-on"));
+  await foreignRegularTarget.click();
+  const dialog = page.getByRole("alertdialog");
+  await dialog.getByRole("button", { name: /Удалить чужие метки/ }).click();
+  await expect(foreignRegularTarget).not.toHaveClass(/is-on/);
+  if (foreignNitroWasOn) await expect(foreignNitro).toHaveClass(/is-on/);
+  else await expect(foreignNitro).not.toHaveClass(/is-on/);
 });
 
 test("cabinet hides payment details and default schedule settings", async ({ page }) => {
