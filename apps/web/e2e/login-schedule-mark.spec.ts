@@ -198,7 +198,7 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
   const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
   expect(cellBox && frameBox).toBeTruthy();
   await expect(candidate).toHaveClass(/is-hover/);
-  await expect(candidate).toHaveCSS("filter", /brightness\(1\.55\)/);
+  await expect(candidate).toHaveCSS("filter", /brightness\(1\.72\)/);
   expect(Math.abs((frameBox!.x + frameBox!.width / 2) - (cellBox!.x + cellBox!.width / 2))).toBeLessThan(3);
   expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(cellBox!.y);
 
@@ -377,6 +377,13 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   await expect(page.locator('.v2-opt-gutter-kind[data-variant="regular"] .v2-limit-chip', { hasText: "E50" }).first()).toBeVisible();
   await expect(page.locator('[data-slot][data-variant="nitro"][data-limit="50"]').first()).toBeVisible();
   await expect(page.locator('[data-slot][data-variant="regular"][data-limit="50"]').first()).toBeVisible();
+  const nitroChip = page.locator('.v2-opt-gutter-kind[data-variant="nitro"] .v2-limit-chip').first();
+  const regularChip = page.locator('.v2-opt-gutter-kind[data-variant="regular"] .v2-limit-chip').first();
+  const [nitroColor, regularColor] = await Promise.all([
+    nitroChip.evaluate((node) => getComputedStyle(node).color),
+    regularChip.evaluate((node) => getComputedStyle(node).color),
+  ]);
+  expect(nitroColor).not.toBe(regularColor);
 
   await page.getByTitle("Редактирование").click();
   const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();

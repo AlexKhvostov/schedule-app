@@ -10391,14 +10391,14 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-cell.is-hover {
   z-index: 7;
-  filter: brightness(1.55) saturate(1.16);
+  filter: brightness(1.72) saturate(1.2);
   box-shadow:
-    inset 0 0 14px color-mix(in srgb, var(--ring) 54%, transparent),
-    0 0 12px color-mix(in srgb, var(--ring) 42%, transparent);
+    inset 0 0 15px color-mix(in srgb, var(--ring) 64%, transparent),
+    0 0 12px color-mix(in srgb, var(--ring) 44%, transparent);
 }
 
 .v2-opt-cell.is-hover:not(.is-on):not(.is-lock) {
-  background: color-mix(in srgb, var(--ring) 36%, var(--slot-future-bg, var(--slot-cell, var(--background))));
+  background: color-mix(in srgb, var(--ring) 48%, var(--slot-future-bg, var(--slot-cell, var(--background))));
 }
 
 .v2-opt-face {

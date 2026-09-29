@@ -544,6 +544,7 @@ const OptBody = memo(function OptBody({
                         <OptNlChip
                           key={`${dayIdx}-${rowInfo.key}-${level}`}
                           tone={limitTone(rowInfo.limit)}
+                          variant={group.variant}
                           ghost={ghost}
                           label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
                         />
