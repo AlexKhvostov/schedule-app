@@ -120,7 +120,7 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   const gapSpacer = firstLane.locator('[data-work-gap="spacer"]');
   await expect(gapSpacer).toHaveCount(1);
   const gapBox = await gapSpacer.boundingBox();
-  expect(gapBox?.width).toBeGreaterThanOrEqual(8);
+  expect(gapBox?.width).toBeGreaterThanOrEqual(10);
 
   await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
   await page.getByTitle("Редактирование").click();
@@ -133,7 +133,7 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   await page.mouse.move(rangeStartBox!.x + rangeStartBox!.width / 2, rangeStartBox!.y + rangeStartBox!.height / 2);
   await page.mouse.down();
   await page.mouse.move(rangeEndBox!.x + rangeEndBox!.width / 2, rangeEndBox!.y + rangeEndBox!.height / 2);
-  await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", "01:30 – 02:00");
+  await expect(page.locator(".v2-opt-pick")).toHaveCount(0);
   await page.mouse.up();
 
   await page.reload();
@@ -187,13 +187,16 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
   await expect(frame).toHaveText(`${format(half)} – ${format(half + 1)}`);
   const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
   expect(cellBox && frameBox).toBeTruthy();
-  expect(Math.abs(frameBox!.width - cellBox!.width)).toBeLessThan(8);
+  await expect(candidate).toHaveClass(/is-hover/);
+  expect(Math.abs((frameBox!.x + frameBox!.width / 2) - (cellBox!.x + cellBox!.width / 2))).toBeLessThan(3);
+  expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(cellBox!.y);
 
   const [startBox, endBox] = await Promise.all([candidate.boundingBox(), target.boundingBox()]);
   expect(startBox && endBox).toBeTruthy();
   await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
   await page.mouse.down();
   await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
+  await expect(frame).toBeHidden();
   const first = Math.min(half, targetHalf);
   const last = Math.max(half, targetHalf);
   await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", `${format(first)} – ${format(last + 1)}`);

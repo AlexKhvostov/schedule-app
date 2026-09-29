@@ -86,6 +86,7 @@ type NavMem = {
   block: Element | null;
   hour: HTMLElement | null;
   lane: Element | null;
+  cell: HTMLElement | null;
   hours: Element | null;
   frame: HTMLDivElement | null;
   col: string;
@@ -252,7 +253,7 @@ function hidePick(root?: HTMLElement | null) {
 function navOf(root: HTMLElement): NavMem {
   let mem = navMem.get(root);
   if (!mem) {
-    mem = { block: null, hour: null, lane: null, hours: null, frame: null, col: "" };
+    mem = { block: null, hour: null, lane: null, cell: null, hours: null, frame: null, col: "" };
     navMem.set(root, mem);
   }
   return mem;
@@ -275,31 +276,13 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
   if (!frame) return;
   const host = frame.parentElement;
   if (!host) return;
-  const kit = root.classList.contains("is-kit");
-  const scope =
-    (kit ? hit.cell.closest(".v2-opt-limit") : null) ?? hit.cell.closest(".v2-opt-lanes");
-  if (!scope) return;
-  const cells = scope.querySelectorAll<HTMLElement>(`[data-slot][data-half="${hit.half}"]`);
-  if (!cells.length) return;
   const hostBox = host.getBoundingClientRect();
-  let left = Infinity;
-  let top = Infinity;
-  let right = -Infinity;
-  let bottom = -Infinity;
-  for (const cell of cells) {
-    const box = cell.getBoundingClientRect();
-    left = Math.min(left, box.left);
-    top = Math.min(top, box.top);
-    right = Math.max(right, box.right);
-    bottom = Math.max(bottom, box.bottom);
-  }
-  const pad = kit ? 2 : 3;
-  const cap = 11;
+  const cellBox = hit.cell.getBoundingClientRect();
   const col = String(hit.half);
-  frame.style.left = `${left - hostBox.left - pad}px`;
-  frame.style.top = `${top - hostBox.top - pad - cap}px`;
-  frame.style.width = `${right - left + pad * 2}px`;
-  frame.style.height = `${bottom - top + pad * 2 + cap}px`;
+  frame.style.left = `${cellBox.left - hostBox.left + cellBox.width / 2}px`;
+  frame.style.top = `${cellBox.top - hostBox.top - 5}px`;
+  frame.style.width = "max-content";
+  frame.style.height = "auto";
   frame.style.bottom = "auto";
   if (mem.col !== col) {
     frame.textContent = label;
@@ -316,9 +299,11 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
     if (!root.dataset.row && !mem.block && !mem.hour) return;
     mem.block?.classList.remove("is-hot");
     mem.lane?.classList.remove("is-hot");
+    mem.cell?.classList.remove("is-hover");
     mem.hour?.classList.remove("is-hot", "is-early", "is-late");
     mem.block = null;
     mem.lane = null;
+    mem.cell = null;
     mem.hour = null;
     delete root.dataset.row;
     delete root.dataset.lane;
@@ -341,6 +326,11 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
     mem.block?.classList.remove("is-hot");
     nextBlock?.classList.add("is-hot");
     mem.block = nextBlock;
+  }
+  if (mem.cell !== hit.cell) {
+    mem.cell?.classList.remove("is-hover");
+    hit.cell.classList.add("is-hover");
+    mem.cell = hit.cell;
   }
   if (!kit) {
     const nextLane = nextBlock?.querySelector(`[data-lane="${lane}"]`) ?? null;
@@ -1190,6 +1180,7 @@ export const OptField = memo(function OptField({
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
     hidePick(rootRef.current);
+    if (rootRef.current) applyNav(rootRef.current, null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -1237,7 +1228,7 @@ export const OptField = memo(function OptField({
     if (mode === "look") return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    showPick(hit, hit.half, hit.half, mode);
+    if (root) hideFrame(navOf(root));
   }, []);
 
   const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -1255,6 +1246,7 @@ export const OptField = memo(function OptField({
     if (root) {
       const cursor = hitOnLane(drag.origin, endHalf);
       if (cursor) applyNav(root, cursor);
+      hideFrame(navOf(root));
     }
     showPick(drag.origin, drag.origin.half, endHalf, drag.mode);
   }, []);
@@ -1362,7 +1354,7 @@ export const OptField = memo(function OptField({
           ["--opt-day-w" as string]: `${Math.max(26, Math.min(32, 24 + cellWidth * 0.4))}px`,
           ["--opt-gap" as string]: `${cellWidth * 0.15}px`,
           ["--opt-visible-slots" as string]: visibleSlotCount,
-          ["--opt-work-gap-w" as string]: `${Math.max(8, cellWidth * 0.45)}px`,
+          ["--opt-work-gap-w" as string]: `${Math.max(10, cellWidth * 0.55)}px`,
           ["--opt-grid-template" as string]: workGridTemplate,
           ["--opt-row-pad" as string]: `${Math.max(1, cellWidth * 0.2)}px`,
           ["--opt-lane-gap" as string]: `${Math.max(0.6, cellWidth * 0.2)}px`,

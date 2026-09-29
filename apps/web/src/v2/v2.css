@@ -9926,17 +9926,33 @@ textarea.v2-ctrl.v2-cab-area {
   align-self: stretch;
   width: 100%;
   min-height: 100%;
-  border-inline: 1px solid color-mix(in srgb, var(--primary) 68%, var(--foreground));
+  overflow: hidden;
+  border-inline: 2px solid color-mix(in srgb, var(--primary) 86%, var(--foreground));
   background:
-    repeating-linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--primary) 36%, var(--background)) 0 2px,
-      color-mix(in srgb, var(--background) 92%, var(--foreground)) 2px 5px
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary) 38%, var(--background)),
+      color-mix(in srgb, var(--primary) 18%, var(--background)) 48%,
+      color-mix(in srgb, var(--primary) 38%, var(--background))
     );
   box-shadow:
-    inset 1px 0 color-mix(in srgb, var(--background) 72%, transparent),
-    inset -1px 0 color-mix(in srgb, var(--background) 72%, transparent);
+    inset 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    inset -1px 0 color-mix(in srgb, #fff 18%, transparent),
+    0 0 5px color-mix(in srgb, var(--primary) 22%, transparent);
   pointer-events: none;
+}
+
+.v2-opt-work-gap::before {
+  content: "";
+  position: absolute;
+  inset: -4px 1px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    color-mix(in srgb, var(--primary) 94%, #fff) 3px 5px,
+    transparent 5px 8px
+  );
+  opacity: 0.9;
 }
 
 .v2-opt-hour b {
@@ -9978,31 +9994,24 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-frame {
   position: absolute;
   box-sizing: border-box;
-  top: calc(-1 * var(--opt-frame-pad) - 11px);
-  bottom: calc(-1 * var(--opt-frame-pad));
-  left: calc(
-    var(--opt-day-w) + var(--opt-nl-gap) + var(--opt-nl-w) + var(--opt-nl-gap) + var(--opt-pad-l) + var(--opt-col, 0) * 2 *
-      (var(--opt-cell-w) + var(--opt-gap)) - var(--opt-frame-pad)
-  );
-  width: calc(2 * var(--opt-cell-w) + var(--opt-gap) + 2 * var(--opt-frame-pad));
-  z-index: 8;
-  overflow: visible;
-  padding-top: 2px;
-  border: 1.5px solid var(--opt-frame);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--ring) 10%, transparent);
-  color: var(--foreground);
+  z-index: 12;
+  width: max-content;
+  height: auto;
+  padding: 4px 7px 5px;
+  border: 1px solid color-mix(in srgb, var(--ring) 42%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--popover) 92%, var(--ring));
+  color: var(--popover-foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-  text-shadow:
-    0 0 4px var(--background),
-    0 1px 1px var(--background),
-    0 -1px 1px var(--background);
+  text-shadow: none;
+  transform: translate(-50%, -100%);
+  box-shadow: 0 5px 16px color-mix(in srgb, #000 34%, transparent);
   pointer-events: none;
 }
 
@@ -10369,6 +10378,18 @@ textarea.v2-ctrl.v2-cab-area {
   z-index: 7;
 }
 
+.v2-opt-cell.is-hover {
+  z-index: 7;
+  filter: brightness(1.16) saturate(1.04);
+  box-shadow:
+    inset 0 0 9px color-mix(in srgb, var(--ring) 22%, transparent),
+    0 0 7px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+
+.v2-opt-cell.is-hover:not(.is-on):not(.is-lock) {
+  background: color-mix(in srgb, var(--ring) 11%, var(--slot-future-bg, var(--slot-cell, var(--background))));
+}
+
 .v2-opt-face {
   position: relative;
   display: grid;
@@ -10642,14 +10663,10 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt.is-kit .v2-opt-frame {
-  box-sizing: border-box;
-  color: var(--foreground);
-  text-shadow:
-    0 0 4px var(--background),
-    0 1px 1px var(--background),
-    0 -1px 1px var(--background);
-  background: color-mix(in srgb, var(--ring) 10%, transparent);
-  border-color: var(--ring);
+  color: var(--popover-foreground);
+  text-shadow: none;
+  background: color-mix(in srgb, var(--popover) 92%, var(--ring));
+  border-color: color-mix(in srgb, var(--ring) 42%, var(--border));
 }
 
 .v2-opt.is-kit .v2-opt-lane.is-hot .v2-limit-chip {
