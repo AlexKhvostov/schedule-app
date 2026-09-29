@@ -52,6 +52,8 @@ jobs:
         run: supabase db reset
       - name: Check database security contracts
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/security_contracts.sql
+      - name: Check schedule filter limit RPC
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/schedule_filter_limits.sql
       - name: Lint database
         run: supabase db lint --local --level warning
       - name: Stop local database

@@ -49,6 +49,38 @@ begin
     raise exception 'consolidated data-access RPC grants are incomplete';
   end if;
 
+  if not has_function_privilege('authenticated', 'public.save_schedule_filter_limits(text[],text[])', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_schedule_filter_limits(text[],text[])', 'EXECUTE') then
+    raise exception 'schedule filter limit RPC grants are incorrect';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'filter_limits_nitro' and data_type = 'ARRAY'
+  ) or not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'filter_limits_regular' and data_type = 'ARRAY'
+  ) then
+    raise exception 'schedule filter limit columns are missing';
+  end if;
+
+  if has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'filter_limits_nitro',
+       'UPDATE'
+     )
+     or has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'filter_limits_regular',
+       'UPDATE'
+     ) then
+    raise exception 'schedule filter limit arrays must only be writable through the atomic RPC';
+  end if;
+
   if has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'SELECT')
      or has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'INSERT')
      or has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'UPDATE')

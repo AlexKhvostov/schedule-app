@@ -35,6 +35,7 @@
 | Правило «заменять чужие метки» | `schedule_settings.allow_replace_marks` | По умолчанию выкл. Пишет admin/root. Протяжка: RPC `replace_foreign_slots` сначала DELETE чужих, затем INSERT кисти. Клик по чужой остаётся снятием |
 | Правило «работа со столами» | `schedule_settings.count_tables` | По умолчанию выкл. Пишет admin/root. Выкл — продукт столы не показывает и не правит. Колонки `members.tables` / `occupancy.tables` в схеме остаются |
 | Постоянное редактирование на компьютере | `schedule_settings.edit_by_button` | Историческое обратное имя: `false` разрешает desktop-пользователям менять сетку сразу, `true` требует карандаш. На touch-устройствах клиент всегда требует явного включения после достаточного увеличения |
+| Доступные лимиты фильтра | `schedule_settings.filter_limits_nitro` + `filter_limits_regular` | Два непустых массива ID из `limits`, отдельно по виду. Читает расписание; роль с `schedule.manage` заменяет оба массива одной RPC `save_schedule_filter_limits`. Прямая запись массивов закрыта |
 | Турниры за месяц (дистанции) | `distance_entries` + `distance_values` | запись: участник + снимки ID/ника + рум + месяц + Nitro/Regular + part + комментарий; значения — отдельные ненулевые строки лимитов. Пишут импорт и staff-RPC |
 | Куда бот пишет человеку | `profiles.notify_channel` | `discord` (по умолчанию), `telegram`, `email`. Пишет владелец и SQL `is_staff()` (admin/root) из карточки человека |
 | Настройки ботов | `bot_settings` + `bot_secrets` | Две строки: Discord и Telegram. Публичные поля читает клуб, пишет root. Токен — только запись через RPC `set_bot_token`, SELECT клиенту закрыт. Автоуведомления: `notify_mark_removed`, `notify_fill_queue`. Канал клуба — `notice_chat`. Писать от имени бота может только root |
@@ -90,6 +91,8 @@ erDiagram
     boolean allow_overwrite_marks
     boolean allow_replace_marks
     boolean count_tables
+    text[] filter_limits_nitro
+    text[] filter_limits_regular
   }
   DISCORD_GUILD {
     text id PK
@@ -171,7 +174,7 @@ erDiagram
 | `capacity_flags` | 22: включены ли правила месяца и недели |
 | `capacity_rules` | 22 базовых: **сейчас все единицы**. Сид и сброс матрицы в админке — день 1, ночь 22–06 = 2. Не путать сид с боем |
 | `occupancy` | живые записи с поля |
-| `schedule_settings` | одна строка: галка **удалять чужие метки**, галка **заменять чужие метки**, галка **работа со столами** (сейчас выкл). Пишет SQL `is_staff()` (admin/root), читает вошедший |
+| `schedule_settings` | одна строка: клубные галки сетки и два непустых набора лимитов фильтра Nitro/Regular. Читает вошедший с доступом к расписанию; галки меняет роль с `schedule.manage`, лимиты — только атомарная RPC `save_schedule_filter_limits` |
 
 ### Снимок Discord
 
@@ -209,6 +212,7 @@ erDiagram
 - Ставить слот может только `active`.
 - На закрытый уровень поставить нельзя (триггер смотрит `hours_of`).
 - Если на час заданы и число месяца, и день недели — берётся **минимум**.
+- `save_schedule_filter_limits` проверяет `schedule.manage`, известность каждого ID в справочнике и наличие соответствующего `schedule_kind`; нормализует порядок по `limits.sort` и меняет оба вида в одной транзакции. Ошибка оставляет прежние массивы без изменений.
 - Живое обновление: Realtime на `occupancy`, `members` и `schedule_settings`. Журнал `occupancy_events` в realtime не входит. Клиент грузит месяц одной функцией `load_month_schedule`. После **своей** успешной записи месяц целиком не качает — иначе метка мигает. Чужие изменения подтягивает realtime.
 - Постановка и снятие пишут строку в `occupancy_events` (триггер). Сетка этот журнал не читает. Строки старше 2 месяцев удаляет ночной cron. Снятие чужой через `remove_foreign_slots` и замена через `replace_foreign_slots` тоже пишут журнал.
 - Если чужую метку сняли (клик или замена), Edge Function `notify-mark-removed` пишет в клубный Discord-канал: какая метка, слот, кто снял — и в личку обоим. Галка в Root. Канал человека в кабинете и в карточке участника: Discord / Telegram / почта.

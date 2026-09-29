@@ -19,7 +19,7 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 ## Релизный барьер
 
-Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS и database lint.
+Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняется `schedule_filter_limits.sql`, который проверяет атомарность, откат и отказ пользователю без `schedule.manage`.
 
 Базовый E2E всегда выполняет детерминированный локальный сценарий. Для smoke-теста реальной Discord-сессии на staging укажите `E2E_AUTH_STATE` — путь к некоммитящемуся Playwright storage-state. Мутационные тесты нельзя направлять в production.
 

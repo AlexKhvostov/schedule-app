@@ -1,10 +1,17 @@
 import { getSupabase } from "./client";
+import { LIMIT_OPTIONS } from "../schedule/capacity";
+
+export type ScheduleFilterLimits = {
+  nitro: string[];
+  regular: string[];
+};
 
 export type ClubGridSettings = {
   allowOverwriteMarks: boolean;
   allowActAs: boolean;
   countTables: boolean;
   editByButton: boolean;
+  filterLimits: ScheduleFilterLimits;
 };
 
 const EMPTY: ClubGridSettings = {
@@ -12,14 +19,28 @@ const EMPTY: ClubGridSettings = {
   allowActAs: false,
   countTables: false,
   editByButton: true,
+  filterLimits: { nitro: [...LIMIT_OPTIONS], regular: [...LIMIT_OPTIONS] },
 };
+
+export function normalizeScheduleFilterLimits(value: unknown) {
+  if (!Array.isArray(value)) return [...LIMIT_OPTIONS];
+  const found = [
+    ...new Set(
+      value.filter(
+        (item): item is string =>
+          typeof item === "string" && LIMIT_OPTIONS.includes(item as (typeof LIMIT_OPTIONS)[number]),
+      ),
+    ),
+  ];
+  return found.length ? found : [...LIMIT_OPTIONS];
+}
 
 export async function loadScheduleSettings(): Promise<ClubGridSettings> {
   const db = getSupabase();
   if (!db) return EMPTY;
   const { data } = await db
     .from("schedule_settings")
-    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button")
+    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button, filter_limits_nitro, filter_limits_regular")
     .eq("id", true)
     .maybeSingle();
   return {
@@ -27,7 +48,21 @@ export async function loadScheduleSettings(): Promise<ClubGridSettings> {
     allowActAs: Boolean(data?.allow_act_as),
     countTables: Boolean(data?.count_tables),
     editByButton: data?.edit_by_button !== false,
+    filterLimits: {
+      nitro: normalizeScheduleFilterLimits(data?.filter_limits_nitro),
+      regular: normalizeScheduleFilterLimits(data?.filter_limits_regular),
+    },
   };
+}
+
+export async function saveScheduleFilterLimits(next: ScheduleFilterLimits) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const };
+  const { error } = await db.rpc("save_schedule_filter_limits", {
+    p_nitro: next.nitro,
+    p_regular: next.regular,
+  });
+  return { error: error?.message };
 }
 
 export async function saveOverwriteMarks(value: boolean) {
