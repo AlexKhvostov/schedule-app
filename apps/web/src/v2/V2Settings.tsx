@@ -1,14 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { DISPLAY_RANGES, type DisplayRange } from "../schedule/displayRange";
-import { DAY_HALF_SLOTS, halfTimeLabel } from "../schedule/workHours";
+import { DAY_HOURS } from "../schedule/workHours";
 import { V2Float } from "./V2Float";
 
 type Props = {
   dimPast: boolean;
   hidePastDays: boolean;
   displayRange: DisplayRange;
-  workStartHalf: number;
-  workEndHalf: number;
+  workHours: number[];
   showDisplayRange?: boolean;
   showTables: boolean;
   countTables?: boolean;
@@ -23,7 +22,7 @@ type Props = {
   onDimPast: (value: boolean) => void;
   onHidePastDays: (value: boolean) => void;
   onDisplayRange: (value: DisplayRange) => void;
-  onWorkHours: (startHalf: number, endHalf: number) => void;
+  onWorkHours: (hours: number[]) => void;
   onShowTables: (value: boolean) => void;
   onShowTip: (value: boolean) => void;
   onEditPulse: (value: boolean) => void;
@@ -37,8 +36,7 @@ export function V2Settings({
   dimPast,
   hidePastDays,
   displayRange,
-  workStartHalf,
-  workEndHalf,
+  workHours,
   showDisplayRange = true,
   showTables,
   countTables = false,
@@ -146,31 +144,28 @@ export function V2Settings({
             <b>{t("schedule.workHours")}</b>
             <small>{t("schedule.workHoursHint")}</small>
           </div>
-          <div className="v2-settings-work-hours">
-            <label>
-              <span>{t("schedule.workHoursFrom")}</span>
-              <select
-                aria-label={t("schedule.workHoursFrom")}
-                value={workStartHalf}
-                onChange={(event) => onWorkHours(Number(event.target.value), workEndHalf)}
-              >
-                {Array.from({ length: DAY_HALF_SLOTS }, (_, half) => (
-                  <option key={half} value={half} disabled={half >= workEndHalf}>{halfTimeLabel(half)}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>{t("schedule.workHoursTo")}</span>
-              <select
-                aria-label={t("schedule.workHoursTo")}
-                value={workEndHalf}
-                onChange={(event) => onWorkHours(workStartHalf, Number(event.target.value))}
-              >
-                {Array.from({ length: DAY_HALF_SLOTS }, (_, index) => index + 1).map((half) => (
-                  <option key={half} value={half} disabled={half <= workStartHalf}>{halfTimeLabel(half)}</option>
-                ))}
-              </select>
-            </label>
+          <div className="v2-settings-work-hours" role="group" aria-label={t("schedule.workHours")}>
+            {Array.from({ length: DAY_HOURS }, (_, hour) => {
+              const selected = workHours.includes(hour);
+              const label = `${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00`;
+              return (
+                <button
+                  key={hour}
+                  type="button"
+                  className={selected ? "is-on" : ""}
+                  aria-label={label}
+                  aria-pressed={selected}
+                  disabled={selected && workHours.length === 1}
+                  onClick={() => onWorkHours(
+                    selected
+                      ? workHours.filter((value) => value !== hour)
+                      : [...workHours, hour].sort((a, b) => a - b),
+                  )}
+                >
+                  {String(hour).padStart(2, "0")}
+                </button>
+              );
+            })}
           </div>
         </section>
         {rows.map((row) => (

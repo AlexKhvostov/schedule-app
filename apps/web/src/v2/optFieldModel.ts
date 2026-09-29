@@ -119,18 +119,30 @@ export function findHitCss(query: string) {
   return `.v2-opt.is-find[data-opt-find="${query}"] .v2-opt-cell.is-on[data-mark="${query}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
 }
 
-export function nowAlongTrack(half: number, progress: number, startHalf = 0, endHalf = 48) {
-  const slotCount = endHalf - startHalf;
-  const t = Math.min(endHalf, Math.max(startHalf, half + Math.min(1, Math.max(0, progress)))) - startHalf;
+export function nowAlongTrack(half: number, progress: number, startHalfOrVisible: number | number[] = 0, endHalf = 48) {
+  const clampedProgress = Math.min(1, Math.max(0, progress));
+  const visible = Array.isArray(startHalfOrVisible) ? startHalfOrVisible : undefined;
+  const startHalf = typeof startHalfOrVisible === "number" ? startHalfOrVisible : 0;
+  const slotCount = visible ? visible.length : endHalf - startHalf;
+  const t = visible
+    ? Math.max(0, visible.indexOf(half)) + clampedProgress
+    : Math.min(endHalf, Math.max(startHalf, half + clampedProgress)) - startHalf;
   const cell = Math.min(slotCount - 1, Math.floor(t));
   const frac = t - cell;
+  if (visible) {
+    let gaps = 0;
+    for (let at = 1; at <= cell; at += 1) {
+      if (visible[at] !== visible[at - 1] + 1) gaps += 1;
+    }
+    return `var(--opt-pad-l) + ${cell} * (var(--opt-cell-w) + var(--opt-gap)) + ${gaps} * (var(--opt-work-gap-w) + var(--opt-gap)) + ${frac} * var(--opt-cell-w)`;
+  }
   return `var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - ${slotCount - 1} * var(--opt-gap)) * ${cell + frac} / ${slotCount} + ${cell} * var(--opt-gap)`;
 }
 
-export function nowHeadLeft(half: number, progress: number, startHalf = 0, endHalf = 48) {
-  return `calc(${nowAlongTrack(half, progress, startHalf, endHalf)})`;
+export function nowHeadLeft(half: number, progress: number, startHalfOrVisible: number | number[] = 0, endHalf = 48) {
+  return `calc(${nowAlongTrack(half, progress, startHalfOrVisible, endHalf)})`;
 }
 
-export function nowLineLeft(half: number, progress: number, startHalf = 0, endHalf = 48) {
-  return `calc(${nowAlongTrack(half, progress, startHalf, endHalf)})`;
+export function nowLineLeft(half: number, progress: number, startHalfOrVisible: number | number[] = 0, endHalf = 48) {
+  return `calc(${nowAlongTrack(half, progress, startHalfOrVisible, endHalf)})`;
 }

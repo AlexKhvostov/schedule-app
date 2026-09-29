@@ -16,6 +16,7 @@ describe("schedule preferences", () => {
     expect(damaged).toEqual(DEFAULT_PREFS);
     expect(missing.limits).not.toBe(DEFAULT_PREFS.limits);
     expect(missing.kinds).not.toBe(DEFAULT_PREFS.kinds);
+    expect(missing.workHours).not.toBe(DEFAULT_PREFS.workHours);
   });
 
   it("migrates the legacy unversioned shape and validates every field", () => {
@@ -78,14 +79,11 @@ describe("schedule preferences", () => {
     expect(normalizeSchedulePrefs({ displayRange: "other" }).displayRange).toBe("month");
   });
 
-  it("keeps valid working hours and resets an overnight range", () => {
-    expect(normalizeSchedulePrefs({ workStartHalf: 17, workEndHalf: 36 })).toMatchObject({
-      workStartHalf: 17,
-      workEndHalf: 36,
-    });
-    expect(normalizeSchedulePrefs({ workStartHalf: 36, workEndHalf: 17 })).toMatchObject({
-      workStartHalf: 0,
-      workEndHalf: 48,
-    });
+  it("keeps multiple working-hour blocks and migrates the old range", () => {
+    expect(normalizeSchedulePrefs({ workHours: [23, 0, 1, 18, 23] }).workHours).toEqual([0, 1, 18, 23]);
+    expect(normalizeSchedulePrefs({ version: 5, workStartHalf: 17, workEndHalf: 36 }).workHours).toEqual([
+      8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+    ]);
+    expect(normalizeSchedulePrefs({ workHours: [] }).workHours).toEqual(DEFAULT_PREFS.workHours);
   });
 });

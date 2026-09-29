@@ -8306,27 +8306,32 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-settings-work-hours {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
 }
 
-.v2-settings-work-hours label {
-  display: grid;
-  gap: 4px;
-  color: var(--muted-foreground);
-  font-size: 10px;
-}
-
-.v2-settings-work-hours select {
+.v2-settings-work-hours button {
   min-width: 0;
-  height: 30px;
-  padding: 0 7px;
+  height: 25px;
+  padding: 0 2px;
   border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--background);
-  color: var(--foreground);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--muted-foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.v2-settings-work-hours button.is-on {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
+  color: var(--primary);
+}
+
+.v2-settings-work-hours button:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .v2-settings-row,
@@ -9651,7 +9656,7 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-track {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(var(--opt-visible-slots, 48), var(--opt-cell-w));
+  grid-template-columns: var(--opt-grid-template, repeat(var(--opt-visible-slots, 48), var(--opt-cell-w)));
   column-gap: var(--opt-gap);
   row-gap: 0;
   justify-items: stretch;
@@ -9912,6 +9917,25 @@ textarea.v2-ctrl.v2-cab-area {
   white-space: nowrap;
   font-size: 11px;
   font-weight: 650;
+  pointer-events: none;
+}
+
+.v2-opt-work-gap {
+  position: relative;
+  z-index: 3;
+  align-self: stretch;
+  width: 100%;
+  min-height: 100%;
+  border-inline: 1px solid color-mix(in srgb, var(--primary) 68%, var(--foreground));
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary) 36%, var(--background)) 0 2px,
+      color-mix(in srgb, var(--background) 92%, var(--foreground)) 2px 5px
+    );
+  box-shadow:
+    inset 1px 0 color-mix(in srgb, var(--background) 72%, transparent),
+    inset -1px 0 color-mix(in srgb, var(--background) 72%, transparent);
   pointer-events: none;
 }
 

@@ -3,7 +3,7 @@ import { DISPLAY_RANGES, type DisplayRange } from "../schedule/displayRange";
 import { DEFAULT_WORK_HOURS, normalizeWorkHours } from "../schedule/workHours";
 
 const KEY = "v2-schedule-prefs";
-export const SCHEDULE_PREFS_VERSION = 5;
+export const SCHEDULE_PREFS_VERSION = 6;
 export const SCHEDULE_KINDS = ["nitro", "regular"] as const;
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
@@ -19,8 +19,7 @@ export type SchedulePrefs = {
   dimPast: boolean;
   hidePastDays: boolean;
   displayRange: DisplayRange;
-  workStartHalf: number;
-  workEndHalf: number;
+  workHours: number[];
   hideTables: boolean;
   showTip: boolean;
 };
@@ -39,8 +38,7 @@ export const DEFAULT_PREFS: SchedulePrefs = {
   dimPast: true,
   hidePastDays: false,
   displayRange: "month",
-  workStartHalf: DEFAULT_WORK_HOURS.startHalf,
-  workEndHalf: DEFAULT_WORK_HOURS.endHalf,
+  workHours: [...DEFAULT_WORK_HOURS],
   hideTables: false,
   showTip: true,
 };
@@ -50,7 +48,12 @@ function ym(date: Date) {
 }
 
 function defaults(): SchedulePrefs {
-  return { ...DEFAULT_PREFS, limits: [...DEFAULT_PREFS.limits], kinds: [...DEFAULT_PREFS.kinds] };
+  return {
+    ...DEFAULT_PREFS,
+    limits: [...DEFAULT_PREFS.limits],
+    kinds: [...DEFAULT_PREFS.kinds],
+    workHours: [...DEFAULT_PREFS.workHours],
+  };
 }
 
 function booleanOr(value: unknown, fallback: boolean) {
@@ -75,7 +78,7 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
   const limits = [...new Set(rawLimits)]
     .filter((item): item is string => typeof item === "string" && LIMIT_OPTIONS.includes(item as (typeof LIMIT_OPTIONS)[number]))
     .sort((a, b) => Number(a) - Number(b));
-  const workHours = normalizeWorkHours(parsed.workStartHalf, parsed.workEndHalf);
+  const workHours = normalizeWorkHours(parsed.workHours, parsed.workStartHalf, parsed.workEndHalf);
   return {
     version: SCHEDULE_PREFS_VERSION,
     limits: limits.length ? limits : [...DEFAULT_PREFS.limits],
@@ -91,8 +94,7 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
     displayRange: DISPLAY_RANGES.includes(parsed.displayRange as DisplayRange)
       ? parsed.displayRange as DisplayRange
       : DEFAULT_PREFS.displayRange,
-    workStartHalf: workHours.startHalf,
-    workEndHalf: workHours.endHalf,
+    workHours,
     hideTables: booleanOr(parsed.hideTables, DEFAULT_PREFS.hideTables),
     showTip: booleanOr(parsed.showTip, DEFAULT_PREFS.showTip),
   };

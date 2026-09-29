@@ -1,48 +1,55 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WORK_HOURS,
-  clipWorkRun,
-  halfTimeLabel,
+  clampWorkRangeHalf,
   normalizeWorkHours,
+  visibleWorkRuns,
+  workGapBefore,
   workHalfSlots,
   workHourSegments,
   workTrackProgress,
 } from "./workHours";
 
-describe("working-time display range", () => {
-  it("keeps a valid same-day half-hour range", () => {
-    expect(normalizeWorkHours(17, 36)).toEqual({ startHalf: 17, endHalf: 36 });
-    expect(workHalfSlots(17, 36)).toHaveLength(19);
-    expect(workHalfSlots(17, 36)).toEqual(expect.arrayContaining([17, 35]));
+describe("working-hour display selection", () => {
+  it("keeps sorted unique hours and expands each one to two half-hours", () => {
+    expect(normalizeWorkHours([18, 0, 1, 18, 23])).toEqual([0, 1, 18, 23]);
+    expect(workHalfSlots([0, 1, 18, 23])).toEqual([0, 1, 2, 3, 36, 37, 46, 47]);
   });
 
-  it("accepts the full day and formats its boundaries", () => {
-    expect(normalizeWorkHours(0, 48)).toEqual(DEFAULT_WORK_HOURS);
-    expect(halfTimeLabel(0)).toBe("00:00");
-    expect(halfTimeLabel(17)).toBe("08:30");
-    expect(halfTimeLabel(48)).toBe("24:00");
+  it("falls back to the full day for an empty or invalid selection", () => {
+    expect(normalizeWorkHours([])).toEqual(DEFAULT_WORK_HOURS);
+    expect(normalizeWorkHours([24, -1, 1.5])).toEqual(DEFAULT_WORK_HOURS);
   });
 
-  it("rejects reversed, empty, fractional, and out-of-day ranges", () => {
-    expect(normalizeWorkHours(36, 17)).toEqual(DEFAULT_WORK_HOURS);
-    expect(normalizeWorkHours(17, 17)).toEqual(DEFAULT_WORK_HOURS);
-    expect(normalizeWorkHours(17.5, 36)).toEqual(DEFAULT_WORK_HOURS);
-    expect(normalizeWorkHours(-1, 36)).toEqual(DEFAULT_WORK_HOURS);
-    expect(normalizeWorkHours(17, 49)).toEqual(DEFAULT_WORK_HOURS);
+  it("migrates a legacy half-hour range without hiding a previously visible half-hour", () => {
+    expect(normalizeWorkHours(undefined, 17, 36)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+    expect(normalizeWorkHours(undefined, 36, 17)).toEqual(DEFAULT_WORK_HOURS);
   });
 
-  it("builds clipped hour headings and current-time progress", () => {
-    expect(workHourSegments(17, 36)).toEqual([
-      { hour: 8, startHalf: 17, span: 1 },
-      ...Array.from({ length: 9 }, (_, index) => ({ hour: 9 + index, startHalf: 18 + index * 2, span: 2 })),
+  it("builds compressed headings and current-time progress", () => {
+    expect(workHourSegments([0, 1, 18])).toEqual([
+      { hour: 0, startHalf: 0, span: 2, visibleStart: 0 },
+      { hour: 1, startHalf: 2, span: 2, visibleStart: 2 },
+      { hour: 18, startHalf: 36, span: 2, visibleStart: 4 },
     ]);
-    expect(workTrackProgress(17, 0, 17, 36)).toBe(0);
-    expect(workTrackProgress(26, 0.5, 17, 36)).toBe(0.5);
-    expect(workTrackProgress(8, 0, 17, 36)).toBeNull();
+    expect(workTrackProgress(2, 0.5, [0, 1, 18])).toBe(2.5 / 6);
+    expect(workTrackProgress(20, 0, [0, 1, 18])).toBeNull();
   });
 
-  it("clips runs without changing their source coordinates", () => {
-    expect(clipWorkRun(16, 20, 17, 36)).toEqual({ start: 17, end: 20 });
-    expect(clipWorkRun(36, 40, 17, 36)).toBeNull();
+  it("splits a shift around hidden hours and preserves compressed positions", () => {
+    expect(visibleWorkRuns(1, 38, [0, 1, 18, 19])).toEqual([
+      { start: 1, end: 4, visibleStart: 1, span: 3 },
+      { start: 36, end: 38, visibleStart: 4, span: 2 },
+    ]);
+    expect(visibleWorkRuns(8, 12, [0, 1, 18])).toEqual([]);
+  });
+
+  it("marks a visual gap and stops a dragged range at its edge", () => {
+    const visible = workHalfSlots([7, 9]);
+    expect(workGapBefore(visible, 18)).toBe(true);
+    expect(workGapBefore(visible, 19)).toBe(false);
+    expect(clampWorkRangeHalf(15, 18, [7, 9])).toBe(15);
+    expect(clampWorkRangeHalf(18, 15, [7, 9])).toBe(18);
+    expect(clampWorkRangeHalf(18, 19, [7, 9])).toBe(19);
   });
 });

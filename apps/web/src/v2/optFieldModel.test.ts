@@ -24,6 +24,7 @@ describe("opt field presentation model", () => {
     expect(tablesLabel(3, "ru")).toBe("3 стола");
     expect(tablesLabel(11, "ru")).toBe("11 столов");
     expect(nowHeadLeft(48, 2)).toContain("/ 48");
+    expect(nowHeadLeft(36, 0.5, [0, 1, 2, 3, 36, 37])).toContain("var(--opt-work-gap-w)");
   });
 
   it("groups rows by variant before limit and keeps equal limits distinct", () => {

@@ -88,8 +88,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [dimPast, setDimPast] = useState(boot.dimPast);
   const [hidePastDays, setHidePastDays] = useState(boot.hidePastDays);
   const [displayRange, setDisplayRange] = useState(boot.displayRange);
-  const [workStartHalf, setWorkStartHalf] = useState(boot.workStartHalf);
-  const [workEndHalf, setWorkEndHalf] = useState(boot.workEndHalf);
+  const [workHours, setWorkHours] = useState(boot.workHours);
   const [showTip, setShowTip] = useState(boot.showTip);
   const [canEdit, setCanEdit] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
@@ -1248,8 +1247,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           dimPast={dimPast}
           hidePastDays={hidePastDays}
           displayRange={displayRange}
-          workStartHalf={workStartHalf}
-          workEndHalf={workEndHalf}
+          workHours={workHours}
           showTip={showTip}
           canEdit={paintOn && !gridLoading}
           quietEdit={!editGlow || !editPulse}
@@ -1290,8 +1288,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             columns={auxiliaryItems}
             grids={mineGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
-            workStartHalf={workStartHalf}
-            workEndHalf={workEndHalf}
+            workHours={workHours}
             x={calPos.x}
             y={calPos.y}
             z={zOf("calendar")}
@@ -1305,8 +1302,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             dimPast={dimPast}
             hidePastDays={hidePastDays}
             displayRange={displayRange}
-            workStartHalf={workStartHalf}
-            workEndHalf={workEndHalf}
+            workHours={workHours}
             showDisplayRange={cetTick.year === year && cetTick.monthIndex === monthIndex}
             showTables={!hideTables}
             countTables={countTables}
@@ -1330,10 +1326,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setDisplayRange(value);
               savePrefs({ ...loadPrefs(), displayRange: value });
             }}
-            onWorkHours={(startHalf, endHalf) => {
-              setWorkStartHalf(startHalf);
-              setWorkEndHalf(endHalf);
-              savePrefs({ ...loadPrefs(), workStartHalf: startHalf, workEndHalf: endHalf });
+            onWorkHours={(hours) => {
+              setWorkHours(hours);
+              savePrefs({ ...loadPrefs(), workHours: hours });
             }}
             onShowTables={(value) => {
               setHideTables(!value);
@@ -1362,8 +1357,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setDimPast(next.dimPast);
               setHidePastDays(next.hidePastDays);
               setDisplayRange(next.displayRange);
-              setWorkStartHalf(next.workStartHalf);
-              setWorkEndHalf(next.workEndHalf);
+              setWorkHours(next.workHours);
               setHideTables(next.hideTables);
               setShowTip(next.showTip);
               onKindChange?.(next.kinds[0]);

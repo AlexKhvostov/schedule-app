@@ -1,6 +1,6 @@
 import { limitTonePaint } from "../schedule/capacity";
 import type { ShiftRun } from "./myShifts";
-import { clipWorkRun, workHourSegments, workTrackProgress } from "../schedule/workHours";
+import { visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 
 const WIDTH = 680;
 const PAD = 12;
@@ -49,8 +49,7 @@ type Opts = {
   kicker: string;
   meta: string;
   dayLabel: string;
-  workStartHalf: number;
-  workEndHalf: number;
+  workHours: number[];
 };
 
 export type CalendarShiftRun = ShiftRun & {
@@ -68,8 +67,8 @@ function limitInk(limit: string) {
   return limit === "25" ? "#14532d" : "#071014";
 }
 
-function slotX(trackW: number, slot: number, startHalf: number, endHalf: number) {
-  return (trackW * (slot - startHalf)) / (endHalf - startHalf);
+function slotX(trackW: number, visibleSlot: number, slotCount: number) {
+  return (trackW * visibleSlot) / slotCount;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -92,7 +91,8 @@ function runPast(day: number, end: number, today: number | null, nowAt: number) 
 
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel, workStartHalf, workEndHalf } = opts;
+  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel, workHours } = opts;
+  const visibleSlotCount = workHalfSlots(workHours).length;
   const laneCount = Math.max(1, usedColumns.length);
   const rowH = Math.max(22, laneCount * 18 + 4);
   const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + PAD;
@@ -156,9 +156,9 @@ export async function downloadCalendarJpeg(opts: Opts) {
   ctx.font = "600 9px JetBrains Mono, IBM Plex Mono, monospace";
   ctx.fillText("CET", sheetX + 8, sheetY + 17);
 
-  for (const segment of workHourSegments(workStartHalf, workEndHalf)) {
-    const x = trackX + slotX(trackW, segment.startHalf, workStartHalf, workEndHalf);
-    const w = (trackW * segment.span) / (workEndHalf - workStartHalf);
+  for (const segment of workHourSegments(workHours)) {
+    const x = trackX + slotX(trackW, segment.visibleStart, visibleSlotCount);
+    const w = (trackW * segment.span) / visibleSlotCount;
     ctx.strokeStyle = segment.hour === 5 || segment.hour === 11 || segment.hour === 17 ? paint.lineStrong : paint.line;
     ctx.beginPath();
     ctx.moveTo(x + w + 0.5, sheetY);
@@ -167,7 +167,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.textAlign = "center";
     ctx.font = "650 9px JetBrains Mono, IBM Plex Mono, monospace";
     ctx.fillStyle = paint.muted;
-    ctx.fillText(segment.span === 1 && segment.startHalf % 2 ? `${segment.hour}:30` : String(segment.hour), x + w / 2, sheetY + 10);
+    ctx.fillText(String(segment.hour), x + w / 2, sheetY + 10);
     ctx.textAlign = "left";
   }
 
@@ -199,58 +199,59 @@ export async function downloadCalendarJpeg(opts: Opts) {
     }
 
     for (const run of byDay.get(day.d) ?? []) {
-      const clipped = clipWorkRun(run.start, run.end, workStartHalf, workEndHalf);
-      if (!clipped) continue;
-      const len = clipped.end - clipped.start;
-      const x = trackX + slotX(trackW, clipped.start, workStartHalf, workEndHalf);
-      const w = Math.max(2, (trackW * len) / (workEndHalf - workStartHalf));
-      const cy = y + 2 + run.lane * 18;
-      const past = runPast(day.d, run.end, today, nowAt);
-      ctx.save();
-      if (dimPast && past) {
-        ctx.filter = "saturate(0.12) grayscale(0.62)";
-        ctx.globalAlpha = 0.68;
-      }
-      ctx.fillStyle = mineTone(run.rawLimit);
-      roundRect(ctx, x, cy, w, CHIP_H, 2);
-      ctx.fill();
-      if (len > 1) {
-        ctx.beginPath();
-        roundRect(ctx, x, cy, w, CHIP_H, 2);
-        ctx.clip();
-        ctx.strokeStyle = limitInk(run.rawLimit);
-        ctx.lineWidth = 1;
-        for (let i = 1; i < len; i += 1) {
-          if ((clipped.start + i) % 2 !== 0) continue;
-          const tx = x + (w * i) / len;
-          ctx.globalAlpha = dimPast && past ? 0.45 : 0.5;
-          ctx.beginPath();
-          ctx.moveTo(tx + 0.5, cy + 2);
-          ctx.lineTo(tx + 0.5, cy + CHIP_H - 2);
-          ctx.stroke();
+      for (const segment of visibleWorkRuns(run.start, run.end, workHours)) {
+        const len = segment.span;
+        const x = trackX + slotX(trackW, segment.visibleStart, visibleSlotCount);
+        const w = Math.max(2, (trackW * len) / visibleSlotCount);
+        const cy = y + 2 + run.lane * 18;
+        const past = runPast(day.d, segment.end, today, nowAt);
+        ctx.save();
+        if (dimPast && past) {
+          ctx.filter = "saturate(0.12) grayscale(0.62)";
+          ctx.globalAlpha = 0.68;
         }
+        ctx.fillStyle = mineTone(run.rawLimit);
+        roundRect(ctx, x, cy, w, CHIP_H, 2);
+        ctx.fill();
+        if (len > 1) {
+          ctx.beginPath();
+          roundRect(ctx, x, cy, w, CHIP_H, 2);
+          ctx.clip();
+          ctx.strokeStyle = limitInk(run.rawLimit);
+          ctx.lineWidth = 1;
+          for (let i = 1; i < len; i += 1) {
+            if ((segment.start + i) % 2 !== 0) continue;
+            const tx = x + (w * i) / len;
+            ctx.globalAlpha = dimPast && past ? 0.45 : 0.5;
+            ctx.beginPath();
+            ctx.moveTo(tx + 0.5, cy + 2);
+            ctx.lineTo(tx + 0.5, cy + CHIP_H - 2);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+        ctx.save();
+        if (dimPast && past) {
+          ctx.filter = "saturate(0.12) grayscale(0.62)";
+          ctx.globalAlpha = 0.68;
+        }
+        ctx.fillStyle = limitInk(run.rawLimit);
+        ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(len >= 6 ? run.label : run.label.slice(0, 1), x + w / 2, cy + CHIP_H / 2);
+        ctx.restore();
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
       }
-      ctx.restore();
-      ctx.save();
-      if (dimPast && past) {
-        ctx.filter = "saturate(0.12) grayscale(0.62)";
-        ctx.globalAlpha = 0.68;
-      }
-      ctx.fillStyle = limitInk(run.rawLimit);
-      ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(len >= 6 ? run.label : run.label.slice(0, 1), x + w / 2, cy + CHIP_H / 2);
-      ctx.restore();
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
     }
   });
 
-  if (dimPast && today != null && workTrackProgress(Math.floor(nowAt), nowAt % 1, workStartHalf, workEndHalf) != null) {
+  const nowProgress = workTrackProgress(Math.floor(nowAt), nowAt % 1, workHours);
+  if (dimPast && today != null && nowProgress != null) {
     const todayIdx = days.findIndex((day) => day.d === today);
     if (todayIdx >= 0) {
-      const x = trackX + slotX(trackW, nowAt, workStartHalf, workEndHalf);
+      const x = trackX + trackW * nowProgress;
       const y = sheetY + HOUR_H + todayIdx * rowH;
       ctx.fillStyle = paint.now;
       ctx.fillRect(x - 1.5, y, 3, rowH);

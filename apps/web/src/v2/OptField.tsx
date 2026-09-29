@@ -8,7 +8,7 @@ import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from 
 import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../data/slots";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { visibleMonthDays, type DisplayRange } from "../schedule/displayRange";
-import { workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
+import { DEFAULT_WORK_HOURS, clampWorkRangeHalf, workGapBefore, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -44,8 +44,7 @@ type Props = {
   dimPast: boolean;
   hidePastDays?: boolean;
   displayRange?: DisplayRange;
-  workStartHalf?: number;
-  workEndHalf?: number;
+  workHours?: number[];
   showTip: boolean;
   canEdit: boolean;
   quietEdit?: boolean;
@@ -150,6 +149,28 @@ function laneCells(origin: SlotHit) {
   const track = origin.cell.closest(".v2-opt-track");
   if (!track) return [] as HTMLElement[];
   return [...track.querySelectorAll<HTMLElement>("[data-slot]")];
+}
+
+function workGridColumn(visibleHalves: number[], half: number) {
+  const index = visibleHalves.indexOf(half);
+  if (index < 0) return 1;
+  let gaps = 0;
+  for (let at = 1; at <= index; at += 1) {
+    if (visibleHalves[at] !== visibleHalves[at - 1] + 1) gaps += 1;
+  }
+  return index + gaps + 1;
+}
+
+function WorkGapTracks({ visibleHalves }: { visibleHalves: number[] }) {
+  return visibleHalves.map((half) => workGapBefore(visibleHalves, half) ? (
+    <i
+      key={`work-gap-${half}`}
+      className="v2-opt-work-gap"
+      data-work-gap="spacer"
+      style={{ gridColumn: workGridColumn(visibleHalves, half) - 1 }}
+      aria-hidden
+    />
+  ) : null);
 }
 
 function halfOnLane(origin: SlotHit, clientX: number) {
@@ -380,6 +401,8 @@ const OptCell = memo(function OptCell({
   nowPct,
   busyLimits,
   busyHalf,
+  workGap,
+  gridColumn,
 }: {
   dayIdx: number;
   day: number;
@@ -400,6 +423,8 @@ const OptCell = memo(function OptCell({
   nowPct?: number;
   busyLimits?: string[];
   busyHalf?: boolean;
+  workGap?: boolean;
+  gridColumn?: number;
 }) {
   const on = Boolean(bg);
   const mark = tag?.trim().toUpperCase() || undefined;
@@ -417,12 +442,14 @@ const OptCell = memo(function OptCell({
       data-lane={lane}
       data-mark={mark}
       data-busy={busyLimits?.length ? busyLimits.join(",") : undefined}
-      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}`}
+      data-work-gap={workGap ? "before" : undefined}
+      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}${workGap ? " is-work-gap" : ""}`}
       style={
         {
           "--mark": bg,
           "--mark-ink": fg,
           "--opt-now-pct": nowPct != null ? `${nowPct}%` : undefined,
+          gridColumn,
         } as CSSProperties
       }
     >
@@ -440,9 +467,10 @@ const OptNowLine = memo(function OptNowLine() {
   return <span className="v2-opt-now" aria-hidden />;
 });
 
-const OptHeadNow = memo(function OptHeadNow({ cet, startHalf, endHalf }: { cet: CetStamp; startHalf: number; endHalf: number }) {
-  if (workTrackProgress(cet.half, cet.slotProgress, startHalf, endHalf) == null) return null;
-  return <span className="v2-opt-head-now" style={{ left: nowHeadLeft(cet.half, cet.slotProgress, startHalf, endHalf) }} aria-hidden />;
+const OptHeadNow = memo(function OptHeadNow({ cet, workHours }: { cet: CetStamp; workHours: number[] }) {
+  const visibleHalves = workHalfSlots(workHours);
+  if (workTrackProgress(cet.half, cet.slotProgress, workHours) == null) return null;
+  return <span className="v2-opt-head-now" style={{ left: nowHeadLeft(cet.half, cet.slotProgress, visibleHalves) }} aria-hidden />;
 });
 
 const OptBody = memo(function OptBody({
@@ -460,8 +488,7 @@ const OptBody = memo(function OptBody({
   todayRef,
   skin,
   busy,
-  workStartHalf,
-  workEndHalf,
+  workHours,
 }: {
   year: number;
   monthIndex: number;
@@ -477,13 +504,12 @@ const OptBody = memo(function OptBody({
   cet: CetStamp;
   todayRef: RefObject<HTMLDivElement | null>;
   busy?: (string[] | null)[][];
-  workStartHalf: number;
-  workEndHalf: number;
+  workHours: number[];
 }) {
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
   const groups = scheduleKindGroups(kinds, limits);
-  const visibleHalves = workHalfSlots(workStartHalf, workEndHalf);
-  const nowVisible = workTrackProgress(cet.half, cet.slotProgress, workStartHalf, workEndHalf) != null;
+  const visibleHalves = workHalfSlots(workHours);
+  const nowVisible = workTrackProgress(cet.half, cet.slotProgress, workHours) != null;
 
   return (
     <>
@@ -498,7 +524,7 @@ const OptBody = memo(function OptBody({
             ref={today ? todayRef : undefined}
             data-row={dayIdx}
             className={`v2-opt-block${today ? " is-today" : ""}${day.weekend ? " is-weekend" : ""}${dayPast ? " is-day-past" : ""}${today && dimPast ? " is-now-cut" : ""}`}
-            style={today && nowVisible ? ({ ["--opt-now"]: nowLineLeft(cet.half, cet.slotProgress, workStartHalf, workEndHalf) } as CSSProperties) : undefined}
+            style={today && nowVisible ? ({ ["--opt-now"]: nowLineLeft(cet.half, cet.slotProgress, visibleHalves) } as CSSProperties) : undefined}
           >
             <div className="v2-opt-gutter">
               <div className="v2-opt-day v2-mono">
@@ -550,6 +576,7 @@ const OptBody = memo(function OptBody({
                           tone={limitTone(rowInfo.limit)}
                           label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
                         >
+                          {!ghost && <WorkGapTracks visibleHalves={visibleHalves} />}
                           {ghost
                             ? null
                             : visibleHalves.map((half) => {
@@ -584,6 +611,8 @@ const OptBody = memo(function OptBody({
                                   nowPct={nowPct}
                                   busyLimits={hidden}
                                   busyHalf={Boolean(hidden?.length)}
+                                  workGap={workGapBefore(visibleHalves, half)}
+                                  gridColumn={workGridColumn(visibleHalves, half)}
                                 />
                               );
                             })}
@@ -842,8 +871,7 @@ export const OptField = memo(function OptField({
   dimPast,
   hidePastDays,
   displayRange = "month",
-  workStartHalf = 0,
-  workEndHalf = 48,
+  workHours = DEFAULT_WORK_HOURS,
   showTip,
   canEdit,
   quietEdit,
@@ -882,6 +910,7 @@ export const OptField = memo(function OptField({
     canRemoveForeign,
     onOverwriteAsk,
     onForeignKept,
+    workHours,
   });
   propsRef.current = {
     year,
@@ -898,6 +927,7 @@ export const OptField = memo(function OptField({
     canRemoveForeign,
     onOverwriteAsk,
     onForeignKept,
+    workHours,
   };
   const dragRef = useRef<{
     pointerId: number;
@@ -919,8 +949,15 @@ export const OptField = memo(function OptField({
     const visible = new Set(visibleMonthDays(year, monthIndex, displayRange, cet));
     return daysInMonth(year, monthIndex, i18n.language).filter((day) => visible.has(day.d));
   }, [year, monthIndex, i18n.language, displayRange, cet]);
-  const hours = useMemo(() => workHourSegments(workStartHalf, workEndHalf), [workStartHalf, workEndHalf]);
-  const visibleSlotCount = workEndHalf - workStartHalf;
+  const hours = useMemo(() => workHourSegments(workHours), [workHours]);
+  const visibleHalves = useMemo(() => workHalfSlots(workHours), [workHours]);
+  const workGridTemplate = useMemo(
+    () => visibleHalves.flatMap((half) => workGapBefore(visibleHalves, half)
+      ? ["var(--opt-work-gap-w)", "var(--opt-cell-w)"]
+      : ["var(--opt-cell-w)"]).join(" "),
+    [visibleHalves],
+  );
+  const visibleSlotCount = visibleHalves.length;
   const clock = usePlayerClock();
   const [slotLook, setSlotLook] = useState(() => loadSlotLook());
 
@@ -1019,6 +1056,7 @@ export const OptField = memo(function OptField({
     const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
     const from = Math.min(origin.half, endHalf);
     const to = Math.max(origin.half, endHalf);
+    const visible = new Set(workHalfSlots(p.workHours));
     const self = p.self ?? p.me;
     const brush = p.me;
     const brushIsSelf = isSelfSeat(brush, self);
@@ -1032,7 +1070,7 @@ export const OptField = memo(function OptField({
       let changed = false;
       let keptForeign = false;
       const nextRow = grid[origin.dayIdx].map((item, half) => {
-        if (half < from || half > to) return item;
+        if (half < from || half > to || !visible.has(half)) return item;
         if (isPastSlot(p.year, p.monthIndex, origin.day, half, now)) return item;
         if (!levelAllowed(half, origin.level, hoursCaps) && mode === "place") return item;
         const before = seatsOf(item, origin.level + 1)[origin.level];
@@ -1209,7 +1247,8 @@ export const OptField = memo(function OptField({
       if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 8) drag.panned = true;
       return;
     }
-    const endHalf = halfOnLane(drag.origin, event.clientX);
+    const hoveredHalf = halfOnLane(drag.origin, event.clientX);
+    const endHalf = clampWorkRangeHalf(drag.origin.half, hoveredHalf, propsRef.current.workHours);
     if (endHalf === drag.endHalf) return;
     drag.endHalf = endHalf;
     const root = rootRef.current;
@@ -1323,6 +1362,8 @@ export const OptField = memo(function OptField({
           ["--opt-day-w" as string]: `${Math.max(26, Math.min(32, 24 + cellWidth * 0.4))}px`,
           ["--opt-gap" as string]: `${cellWidth * 0.15}px`,
           ["--opt-visible-slots" as string]: visibleSlotCount,
+          ["--opt-work-gap-w" as string]: `${Math.max(8, cellWidth * 0.45)}px`,
+          ["--opt-grid-template" as string]: workGridTemplate,
           ["--opt-row-pad" as string]: `${Math.max(1, cellWidth * 0.2)}px`,
           ["--opt-lane-gap" as string]: `${Math.max(0.6, cellWidth * 0.2)}px`,
           ["--opt-track-pad-y" as string]: `${Math.max(0.5, cellWidth * 0.1)}px`,
@@ -1354,17 +1395,18 @@ export const OptField = memo(function OptField({
           <div className="v2-opt-lanes">
             <div className="v2-opt-lane">
               <div className="v2-opt-track v2-opt-head v2-mono relative">
-                {hours.map((segment) => {
+                <WorkGapTracks visibleHalves={visibleHalves} />
+                {hours.map((segment, index) => {
                   const h = segment.hour;
                   const local = (h + clock.offset + 24) % 24;
-                  const partial = segment.span === 1;
+                  const workGap = index > 0 && hours[index - 1].hour !== h - 1;
                   return (
-                    <span key={h} data-h={h} className="v2-opt-hour" style={{ gridColumn: `${segment.startHalf - workStartHalf + 1} / span ${segment.span}` }}>
+                    <span key={h} data-h={h} data-work-gap={workGap ? "before" : undefined} className={`v2-opt-hour${workGap ? " is-work-gap" : ""}`} style={{ gridColumn: `${workGridColumn(visibleHalves, segment.startHalf)} / span ${segment.span}` }}>
                       <b>
-                        <span className="v2-opt-hour-full">{partial ? (segment.startHalf % 2 ? `${h}:30` : `${h}:00`) : `${h}–${h + 1}`}</span>
-                        <span className="v2-opt-hour-short">{partial ? (segment.startHalf % 2 ? `${h}:30` : h) : h}</span>
+                        <span className="v2-opt-hour-full">{`${h}–${h + 1}`}</span>
+                        <span className="v2-opt-hour-short">{h}</span>
                       </b>
-                      {clock.showLocal && !partial ? (
+                      {clock.showLocal ? (
                         <small title={clock.label}>
                           {local}–{local + 1 > 24 ? 24 : local + 1}
                         </small>
@@ -1372,7 +1414,7 @@ export const OptField = memo(function OptField({
                     </span>
                   );
                 })}
-                <OptHeadNow cet={cet} startHalf={workStartHalf} endHalf={workEndHalf} />
+                <OptHeadNow cet={cet} workHours={workHours} />
               </div>
             </div>
           </div>
@@ -1394,8 +1436,7 @@ export const OptField = memo(function OptField({
               todayRef={todayRef}
               skin={skin}
               busy={busy}
-              workStartHalf={workStartHalf}
-              workEndHalf={workEndHalf}
+              workHours={workHours}
             />
             {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
               <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>
