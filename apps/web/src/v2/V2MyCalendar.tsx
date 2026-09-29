@@ -2,21 +2,22 @@ import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type Point
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
-import { LIMIT_OPTIONS, formatVariantLimit, limitTone } from "../schedule/capacity";
+import { limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { formatDayLong } from "../schedule/formatDate";
-import { downloadCalendarJpeg } from "./calendarJpeg";
+import { downloadCalendarJpeg, type CalendarShiftRun } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
-import { hourBoundaries, myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
+import { hourBoundaries, myShifts, uniqueShiftHours } from "./myShifts";
 import { fitFloat } from "./windowPos";
+import type { VariantGridItem } from "./variantSchedule";
 
 type Props = {
   year: number;
   monthIndex: number;
   title: string;
   tag: string;
-  kind: "nitro" | "regular";
+  columns: VariantGridItem[];
   grids: Record<string, Occupancy>;
   today: number | null;
   x: number;
@@ -29,7 +30,7 @@ type Props = {
 
 const SLOT_COUNT = 48;
 
-type Hover = { day: number; start: number; end: number; limit: string; x: number; y: number };
+type Hover = { day: number; start: number; end: number; limit: string; label: string; x: number; y: number };
 
 function runBox(start: number, len: number) {
   return {
@@ -96,7 +97,7 @@ function useFitScale(ref: RefObject<HTMLElement | null>) {
   return box;
 }
 
-export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
+export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
   const { t, i18n } = useTranslation();
   const mineRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ ox: number; oy: number } | null>(null);
@@ -107,20 +108,33 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
   const [cet] = useState(() => readCet());
   const playerClock = usePlayerClock();
   const days = useMemo(() => daysInMonth(year, monthIndex, i18n.language), [year, monthIndex, i18n.language]);
-  const lanes = useMemo(() => myTimeline(grids, tag), [grids, tag]);
-  const runs = useMemo(() => myShifts(grids, tag), [grids, tag]);
-  const usedLimits = LIMIT_OPTIONS.filter((limit) => runs.some((run) => run.limit === limit));
+  const runs = useMemo(() => {
+    const found = columns.flatMap((column) =>
+      myShifts(grids, tag, [column.label]).map((run) => ({
+        ...run,
+        label: column.label,
+        rawLimit: column.limit,
+        lane: 0,
+      })),
+    );
+    const used = columns.filter((column) => found.some((run) => run.label === column.label));
+    const lanes = new Map(used.map((column, lane) => [column.label, lane]));
+    return found.map((run) => ({ ...run, lane: lanes.get(run.label) ?? 0 })) as CalendarShiftRun[];
+  }, [columns, grids, tag]);
+  const usedColumns = columns.filter((column) => runs.some((run) => run.label === column.label));
+  const laneCount = Math.max(1, usedColumns.length);
+  const physicalHours = uniqueShiftHours(runs);
   const hours = Array.from({ length: 24 }, (_, hour) => hour);
   const hoverHour = hover ? Math.floor(hover.start / 2) : null;
   const theme = loadTheme();
 
-  const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string) => {
+  const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string, label: string) => {
     const box = event.currentTarget.getBoundingClientRect();
     let x = box.right + 8;
     let y = box.top;
     if (x + 220 > window.innerWidth - 8) x = Math.max(8, box.left - 228);
     if (y + 110 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 118);
-    setHover({ day, start, end, limit, x, y });
+    setHover({ day, start, end, limit, label, x, y });
   };
 
   const tip = hover ? (
@@ -144,7 +158,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
         ) : null}
       </div>
       <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-        {formatVariantLimit(kind, hover.limit)}
+        {hover.label}
       </div>
     </div>
   ) : null;
@@ -199,7 +213,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
             <strong>{title}</strong>
             <span className="v2-mine-tag">{tag}</span>
             <span className="v2-mine-stat">{t("schedule.myShifts", { n: runs.length })}</span>
-            <span className="v2-mine-stat">{t("schedule.myHours", { n: shiftHours(runs) })}</span>
+            <span className="v2-mine-stat">{t("schedule.myHours", { n: physicalHours })}</span>
           </div>
           <label className="v2-mine-toggle">
             <input
@@ -226,10 +240,10 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
             </div>
           </div>
 
-          {days.map((day, dayIdx) => {
+          {days.map((day) => {
             const isToday = today === day.d;
             const past = isPastDay(year, monthIndex, day.d, cet);
-            const dayRuns = runsFromLane(lanes[dayIdx] ?? [], day.d);
+            const dayRuns = runs.filter((run) => run.day === day.d);
             const hovered = hover?.day === day.d;
             return (
               <div
@@ -239,7 +253,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
                 <div className="v2-mine-date v2-mono">
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
-                <div className="v2-mine-track">
+                <div className="v2-mine-track" style={{ minHeight: `${laneCount * 14 + 4}px` }}>
                   <HourCells />
                   {dayRuns.map((run) => {
                     const len = run.end - run.start;
@@ -252,16 +266,17 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
                         : null;
                     return (
                       <button
-                        key={`${run.limit}-${run.start}`}
+                        key={`${run.label}-${run.start}`}
                         type="button"
                         className={`v2-mine-chip${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
                         style={{
                           left: box.left,
                           width: box.width,
-                          background: mineTone(run.limit),
-                          color: limitInk(run.limit),
+                          top: `${2 + run.lane * 14}px`,
+                          background: mineTone(run.rawLimit),
+                          color: limitInk(run.rawLimit),
                         }}
-                        onMouseEnter={(event) => placeTip(event, day.d, run.start, run.end, run.limit)}
+                        onMouseEnter={(event) => placeTip(event, day.d, run.start, run.end, run.rawLimit, run.label)}
                         onMouseLeave={() => setHover(null)}
                       >
                         {liveCut && dimPastShifts && <span className="v2-mine-chip-dim" style={{ width: liveCut }} aria-hidden />}
@@ -277,7 +292,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
                           </span>
                         )}
                         <span className="v2-chip-face">
-                          {len >= 4 ? formatVariantLimit(kind, run.limit) : kind === "nitro" ? "N" : "E"}
+                          {len >= 4 ? run.label : run.label.slice(0, 1)}
                         </span>
                       </button>
                     );
@@ -291,10 +306,10 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
 
         <footer className="v2-mine-foot">
           <div className="v2-mine-legends">
-            {usedLimits.map((limit) => (
-              <span key={limit} className="v2-mine-legend">
-                <i style={{ background: mineTone(limit) }} />
-                {formatVariantLimit(kind, limit)}
+            {usedColumns.map((column) => (
+              <span key={column.key} className="v2-mine-legend">
+                <i style={{ background: mineTone(column.limit) }} />
+                {column.label}
               </span>
             ))}
           </div>
@@ -310,15 +325,14 @@ export function V2MyCalendar({ year, monthIndex, title, tag, kind, grids, today,
                 monthIndex,
                 title,
                 tag,
-                kind,
                 days,
                 runs,
-                usedLimits,
+                usedColumns: usedColumns.map((column) => ({ label: column.label, limit: column.limit })),
                 today,
                 dimPast: dimPastShifts,
                 nowAt: cet.half + cet.slotProgress,
                 kicker: t("schedule.myCalendar"),
-                meta: `${tag} · ${t("schedule.myShifts", { n: runs.length })} · ${t("schedule.myHours", { n: shiftHours(runs) })}`,
+                meta: `${tag} · ${t("schedule.myShifts", { n: runs.length })} · ${t("schedule.myHours", { n: physicalHours })}`,
                 dayLabel: t("v2.day"),
               }).finally(() => setSaving(false));
             }}

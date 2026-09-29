@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { formatLimit } from "../schedule/capacity";
 import { weekdayLabelsMonFirst } from "../schedule/formatDate";
 import type { Mark } from "../schedule/marks";
 import { formatHours } from "../schedule/roster";
@@ -12,6 +11,7 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { heatFill, rowInitials, whoLines } from "./schedulePresentation";
 import { V2Float } from "./V2Float";
 import { scheduleZoomPercent } from "./scheduleZoom";
+import { displayScheduleColumn } from "./variantSchedule";
 
 export function BarMark({
   me,
@@ -354,7 +354,7 @@ export function HoursPanel({
             <tbody>
               {cols.map((limit) => (
                 <tr key={limit}>
-                  <th>{formatLimit(limit)}</th>
+                  <th>{displayScheduleColumn(limit)}</th>
                   <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
                   <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
                   <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>

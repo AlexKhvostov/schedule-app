@@ -309,6 +309,56 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   else await expect(foreignNitro).not.toHaveClass(/is-on/);
 });
 
+test("auxiliary schedule windows keep N/E separate without doubling physical hours", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "Nitro", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+
+  const ownNitro = page.locator('[data-slot][data-variant="nitro"][data-limit="50"][data-mark="YO"]:not(.is-past)').first();
+  await expect(ownNitro).toBeVisible();
+  const day = await ownNitro.getAttribute("data-day");
+  const half = await ownNitro.getAttribute("data-half");
+  const regularEmpty = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"]:not(.is-on)`).first();
+  await expect(regularEmpty).toBeVisible();
+  const level = await regularEmpty.getAttribute("data-level");
+  const regular = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
+  await page.getByTitle("Редактирование").click();
+  await regular.click();
+  await expect(regular).toHaveClass(/is-on/);
+
+  await page.getByRole("button", { name: "Часы", exact: true }).click();
+  const hours = page.locator(".v2-hours-summary");
+  const nitro = hours.getByRole("row", { name: /^N50 / });
+  const regularHours = hours.getByRole("row", { name: /^E50 / });
+  const total = hours.getByRole("row", { name: /^Итого / });
+  await expect(nitro).toBeVisible();
+  await expect(regularHours).toBeVisible();
+  const valueAt = async (row: typeof nitro) => Number(await row.getByRole("cell").nth(1).textContent());
+  const [nitroValue, regularValue, totalValue] = await Promise.all([valueAt(nitro), valueAt(regularHours), valueAt(total)]);
+  expect(totalValue).toBeLessThan(nitroValue + regularValue);
+  await page.getByRole("button", { name: "Часы", exact: true }).click();
+
+  await page.getByRole("button", { name: "Аналитика", exact: true }).click();
+  await expect(page.locator(".v2-analytics h3")).toHaveText(["N50", "E50"]);
+  await page.getByRole("button", { name: "Аналитика", exact: true }).click();
+
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  await expect(page.locator(".v2-people-table thead")).toContainText("N50, ч");
+  await expect(page.locator(".v2-people-table thead")).toContainText("E50, ч");
+  await page.locator(".v2-people-table tbody tr", { hasText: "polar" }).click();
+  await expect(page.locator(".v2-user-card")).toContainText("N50");
+  await expect(page.locator(".v2-user-card")).toContainText("E50");
+  await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+
+  await page.getByRole("button", { name: "Мой календарь", exact: true }).click();
+  const calendar = page.locator(".v2-mine");
+  await expect(calendar.locator(".v2-mine-legends")).toContainText("N50");
+  await expect(calendar.locator(".v2-mine-legends")).toContainText("E50");
+});
+
 test("cabinet hides payment details and default schedule settings", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();

@@ -21,7 +21,7 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { BarMark, HoursPanel, MobileScheduleDock } from "./SchedulePanels";
 import { showV2Toast } from "./V2Toast";
-import { gridsWithMySlots, limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
+import { limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, resetSchedulePrefs, savePrefs } from "./prefs";
 import { centerPos, useWindowPos } from "./windowPos";
@@ -45,10 +45,11 @@ import {
 } from "../data/slots";
 import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
 import { notifyMarkRemoved } from "../data/notifyMark";
-import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
+import { loadMembers, memberOfSession, saveMembers } from "../schedule/members";
 import { readSession } from "./session";
 import { decorateDemoRoster, rowInitials, seatDiffs, showNick, type SeatDiff } from "./schedulePresentation";
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
+import { displayScheduleColumn, gridsByVariantLabel, variantGridItems } from "./variantSchedule";
 
 type Props = {
   cursor: Date;
@@ -97,7 +98,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [editPulse, setEditPulse] = useState(boot.editPulse);
   const [busyHint, setBusyHint] = useState(boot.busyHint);
   const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
-  const [mineRemote, setMineRemote] = useState<(string[] | null)[][] | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
   const [tablesDraft, setTablesDraft] = useState("11");
   const [limits, setLimits] = useState<string[]>(boot.limits);
@@ -156,9 +156,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   actingRef.current = actingId || selfId;
   const selfIdRef = useRef(selfId);
   selfIdRef.current = selfId;
-  const [playLimits, setPlayLimits] = useState<string[]>(() =>
-    winamaxPlayLimits({ memberId: actingRef.current, nick: sessionNick }),
-  );
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const mayActAs = canActAs || allowActAs;
   const canRemoveForeign = canActAs || allowOverwrite;
@@ -177,13 +174,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       emptyMonth(year, monthIndex),
     ])));
   }, [gridLoading, readyStamp, viewStamp, gridStore, kinds, limits, year, monthIndex]);
-  const shownGrids = useMemo(() => {
-    const stored = gridsForVariant(shownGridStore, kind, limits);
-    return Object.fromEntries(limits.map((limit) => [
-      limit,
-      stored[limit] ?? emptyMonth(year, monthIndex),
-    ]));
-  }, [shownGridStore, kind, limits, year, monthIndex]);
+  const auxiliaryItems = useMemo(
+    () => variantGridItems(shownGridStore, kinds, limits),
+    [shownGridStore, kinds, limits],
+  );
+  const auxiliaryLabels = useMemo(() => auxiliaryItems.map((item) => item.label), [auxiliaryItems]);
+  const auxiliaryGrids = useMemo(() => gridsByVariantLabel(auxiliaryItems), [auxiliaryItems]);
 
   const pullGrids = useCallback(
     (stamp: string) => {
@@ -201,10 +197,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     },
     [year, monthIndex, kinds, limits, t],
   );
-
-  useEffect(() => {
-    setPlayLimits(winamaxPlayLimits({ memberId: actingId || selfId, nick: me.discord || sessionNick }));
-  }, [actingId, selfId, me.discord, sessionNick, canEdit]);
 
   useEffect(() => {
     const id = actingId || selfId;
@@ -301,25 +293,23 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     (who: string | undefined) => {
       if (!isLiveData()) {
         setBusyRemote(undefined);
-        setMineRemote(undefined);
         return Promise.resolve();
       }
       if (!who) return Promise.resolve();
       const gen = ++busyGen.current;
-      return loadMemberOccupiedSlots(year, monthIndex, kind, who).then((rows) => {
+      return Promise.all(kinds.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who))).then((groups) => {
         if (gen !== busyGen.current) return;
-        if (!rows) return;
+        if (groups.some((rows) => rows === null)) return;
+        const rows = groups.flatMap((group) => group ?? []);
         const map = occupiedFromSlots(rows, busyDays);
         if (who === actingRef.current) setBusyRemote(map);
-        if (who === selfIdRef.current) setMineRemote(map);
       });
     },
-    [year, monthIndex, kind, busyDays],
+    [year, monthIndex, kinds, busyDays],
   );
 
   const refreshBusy = useCallback(() => {
     void pullBusy(actingRef.current);
-    if (selfIdRef.current && selfIdRef.current !== actingRef.current) void pullBusy(selfIdRef.current);
   }, [pullBusy]);
 
   useEffect(() => {
@@ -482,7 +472,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const visibleGrids = useMemo(() => limits.map((limit) => shownGrids[limit]).filter(Boolean), [shownGrids, limits]);
+  const visibleGrids = useMemo(() => auxiliaryItems.map((item) => item.grid), [auxiliaryItems]);
   const fieldMarks = useMemo(() => {
     const seen = new Map<string, Mark>();
     for (const grid of visibleGrids) {
@@ -500,21 +490,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   useEffect(() => {
     if (!paintOn && !showPeople && !mayActAs) return;
     let alive = true;
-    void listLimitMarks(kind, limits).then((rows) => {
-      if (alive) setLimitMarks(rows);
+    void Promise.all(kinds.map((variant) => listLimitMarks(variant, limits))).then((groups) => {
+      if (!alive) return;
+      const seen = new Map<string, Mark>();
+      for (const mark of groups.flat()) seen.set(markKey(mark), mark);
+      setLimitMarks([...seen.values()]);
     });
     return () => {
       alive = false;
     };
-  }, [kind, limits, paintOn, showPeople, mayActAs]);
+  }, [kinds, limits, paintOn, showPeople, mayActAs]);
 
   const clubPlayerIds = useMemo(() => new Set(players.map((row) => row.id)), [players]);
   const roster = useMemo(() => {
     if (!showPeople) return [];
     const rawRows = rosterFromGrids(
-      limits
-        .map((limit) => ({ limit, grid: shownGrids[limit] }))
-        .filter((row): row is { limit: string; grid: Occupancy } => Boolean(row.grid)),
+      auxiliaryItems.map((item) => ({ limit: item.label, grid: item.grid })),
       year,
       monthIndex,
       cetTick,
@@ -524,7 +515,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const rows = isLiveData() ? rawRows : decorateDemoRoster(rawRows, loadMembers());
     if (!isLiveData() || !clubPlayerIds.size) return rows;
     return rows.filter((row) => !row.mark.memberId || clubPlayerIds.has(row.mark.memberId));
-  }, [showPeople, shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
+  }, [showPeople, auxiliaryItems, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
 
   const peopleIdsKey = useMemo(() => {
     if (!showPeople) return "";
@@ -549,34 +540,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const fillByLimit = useMemo(
     () => {
       if (!showAnalytics) return [];
-      return limits.flatMap((limit) => {
-        const grid = shownGrids[limit];
-        if (!grid) return [];
-        return [
-          {
-            limit,
-            fill: fieldFill(grid, year, monthIndex, cetTick, limit, undefined, capacity),
-            cols: columnFill(shownGrids, [limit], capacity, year, monthIndex),
-          },
-        ];
-      });
+      return auxiliaryItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        limit: item.limit,
+        fill: fieldFill(item.grid, year, monthIndex, cetTick, item.limit, undefined, capacity),
+        cols: columnFill({ [item.limit]: item.grid }, [item.limit], capacity, year, monthIndex),
+      }));
     },
-    [showAnalytics, shownGrids, limits, year, monthIndex, cetTick, capacity],
+    [showAnalytics, auxiliaryItems, year, monthIndex, cetTick, capacity],
   );
-  const mineGrids = useMemo(
-    () => gridsWithMySlots(shownGrids, mineRemote, selfMark, year, monthIndex),
-    [shownGrids, mineRemote, selfMark, year, monthIndex],
-  );
-  const hoursGrids = useMemo(
-    () => gridsWithMySlots(shownGrids, busyRemote, me, year, monthIndex),
-    [shownGrids, busyRemote, me, year, monthIndex],
-  );
+  const mineGrids = auxiliaryGrids;
+  const hoursGrids = auxiliaryGrids;
   const dockLimits = useMemo(() => {
-    const marked = limitsWithMyMarks(hoursGrids, me);
-    const source = playLimits.length ? playLimits : marked.length ? marked : limits;
-    const set = new Set([...source, ...marked]);
-    return LIMIT_OPTIONS.filter((limit) => set.has(limit));
-  }, [playLimits, hoursGrids, me, limits]);
+    const marked = limitsWithMyMarks(hoursGrids, me, auxiliaryLabels);
+    return marked.length ? marked : auxiliaryLabels;
+  }, [hoursGrids, me, auxiliaryLabels]);
   const hoursMatrix = useMemo(
     () => (showHours ? myHoursMatrix(hoursGrids, me, dockLimits, { year, monthIndex, cet: cetTick }) : null),
     [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
@@ -1302,7 +1281,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             monthIndex={monthIndex}
             title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
-            kind={kind}
+            columns={auxiliaryItems}
             grids={mineGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
             x={calPos.x}
@@ -1404,7 +1383,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             <div className="v2-analytics">
               <p className="v2-analytics-lead">{t("schedule.fillByHourHint")}</p>
               {fillByLimit.map((row) => (
-                <FillByHourChart key={row.limit} limit={row.limit} cols={row.cols} fill={row.fill} />
+                <FillByHourChart key={row.key} limit={row.limit} label={row.label} cols={row.cols} fill={row.fill} />
               ))}
             </div>
           </V2Float>
@@ -1414,7 +1393,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             title={t("schedule.playersTitle")}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(640, 240 + Math.max(1, limits.length) * 76)}
+            width={Math.min(720, 240 + Math.max(1, auxiliaryLabels.length) * 76)}
             compact
             z={zOf("people")}
             onMove={setPeoplePos}
@@ -1427,7 +1406,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   <col className="v2-people-col-n" />
                   <col />
                   <col className="v2-people-col-mark" />
-                  {limits.map((limit) => (
+                  {auxiliaryLabels.map((limit) => (
                     <col key={limit} className="v2-people-col-limit" />
                   ))}
                   <col className="v2-people-col-tick" />
@@ -1437,13 +1416,13 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                     <th title={t("schedule.colRankHint")}>{t("schedule.colRank")}</th>
                     <th>{t("schedule.colPlayer")}</th>
                     <th>{t("schedule.colMark")}</th>
-                    {limits.map((limit) => (
+                    {auxiliaryLabels.map((limit) => (
                       <th
                         key={limit}
                         className="v2-people-limit"
-                        title={t("schedule.colHoursHint", { limit: formatLimit(limit) })}
+                        title={t("schedule.colHoursHint", { limit: displayScheduleColumn(limit) })}
                       >
-                        {formatLimit(limit)}, {t("schedule.colHoursUnit")}
+                        {displayScheduleColumn(limit)}, {t("schedule.colHoursUnit")}
                       </th>
                     ))}
                     <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
@@ -1493,9 +1472,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                             <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={countTables && !hideTables} />
                           </span>
                         </td>
-                        {limits.map((limit) => {
+                        {auxiliaryLabels.map((limit) => {
                           const stat = row.byLimit[limit];
-                          const label = formatLimit(limit);
+                          const label = displayScheduleColumn(limit);
                           if (!stat) {
                             return (
                               <td

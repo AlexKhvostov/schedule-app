@@ -122,11 +122,15 @@ export function mergeOccupiedLimits(
   );
 }
 
-export function myTimeline(grids: Record<string, Occupancy>, who: Mark | string): (string | null)[][] {
+export function myTimeline(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+): (string | null)[][] {
   const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length));
   return Array.from({ length: days }, (_, dayIdx) =>
     Array.from({ length: 48 }, (_, half) => {
-      for (const limit of LIMIT_OPTIONS) {
+      for (const limit of keys) {
         if (grids[limit]?.[dayIdx]?.[half]?.some((mark) => seatIsMine(mark, who))) return limit;
       }
       return null;
@@ -154,8 +158,12 @@ export function runsFromLane(lane: (string | null)[], day: number): ShiftRun[] {
   return runs;
 }
 
-export function myShifts(grids: Record<string, Occupancy>, who: Mark | string): ShiftRun[] {
-  return myTimeline(grids, who).flatMap((lane, dayIdx) => runsFromLane(lane, dayIdx + 1));
+export function myShifts(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+): ShiftRun[] {
+  return myTimeline(grids, who, keys).flatMap((lane, dayIdx) => runsFromLane(lane, dayIdx + 1));
 }
 
 export function formatHalf(half: number) {
@@ -166,6 +174,15 @@ export function formatHalf(half: number) {
 
 export function shiftHours(runs: ShiftRun[]) {
   return hoursFromSlots(runs.reduce((sum, run) => sum + (run.end - run.start), 0));
+}
+
+/** Фактическое время: пересекающиеся виды и лимиты не удваивают один получас. */
+export function uniqueShiftHours(runs: ShiftRun[]) {
+  const halves = new Set<string>();
+  for (const run of runs) {
+    for (let half = run.start; half < run.end; half += 1) halves.add(`${run.day}:${half}`);
+  }
+  return hoursFromSlots(halves.size);
 }
 
 export function myPlayStats(
@@ -191,8 +208,12 @@ export function myPlayStats(
   };
 }
 
-export function limitsWithMyMarks(grids: Record<string, Occupancy>, who: Mark | string) {
-  return LIMIT_OPTIONS.filter((limit) =>
+export function limitsWithMyMarks(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+) {
+  return keys.filter((limit) =>
     (grids[limit] ?? []).some((day) => day.some((cell) => cell?.some((mark) => seatIsMine(mark, who)))),
   );
 }

@@ -15,10 +15,12 @@ export function FillByHourChart({
   cols,
   fill,
   limit,
+  label,
 }: {
   cols: number[];
   fill: FieldFill;
   limit: string;
+  label?: string;
 }) {
   const { t } = useTranslation();
   const tone = limitTone(limit);
@@ -26,7 +28,7 @@ export function FillByHourChart({
   return (
     <section className="v2-analytics-limit" style={{ ["--fill-tone"]: tone } as CSSProperties}>
       <header className="v2-analytics-limit-head">
-        <h3>{formatLimit(limit)}</h3>
+        <h3>{label ?? formatLimit(limit)}</h3>
       </header>
       <div className="v2-fill-chart">
         <div className="v2-opt-foot-chart">

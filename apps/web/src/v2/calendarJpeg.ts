@@ -1,4 +1,4 @@
-import { formatVariantLimit, limitTonePaint } from "../schedule/capacity";
+import { limitTonePaint } from "../schedule/capacity";
 import type { ShiftRun } from "./myShifts";
 
 const SLOT_COUNT = 48;
@@ -6,7 +6,6 @@ const WIDTH = 680;
 const PAD = 12;
 const DATE_W = 54;
 const HOUR_H = 28;
-const ROW_H = 22;
 const CHIP_H = 16;
 const TITLE_H = 50;
 const FOOT_H = 34;
@@ -41,16 +40,21 @@ type Opts = {
   monthIndex: number;
   title: string;
   tag: string;
-  kind: "nitro" | "regular";
   days: Day[];
-  runs: ShiftRun[];
-  usedLimits: string[];
+  runs: CalendarShiftRun[];
+  usedColumns: { label: string; limit: string }[];
   today: number | null;
   dimPast: boolean;
   nowAt: number;
   kicker: string;
   meta: string;
   dayLabel: string;
+};
+
+export type CalendarShiftRun = ShiftRun & {
+  label: string;
+  rawLimit: string;
+  lane: number;
 };
 
 function mineTone(limit: string) {
@@ -86,8 +90,10 @@ function runPast(day: number, end: number, today: number | null, nowAt: number) 
 
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { title, tag, kind, days, runs, usedLimits, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
-  const height = PAD + TITLE_H + HOUR_H + days.length * ROW_H + FOOT_H + PAD;
+  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
+  const laneCount = Math.max(1, usedColumns.length);
+  const rowH = Math.max(22, laneCount * 18 + 4);
+  const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + PAD;
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * DPR;
   canvas.height = height * DPR;
@@ -119,7 +125,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
   const sheetX = PAD;
   const sheetY = PAD + TITLE_H;
   const sheetW = WIDTH - PAD * 2;
-  const sheetH = HOUR_H + days.length * ROW_H;
+  const sheetH = HOUR_H + days.length * rowH;
   const trackX = sheetX + DATE_W;
   const trackW = sheetW - DATE_W;
 
@@ -163,7 +169,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.textAlign = "left";
   }
 
-  const byDay = new Map<number, ShiftRun[]>();
+  const byDay = new Map<number, CalendarShiftRun[]>();
   for (const run of runs) {
     const list = byDay.get(run.day) ?? [];
     list.push(run);
@@ -171,7 +177,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
   }
 
   days.forEach((day, idx) => {
-    const y = sheetY + HOUR_H + idx * ROW_H;
+    const y = sheetY + HOUR_H + idx * rowH;
     ctx.strokeStyle = paint.line;
     ctx.beginPath();
     ctx.moveTo(sheetX, y + 0.5);
@@ -185,7 +191,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     if (isToday) {
       ctx.strokeStyle = paint.cyan;
       ctx.lineWidth = 1.5;
-      roundRect(ctx, sheetX + 3, y + 2, DATE_W - 7, ROW_H - 4, 2);
+      roundRect(ctx, sheetX + 3, y + 2, DATE_W - 7, rowH - 4, 2);
       ctx.stroke();
       ctx.lineWidth = 1;
     }
@@ -194,23 +200,24 @@ export async function downloadCalendarJpeg(opts: Opts) {
       const len = run.end - run.start;
       const x = trackX + slotX(trackW, run.start);
       const w = Math.max(2, slotX(trackW, len));
-      const cy = y + (ROW_H - CHIP_H) / 2;
+      const cy = y + 2 + run.lane * 18;
       const past = runPast(day.d, run.end, today, nowAt);
       ctx.save();
       if (dimPast && past) {
         ctx.filter = "saturate(0.12) grayscale(0.62)";
         ctx.globalAlpha = 0.68;
       }
-      ctx.fillStyle = mineTone(run.limit);
+      ctx.fillStyle = mineTone(run.rawLimit);
       roundRect(ctx, x, cy, w, CHIP_H, 2);
       ctx.fill();
       if (len > 1) {
         ctx.beginPath();
         roundRect(ctx, x, cy, w, CHIP_H, 2);
         ctx.clip();
-        ctx.strokeStyle = limitInk(run.limit);
+        ctx.strokeStyle = limitInk(run.rawLimit);
         ctx.lineWidth = 1;
         for (let i = 1; i < len; i += 1) {
+          if ((run.start + i) % 2 !== 0) continue;
           const tx = x + (w * i) / len;
           ctx.globalAlpha = dimPast && past ? 0.45 : (run.start + i) % 2 === 0 ? 0.5 : 0.28;
           ctx.beginPath();
@@ -225,11 +232,11 @@ export async function downloadCalendarJpeg(opts: Opts) {
         ctx.filter = "saturate(0.12) grayscale(0.62)";
         ctx.globalAlpha = 0.68;
       }
-      ctx.fillStyle = limitInk(run.limit);
+      ctx.fillStyle = limitInk(run.rawLimit);
       ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(len >= 6 ? formatVariantLimit(kind, run.limit) : run.limit, x + w / 2, y + ROW_H / 2);
+      ctx.fillText(len >= 6 ? run.label : run.label.slice(0, 1), x + w / 2, cy + CHIP_H / 2);
       ctx.restore();
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
@@ -240,22 +247,22 @@ export async function downloadCalendarJpeg(opts: Opts) {
     const todayIdx = days.findIndex((day) => day.d === today);
     if (todayIdx >= 0) {
       const x = trackX + slotX(trackW, nowAt);
-      const y = sheetY + HOUR_H + todayIdx * ROW_H;
+      const y = sheetY + HOUR_H + todayIdx * rowH;
       ctx.fillStyle = paint.now;
-      ctx.fillRect(x - 1.5, y, 3, ROW_H);
+      ctx.fillRect(x - 1.5, y, 3, rowH);
     }
   }
 
   const footY = sheetY + sheetH + 14;
   ctx.font = "600 11px JetBrains Mono, IBM Plex Mono, monospace";
   let legendX = PAD;
-  for (const limit of usedLimits) {
-    ctx.fillStyle = mineTone(limit);
+  for (const column of usedColumns) {
+    ctx.fillStyle = mineTone(column.limit);
     ctx.beginPath();
     ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = paint.muted;
-    const label = formatVariantLimit(kind, limit);
+    const label = column.label;
     ctx.fillText(label, legendX + 14, footY);
     legendX += ctx.measureText(label).width + 28;
   }
