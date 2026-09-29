@@ -17,6 +17,8 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 Миграции Supabase и Edge Functions автоматически из GitHub сейчас **не выкатываются**. Если релиз зависит от новой схемы или функции, сначала применяем и проверяем совместимое серверное изменение, затем отправляем клиент в `main`. Автоматизировать базу можно позже отдельным защищённым workflow с секретами Staging/Production.
 
+На 29 сентября 2026 миграция `20260929160000_schedule_filter_limits.sql` ещё не применена к Working: авторизованная проверка возвращает `42703` для новых колонок и `PGRST202` для RPC. Перед продолжением этапа F её нужно вручную применить к Working и повторить RPC/security-проверки.
+
 ## Релизный барьер
 
 Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняется `schedule_filter_limits.sql`, который проверяет атомарность, откат и отказ пользователю без `schedule.manage`.
