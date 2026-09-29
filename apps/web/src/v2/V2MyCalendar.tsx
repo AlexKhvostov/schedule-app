@@ -8,7 +8,7 @@ import { formatDayLong } from "../schedule/formatDate";
 import { downloadCalendarJpeg } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
-import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
+import { hourBoundaries, myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
 import { fitFloat } from "./windowPos";
 
 type Props = {
@@ -266,16 +266,13 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
                         {liveCut && dimPastShifts && <span className="v2-mine-chip-dim" style={{ width: liveCut }} aria-hidden />}
                         {len > 1 && (
                           <span className="v2-chip-ticks" aria-hidden>
-                            {Array.from({ length: len - 1 }, (_, i) => {
-                              const at = run.start + i + 1;
-                              return (
-                                <i
-                                  key={i}
-                                  className={at % 2 === 0 ? "is-hour" : undefined}
-                                  style={{ left: `${((i + 1) / len) * 100}%` }}
-                                />
-                              );
-                            })}
+                            {hourBoundaries(run.start, run.end).map((at) => (
+                              <i
+                                key={at}
+                                className="is-hour"
+                                style={{ left: `${((at - run.start) / len) * 100}%` }}
+                              />
+                            ))}
                           </span>
                         )}
                         <span className="v2-chip-face">

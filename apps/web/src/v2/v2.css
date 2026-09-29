@@ -10275,6 +10275,10 @@ textarea.v2-ctrl.v2-cab-area {
   letter-spacing: 0.02em;
 }
 
+.v2-opt-face.has-n b {
+  transform: translateY(-1px);
+}
+
 .v2-opt-face i {
   position: absolute;
   right: 1px;

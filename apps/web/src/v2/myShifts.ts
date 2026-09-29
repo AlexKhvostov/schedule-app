@@ -11,6 +11,11 @@ export type ShiftRun = {
   end: number;
 };
 
+export function hourBoundaries(start: number, end: number) {
+  return Array.from({ length: Math.max(0, end - start - 1) }, (_, index) => start + index + 1)
+    .filter((half) => half % 2 === 0);
+}
+
 function seatIsMine(seat: Mark | null | undefined, who: Mark | string) {
   if (typeof who === "string") return Boolean(seat && who && seat.t === who);
   return isOwnMark(seat, who);
