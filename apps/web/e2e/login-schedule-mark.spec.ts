@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-09-29T08:00:00Z"));
+});
+
 test("login → schedule → place and remove own mark", async ({ page }) => {
   await page.goto("/");
 
@@ -120,7 +124,7 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   const gapSpacer = firstLane.locator('[data-work-gap="spacer"]');
   await expect(gapSpacer).toHaveCount(1);
   const gapBox = await gapSpacer.boundingBox();
-  expect(gapBox?.width).toBeGreaterThanOrEqual(10);
+  expect(gapBox?.width).toBeGreaterThanOrEqual(12);
 
   await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
   await page.getByTitle("Редактирование").click();
@@ -197,6 +201,8 @@ test("schedule cursor follows one half-hour and drag shows the full range", asyn
   await page.mouse.down();
   await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
   await expect(frame).toBeHidden();
+  await expect(page.locator(".v2-opt-block.is-picking")).toHaveCount(1);
+  await expect(page.locator(".v2-opt-block.is-picking")).toHaveCSS("z-index", "20");
   const first = Math.min(half, targetHalf);
   const last = Math.max(half, targetHalf);
   await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", `${format(first)} – ${format(last + 1)}`);

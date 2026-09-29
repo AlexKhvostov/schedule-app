@@ -213,6 +213,7 @@ function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode: "plac
     pick.setAttribute("aria-hidden", "true");
     track.appendChild(pick);
   }
+  track.closest(".v2-opt-block")?.classList.add("is-picking");
   const a = Math.min(fromHalf, toHalf);
   const b = Math.max(fromHalf, toHalf);
   const cells = laneCells(origin).filter((el) => {
@@ -247,7 +248,11 @@ function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode: "plac
 
 function hidePick(root?: HTMLElement | null) {
   const scope = root ?? document;
-  scope.querySelectorAll(".v2-opt-pick").forEach((el) => el.remove());
+  scope.querySelectorAll(".v2-opt-pick").forEach((el) => {
+    el.closest(".v2-opt-block")?.classList.remove("is-picking");
+    el.remove();
+  });
+  scope.querySelectorAll(".v2-opt-block.is-picking").forEach((el) => el.classList.remove("is-picking"));
 }
 
 function navOf(root: HTMLElement): NavMem {
@@ -1354,7 +1359,7 @@ export const OptField = memo(function OptField({
           ["--opt-day-w" as string]: `${Math.max(26, Math.min(32, 24 + cellWidth * 0.4))}px`,
           ["--opt-gap" as string]: `${cellWidth * 0.15}px`,
           ["--opt-visible-slots" as string]: visibleSlotCount,
-          ["--opt-work-gap-w" as string]: `${Math.max(10, cellWidth * 0.55)}px`,
+          ["--opt-work-gap-w" as string]: `${Math.max(12, cellWidth * 0.6)}px`,
           ["--opt-grid-template" as string]: workGridTemplate,
           ["--opt-row-pad" as string]: `${Math.max(1, cellWidth * 0.2)}px`,
           ["--opt-lane-gap" as string]: `${Math.max(0.6, cellWidth * 0.2)}px`,
