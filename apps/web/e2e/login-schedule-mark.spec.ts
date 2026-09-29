@@ -51,6 +51,52 @@ test("schedule filters stay above the timeline and display preferences survive r
   await expect(page.getByRole("button", { name: /Скрыть прошлые дни/ })).not.toHaveClass(/is-on/);
 });
 
+test("current-month view ranges persist and hide-past has priority", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  const now = await page.evaluate(() => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Madrid",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    }).formatToParts(new Date());
+    const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+    return { year: value("year"), monthIndex: value("month") - 1, day: value("day") };
+  });
+  const last = new Date(now.year, now.monthIndex + 1, 0).getDate();
+  const weekday = new Date(Date.UTC(now.year, now.monthIndex, now.day)).getUTCDay();
+  const monday = now.day - ((weekday + 6) % 7);
+  const weekStart = Math.max(1, monday);
+  const weekEnd = Math.min(last, monday + 6);
+  const rows = page.locator(".v2-opt-block");
+
+  await page.getByTitle("Настройки").click();
+  const ranges = page.locator(".v2-settings-range");
+  await ranges.getByRole("button", { name: "День", exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await ranges.getByRole("button", { name: "3 дня", exact: true }).click();
+  await expect(rows).toHaveCount(Math.min(last, now.day + 2) - now.day + 1);
+  await ranges.getByRole("button", { name: "7 дней", exact: true }).click();
+  await expect(rows).toHaveCount(Math.min(last, now.day + 6) - now.day + 1);
+  await ranges.getByRole("button", { name: "Неделя", exact: true }).click();
+  await expect(rows).toHaveCount(weekEnd - weekStart + 1);
+  await page.getByRole("button", { name: /Скрыть прошлые дни/ }).click();
+  await expect(rows).toHaveCount(Math.max(0, weekEnd - Math.max(now.day, weekStart) + 1));
+
+  await page.reload();
+  await expect(rows).toHaveCount(Math.max(0, weekEnd - Math.max(now.day, weekStart) + 1));
+  await page.getByTitle("Настройки").click();
+  await expect(page.locator(".v2-settings-range").getByRole("button", { name: "Неделя", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "next", exact: true }).click();
+  await expect(page.locator(".v2-settings-range")).toHaveCount(0);
+  const nextLast = new Date(now.year, now.monthIndex + 2, 0).getDate();
+  await expect(rows).toHaveCount(nextLast);
+});
+
 test("schedule cursor follows one half-hour and drag shows the full range", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();

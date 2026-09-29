@@ -55,6 +55,7 @@ describe("schedule preferences", () => {
       limits: [],
       dimPast: false,
       hidePastDays: true,
+      displayRange: "week",
       hideTables: true,
       showTip: false,
       editPulse: "no",
@@ -65,9 +66,15 @@ describe("schedule preferences", () => {
       limits: ["50"],
       dimPast: false,
       hidePastDays: true,
+      displayRange: "week",
       hideTables: true,
       showTip: false,
       editPulse: true,
     });
+  });
+
+  it("keeps a valid display range and falls back to the full month", () => {
+    expect(normalizeSchedulePrefs({ displayRange: "sevenDays" }).displayRange).toBe("sevenDays");
+    expect(normalizeSchedulePrefs({ displayRange: "other" }).displayRange).toBe("month");
   });
 });

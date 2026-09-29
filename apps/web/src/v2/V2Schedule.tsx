@@ -87,6 +87,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [hideTables, setHideTables] = useState(boot.hideTables);
   const [dimPast, setDimPast] = useState(boot.dimPast);
   const [hidePastDays, setHidePastDays] = useState(boot.hidePastDays);
+  const [displayRange, setDisplayRange] = useState(boot.displayRange);
   const [showTip, setShowTip] = useState(boot.showTip);
   const [canEdit, setCanEdit] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
@@ -1244,6 +1245,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           countTables={countTables}
           dimPast={dimPast}
           hidePastDays={hidePastDays}
+          displayRange={displayRange}
           showTip={showTip}
           canEdit={paintOn && !gridLoading}
           quietEdit={!editGlow || !editPulse}
@@ -1296,6 +1298,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2Settings
             dimPast={dimPast}
             hidePastDays={hidePastDays}
+            displayRange={displayRange}
+            showDisplayRange={cetTick.year === year && cetTick.monthIndex === monthIndex}
             showTables={!hideTables}
             countTables={countTables}
             showTip={showTip}
@@ -1313,6 +1317,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onHidePastDays={(value) => {
               setHidePastDays(value);
               savePrefs({ ...loadPrefs(), hidePastDays: value });
+            }}
+            onDisplayRange={(value) => {
+              setDisplayRange(value);
+              savePrefs({ ...loadPrefs(), displayRange: value });
             }}
             onShowTables={(value) => {
               setHideTables(!value);
@@ -1340,6 +1348,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setBusyHint(next.busyHint);
               setDimPast(next.dimPast);
               setHidePastDays(next.hidePastDays);
+              setDisplayRange(next.displayRange);
               setHideTables(next.hideTables);
               setShowTip(next.showTip);
               onKindChange?.(next.kinds[0]);

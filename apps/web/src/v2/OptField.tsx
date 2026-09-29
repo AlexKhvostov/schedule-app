@@ -7,6 +7,7 @@ import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityM
 import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
 import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../data/slots";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
+import { visibleMonthDays, type DisplayRange } from "../schedule/displayRange";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -41,6 +42,7 @@ type Props = {
   countTables?: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
+  displayRange?: DisplayRange;
   showTip: boolean;
   canEdit: boolean;
   quietEdit?: boolean;
@@ -476,7 +478,8 @@ const OptBody = memo(function OptBody({
 
   return (
     <>
-      {days.map((day, dayIdx) => {
+      {days.map((day) => {
+        const dayIdx = day.d - 1;
         const today = sameMonth && cet.day === day.d;
         if (hidePastDays && isPastDay(year, monthIndex, day.d, cet)) return null;
         const dayPast = dimPast && isPastSlot(year, monthIndex, day.d, 47, cet) && !today;
@@ -829,6 +832,7 @@ export const OptField = memo(function OptField({
   countTables = false,
   dimPast,
   hidePastDays,
+  displayRange = "month",
   showTip,
   canEdit,
   quietEdit,
@@ -900,10 +904,10 @@ export const OptField = memo(function OptField({
   const fixedWidthRef = useRef(70);
   const pinchRef = useRef<{ distance: number; width: number; contentHalf: number; focalX: number } | null>(null);
   const todayRef = useRef<HTMLDivElement>(null);
-  const days = useMemo(
-    () => daysInMonth(year, monthIndex, i18n.language),
-    [year, monthIndex, i18n.language],
-  );
+  const days = useMemo(() => {
+    const visible = new Set(visibleMonthDays(year, monthIndex, displayRange, cet));
+    return daysInMonth(year, monthIndex, i18n.language).filter((day) => visible.has(day.d));
+  }, [year, monthIndex, i18n.language, displayRange, cet]);
   const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
   const clock = usePlayerClock();
   const [slotLook, setSlotLook] = useState(() => loadSlotLook());

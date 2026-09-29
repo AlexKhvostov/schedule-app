@@ -8250,6 +8250,60 @@ textarea.v2-ctrl.v2-cab-area {
   padding: 0;
 }
 
+.v2-settings-range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+}
+
+.v2-settings-range-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.v2-settings-range-head b {
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.v2-settings-range-head small {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.v2-settings-range-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.v2-settings-range-options button {
+  min-width: 0;
+  height: 24px;
+  padding: 0 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-settings-range-options button.is-on {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
+  color: var(--primary);
+}
+
 .v2-settings-row,
 .v2-settings-reset {
   display: flex;

@@ -1,7 +1,8 @@
 import { LIMIT_OPTIONS } from "../schedule/capacity";
+import { DISPLAY_RANGES, type DisplayRange } from "../schedule/displayRange";
 
 const KEY = "v2-schedule-prefs";
-export const SCHEDULE_PREFS_VERSION = 3;
+export const SCHEDULE_PREFS_VERSION = 4;
 export const SCHEDULE_KINDS = ["nitro", "regular"] as const;
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
@@ -16,6 +17,7 @@ export type SchedulePrefs = {
   busyHint: boolean;
   dimPast: boolean;
   hidePastDays: boolean;
+  displayRange: DisplayRange;
   hideTables: boolean;
   showTip: boolean;
 };
@@ -33,6 +35,7 @@ export const DEFAULT_PREFS: SchedulePrefs = {
   busyHint: false,
   dimPast: true,
   hidePastDays: false,
+  displayRange: "month",
   hideTables: false,
   showTip: true,
 };
@@ -79,6 +82,9 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
     busyHint: booleanOr(parsed.busyHint, DEFAULT_PREFS.busyHint),
     dimPast: booleanOr(parsed.dimPast, DEFAULT_PREFS.dimPast),
     hidePastDays: booleanOr(parsed.hidePastDays, DEFAULT_PREFS.hidePastDays),
+    displayRange: DISPLAY_RANGES.includes(parsed.displayRange as DisplayRange)
+      ? parsed.displayRange as DisplayRange
+      : DEFAULT_PREFS.displayRange,
     hideTables: booleanOr(parsed.hideTables, DEFAULT_PREFS.hideTables),
     showTip: booleanOr(parsed.showTip, DEFAULT_PREFS.showTip),
   };
