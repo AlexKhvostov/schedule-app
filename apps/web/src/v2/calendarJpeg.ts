@@ -1,7 +1,7 @@
 import { limitTonePaint } from "../schedule/capacity";
 import type { ShiftRun } from "./myShifts";
+import { clipWorkRun, workHourSegments, workTrackProgress } from "../schedule/workHours";
 
-const SLOT_COUNT = 48;
 const WIDTH = 680;
 const PAD = 12;
 const DATE_W = 54;
@@ -49,6 +49,8 @@ type Opts = {
   kicker: string;
   meta: string;
   dayLabel: string;
+  workStartHalf: number;
+  workEndHalf: number;
 };
 
 export type CalendarShiftRun = ShiftRun & {
@@ -66,8 +68,8 @@ function limitInk(limit: string) {
   return limit === "25" ? "#14532d" : "#071014";
 }
 
-function slotX(trackW: number, slot: number) {
-  return (trackW * slot) / SLOT_COUNT;
+function slotX(trackW: number, slot: number, startHalf: number, endHalf: number) {
+  return (trackW * (slot - startHalf)) / (endHalf - startHalf);
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -90,7 +92,7 @@ function runPast(day: number, end: number, today: number | null, nowAt: number) 
 
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
+  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel, workStartHalf, workEndHalf } = opts;
   const laneCount = Math.max(1, usedColumns.length);
   const rowH = Math.max(22, laneCount * 18 + 4);
   const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + PAD;
@@ -154,10 +156,10 @@ export async function downloadCalendarJpeg(opts: Opts) {
   ctx.font = "600 9px JetBrains Mono, IBM Plex Mono, monospace";
   ctx.fillText("CET", sheetX + 8, sheetY + 17);
 
-  for (let h = 0; h < 24; h += 1) {
-    const x = trackX + slotX(trackW, h * 2);
-    const w = slotX(trackW, 2);
-    ctx.strokeStyle = h === 5 || h === 11 || h === 17 ? paint.lineStrong : paint.line;
+  for (const segment of workHourSegments(workStartHalf, workEndHalf)) {
+    const x = trackX + slotX(trackW, segment.startHalf, workStartHalf, workEndHalf);
+    const w = (trackW * segment.span) / (workEndHalf - workStartHalf);
+    ctx.strokeStyle = segment.hour === 5 || segment.hour === 11 || segment.hour === 17 ? paint.lineStrong : paint.line;
     ctx.beginPath();
     ctx.moveTo(x + w + 0.5, sheetY);
     ctx.lineTo(x + w + 0.5, sheetY + sheetH);
@@ -165,7 +167,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.textAlign = "center";
     ctx.font = "650 9px JetBrains Mono, IBM Plex Mono, monospace";
     ctx.fillStyle = paint.muted;
-    ctx.fillText(String(h), x + w / 2, sheetY + 10);
+    ctx.fillText(segment.span === 1 && segment.startHalf % 2 ? `${segment.hour}:30` : String(segment.hour), x + w / 2, sheetY + 10);
     ctx.textAlign = "left";
   }
 
@@ -197,9 +199,11 @@ export async function downloadCalendarJpeg(opts: Opts) {
     }
 
     for (const run of byDay.get(day.d) ?? []) {
-      const len = run.end - run.start;
-      const x = trackX + slotX(trackW, run.start);
-      const w = Math.max(2, slotX(trackW, len));
+      const clipped = clipWorkRun(run.start, run.end, workStartHalf, workEndHalf);
+      if (!clipped) continue;
+      const len = clipped.end - clipped.start;
+      const x = trackX + slotX(trackW, clipped.start, workStartHalf, workEndHalf);
+      const w = Math.max(2, (trackW * len) / (workEndHalf - workStartHalf));
       const cy = y + 2 + run.lane * 18;
       const past = runPast(day.d, run.end, today, nowAt);
       ctx.save();
@@ -217,9 +221,9 @@ export async function downloadCalendarJpeg(opts: Opts) {
         ctx.strokeStyle = limitInk(run.rawLimit);
         ctx.lineWidth = 1;
         for (let i = 1; i < len; i += 1) {
-          if ((run.start + i) % 2 !== 0) continue;
+          if ((clipped.start + i) % 2 !== 0) continue;
           const tx = x + (w * i) / len;
-          ctx.globalAlpha = dimPast && past ? 0.45 : (run.start + i) % 2 === 0 ? 0.5 : 0.28;
+          ctx.globalAlpha = dimPast && past ? 0.45 : 0.5;
           ctx.beginPath();
           ctx.moveTo(tx + 0.5, cy + 2);
           ctx.lineTo(tx + 0.5, cy + CHIP_H - 2);
@@ -243,10 +247,10 @@ export async function downloadCalendarJpeg(opts: Opts) {
     }
   });
 
-  if (dimPast && today != null) {
+  if (dimPast && today != null && workTrackProgress(Math.floor(nowAt), nowAt % 1, workStartHalf, workEndHalf) != null) {
     const todayIdx = days.findIndex((day) => day.d === today);
     if (todayIdx >= 0) {
-      const x = trackX + slotX(trackW, nowAt);
+      const x = trackX + slotX(trackW, nowAt, workStartHalf, workEndHalf);
       const y = sheetY + HOUR_H + todayIdx * rowH;
       ctx.fillStyle = paint.now;
       ctx.fillRect(x - 1.5, y, 3, rowH);

@@ -8097,9 +8097,9 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-mine-track {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(24, 18px);
-  width: calc(24 * 18px);
-  min-width: calc(24 * 18px);
+  grid-template-columns: repeat(var(--mine-visible-slots, 48), calc(432px / var(--mine-visible-slots, 48)));
+  width: 432px;
+  min-width: 432px;
   flex: none;
   align-self: stretch;
   background: var(--card);
@@ -8302,6 +8302,31 @@ textarea.v2-ctrl.v2-cab-area {
   border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
   background: color-mix(in srgb, var(--primary) 16%, var(--card));
   color: var(--primary);
+}
+
+.v2-settings-work-hours {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.v2-settings-work-hours label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.v2-settings-work-hours select {
+  min-width: 0;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
 }
 
 .v2-settings-row,
@@ -9626,7 +9651,7 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-track {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(48, var(--opt-cell-w));
+  grid-template-columns: repeat(var(--opt-visible-slots, 48), var(--opt-cell-w));
   column-gap: var(--opt-gap);
   row-gap: 0;
   justify-items: stretch;

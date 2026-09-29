@@ -1,11 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { DISPLAY_RANGES, type DisplayRange } from "../schedule/displayRange";
+import { DAY_HALF_SLOTS, halfTimeLabel } from "../schedule/workHours";
 import { V2Float } from "./V2Float";
 
 type Props = {
   dimPast: boolean;
   hidePastDays: boolean;
   displayRange: DisplayRange;
+  workStartHalf: number;
+  workEndHalf: number;
   showDisplayRange?: boolean;
   showTables: boolean;
   countTables?: boolean;
@@ -20,6 +23,7 @@ type Props = {
   onDimPast: (value: boolean) => void;
   onHidePastDays: (value: boolean) => void;
   onDisplayRange: (value: DisplayRange) => void;
+  onWorkHours: (startHalf: number, endHalf: number) => void;
   onShowTables: (value: boolean) => void;
   onShowTip: (value: boolean) => void;
   onEditPulse: (value: boolean) => void;
@@ -33,6 +37,8 @@ export function V2Settings({
   dimPast,
   hidePastDays,
   displayRange,
+  workStartHalf,
+  workEndHalf,
   showDisplayRange = true,
   showTables,
   countTables = false,
@@ -47,6 +53,7 @@ export function V2Settings({
   onDimPast,
   onHidePastDays,
   onDisplayRange,
+  onWorkHours,
   onShowTables,
   onShowTip,
   onEditPulse,
@@ -115,7 +122,7 @@ export function V2Settings({
   return (
     <V2Float title={t("schedule.settingsTitle")} x={x} y={y} width={300} z={z} compact onMove={onMove} onFocus={onFocus} onClose={onClose}>
       <div className="v2-settings-list">
-        {showDisplayRange ? <section className="v2-settings-range" aria-label={t("schedule.displayRange")}>
+        {showDisplayRange ? <section className="v2-settings-range v2-settings-display-range" aria-label={t("schedule.displayRange")}>
           <div className="v2-settings-range-head">
             <b>{t("schedule.displayRange")}</b>
             <small>{t("schedule.displayRangeHint")}</small>
@@ -134,6 +141,38 @@ export function V2Settings({
             ))}
           </div>
         </section> : null}
+        <section className="v2-settings-range" aria-label={t("schedule.workHours")}>
+          <div className="v2-settings-range-head">
+            <b>{t("schedule.workHours")}</b>
+            <small>{t("schedule.workHoursHint")}</small>
+          </div>
+          <div className="v2-settings-work-hours">
+            <label>
+              <span>{t("schedule.workHoursFrom")}</span>
+              <select
+                aria-label={t("schedule.workHoursFrom")}
+                value={workStartHalf}
+                onChange={(event) => onWorkHours(Number(event.target.value), workEndHalf)}
+              >
+                {Array.from({ length: DAY_HALF_SLOTS }, (_, half) => (
+                  <option key={half} value={half} disabled={half >= workEndHalf}>{halfTimeLabel(half)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{t("schedule.workHoursTo")}</span>
+              <select
+                aria-label={t("schedule.workHoursTo")}
+                value={workEndHalf}
+                onChange={(event) => onWorkHours(workStartHalf, Number(event.target.value))}
+              >
+                {Array.from({ length: DAY_HALF_SLOTS }, (_, index) => index + 1).map((half) => (
+                  <option key={half} value={half} disabled={half <= workStartHalf}>{halfTimeLabel(half)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
         {rows.map((row) => (
           <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} onClick={row.toggle}>
             <span className="v2-settings-ico">

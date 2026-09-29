@@ -1,8 +1,9 @@
 import { LIMIT_OPTIONS } from "../schedule/capacity";
 import { DISPLAY_RANGES, type DisplayRange } from "../schedule/displayRange";
+import { DEFAULT_WORK_HOURS, normalizeWorkHours } from "../schedule/workHours";
 
 const KEY = "v2-schedule-prefs";
-export const SCHEDULE_PREFS_VERSION = 4;
+export const SCHEDULE_PREFS_VERSION = 5;
 export const SCHEDULE_KINDS = ["nitro", "regular"] as const;
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
@@ -18,6 +19,8 @@ export type SchedulePrefs = {
   dimPast: boolean;
   hidePastDays: boolean;
   displayRange: DisplayRange;
+  workStartHalf: number;
+  workEndHalf: number;
   hideTables: boolean;
   showTip: boolean;
 };
@@ -36,6 +39,8 @@ export const DEFAULT_PREFS: SchedulePrefs = {
   dimPast: true,
   hidePastDays: false,
   displayRange: "month",
+  workStartHalf: DEFAULT_WORK_HOURS.startHalf,
+  workEndHalf: DEFAULT_WORK_HOURS.endHalf,
   hideTables: false,
   showTip: true,
 };
@@ -70,6 +75,7 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
   const limits = [...new Set(rawLimits)]
     .filter((item): item is string => typeof item === "string" && LIMIT_OPTIONS.includes(item as (typeof LIMIT_OPTIONS)[number]))
     .sort((a, b) => Number(a) - Number(b));
+  const workHours = normalizeWorkHours(parsed.workStartHalf, parsed.workEndHalf);
   return {
     version: SCHEDULE_PREFS_VERSION,
     limits: limits.length ? limits : [...DEFAULT_PREFS.limits],
@@ -85,6 +91,8 @@ export function normalizeSchedulePrefs(value: unknown): SchedulePrefs {
     displayRange: DISPLAY_RANGES.includes(parsed.displayRange as DisplayRange)
       ? parsed.displayRange as DisplayRange
       : DEFAULT_PREFS.displayRange,
+    workStartHalf: workHours.startHalf,
+    workEndHalf: workHours.endHalf,
     hideTables: booleanOr(parsed.hideTables, DEFAULT_PREFS.hideTables),
     showTip: booleanOr(parsed.showTip, DEFAULT_PREFS.showTip),
   };

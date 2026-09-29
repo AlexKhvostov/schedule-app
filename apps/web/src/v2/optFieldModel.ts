@@ -30,8 +30,6 @@ export type OverwriteAsk = {
   empty?: Occupancy;
 };
 
-const SLOT_COUNT = 48;
-
 export function scheduleKindGroups(variants: ScheduleVariant[], limits: string[]) {
   return [...new Set(variants)].map((variant) => ({
     variant,
@@ -121,17 +119,18 @@ export function findHitCss(query: string) {
   return `.v2-opt.is-find[data-opt-find="${query}"] .v2-opt-cell.is-on[data-mark="${query}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
 }
 
-export function nowAlongTrack(half: number, progress: number) {
-  const t = Math.min(SLOT_COUNT, Math.max(0, half + Math.min(1, Math.max(0, progress))));
-  const cell = Math.min(SLOT_COUNT - 1, Math.floor(t));
+export function nowAlongTrack(half: number, progress: number, startHalf = 0, endHalf = 48) {
+  const slotCount = endHalf - startHalf;
+  const t = Math.min(endHalf, Math.max(startHalf, half + Math.min(1, Math.max(0, progress)))) - startHalf;
+  const cell = Math.min(slotCount - 1, Math.floor(t));
   const frac = t - cell;
-  return `var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - 47 * var(--opt-gap)) * ${cell + frac} / ${SLOT_COUNT} + ${cell} * var(--opt-gap)`;
+  return `var(--opt-pad-l) + (100% - var(--opt-pad-l) - var(--opt-pad-r) - ${slotCount - 1} * var(--opt-gap)) * ${cell + frac} / ${slotCount} + ${cell} * var(--opt-gap)`;
 }
 
-export function nowHeadLeft(half: number, progress: number) {
-  return `calc(${nowAlongTrack(half, progress)})`;
+export function nowHeadLeft(half: number, progress: number, startHalf = 0, endHalf = 48) {
+  return `calc(${nowAlongTrack(half, progress, startHalf, endHalf)})`;
 }
 
-export function nowLineLeft(half: number, progress: number) {
-  return `calc(${nowAlongTrack(half, progress)})`;
+export function nowLineLeft(half: number, progress: number, startHalf = 0, endHalf = 48) {
+  return `calc(${nowAlongTrack(half, progress, startHalf, endHalf)})`;
 }

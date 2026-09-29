@@ -74,7 +74,7 @@ test("current-month view ranges persist and hide-past has priority", async ({ pa
   const rows = page.locator(".v2-opt-block");
 
   await page.getByTitle("Настройки").click();
-  const ranges = page.locator(".v2-settings-range");
+  const ranges = page.locator(".v2-settings-display-range");
   await ranges.getByRole("button", { name: "День", exact: true }).click();
   await expect(rows).toHaveCount(1);
   await ranges.getByRole("button", { name: "3 дня", exact: true }).click();
@@ -89,12 +89,49 @@ test("current-month view ranges persist and hide-past has priority", async ({ pa
   await page.reload();
   await expect(rows).toHaveCount(Math.max(0, weekEnd - Math.max(now.day, weekStart) + 1));
   await page.getByTitle("Настройки").click();
-  await expect(page.locator(".v2-settings-range").getByRole("button", { name: "Неделя", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".v2-settings-display-range").getByRole("button", { name: "Неделя", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: "next", exact: true }).click();
-  await expect(page.locator(".v2-settings-range")).toHaveCount(0);
+  await expect(page.locator(".v2-settings-display-range")).toHaveCount(0);
   const nextLast = new Date(now.year, now.monthIndex + 2, 0).getDate();
   await expect(rows).toHaveCount(nextLast);
+});
+
+test("working hours crop the schedule and survive reload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByTitle("Настройки").click();
+
+  await page.getByRole("combobox", { name: "Начало" }).selectOption("17");
+  await page.getByRole("combobox", { name: "Конец" }).selectOption("36");
+
+  const firstLane = page.locator(".v2-days .v2-opt-lane:not(.is-ghost) .v2-opt-track").first();
+  await expect(firstLane.locator("[data-slot]")).toHaveCount(19);
+  await expect(firstLane.locator("[data-slot]").first()).toHaveAttribute("data-half", "17");
+  await expect(firstLane.locator("[data-slot]").last()).toHaveAttribute("data-half", "35");
+  await expect(page.locator('.v2-opt-head [data-h="8"]')).toContainText("8:30");
+
+  await page.reload();
+  await expect(firstLane.locator("[data-slot]")).toHaveCount(19);
+  await page.getByTitle("Настройки").click();
+  await expect(page.getByRole("combobox", { name: "Начало" })).toHaveValue("17");
+  await expect(page.getByRole("combobox", { name: "Конец" })).toHaveValue("36");
+
+  await page.getByTitle("Мой календарь").click();
+  const calendarHours = page.locator(".v2-mine-hours-grid .v2-mine-hour");
+  await expect(calendarHours).toHaveCount(10);
+  await expect(calendarHours.first()).toHaveText("8:30");
+  await expect(calendarHours.last()).toHaveText("17");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Скачать" }).click();
+  await download;
+
+  await page.locator(".v2-mine .v2-modal-close").click();
+  await page.getByRole("button", { name: /Сбросить отображение/ }).click();
+  await expect(firstLane.locator("[data-slot]")).toHaveCount(48);
+  await expect(page.getByRole("combobox", { name: "Начало" })).toHaveValue("0");
+  await expect(page.getByRole("combobox", { name: "Конец" })).toHaveValue("48");
 });
 
 test("schedule cursor follows one half-hour and drag shows the full range", async ({ page }) => {

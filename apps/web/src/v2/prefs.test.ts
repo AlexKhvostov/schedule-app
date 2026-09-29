@@ -77,4 +77,15 @@ describe("schedule preferences", () => {
     expect(normalizeSchedulePrefs({ displayRange: "sevenDays" }).displayRange).toBe("sevenDays");
     expect(normalizeSchedulePrefs({ displayRange: "other" }).displayRange).toBe("month");
   });
+
+  it("keeps valid working hours and resets an overnight range", () => {
+    expect(normalizeSchedulePrefs({ workStartHalf: 17, workEndHalf: 36 })).toMatchObject({
+      workStartHalf: 17,
+      workEndHalf: 36,
+    });
+    expect(normalizeSchedulePrefs({ workStartHalf: 36, workEndHalf: 17 })).toMatchObject({
+      workStartHalf: 0,
+      workEndHalf: 48,
+    });
+  });
 });
