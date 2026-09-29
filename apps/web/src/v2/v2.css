@@ -4380,7 +4380,7 @@ i.v2-staff-ico {
 
 .v2-sched-bar {
   position: relative;
-  z-index: 20;
+  z-index: 40;
   gap: 8px;
   padding: 0 16px;
   overflow: visible;
@@ -9878,6 +9878,7 @@ textarea.v2-ctrl.v2-cab-area {
   letter-spacing: 0.02em;
   line-height: 1;
   text-align: center;
+  white-space: nowrap;
   text-shadow:
     0 0 4px var(--background),
     0 1px 1px var(--background),
@@ -10592,6 +10593,23 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt.is-kit .v2-opt-pick {
   border-color: var(--title);
   background: color-mix(in srgb, var(--title) 16%, transparent);
+  pointer-events: none;
+}
+
+.v2-opt-pick::before {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--title) 34%, var(--border));
+  border-radius: 5px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font: 700 8px/1.2 "JetBrains Mono", ui-monospace, monospace;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.28);
 }
 
 .v2-opt.is-kit .v2-opt-pick.is-off {

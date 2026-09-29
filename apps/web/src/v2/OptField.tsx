@@ -19,6 +19,7 @@ import {
   nowHeadLeft,
   nowLineLeft,
   packOwner,
+  slotRangeSpan,
   slotSpan,
   tablesLabel,
   tipDate,
@@ -208,6 +209,7 @@ function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode: "plac
   pick.style.top = `${top - trackBox.top - pad}px`;
   pick.style.width = `${right - left + pad * 2}px`;
   pick.style.height = `${bottom - top + pad * 2}px`;
+  pick.dataset.label = slotRangeSpan(a, b);
   pick.classList.toggle("is-off", mode === "remove");
   pick.hidden = false;
 }
@@ -247,7 +249,7 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
   const scope =
     (kit ? hit.cell.closest(".v2-opt-limit") : null) ?? hit.cell.closest(".v2-opt-lanes");
   if (!scope) return;
-  const cells = scope.querySelectorAll<HTMLElement>(`[data-slot][data-h="${hit.hour}"]`);
+  const cells = scope.querySelectorAll<HTMLElement>(`[data-slot][data-half="${hit.half}"]`);
   if (!cells.length) return;
   const hostBox = host.getBoundingClientRect();
   let left = Infinity;
@@ -263,7 +265,7 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
   }
   const pad = kit ? 2 : 3;
   const cap = 11;
-  const col = String(hit.hour);
+  const col = String(hit.half);
   frame.style.left = `${left - hostBox.left - pad}px`;
   frame.style.top = `${top - hostBox.top - pad - cap}px`;
   frame.style.width = `${right - left + pad * 2}px`;
@@ -294,13 +296,13 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
     hideFrame(mem);
     return;
   }
-  const col = String(hit.hour);
   const slot = String(hit.half);
+  const col = String(hit.hour);
   const row = String(hit.dayIdx);
   const lane = hit.lane;
   const late = hit.half % 2 === 1;
-  if (kit && root.dataset.row === row && mem.hour?.dataset.h === col && root.dataset.lane === lane) {
-    if (!editing || (!mem.frame?.hidden && mem.col === col)) return;
+  if (kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
+    if (!editing || (!mem.frame?.hidden && mem.col === slot)) return;
   } else if (!kit && root.dataset.half === slot && root.dataset.row === row && root.dataset.lane === lane) {
     return;
   }
@@ -340,7 +342,7 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.row = row;
   root.dataset.lane = lane;
   root.dataset.half = slot;
-  if (editing) placeFrame(root, mem, hit, `${hit.hour}–${hit.hour + 1}`);
+  if (editing) placeFrame(root, mem, hit, slotSpan(hit.half));
   else hideFrame(mem);
 }
 

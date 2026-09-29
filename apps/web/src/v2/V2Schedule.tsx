@@ -23,7 +23,7 @@ import { BarMark, HoursPanel, MobileScheduleDock } from "./SchedulePanels";
 import { showV2Toast } from "./V2Toast";
 import { gridsWithMySlots, limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
-import { loadPrefs, savePrefs } from "./prefs";
+import { loadPrefs, resetSchedulePrefs, savePrefs } from "./prefs";
 import { centerPos, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
@@ -70,10 +70,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const accessRef = useRef<Set<string>>(new Set());
   const selfMarkRef = useRef(selfMark);
   selfMarkRef.current = selfMark;
-  const [hideTables, setHideTables] = useState(false);
-  const [dimPast, setDimPast] = useState(true);
-  const [hidePastDays, setHidePastDays] = useState(false);
-  const [showTip, setShowTip] = useState(true);
+  const [hideTables, setHideTables] = useState(boot.hideTables);
+  const [dimPast, setDimPast] = useState(boot.dimPast);
+  const [hidePastDays, setHidePastDays] = useState(boot.hidePastDays);
+  const [showTip, setShowTip] = useState(boot.showTip);
   const [canEdit, setCanEdit] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
   const [mobileEditOn, setMobileEditOn] = useState(false);
@@ -766,8 +766,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   const toggleLimit = (value: string) => {
     setLimits((prev) => {
-      if (prev.includes(value)) return prev.length === 1 ? prev : prev.filter((item) => item !== value);
-      return [...prev, value].sort((a, b) => Number(a) - Number(b));
+      const next = prev.includes(value)
+        ? prev.length === 1 ? prev : prev.filter((item) => item !== value)
+        : [...prev, value].sort((a, b) => Number(a) - Number(b));
+      savePrefs({ ...loadPrefs(), limits: next });
+      return next;
     });
     setGrids((prev) => (prev[value] ? prev : { ...prev, [value]: emptyMonth(year, monthIndex) }));
   };
@@ -1283,10 +1286,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             z={zOf("settings")}
             onMove={setSettingsPos}
             onFocus={() => setFront("settings")}
-            onDimPast={setDimPast}
-            onHidePastDays={setHidePastDays}
-            onShowTables={(value) => setHideTables(!value)}
-            onShowTip={setShowTip}
+            onDimPast={(value) => {
+              setDimPast(value);
+              savePrefs({ ...loadPrefs(), dimPast: value });
+            }}
+            onHidePastDays={(value) => {
+              setHidePastDays(value);
+              savePrefs({ ...loadPrefs(), hidePastDays: value });
+            }}
+            onShowTables={(value) => {
+              setHideTables(!value);
+              savePrefs({ ...loadPrefs(), hideTables: !value });
+            }}
+            onShowTip={(value) => {
+              setShowTip(value);
+              savePrefs({ ...loadPrefs(), showTip: value });
+            }}
             onEditPulse={(value) => {
               setEditPulse(value);
               savePrefs({ ...loadPrefs(), editPulse: value });
@@ -1294,6 +1309,19 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onShowLocalTime={(value) => {
               setShowExtraTz(value);
               savePrefs({ ...loadPrefs(), showExtraTz: value });
+            }}
+            onResetPrefs={() => {
+              const next = resetSchedulePrefs();
+              setLimits(next.limits);
+              setKind(next.kind);
+              setEditPulse(next.editPulse);
+              setShowExtraTz(next.showExtraTz);
+              setBusyHint(next.busyHint);
+              setDimPast(next.dimPast);
+              setHidePastDays(next.hidePastDays);
+              setHideTables(next.hideTables);
+              setShowTip(next.showTip);
+              onKindChange?.(next.kind);
             }}
             onResetDemo={!isLiveData() ? () => {
               resetDemoSchedules();

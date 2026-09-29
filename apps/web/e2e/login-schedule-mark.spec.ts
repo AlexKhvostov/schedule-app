@@ -24,6 +24,72 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
   await expect(editableCell).not.toHaveClass(/is-on/);
 });
 
+test("schedule filters stay above the timeline and display preferences survive reload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "Расписание" }).click();
+
+  const limit = page.locator(".v2-limit-hit");
+  await limit.click();
+  await expect(page.locator(".v2-limit-wrap .v2-bar-menu")).toBeVisible();
+  const layers = await page.evaluate(() => ({
+    filters: Number.parseInt(getComputedStyle(document.querySelector(".v2-sched-bar")!).zIndex, 10),
+    timeline: Number.parseInt(getComputedStyle(document.querySelector(".v2-opt-hours")!).zIndex, 10),
+  }));
+  expect(layers.filters).toBeGreaterThan(layers.timeline);
+  await page.locator(".v2-limit-wrap .v2-bar-menu button", { hasText: "100" }).click();
+
+  await page.getByTitle("Настройки").click();
+  const hidePast = page.getByRole("button", { name: /Скрыть прошлые дни/ });
+  await hidePast.click();
+  await expect(hidePast).toHaveClass(/is-on/);
+
+  await page.reload();
+  await expect(page.locator(".v2-limit-hit")).toHaveAttribute("title", /100/);
+  await page.getByTitle("Настройки").click();
+  await expect(page.getByRole("button", { name: /Скрыть прошлые дни/ })).toHaveClass(/is-on/);
+
+  await page.getByRole("button", { name: /Сбросить отображение/ }).click();
+  await expect(page.locator(".v2-limit-hit")).toHaveAttribute("title", "50");
+  await expect(page.getByRole("button", { name: /Скрыть прошлые дни/ })).not.toHaveClass(/is-on/);
+});
+
+test("schedule cursor follows one half-hour and drag shows the full range", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "Расписание" }).click();
+  await page.getByTitle("Редактирование").click();
+
+  const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  await expect(candidate).toBeVisible();
+  const half = Number(await candidate.getAttribute("data-half"));
+  const day = await candidate.getAttribute("data-day");
+  const lane = await candidate.getAttribute("data-lane");
+  const targetHalf = half <= 45 ? half + 2 : half - 2;
+  const target = page.locator(`[data-slot][data-day="${day}"][data-lane="${lane}"][data-half="${targetHalf}"]`);
+  const format = (value: number) => `${String(Math.floor((value % 48) / 2)).padStart(2, "0")}:${value % 2 ? "30" : "00"}`;
+
+  await candidate.hover();
+  const frame = page.locator(".v2-opt-frame");
+  await expect(frame).toBeVisible();
+  await expect(frame).toHaveText(`${format(half)} – ${format(half + 1)}`);
+  const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
+  expect(cellBox && frameBox).toBeTruthy();
+  expect(Math.abs(frameBox!.width - cellBox!.width)).toBeLessThan(8);
+
+  const [startBox, endBox] = await Promise.all([candidate.boundingBox(), target.boundingBox()]);
+  expect(startBox && endBox).toBeTruthy();
+  await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
+  const first = Math.min(half, targetHalf);
+  const last = Math.max(half, targetHalf);
+  await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", `${format(first)} – ${format(last + 1)}`);
+  await page.mouse.up();
+});
+
 test("mobile schedule starts safe and only edits at a readable zoom", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/");

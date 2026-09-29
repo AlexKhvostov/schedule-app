@@ -264,6 +264,8 @@
     "dimPast": "Dim the past",
     "dimPastHint": "Dims the past. Turn off to keep past as bright as the future.",
     "hidePastDays": "Hide past days",
+    "resetView": "Reset schedule view",
+    "resetViewHint": "Restore default filters and schedule view. Your profile and club-wide rules stay unchanged.",
     "hidePastDaysHint": "Only today and the future stay on the month. Uncheck to bring the days back.",
     "hidePastEmpty": "Every day in this month has already passed. Uncheck “Hide past days” to see them again.",
     "showLocalTime": "My time on the grid",

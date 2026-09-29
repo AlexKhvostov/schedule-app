@@ -30,8 +30,14 @@ export type OverwriteAsk = {
 const SLOT_COUNT = 48;
 
 export function slotSpan(half: number, hourShift = 0) {
-  const start = (Math.floor(half / 2) * 60 + (half % 2 ? 30 : 0) + hourShift * 60 + 24 * 60) % (24 * 60);
-  const end = (start + 30) % (24 * 60);
+  return slotRangeSpan(half, half, hourShift);
+}
+
+export function slotRangeSpan(fromHalf: number, toHalf: number, hourShift = 0) {
+  const first = Math.min(fromHalf, toHalf);
+  const last = Math.max(fromHalf, toHalf);
+  const start = (first * 30 + hourShift * 60 + 24 * 60) % (24 * 60);
+  const end = ((last + 1) * 30 + hourShift * 60 + 24 * 60) % (24 * 60);
   const fmt = (mins: number) =>
     `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
   return `${fmt(start)} – ${fmt(end)}`;
