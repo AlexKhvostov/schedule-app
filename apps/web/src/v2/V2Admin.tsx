@@ -25,6 +25,7 @@ import { FoldHead } from "./FoldHead";
 import { V2Root } from "./V2Root";
 import { V2SaveButton } from "./V2SaveButton";
 import { showV2Toast } from "./V2Toast";
+import { DeadTimeEditor } from "./DeadTimeEditor";
 import {
   loadScheduleSettings,
   saveActAs,
@@ -466,6 +467,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
           </button>
         </div>
       </section>
+      <DeadTimeEditor />
       <section className="v2-admin-card">
         <div className="v2-admin-section-head">
           <span className="v2-admin-kicker">{t("admin.filterLimits.kicker")}</span>

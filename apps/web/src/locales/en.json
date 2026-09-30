@@ -704,6 +704,25 @@
       "saving": "Saving…",
       "saveErr": "Could not save the limits. Check your access and try again."
     },
+    "deadTime": {
+      "kicker": "traffic",
+      "title": "Dead time",
+      "lead": "Daily low-traffic intervals for each tournament type and limit.",
+      "variant": "Tournament type",
+      "limit": "Limit",
+      "from": "From",
+      "to": "To",
+      "add": "Add interval",
+      "remove": "Remove interval",
+      "empty": "No intervals are set for this pair.",
+      "timezone": "CET / Europe/Madrid time, in 30-minute steps.",
+      "overlap": "Intervals for the same pair must not overlap.",
+      "bounds": "The interval must start before it ends within one day.",
+      "full": "The whole day is already covered by intervals.",
+      "saving": "Saving…",
+      "loadErr": "Could not load the intervals. Refresh the page and try again.",
+      "saveErr": "Could not save the intervals. The previous rules were kept."
+    },
     "root": {
       "kicker": "root",
       "title": "Root",

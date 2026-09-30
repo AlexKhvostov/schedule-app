@@ -54,6 +54,18 @@ begin
     raise exception 'schedule filter limit RPC grants are incorrect';
   end if;
 
+  if not has_function_privilege('authenticated', 'public.save_schedule_dead_intervals(jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_schedule_dead_intervals(jsonb)', 'EXECUTE') then
+    raise exception 'schedule dead interval RPC grants are incorrect';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'SELECT')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'INSERT')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'DELETE') then
+    raise exception 'schedule dead intervals must be read-only outside the atomic RPC';
+  end if;
+
   if not exists (
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'schedule_settings'
