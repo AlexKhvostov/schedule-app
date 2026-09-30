@@ -129,3 +129,15 @@ export async function saveDeadTimeIntervals(intervals: DeadTimeInterval[]) {
   });
   return { error: error?.message };
 }
+
+export function subscribeDeadTimeIntervals(onChange: () => void) {
+  const db = getSupabase();
+  if (!db) return () => {};
+  const channel = db
+    .channel("schedule-dead-intervals")
+    .on("postgres_changes", { event: "*", schema: "public", table: "schedule_dead_intervals" }, onChange)
+    .subscribe();
+  return () => {
+    void db.removeChannel(channel);
+  };
+}

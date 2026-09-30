@@ -9,6 +9,7 @@ import { readCet } from "../schedule/cet";
 import { demoMonthPlan } from "../schedule/demoPlan";
 import { loadDemoSchedule, resetDemoSchedules, saveDemoSchedule } from "../schedule/demoScheduleStore";
 import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
+import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadTimeStats";
 import { fieldFill, columnFill } from "../schedule/analytics";
 import { OptField, type OverwriteAsk } from "./OptField";
 import { FillByHourChart } from "./FillByHourChart";
@@ -44,6 +45,7 @@ import {
   type MonthGridStore,
 } from "../data/slots";
 import { loadScheduleSettings, subscribeScheduleSettings, type ScheduleFilterLimits } from "../data/scheduleSettings";
+import { loadDeadTimeIntervals, subscribeDeadTimeIntervals, type DeadTimeInterval } from "../data/deadTime";
 import { notifyMarkRemoved } from "../data/notifyMark";
 import { loadMembers, memberOfSession, saveMembers } from "../schedule/members";
 import { readSession } from "./session";
@@ -120,6 +122,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [allowActAs, setAllowActAs] = useState(false);
   const [countTables, setCountTables] = useState(false);
   const [mergeAdjacentSlots, setMergeAdjacentSlots] = useState(false);
+  const [deadTimeIntervals, setDeadTimeIntervals] = useState<DeadTimeInterval[] | null>(null);
   const [filterLimits, setFilterLimits] = useState<ScheduleFilterLimits>({
     nitro: [...LIMIT_OPTIONS],
     regular: [...LIMIT_OPTIONS],
@@ -426,6 +429,27 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, []);
 
   useEffect(() => {
+    let live = true;
+    const apply = () => {
+      void loadDeadTimeIntervals()
+        .then((next) => {
+          if (live) setDeadTimeIntervals(next);
+        })
+        .catch(() => {
+          if (!live) return;
+          setDeadTimeIntervals(null);
+          showV2Toast("err", t("schedule.deadTimeLoadError"));
+        });
+    };
+    apply();
+    const off = subscribeDeadTimeIntervals(apply);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [t]);
+
+  useEffect(() => {
     return () => {
       window.clearTimeout(refreshTimer.current);
       window.clearTimeout(liveDebounce.current);
@@ -588,6 +612,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     () => (showHours ? myHoursMatrix(hoursGrids, me, dockLimits, { year, monthIndex, cet: cetTick }) : null),
     [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
   );
+  const deadTimeByMember = useMemo(
+    () => deadTimeIntervals ? deadTimeBreakdownsByMember(auxiliaryItems, deadTimeIntervals) : null,
+    [auxiliaryItems, deadTimeIntervals],
+  );
+  const myDeadTime = useMemo(() => {
+    if (!deadTimeByMember) return null;
+    return deadTimeByMember[deadTimeMemberKey(me)] ?? { byPair: {}, total: 0 };
+  }, [deadTimeByMember, me]);
   const actPlayers = useMemo(() => {
     const known = new Map(players.map((row) => [row.id, row]));
     const seen = new Set<string>();
@@ -1420,6 +1452,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {showHours && hoursMatrix ? (
           <HoursPanel
             matrix={hoursMatrix}
+            deadTime={myDeadTime}
             year={year}
             monthIndex={monthIndex}
             x={hoursPos.x}
@@ -1455,7 +1488,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             title={t("schedule.playersTitle")}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(720, 240 + Math.max(1, auxiliaryLabels.length) * 76)}
+            width={Math.min(880, 310 + Math.max(1, auxiliaryLabels.length) * 88)}
             compact
             z={zOf("people")}
             onMove={setPeoplePos}
@@ -1463,7 +1496,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onClose={() => setShowPeople(false)}
           >
             {roster.length ? (
-              <table className="v2-people-table">
+              <table
+                className="v2-people-table"
+                style={{ minWidth: 240 + auxiliaryLabels.length * 84 }}
+              >
                 <colgroup>
                   <col className="v2-people-col-n" />
                   <col />
@@ -1471,6 +1507,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   {auxiliaryLabels.map((limit) => (
                     <col key={limit} className="v2-people-col-limit" />
                   ))}
+                  <col className="v2-people-col-dead" />
                   <col className="v2-people-col-tick" />
                 </colgroup>
                 <thead>
@@ -1484,9 +1521,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                         className="v2-people-limit"
                         title={t("schedule.colHoursHint", { limit: displayScheduleColumn(limit) })}
                       >
-                        {displayScheduleColumn(limit)}, {t("schedule.colHoursUnit")}
+                        <span>{displayScheduleColumn(limit)}</span>
+                        <small>{t("schedule.colHoursDeadUnits")}</small>
                       </th>
                     ))}
+                    <th className="v2-people-dead-total" title={t("schedule.deadTotalHint")}>
+                      <span>{t("schedule.deadTotal")}</span>
+                      <small>{t("schedule.colHoursUnit")}</small>
+                    </th>
                     <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
                       <i className="fa-solid fa-check" aria-hidden />
                     </th>
@@ -1494,6 +1536,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                 </thead>
                 <tbody>
                   {roster.map((row) => {
+                    const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
                     const guild = showNick(row.mark.discord) || "—";
                     const room = showNick(row.mark.room);
                     const vip = vipOf(row.mark, kind);
@@ -1536,6 +1579,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                         </td>
                         {auxiliaryLabels.map((limit) => {
                           const stat = row.byLimit[limit];
+                          const deadHours = memberDeadTime?.byPair[limit] || 0;
                           const label = displayScheduleColumn(limit);
                           if (!stat) {
                             return (
@@ -1554,10 +1598,17 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                               className="v2-people-num"
                               title={t("schedule.colHoursHint", { limit: label })}
                             >
-                              {formatHours(stat.hours)}
+                              <b>{formatHours(stat.hours)}</b>
+                              <small>{t("schedule.deadHoursShort")} {deadTimeByMember && deadHours ? formatHours(deadHours) : "—"}</small>
                             </td>
                           );
                         })}
+                        <td
+                          className={`v2-people-num v2-people-dead-total${memberDeadTime?.total ? " is-on" : ""}`}
+                          title={t("schedule.deadTotalHint")}
+                        >
+                          {deadTimeByMember && memberDeadTime?.total ? formatHours(memberDeadTime.total) : "—"}
+                        </td>
                         <td className="v2-people-tick-cell">
                           <button
                             type="button"

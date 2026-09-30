@@ -6,6 +6,7 @@ import type { Mark } from "../schedule/marks";
 import { formatHours } from "../schedule/roster";
 import type { SchedulePlayer } from "../data/players";
 import { myHoursMatrix } from "./myShifts";
+import type { DeadTimeBreakdown } from "../schedule/deadTimeStats";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { heatFill, rowInitials, whoLines } from "./schedulePresentation";
@@ -296,6 +297,7 @@ export function MobileScheduleDock({
 
 export function HoursPanel({
   matrix,
+  deadTime,
   year,
   monthIndex,
   x,
@@ -306,6 +308,7 @@ export function HoursPanel({
   onClose,
 }: {
   matrix: ReturnType<typeof myHoursMatrix>;
+  deadTime: DeadTimeBreakdown | null;
   year: number;
   monthIndex: number;
   x: number;
@@ -344,8 +347,8 @@ export function HoursPanel({
             <thead>
               <tr>
                 <th>{t("schedule.hoursStatLimit")}</th>
-                <th title={t("schedule.hoursStatMarksHint")}>{t("schedule.hoursStatMarks")}</th>
                 <th title={t("schedule.hoursStatHoursHint")}>{t("schedule.hoursStatHours")}</th>
+                <th className="is-dead" title={t("schedule.hoursStatDeadHint")}>{t("schedule.hoursStatDead")}</th>
                 <th className="is-left" title={t("schedule.hoursStatLeftHint")}>
                   {t("schedule.hoursStatLeft")}
                 </th>
@@ -355,8 +358,10 @@ export function HoursPanel({
               {cols.map((limit) => (
                 <tr key={limit}>
                   <th>{displayScheduleColumn(limit)}</th>
-                  <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
                   <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
+                  <td className={`is-dead${deadTime?.byPair[limit] ? " is-on" : ""}`}>
+                    {deadTime ? formatHours(deadTime.byPair[limit] || 0) : "—"}
+                  </td>
                   <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>
                 </tr>
               ))}
@@ -364,8 +369,10 @@ export function HoursPanel({
             <tfoot>
               <tr>
                 <th>{t("schedule.hoursStatTotal")}</th>
-                <td className={matrix.countGrand ? "is-on" : ""}>{matrix.countGrand || 0}</td>
                 <td className={matrix.grand ? "is-on" : ""}>{formatHours(matrix.grand || 0)}</td>
+                <td className={`is-dead${deadTime?.total ? " is-on" : ""}`}>
+                  {deadTime ? formatHours(deadTime.total) : "—"}
+                </td>
                 <td className={`is-left is-grand${matrix.leftGrand ? " is-on" : ""}`}>{formatHours(matrix.leftGrand || 0)}</td>
               </tr>
             </tfoot>

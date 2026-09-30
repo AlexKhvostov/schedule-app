@@ -512,9 +512,13 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   const total = hours.getByRole("row", { name: /^Итого / });
   await expect(nitro).toBeVisible();
   await expect(regularHours).toBeVisible();
-  const valueAt = async (row: typeof nitro) => Number(await row.getByRole("cell").nth(1).textContent());
+  await expect(hours.getByRole("columnheader")).toHaveText(["Лимит", "Часов", "Мёртвых", "Осталось"]);
+  await expect(hours).not.toContainText("Меток");
+  const valueAt = async (row: typeof nitro) => Number(await row.getByRole("cell").nth(0).textContent());
   const [nitroValue, regularValue, totalValue] = await Promise.all([valueAt(nitro), valueAt(regularHours), valueAt(total)]);
   expect(totalValue).toBeLessThan(nitroValue + regularValue);
+  await expect(nitro.getByRole("cell").nth(1)).toHaveText("0.0");
+  await expect(total.getByRole("cell").nth(1)).toHaveText("0.0");
   await page.getByRole("button", { name: "Часы", exact: true }).click();
 
   await page.getByRole("button", { name: "Аналитика", exact: true }).click();
@@ -522,9 +526,15 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.getByRole("button", { name: "Аналитика", exact: true }).click();
 
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
-  await expect(page.locator(".v2-people-table thead")).toContainText("N50, ч");
-  await expect(page.locator(".v2-people-table thead")).toContainText("E50, ч");
-  await page.locator(".v2-people-table tbody tr", { hasText: "polar" }).click();
+  const peopleTable = page.locator(".v2-people-table");
+  await expect(peopleTable.locator("thead")).toContainText("N50");
+  await expect(peopleTable.locator("thead")).toContainText("E50");
+  await expect(peopleTable.locator("thead")).toContainText("ч / м.ч.");
+  await expect(peopleTable.locator("thead")).toContainText("Мёртвые");
+  const polarRow = peopleTable.locator("tbody tr", { hasText: "polar" });
+  await expect(polarRow.locator(".v2-people-num small")).toHaveText(["м. —", "м. —"]);
+  await expect(polarRow.locator(".v2-people-dead-total")).toHaveText("—");
+  await polarRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("N50");
   await expect(page.locator(".v2-user-card")).toContainText("E50");
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();

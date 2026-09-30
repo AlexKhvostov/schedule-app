@@ -6670,6 +6670,10 @@ button.v2-bar-mark-hit[aria-expanded="true"] .v2-mark-sample {
   color: color-mix(in srgb, var(--success) 80%, var(--foreground));
 }
 
+.v2-hours-summary .is-dead {
+  color: color-mix(in srgb, var(--warning) 76%, var(--foreground));
+}
+
 .v2-hours-cal {
   width: 100%;
   table-layout: fixed;
@@ -13427,7 +13431,11 @@ img.v2-people-ava {
 }
 
 .v2-people-col-limit {
-  width: 72px;
+  width: 84px;
+}
+
+.v2-people-col-dead {
+  width: 62px;
 }
 
 .v2-people-col-tick {
@@ -13473,7 +13481,7 @@ img.v2-people-ava {
 }
 
 .v2-people-table th.v2-people-limit {
-  width: 72px;
+  width: 84px;
   min-width: 0;
   padding-left: 6px;
   padding-right: 6px;
@@ -13484,6 +13492,30 @@ img.v2-people-ava {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: 0;
+}
+
+.v2-people-table th.v2-people-limit span,
+.v2-people-table th.v2-people-limit small,
+.v2-people-table th.v2-people-dead-total span,
+.v2-people-table th.v2-people-dead-total small,
+.v2-people-num small {
+  display: block;
+}
+
+.v2-people-table th.v2-people-limit small,
+.v2-people-table th.v2-people-dead-total small,
+.v2-people-num small {
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 8px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.v2-people-table th.v2-people-dead-total,
+.v2-people-num.v2-people-dead-total {
+  width: 62px;
+  color: color-mix(in srgb, var(--warning) 76%, var(--foreground));
 }
 
 .v2-people-num {
@@ -13498,6 +13530,10 @@ img.v2-people-ava {
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
+}
+
+.v2-people-num > b {
+  font: inherit;
 }
 
 .v2-people-num.is-empty {
