@@ -10347,7 +10347,6 @@ textarea.v2-ctrl.v2-cab-area {
   height: var(--opt-cell-h, 20px);
   align-items: center;
   justify-content: center;
-  gap: 4px;
   overflow: hidden;
   padding: 1px 5px 2px;
   border-radius: 4px;
@@ -10359,6 +10358,18 @@ textarea.v2-ctrl.v2-cab-area {
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.v2-opt-merged.has-tables {
+  padding-right: 14px;
+}
+
+.v2-opt-merged.has-tables.is-single {
+  padding-right: 2px;
+}
+
+.v2-opt-merged.has-tables .v2-opt-merged-label {
+  transform: translateY(var(--opt-letter-shift, -1px));
 }
 
 .v2-opt-merged::after {
@@ -10385,7 +10396,9 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt-merged > i {
-  flex: none;
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
   font-size: var(--opt-tables, 7px);
   font-style: normal;
   opacity: 0.9;
@@ -10432,6 +10445,11 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt.is-overview .v2-opt-face {
+  display: none;
+}
+
+.v2-opt.is-overview .v2-opt-merged-label,
+.v2-opt.is-overview .v2-opt-merged > i {
   display: none;
 }
 
@@ -10773,7 +10791,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt-face.has-n b {
-  transform: translateY(-1px);
+  transform: translateY(var(--opt-letter-shift, -1px));
 }
 
 .v2-opt-face i {

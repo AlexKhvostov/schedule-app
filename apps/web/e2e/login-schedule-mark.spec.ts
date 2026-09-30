@@ -672,10 +672,53 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await candidate.click();
   await expect(page.locator(sharedCell)).toHaveAttribute("data-mark", "YO");
   await expect(page.locator(sharedCell)).toContainText("6");
+  await expect(page.locator(sharedCell).locator(".v2-opt-face b")).toHaveText("YO");
+  const desktopLayout = await page.locator(sharedCell).evaluate((node) => {
+    const cell = node.getBoundingClientRect();
+    const letters = node.querySelector(".v2-opt-face b")!.getBoundingClientRect();
+    const tables = node.querySelector(".v2-opt-face i")!.getBoundingClientRect();
+    return { cellTop: cell.top, cellBottom: cell.bottom, lettersTop: letters.top, lettersBottom: letters.bottom, tablesTop: tables.top, tablesBottom: tables.bottom };
+  });
+  expect(desktopLayout.lettersTop).toBeGreaterThanOrEqual(desktopLayout.cellTop);
+  expect(desktopLayout.lettersBottom).toBeLessThanOrEqual(desktopLayout.cellBottom);
+  expect(desktopLayout.tablesTop).toBeGreaterThan(desktopLayout.lettersTop);
+  expect(desktopLayout.tablesBottom).toBeLessThanOrEqual(desktopLayout.cellBottom);
 
   await page.getByRole("button", { name: "Выбор кисти столов" }).click();
   await page.getByRole("button", { name: "8 столов" }).click();
   await expect(page.locator(sharedCell)).toContainText("6");
+
+  await page.getByTitle("Редактирование").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dock = page.getByRole("complementary", { name: "Инструменты расписания" });
+  const zoomIn = dock.getByRole("button", { name: "Увеличить масштаб" });
+  let checkedVisibleScales = 0;
+  for (let step = 0; step < 5; step += 1) {
+    if (await zoomIn.isEnabled()) await zoomIn.click();
+    const metrics = await page.locator(sharedCell).evaluate((node) => {
+      const face = node.querySelector<HTMLElement>(".v2-opt-face")!;
+      const cell = node.getBoundingClientRect();
+      const letters = face.querySelector("b")!.getBoundingClientRect();
+      const tables = face.querySelector("i")!.getBoundingClientRect();
+      return {
+        visible: getComputedStyle(face).display !== "none",
+        cellTop: cell.top,
+        cellBottom: cell.bottom,
+        lettersTop: letters.top,
+        lettersBottom: letters.bottom,
+        tablesTop: tables.top,
+        tablesBottom: tables.bottom,
+      };
+    });
+    if (!metrics.visible) continue;
+    checkedVisibleScales += 1;
+    expect(metrics.lettersTop).toBeGreaterThanOrEqual(metrics.cellTop - 0.5);
+    expect(metrics.lettersBottom).toBeLessThanOrEqual(metrics.cellBottom + 0.5);
+    expect(metrics.tablesTop).toBeGreaterThan(metrics.lettersTop);
+    expect(metrics.tablesBottom).toBeLessThanOrEqual(metrics.cellBottom + 0.5);
+  }
+  expect(checkedVisibleScales).toBeGreaterThan(1);
+  await page.setViewportSize({ width: 1280, height: 900 });
 
   await page.getByRole("button", { name: "you" }).click();
   await page.getByRole("button", { name: "Кабинет" }).click();
@@ -700,6 +743,9 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await page.getByRole("button", { name: "Войти для проверки" }).click();
 
   const mergeToggle = page.locator("button.v2-settings-row", { hasText: "Соединять рядом стоящие слоты одного игрока" });
+  const tablesToggle = page.locator("button.v2-settings-row", { hasText: "Работа со столами" });
+  await tablesToggle.click();
+  await expect(tablesToggle).toHaveClass(/is-on/);
   await mergeToggle.click();
   await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
@@ -752,6 +798,19 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await expect(end).toHaveClass(/is-on/);
   await expect(segment(run!.half, run!.half + 1)).toHaveCount(1);
   await expect(segment(run!.half + 2, run!.half + 3)).toHaveCount(1);
+  const single = segment(run!.half, run!.half + 1);
+  await expect(single.locator(".v2-opt-merged-label")).toHaveText("YO");
+  await expect(single.locator(":scope > i")).toBeVisible();
+  const singleLayout = await single.evaluate((node) => {
+    const cell = node.getBoundingClientRect();
+    const letters = node.querySelector(".v2-opt-merged-label")!.getBoundingClientRect();
+    const tables = node.querySelector(":scope > i")!.getBoundingClientRect();
+    return { cellTop: cell.top, cellBottom: cell.bottom, lettersTop: letters.top, lettersBottom: letters.bottom, tablesTop: tables.top, tablesBottom: tables.bottom };
+  });
+  expect(singleLayout.lettersTop).toBeGreaterThanOrEqual(singleLayout.cellTop);
+  expect(singleLayout.lettersBottom).toBeLessThanOrEqual(singleLayout.cellBottom);
+  expect(singleLayout.tablesTop).toBeGreaterThan(singleLayout.lettersTop);
+  expect(singleLayout.tablesBottom).toBeLessThanOrEqual(singleLayout.cellBottom);
 
   await page.goto("/#admin-schedule");
   await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");

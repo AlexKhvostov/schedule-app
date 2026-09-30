@@ -411,28 +411,32 @@ const MergedMark = memo(function MergedMark({
     ? `${primary} · ${owner.room}`
     : primary;
   const [label, setLabel] = useState(short);
+  const span = segment.endHalf - segment.startHalf;
 
   useLayoutEffect(() => {
     const node = root.current;
     if (!node) return;
     const update = () => {
+      if (span === 1) {
+        setLabel(short);
+        return;
+      }
       const room = node.querySelector<HTMLElement>("[data-measure='full']");
       const discord = node.querySelector<HTMLElement>("[data-measure='primary']");
-      const allowance = Math.max(0, node.clientWidth - 8);
+      const allowance = Math.max(0, node.clientWidth - (showTables ? 18 : 8));
       setLabel(room && room.scrollWidth <= allowance ? full : discord && discord.scrollWidth <= allowance ? primary : short);
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [full, primary, short, showTables, segment.mark.tables]);
+  }, [full, primary, short, showTables, span]);
 
   const start = workGridColumn(visibleHalves, segment.startHalf);
-  const span = segment.endHalf - segment.startHalf;
   return (
     <div
       ref={root}
-      className={`v2-opt-merged${past ? " is-past" : ""}`}
+      className={`v2-opt-merged${past ? " is-past" : ""}${showTables ? " has-tables" : ""}${span === 1 ? " is-single" : ""}`}
       data-mark={short.toUpperCase()}
       data-day={segment.day}
       data-start-half={segment.startHalf}
@@ -453,8 +457,8 @@ const MergedMark = memo(function MergedMark({
     >
       <span className="v2-opt-merged-label">{label}</span>
       {showTables ? <i>{segment.mark.tables}</i> : null}
-      <span className="v2-opt-merged-measure" data-measure="full">{full}{showTables ? ` ${segment.mark.tables}` : ""}</span>
-      <span className="v2-opt-merged-measure" data-measure="primary">{primary}{showTables ? ` ${segment.mark.tables}` : ""}</span>
+      <span className="v2-opt-merged-measure" data-measure="full">{full}</span>
+      <span className="v2-opt-merged-measure" data-measure="primary">{primary}</span>
     </div>
   );
 });
@@ -1480,6 +1484,9 @@ export const OptField = memo(function OptField({
           ["--busy-mark" as string]: me.bg || undefined,
           ["--opt-cell-w" as string]: `${cellWidth}px`,
           ["--opt-cell-h" as string]: `${cellWidth}px`,
+          ["--opt-letter" as string]: `${Math.max(6, Math.min(10, cellWidth * 0.5))}px`,
+          ["--opt-tables" as string]: `${Math.max(4, Math.min(7, cellWidth * 0.32))}px`,
+          ["--opt-letter-shift" as string]: cellWidth >= 16 ? "-1px" : "0px",
           ["--opt-day-w" as string]: `${Math.max(26, Math.min(32, 24 + cellWidth * 0.4))}px`,
           ["--opt-gap" as string]: `${cellWidth * 0.15}px`,
           ["--opt-visible-slots" as string]: visibleSlotCount,
