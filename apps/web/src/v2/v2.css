@@ -10156,6 +10156,74 @@ textarea.v2-ctrl.v2-cab-area {
   box-shadow: none;
 }
 
+.v2-opt-cell.is-merged-source .v2-opt-face {
+  visibility: hidden;
+}
+
+.v2-opt-merged {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-width: 0;
+  height: var(--opt-cell-h, 20px);
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  padding: 1px 5px 2px;
+  border-radius: 4px;
+  background: var(--mark);
+  color: var(--mark-ink, #111827);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: var(--opt-letter, 10px);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.v2-opt-merged::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 0;
+  width: var(--merged-past-pct, 0%);
+  background: color-mix(in srgb, var(--mark) 28%, var(--background));
+  pointer-events: none;
+}
+
+.v2-opt-merged.is-past {
+  background: color-mix(in srgb, var(--mark) 28%, var(--background));
+  color: var(--slot-past-ink, color-mix(in srgb, var(--muted-foreground) 55%, var(--background)));
+}
+
+.v2-opt-merged-label,
+.v2-opt-merged > i {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v2-opt-merged > i {
+  flex: none;
+  font-size: var(--opt-tables, 7px);
+  font-style: normal;
+  opacity: 0.9;
+}
+
+.v2-opt-merged-measure {
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.v2-opt.is-find .v2-opt-merged {
+  opacity: 0.13;
+}
+
 .v2-opt-pick {
   position: absolute;
   z-index: 6;

@@ -10,6 +10,7 @@ import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { visibleMonthDays, type DisplayRange } from "../schedule/displayRange";
 import { DEFAULT_WORK_HOURS, clampWorkRangeHalf, workGapBefore, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 import { lookToVars, loadSlotLook, SLOT_LOOK_EVENT } from "../schedule/slotLook";
+import { mergeVisualSlots, type VisualSegment } from "../schedule/visualSegments";
 import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
@@ -42,6 +43,7 @@ type Props = {
   self?: Mark;
   showTables: boolean;
   countTables?: boolean;
+  mergeAdjacentSlots?: boolean;
   dimPast: boolean;
   hidePastDays?: boolean;
   displayRange?: DisplayRange;
@@ -388,6 +390,69 @@ function OptFace({ tag, tables, showTables, on }: { tag?: string; tables?: numbe
   return <MarkFace letters={tag?.trim() || "—"} tables={tables} showTables={showTables} />;
 }
 
+const MergedMark = memo(function MergedMark({
+  segment,
+  visibleHalves,
+  showTables,
+  past,
+  pastPct,
+}: {
+  segment: VisualSegment;
+  visibleHalves: number[];
+  showTables: boolean;
+  past: boolean;
+  pastPct?: number;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+  const owner = packOwner(segment.mark);
+  const short = segment.mark.t.trim() || "—";
+  const primary = owner.discord || short;
+  const full = owner.room && owner.room.toLowerCase() !== primary.toLowerCase()
+    ? `${primary} · ${owner.room}`
+    : primary;
+  const [label, setLabel] = useState(short);
+
+  useLayoutEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    const update = () => {
+      const room = node.querySelector<HTMLElement>("[data-measure='full']");
+      const discord = node.querySelector<HTMLElement>("[data-measure='primary']");
+      const allowance = Math.max(0, node.clientWidth - 8);
+      setLabel(room && room.scrollWidth <= allowance ? full : discord && discord.scrollWidth <= allowance ? primary : short);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [full, primary, short, showTables, segment.mark.tables]);
+
+  const start = workGridColumn(visibleHalves, segment.startHalf);
+  const span = segment.endHalf - segment.startHalf;
+  return (
+    <div
+      ref={root}
+      className={`v2-opt-merged${past ? " is-past" : ""}`}
+      data-mark={short.toUpperCase()}
+      aria-hidden
+      style={
+        {
+          gridColumn: `${start} / span ${span}`,
+          gridRow: 1,
+          "--mark": segment.mark.bg,
+          "--mark-ink": segment.mark.fg,
+          "--merged-past-pct": pastPct != null ? `${pastPct}%` : undefined,
+        } as CSSProperties
+      }
+    >
+      <span className="v2-opt-merged-label">{label}</span>
+      {showTables ? <i>{segment.mark.tables}</i> : null}
+      <span className="v2-opt-merged-measure" data-measure="full">{full}{showTables ? ` ${segment.mark.tables}` : ""}</span>
+      <span className="v2-opt-merged-measure" data-measure="primary">{primary}{showTables ? ` ${segment.mark.tables}` : ""}</span>
+    </div>
+  );
+});
+
 const OptCell = memo(function OptCell({
   dayIdx,
   day,
@@ -410,6 +475,7 @@ const OptCell = memo(function OptCell({
   busyHalf,
   workGap,
   gridColumn,
+  mergedSource,
 }: {
   dayIdx: number;
   day: number;
@@ -432,6 +498,7 @@ const OptCell = memo(function OptCell({
   busyHalf?: boolean;
   workGap?: boolean;
   gridColumn?: number;
+  mergedSource?: boolean;
 }) {
   const on = Boolean(bg);
   const mark = tag?.trim().toUpperCase() || undefined;
@@ -450,13 +517,14 @@ const OptCell = memo(function OptCell({
       data-mark={mark}
       data-busy={busyLimits?.length ? busyLimits.join(",") : undefined}
       data-work-gap={workGap ? "before" : undefined}
-      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}${workGap ? " is-work-gap" : ""}`}
+      className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}${workGap ? " is-work-gap" : ""}${mergedSource ? " is-merged-source" : ""}`}
       style={
         {
           "--mark": bg,
           "--mark-ink": fg,
           "--opt-now-pct": nowPct != null ? `${nowPct}%` : undefined,
           gridColumn,
+          gridRow: 1,
         } as CSSProperties
       }
     >
@@ -497,6 +565,7 @@ const OptBody = memo(function OptBody({
   skin,
   busy,
   workHours,
+  mergeAdjacentSlots,
 }: {
   year: number;
   monthIndex: number;
@@ -514,6 +583,7 @@ const OptBody = memo(function OptBody({
   todayRef: RefObject<HTMLDivElement | null>;
   busy?: (string[] | null)[][];
   workHours: number[];
+  mergeAdjacentSlots: boolean;
 }) {
   const { t } = useTranslation();
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
@@ -583,6 +653,15 @@ const OptBody = memo(function OptBody({
                     const named = levels.filter((item) => !item.ghost).length;
                     const lanes = levels.map(({ level, ghost }) => {
                       const lane = `${dayIdx}-${group.variant}-${rowInfo.limit}-${level}`;
+                      const segments = ghost || !mergeAdjacentSlots
+                        ? []
+                        : mergeVisualSlots(visibleHalves.flatMap((half) => {
+                          const mark = seatsOf(row[half], level + 1)[level];
+                          return mark ? [{ day: day.d, half, variant: group.variant, limit: rowInfo.limit, level, mark }] : [];
+                        }));
+                      const mergedHalves = new Set(segments.flatMap((segment) =>
+                        Array.from({ length: segment.endHalf - segment.startHalf }, (_, offset) => segment.startHalf + offset),
+                      ));
                       return (
                         <OptLevelLane
                           key={lane}
@@ -628,9 +707,26 @@ const OptBody = memo(function OptBody({
                                   busyHalf={Boolean(hidden?.length)}
                                   workGap={workGapBefore(visibleHalves, half)}
                                   gridColumn={workGridColumn(visibleHalves, half)}
+                                  mergedSource={mergedHalves.has(half)}
                                 />
                               );
                             })}
+                          {segments.map((segment) => {
+                            const segmentPast = dimPast && isPastSlot(year, monthIndex, day.d, segment.endHalf - 1, cet);
+                            const progress = sameMonth && today && cet.half >= segment.startHalf && cet.half < segment.endHalf
+                              ? Math.min(100, Math.max(0, ((cet.half + cet.slotProgress - segment.startHalf) / (segment.endHalf - segment.startHalf)) * 100))
+                              : undefined;
+                            return (
+                              <MergedMark
+                                key={`${segment.startHalf}-${segment.endHalf}-${segment.mark.memberId ?? segment.mark.t}-${segment.mark.tables}`}
+                                segment={segment}
+                                visibleHalves={visibleHalves}
+                                showTables={showTables}
+                                past={segmentPast}
+                                pastPct={dimPast ? progress : undefined}
+                              />
+                            );
+                          })}
                         </OptLevelLane>
                       );
                     });
@@ -908,6 +1004,7 @@ export const OptField = memo(function OptField({
   onCellWidthChange,
   onFitWidthChange,
   footerTools,
+  mergeAdjacentSlots = false,
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
@@ -1456,6 +1553,7 @@ export const OptField = memo(function OptField({
               skin={skin}
               busy={busy}
               workHours={workHours}
+          mergeAdjacentSlots={mergeAdjacentSlots}
             />
             {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
               <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>

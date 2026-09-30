@@ -81,6 +81,29 @@ begin
     raise exception 'schedule filter limit arrays must only be writable through the atomic RPC';
   end if;
 
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'merge_adjacent_slots' and data_type = 'boolean'
+  ) then
+    raise exception 'merge adjacent slots setting is missing';
+  end if;
+
+  if not has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'merge_adjacent_slots',
+       'UPDATE'
+     )
+     or has_column_privilege(
+       'anon',
+       'public.schedule_settings',
+       'merge_adjacent_slots',
+       'UPDATE'
+     ) then
+    raise exception 'merge adjacent slots update grants are incorrect';
+  end if;
+
   if has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'SELECT')
      or has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'INSERT')
      or has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'UPDATE')

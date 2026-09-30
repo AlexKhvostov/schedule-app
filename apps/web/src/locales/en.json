@@ -691,7 +691,9 @@
       "tables": "Work with tables",
       "tablesHint": "When on, the edit dock sets a table count and it is stored on the mark. Off means tables are unused.",
       "editByButton": "Always edit on desktop",
-      "editByButtonHint": "On: desktop users place marks immediately. Off: they press the pencil first. On phones, editing is always enabled separately after zooming in."
+      "editByButtonHint": "On: desktop users place marks immediately. Off: they press the pencil first. On phones, editing is always enabled separately after zooming in.",
+      "mergeAdjacent": "Merge adjacent slots for the same player",
+      "mergeAdjacentHint": "Matching adjacent half-hours appear as one block. Stored slots and hour totals stay unchanged."
     },
     "filterLimits": {
       "kicker": "filter",

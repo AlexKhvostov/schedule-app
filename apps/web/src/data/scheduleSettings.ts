@@ -11,6 +11,7 @@ export type ClubGridSettings = {
   allowActAs: boolean;
   countTables: boolean;
   editByButton: boolean;
+  mergeAdjacentSlots: boolean;
   filterLimits: ScheduleFilterLimits;
 };
 
@@ -19,8 +20,33 @@ const EMPTY: ClubGridSettings = {
   allowActAs: false,
   countTables: false,
   editByButton: true,
+  mergeAdjacentSlots: false,
   filterLimits: { nitro: [...LIMIT_OPTIONS], regular: [...LIMIT_OPTIONS] },
 };
+
+type ScheduleSettingsRow = {
+  allow_overwrite_marks?: unknown;
+  allow_act_as?: unknown;
+  count_tables?: unknown;
+  edit_by_button?: unknown;
+  merge_adjacent_slots?: unknown;
+  filter_limits_nitro?: unknown;
+  filter_limits_regular?: unknown;
+} | null | undefined;
+
+export function clubGridSettingsFromRow(data: ScheduleSettingsRow): ClubGridSettings {
+  return {
+    allowOverwriteMarks: Boolean(data?.allow_overwrite_marks),
+    allowActAs: Boolean(data?.allow_act_as),
+    countTables: Boolean(data?.count_tables),
+    editByButton: data?.edit_by_button !== false,
+    mergeAdjacentSlots: Boolean(data?.merge_adjacent_slots),
+    filterLimits: {
+      nitro: normalizeScheduleFilterLimits(data?.filter_limits_nitro),
+      regular: normalizeScheduleFilterLimits(data?.filter_limits_regular),
+    },
+  };
+}
 
 export function normalizeScheduleFilterLimits(value: unknown) {
   if (!Array.isArray(value)) return [...LIMIT_OPTIONS];
@@ -53,19 +79,10 @@ export async function loadScheduleSettings(): Promise<ClubGridSettings> {
   if (!db) return EMPTY;
   const { data } = await db
     .from("schedule_settings")
-    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button, filter_limits_nitro, filter_limits_regular")
+    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button, merge_adjacent_slots, filter_limits_nitro, filter_limits_regular")
     .eq("id", true)
     .maybeSingle();
-  return {
-    allowOverwriteMarks: Boolean(data?.allow_overwrite_marks),
-    allowActAs: Boolean(data?.allow_act_as),
-    countTables: Boolean(data?.count_tables),
-    editByButton: data?.edit_by_button !== false,
-    filterLimits: {
-      nitro: normalizeScheduleFilterLimits(data?.filter_limits_nitro),
-      regular: normalizeScheduleFilterLimits(data?.filter_limits_regular),
-    },
-  };
+  return clubGridSettingsFromRow(data);
 }
 
 export async function saveScheduleFilterLimits(next: ScheduleFilterLimits) {
@@ -94,8 +111,12 @@ export async function saveEditByButton(value: boolean) {
   return saveScheduleFlag("edit_by_button", value);
 }
 
+export async function saveMergeAdjacentSlots(value: boolean) {
+  return saveScheduleFlag("merge_adjacent_slots", value);
+}
+
 async function saveScheduleFlag(
-  column: "allow_overwrite_marks" | "allow_act_as" | "count_tables" | "edit_by_button",
+  column: "allow_overwrite_marks" | "allow_act_as" | "count_tables" | "edit_by_button" | "merge_adjacent_slots",
   value: boolean,
 ) {
   const db = getSupabase();

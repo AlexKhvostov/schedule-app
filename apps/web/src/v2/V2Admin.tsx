@@ -30,6 +30,7 @@ import {
   saveActAs,
   saveCountTables,
   saveEditByButton,
+  saveMergeAdjacentSlots,
   saveOverwriteMarks,
   saveScheduleFilterLimits,
   subscribeScheduleSettings,
@@ -104,6 +105,8 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   const [tablesSaving, setTablesSaving] = useState(false);
   const [editByButton, setEditByButton] = useState(true);
   const [editByButtonSaving, setEditByButtonSaving] = useState(false);
+  const [mergeAdjacentSlots, setMergeAdjacentSlots] = useState(false);
+  const [mergeAdjacentSlotsSaving, setMergeAdjacentSlotsSaving] = useState(false);
   const [filterLimits, setFilterLimits] = useState<ScheduleFilterLimits>({
     nitro: [...LIMIT_OPTIONS],
     regular: [...LIMIT_OPTIONS],
@@ -164,6 +167,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
         setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
         setEditByButton(next.editByButton);
+        setMergeAdjacentSlots(next.mergeAdjacentSlots);
         setFilterLimits(next.filterLimits);
         setSavedFilterLimits(next.filterLimits);
         setFilterLimitsSaved(false);
@@ -429,6 +433,36 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
               <small>{t("admin.control.editByButtonHint")}</small>
             </span>
             <span className={`v2-settings-switch${!editByButton ? " is-on" : ""}`} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`v2-settings-row${mergeAdjacentSlots ? " is-on" : ""}`}
+            aria-pressed={mergeAdjacentSlots}
+            disabled={mergeAdjacentSlotsSaving}
+            title={t("admin.control.mergeAdjacentHint")}
+            onClick={() => {
+              const next = !mergeAdjacentSlots;
+              setMergeAdjacentSlots(next);
+              setMergeAdjacentSlotsSaving(true);
+              void saveMergeAdjacentSlots(next).then((result) => {
+                setMergeAdjacentSlotsSaving(false);
+                if (result.error) {
+                  setMergeAdjacentSlots(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-link" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.mergeAdjacent")}</b>
+              <small>{t("admin.control.mergeAdjacentHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${mergeAdjacentSlots ? " is-on" : ""}`} aria-hidden />
           </button>
         </div>
       </section>

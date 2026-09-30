@@ -119,6 +119,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [allowOverwrite, setAllowOverwrite] = useState(false);
   const [allowActAs, setAllowActAs] = useState(false);
   const [countTables, setCountTables] = useState(false);
+  const [mergeAdjacentSlots, setMergeAdjacentSlots] = useState(false);
   const [filterLimits, setFilterLimits] = useState<ScheduleFilterLimits>({
     nitro: [...LIMIT_OPTIONS],
     regular: [...LIMIT_OPTIONS],
@@ -403,6 +404,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         setAllowOverwrite(next.allowOverwriteMarks);
         setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
+        setMergeAdjacentSlots(next.mergeAdjacentSlots);
         setEditByButton(next.editByButton);
         setFilterLimits(next.filterLimits);
         setLimits((current) => {
@@ -1284,6 +1286,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           self={selfMark}
           showTables={countTables && !hideTables}
           countTables={countTables}
+          mergeAdjacentSlots={mergeAdjacentSlots}
           dimPast={dimPast}
           hidePastDays={hidePastDays}
           displayRange={displayRange}

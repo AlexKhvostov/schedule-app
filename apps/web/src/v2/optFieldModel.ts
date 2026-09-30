@@ -121,7 +121,8 @@ export function markQuery(focus: string) {
 
 export function findHitCss(query: string) {
   if (!query) return "";
-  return `.v2-opt.is-find[data-opt-find="${query}"] .v2-opt-cell.is-on[data-mark="${query}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
+  const root = `.v2-opt.is-find[data-opt-find="${query}"]`;
+  return `${root} .v2-opt-cell.is-on[data-mark="${query}"],${root} .v2-opt-merged[data-mark="${query}"]{z-index:8;opacity:1;outline:1.5px solid var(--ring);outline-offset:0;animation:v2-chip-pulse 1.1s ease-in-out infinite}`;
 }
 
 export function nowAlongTrack(half: number, progress: number, startHalfOrVisible: number | number[] = 0, endHalf = 48) {
