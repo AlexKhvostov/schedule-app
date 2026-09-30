@@ -59,6 +59,18 @@ begin
     raise exception 'schedule dead interval RPC grants are incorrect';
   end if;
 
+  if not has_function_privilege('authenticated', 'public.save_member_table_presets(uuid,jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_member_table_presets(uuid,jsonb)', 'EXECUTE') then
+    raise exception 'member table preset RPC grants are incorrect';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.member_table_presets', 'SELECT')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'INSERT')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'DELETE') then
+    raise exception 'member table presets must be read-only outside the atomic RPC';
+  end if;
+
   if not has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'SELECT')
      or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'INSERT')
      or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'UPDATE')

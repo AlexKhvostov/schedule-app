@@ -25,9 +25,11 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 Миграция H01 `20260930150000_schedule_dead_intervals.sql` вручную применена к Working 30 сентября 2026. Транзакционный SQL smoke-test подтвердил серверные границы и пересечения с полным откатом; живая Discord-сессия подтвердила RPC-запись и повторное чтение. При применении учтён включённый в Working запрет `DELETE` без явного `WHERE`. До подготовки чистого database CI миграция остаётся на проверке пересборки и lint.
 
+Миграция I01 `20260930170000_member_table_presets.sql` вручную применена к Working 30 сентября 2026. Backfill дал по одному начальному preset всем 7 участникам; read-only проверка подтвердила RLS, запрет прямых записей, закрытый anon RPC и Realtime. Транзакционный smoke-test с полным `ROLLBACK` подтвердил запись владельца и администратора, отказ пользователю без `admin.people`, сохранение допустимой активной кисти и откат дубля. Чистая пересборка, новый `member_table_presets.sql`, security contracts и database lint выполняются в database CI.
+
 ## Релизный барьер
 
-Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняется `schedule_filter_limits.sql`, который проверяет атомарность, откат и отказ пользователю без `schedule.manage`.
+Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих RPC.
 
 Базовый E2E всегда выполняет детерминированный локальный сценарий. Для smoke-теста реальной Discord-сессии на staging укажите `E2E_AUTH_STATE` — путь к некоммитящемуся Playwright storage-state. Мутационные тесты нельзя направлять в production.
 
