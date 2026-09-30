@@ -959,23 +959,25 @@ function OptTip({
       style={{ left: hover.x, top: hover.y }}
     >
       <div className="v2-opt-tip-context">
-        <span className="v2-opt-tip-kind" data-variant={hover.variant}>
-          {t(`v2.tip.${hover.variant}`)}
-        </span>
-        <span className="v2-opt-tip-limit">{formatLimit(hover.limit)}</span>
-        <b>
-          {timeSpan}
-          {mergedRange ? <small>{t("v2.tip.duration", { hours: slotHoursValue(rangeStartHalf, rangeEndHalf, i18n.language) })}</small> : null}
-        </b>
-        <i>{t("v2.tip.cet")}</i>
-      </div>
-      <div className="v2-opt-tip-when">
+        <div className="v2-opt-tip-meta">
+          <span className="v2-opt-tip-kind" data-variant={hover.variant}>
+            {t(`v2.tip.${hover.variant}`)}
+          </span>
+          <span className="v2-opt-tip-limit">{formatLimit(hover.limit)}</span>
+        </div>
         <b>{tipDate(year, monthIndex, hover.day, i18n.language)}</b>
+      </div>
+      <div className="v2-opt-tip-times">
+        <div className="v2-opt-tip-time is-cet">
+          <i>{t("v2.tip.cet")}</i>
+          <b>{timeSpan}</b>
+          {mergedRange ? <small>{t("v2.tip.duration", { hours: slotHoursValue(rangeStartHalf, rangeEndHalf, i18n.language) })}</small> : null}
+        </div>
         {clock.showLocal ? (
-          <small>
-            {slotRangeSpan(rangeStartHalf, rangeEndHalf - 1, clock.offset)}{" "}
+          <div className="v2-opt-tip-time is-local">
             <i>{clock.label}</i>
-          </small>
+            <b>{slotRangeSpan(rangeStartHalf, rangeEndHalf - 1, clock.offset)}</b>
+          </div>
         ) : null}
       </div>
       {hover.busyLimits?.length ? (

@@ -693,7 +693,7 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await expect(tip).toBeVisible();
   await expect(tip.locator(".v2-opt-tip-kind")).toHaveText(variant === "regular" ? "Regular" : "Nitro");
   await expect(tip.locator(".v2-opt-tip-limit")).toHaveText(`${limit} €`);
-  await expect(tip.locator(".v2-opt-tip-context > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
+  await expect(tip.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
   await expect(tip.locator(".v2-opt-tip-who img.v2-ava")).toHaveAttribute("src", /cdn\.discordapp\.com/);
   await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("you");
   await expect(tip.locator(".v2-opt-tip-person > span")).toContainText("YouNick");
@@ -807,8 +807,8 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await middle.hover();
   await expect(page.locator(".v2-opt-frame")).toHaveText(mergedTime);
   await middle.click({ button: "right" });
-  await expect(page.locator(".v2-opt-tip-context > b")).toContainText(mergedTime);
-  await expect(page.locator(".v2-opt-tip-context > b > small")).toHaveText("· 1,5 ч");
+  await expect(page.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(mergedTime);
+  await expect(page.locator(".v2-opt-tip-time.is-cet > small")).toHaveText("· 1,5 ч");
 
   await start.click();
   await expect(start).not.toHaveClass(/is-on/);
