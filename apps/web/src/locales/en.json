@@ -691,6 +691,15 @@
       "editByButton": "Always edit on desktop",
       "editByButtonHint": "On: desktop users place marks immediately. Off: they press the pencil first. On phones, editing is always enabled separately after zooming in."
     },
+    "filterLimits": {
+      "kicker": "filter",
+      "title": "Schedule limits",
+      "lead": "Choose which limits appear in the filter separately for Nitro and Regular. Existing shifts and player access are not removed.",
+      "hint": "Each tournament type must keep at least one limit.",
+      "needOne": "Keep at least one limit for this tournament type.",
+      "saving": "Saving…",
+      "saveErr": "Could not save the limits. Check your access and try again."
+    },
     "root": {
       "kicker": "root",
       "title": "Root",

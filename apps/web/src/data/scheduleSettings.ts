@@ -35,6 +35,19 @@ export function normalizeScheduleFilterLimits(value: unknown) {
   return found.length ? found : [...LIMIT_OPTIONS];
 }
 
+export function toggleScheduleFilterLimit(
+  current: ScheduleFilterLimits,
+  variant: keyof ScheduleFilterLimits,
+  limit: string,
+) {
+  const selected = current[variant];
+  if (selected.includes(limit) && selected.length === 1) return current;
+  const next = selected.includes(limit)
+    ? selected.filter((value) => value !== limit)
+    : LIMIT_OPTIONS.filter((value) => selected.includes(value) || value === limit);
+  return { ...current, [variant]: next };
+}
+
 export async function loadScheduleSettings(): Promise<ClubGridSettings> {
   const db = getSupabase();
   if (!db) return EMPTY;

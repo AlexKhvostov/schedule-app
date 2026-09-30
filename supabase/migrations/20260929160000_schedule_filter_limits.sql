@@ -6,6 +6,12 @@ alter table schedule_settings
   add column if not exists filter_limits_nitro text[],
   add column if not exists filter_limits_regular text[];
 
+-- Backfill is a migration-owned write, not a user action. The existing stamp
+-- trigger rejects SQL Editor / migration sessions because they have no auth UID.
+-- Disable only this trigger for the backfill; a failed migration transaction
+-- restores its previous state automatically.
+alter table schedule_settings disable trigger schedule_settings_stamp;
+
 update schedule_settings s
 set
   filter_limits_nitro = coalesce(
@@ -35,6 +41,8 @@ set
     array['50']::text[]
   )
 where s.id;
+
+alter table schedule_settings enable trigger schedule_settings_stamp;
 
 alter table schedule_settings
   alter column filter_limits_nitro set default array['50']::text[],

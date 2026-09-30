@@ -364,6 +364,32 @@ test("active player starts on schedule and the brand returns there", async ({ pa
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 });
 
+test("schedule-limit editor keeps tournament types independent and stays admin-only", async ({ page }) => {
+  await page.goto("/#admin-schedule");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-104");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await expect(page.getByRole("heading", { name: "Лимиты в расписании" })).toBeVisible();
+  const nitro25 = page.getByRole("button", { name: "Nitro 25 €", exact: true });
+  const regular25 = page.getByRole("button", { name: "Regular 25 €", exact: true });
+  await expect(nitro25).toHaveAttribute("aria-pressed", "true");
+  await expect(regular25).toHaveAttribute("aria-pressed", "true");
+  await nitro25.click();
+  await expect(nitro25).toHaveAttribute("aria-pressed", "false");
+  await expect(regular25).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".v2-filter-limit-editor").getByRole("button", { name: "Сохранить", exact: true })).toBeEnabled();
+
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-221");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await expect(page.getByRole("heading", { name: "Лимиты в расписании" })).toHaveCount(0);
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+});
+
 test("schedule can show Nitro and Regular together with distinct N/E rows", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
