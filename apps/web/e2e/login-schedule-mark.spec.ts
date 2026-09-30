@@ -599,3 +599,48 @@ test("cabinet saves and validates ordered table presets", async ({ page }) => {
   await expect(restored.getByLabel("Пресет 1")).toHaveValue("10");
   await expect(restored.getByLabel("Пресет 2")).toHaveValue("6");
 });
+
+test("table presets drive new marks, stay frozen and survive a demo user switch", async ({ page }) => {
+  await page.goto("/#admin-schedule");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-415");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  const tablesToggle = page.locator("button.v2-settings-row", { hasText: "Работа со столами" });
+  await expect(tablesToggle).toBeVisible();
+  await tablesToggle.click();
+  await expect(tablesToggle).toHaveClass(/is-on/);
+
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.getByTitle("Редактирование").click();
+  await page.getByRole("button", { name: "Выбор кисти столов" }).click();
+  await page.getByRole("button", { name: "6 столов" }).click();
+
+  const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const lane = await candidate.getAttribute("data-lane");
+  const half = await candidate.getAttribute("data-half");
+  const sharedCell = `[data-slot][data-lane="${lane}"][data-half="${half}"]`;
+  await candidate.click();
+  await expect(page.locator(sharedCell)).toHaveAttribute("data-mark", "YO");
+  await expect(page.locator(sharedCell)).toContainText("6");
+
+  await page.getByRole("button", { name: "Выбор кисти столов" }).click();
+  await page.getByRole("button", { name: "8 столов" }).click();
+  await expect(page.locator(sharedCell)).toContainText("6");
+
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+  await page.getByRole("button", { name: "Аккаунт" }).click();
+  await page.getByRole("button", { name: "Выйти" }).click();
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-221");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+
+  await expect(page.locator(sharedCell)).toHaveAttribute("data-mark", "YO");
+  await expect(page.locator(sharedCell)).toContainText("6");
+  await page.getByTitle("Редактирование").click();
+  await page.getByRole("button", { name: "Выбор кисти столов" }).click();
+  await expect(page.getByRole("button", { name: "Выбрать метку другого игрока" })).toHaveCount(0);
+});
