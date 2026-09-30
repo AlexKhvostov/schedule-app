@@ -30,16 +30,21 @@ export type OverwriteAsk = {
   empty?: Occupancy;
 };
 
-export function scheduleKindGroups(variants: ScheduleVariant[], limits: string[]) {
+export function scheduleKindGroups(
+  variants: ScheduleVariant[],
+  limits: string[],
+  pairRows?: readonly { variant: ScheduleVariant; limit: string; disabled: boolean }[],
+) {
   return [...new Set(variants)].map((variant) => ({
     variant,
     shortLabel: variant === "nitro" ? "N" : "E",
-    rows: limits.map((limit) => ({
+    rows: (pairRows?.filter((row) => row.variant === variant) ?? limits.map((limit) => ({ variant, limit, disabled: false }))).map(({ limit, disabled }) => ({
       key: `${variant}:${limit}`,
       limit,
       label: formatVariantLimit(variant, limit),
+      disabled,
     })),
-  }));
+  })).filter((group) => group.rows.length);
 }
 
 export function slotSpan(half: number, hourShift = 0) {

@@ -308,6 +308,8 @@
     "toastSaveError": "Could not save. The mark was put back.",
     "toastLoadError": "Could not load the schedule. The grid was left as-is — refresh the page.",
     "toastNoAccess": "No access to this schedule. An admin grants it.",
+    "toastLimitDisabled": "An administrator disabled this limit for new marks.",
+    "limitDisabled": "Disabled by administrator",
     "demoReset": "Reset demo schedule",
     "demoResetHint": "Remove local changes and restore the initial demonstration marks.",
     "demoResetDone": "Demo schedule restored to its initial state",

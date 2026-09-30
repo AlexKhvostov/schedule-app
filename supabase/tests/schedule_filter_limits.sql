@@ -9,6 +9,8 @@ declare
   v_plain_auth_id uuid := gen_random_uuid();
   v_member_id uuid;
   v_kind_count bigint;
+  v_disabled_kind uuid;
+  v_slot_date date := current_date + 7;
   v_nitro text[];
   v_regular text[];
 begin
@@ -43,8 +45,35 @@ begin
 
   perform set_config('request.jwt.claim.sub', v_auth_id::text, true);
   select count(*) into v_kind_count from schedule_kinds;
+  select id into v_disabled_kind from schedule_kinds where variant_id = 'nitro' and limit_id = '25';
+
+  perform apply_own_slots(
+    v_disabled_kind,
+    v_member_id,
+    jsonb_build_array(jsonb_build_object('date', v_slot_date, 'half', 20, 'level', 0, 'tables', 1)),
+    '[]'::jsonb
+  );
 
   perform save_schedule_filter_limits(array['100', '50', '50'], array['25', '50']);
+
+  perform apply_own_slots(
+    v_disabled_kind,
+    v_member_id,
+    '[]'::jsonb,
+    jsonb_build_array(jsonb_build_object('date', v_slot_date, 'half', 20, 'level', 0))
+  );
+
+  begin
+    perform apply_own_slots(
+      v_disabled_kind,
+      v_member_id,
+      jsonb_build_array(jsonb_build_object('date', v_slot_date, 'half', 20, 'level', 0, 'tables', 1)),
+      '[]'::jsonb
+    );
+    raise exception 'disabled schedule filter limit accepted a new mark';
+  exception
+    when sqlstate '42501' then null;
+  end;
 
   select filter_limits_nitro, filter_limits_regular
   into v_nitro, v_regular

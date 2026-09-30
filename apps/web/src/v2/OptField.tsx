@@ -14,6 +14,7 @@ import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
+import type { SchedulePairRow } from "./variantSchedule";
 import { clampScheduleCellWidth, fitScheduleCellWidth, scheduleCellStride, scheduleZoomScrollLeft } from "./scheduleZoom";
 import {
   displayNick,
@@ -51,6 +52,7 @@ type Props = {
   focus: string;
   kinds: ScheduleVariant[];
   limits: string[];
+  pairRows?: SchedulePairRow[];
   capacity: CapacityMap;
   grids: MonthGridStore;
   hourLoad?: HourLoadMap;
@@ -486,6 +488,7 @@ const OptBody = memo(function OptBody({
   hidePastDays,
   kinds,
   limits,
+  pairRows,
   capacity,
   grids,
   days,
@@ -503,6 +506,7 @@ const OptBody = memo(function OptBody({
   kinds: ScheduleVariant[];
   skin?: "classic" | "theme";
   limits: string[];
+  pairRows?: SchedulePairRow[];
   capacity: CapacityMap;
   grids: MonthGridStore;
   days: { d: number; wd: string; weekend: boolean }[];
@@ -511,8 +515,9 @@ const OptBody = memo(function OptBody({
   busy?: (string[] | null)[][];
   workHours: number[];
 }) {
+  const { t } = useTranslation();
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
-  const groups = scheduleKindGroups(kinds, limits);
+  const groups = scheduleKindGroups(kinds, limits, pairRows);
   const visibleHalves = workHalfSlots(workHours);
   const nowVisible = workTrackProgress(cet.half, cet.slotProgress, workHours) != null;
 
@@ -552,10 +557,14 @@ const OptBody = memo(function OptBody({
                           label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
                         />
                       ));
+                      const disabled = rowInfo.disabled ? (
+                        <span className="v2-limit-disabled" title={t("schedule.limitDisabled")}>{t("schedule.limitDisabled")}</span>
+                      ) : null;
                       if (skin !== "theme") return chips;
                       return (
                         <div key={rowInfo.key} className="v2-opt-gutter-limit">
                           {chips}
+                          {disabled}
                         </div>
                       );
                     })}
@@ -884,6 +893,7 @@ export const OptField = memo(function OptField({
   focus,
   kinds,
   limits,
+  pairRows,
   capacity,
   grids,
   hourLoad,
@@ -1437,6 +1447,7 @@ export const OptField = memo(function OptField({
               hidePastDays={hidePastDays}
               kinds={kinds}
               limits={limits}
+              pairRows={pairRows}
               capacity={capacity}
               grids={grids}
               days={days}

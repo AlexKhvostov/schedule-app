@@ -9603,6 +9603,25 @@ textarea.v2-ctrl.v2-cab-area {
   gap: var(--opt-lane-gap, 3px);
 }
 
+.v2-opt-gutter-limit {
+  position: relative;
+}
+
+.v2-limit-disabled {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: calc(100% + 5px);
+  width: max-content;
+  max-width: 112px;
+  transform: translateY(-50%);
+  color: var(--warning);
+  font-size: 8px;
+  font-weight: 650;
+  line-height: 1.05;
+  pointer-events: none;
+}
+
 .v2-opt-kind + .v2-opt-kind,
 .v2-opt-gutter-kind + .v2-opt-gutter-kind {
   padding-top: 3px;

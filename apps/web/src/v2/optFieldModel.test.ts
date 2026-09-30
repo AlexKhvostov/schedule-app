@@ -33,16 +33,16 @@ describe("opt field presentation model", () => {
         variant: "nitro",
         shortLabel: "N",
         rows: [
-          { key: "nitro:50", limit: "50", label: "N50" },
-          { key: "nitro:100", limit: "100", label: "N100" },
+          { key: "nitro:50", limit: "50", label: "N50", disabled: false },
+          { key: "nitro:100", limit: "100", label: "N100", disabled: false },
         ],
       },
       {
         variant: "regular",
         shortLabel: "E",
         rows: [
-          { key: "regular:50", limit: "50", label: "E50" },
-          { key: "regular:100", limit: "100", label: "E100" },
+          { key: "regular:50", limit: "50", label: "E50", disabled: false },
+          { key: "regular:100", limit: "100", label: "E100", disabled: false },
         ],
       },
     ]);
