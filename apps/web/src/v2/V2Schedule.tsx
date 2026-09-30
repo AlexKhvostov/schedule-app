@@ -28,8 +28,9 @@ import { loadPrefs, resetSchedulePrefs, savePrefs } from "./prefs";
 import { centerPos, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
-import { saveMemberTables, loadPublicNames } from "../data/people";
+import { loadPublicNames } from "../data/people";
 import { listLimitMarks, listSchedulePlayers, markFromPlayer, type SchedulePlayer } from "../data/players";
+import { loadMemberTablePresets, subscribeMemberTablePresets } from "../data/tablePresets";
 import { loadMyPlays } from "../data/plays";
 import { accessKey, loadScheduleAccess } from "../data/scheduleAccess";
 import {
@@ -47,11 +48,12 @@ import {
 import { loadScheduleSettings, subscribeScheduleSettings, type ScheduleFilterLimits } from "../data/scheduleSettings";
 import { loadDeadTimeIntervals, subscribeDeadTimeIntervals, type DeadTimeInterval } from "../data/deadTime";
 import { notifyMarkRemoved } from "../data/notifyMark";
-import { loadMembers, memberOfSession, saveMembers } from "../schedule/members";
+import { loadMembers, memberOfSession } from "../schedule/members";
 import { readSession } from "./session";
 import { decorateDemoRoster, rowInitials, seatDiffs, showNick, type SeatDiff } from "./schedulePresentation";
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
 import { displayScheduleColumn, gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
+import { loadTablePresetSelection, saveTablePresetSelection } from "./tablePresetSelection";
 
 type Props = {
   cursor: Date;
@@ -103,7 +105,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [busyHint, setBusyHint] = useState(boot.busyHint);
   const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
-  const [tablesDraft, setTablesDraft] = useState("11");
+  const [tablePresets, setTablePresets] = useState<number[]>([ME.tables]);
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [kinds, setKinds] = useState(boot.kinds);
@@ -153,7 +155,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const refreshTimer = useRef(0);
   const liveDebounce = useRef(0);
   const dirtyLive = useRef(false);
-  const tablesSaveTimer = useRef(0);
   const grids = useMemo(() => {
     const stored = gridsForVariant(gridStore, kind, limits);
     return Object.fromEntries(limits.map((limit) => [
@@ -270,7 +271,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       setActingId((current) => {
         if (current && id && current !== id) return current;
         setMe(mark);
-        setTablesDraft(String(mark.tables));
         return id ?? current;
       });
     };
@@ -453,7 +453,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return () => {
       window.clearTimeout(refreshTimer.current);
       window.clearTimeout(liveDebounce.current);
-      window.clearTimeout(tablesSaveTimer.current);
     };
   }, []);
 
@@ -497,7 +496,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (!editByButton || canEdit) return;
     setActingId(selfId);
     setMe(selfMarkRef.current);
-    setTablesDraft(String(selfMarkRef.current.tables));
   }, [canEdit, selfId, editByButton]);
 
   useEffect(() => {
@@ -505,16 +503,44 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (!selfId) return;
     setActingId(selfId);
     setMe(selfMarkRef.current);
-    setTablesDraft(String(selfMarkRef.current.tables));
   }, [mayActAs, selfId]);
 
   useEffect(() => {
     void listSchedulePlayers().then(setPlayers);
   }, []);
 
+  const brushId = actingId || selfId;
   useEffect(() => {
-    setTablesDraft(String(me.tables));
-  }, [me.tables]);
+    if (!brushId) return;
+    let active = true;
+    const player = players.find((row) => row.id === brushId);
+    const fallback = brushId === selfId ? selfMarkRef.current.tables : player?.tables ?? 1;
+    const apply = (presets: readonly number[]) => {
+      if (!active) return;
+      const selected = loadTablePresetSelection(brushId, presets, fallback);
+      setTablePresets(selected.values);
+      setMe((mark) => (mark.memberId && mark.memberId !== brushId ? mark : { ...mark, tables: selected.active }));
+      if (brushId === selfId) {
+        setSelfMark((mark) => ({ ...mark, tables: selected.active }));
+      }
+    };
+    if (!isLiveData()) {
+      const member = loadMembers().find((row) => row.id === brushId);
+      apply(member?.tablePresets ?? player?.tablePresets ?? [fallback]);
+      return () => {
+        active = false;
+      };
+    }
+    const reload = () => {
+      void loadMemberTablePresets(brushId, fallback).then((result) => apply(result.presets));
+    };
+    reload();
+    const off = subscribeMemberTablePresets(brushId, reload);
+    return () => {
+      active = false;
+      off();
+    };
+  }, [brushId, selfId, players]);
 
   useEffect(() => {
     const onDoc = (event: MouseEvent) => {
@@ -655,7 +681,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (selfId && id === selfId) {
       setActingId(selfId);
       setMe(selfMarkRef.current);
-      setTablesDraft(String(selfMarkRef.current.tables));
       return;
     }
     const row = players.find((item) => item.id === id);
@@ -663,14 +688,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       const mark = markFromPlayer(row);
       setActingId(row.id);
       setMe(mark);
-      setTablesDraft(String(mark.tables));
       return;
     }
     const mark = (limitMarks ?? []).find((item) => item.memberId === id);
     if (!mark?.memberId) return;
     setActingId(mark.memberId);
     setMe(mark);
-    setTablesDraft(String(mark.tables));
   };
 
   const writeDiffs = useCallback(
@@ -872,33 +895,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   const shiftMonth = (delta: number) => onCursorChange(new Date(year, monthIndex + delta, 1));
 
-  const applyTables = (raw: number) => {
-    const next = Math.min(30, Math.max(1, Math.round(raw)));
+  const selectTablePreset = (value: number) => {
     const targetId = actingRef.current;
-    setMe((mark) => (mark.tables === next ? mark : { ...mark, tables: next }));
-    setTablesDraft(String(next));
+    if (!targetId || !tablePresets.includes(value)) return;
+    saveTablePresetSelection(targetId, value);
+    setMe((mark) => ({ ...mark, tables: value }));
     if (selfId && targetId === selfId) {
-      setSelfMark((mark) => (mark.tables === next ? mark : { ...mark, tables: next }));
+      setSelfMark((mark) => ({ ...mark, tables: value }));
     }
-    setPlayers((list) => list.map((row) => (row.id === targetId ? { ...row, tables: next } : row)));
-    window.clearTimeout(tablesSaveTimer.current);
-    tablesSaveTimer.current = window.setTimeout(() => {
-      if (!targetId) return;
-      if (isLiveData()) {
-        void saveMemberTables(targetId, next).then((result) => {
-          if (result.error) showV2Toast("err", t("schedule.toastSaveError"));
-        });
-        return;
-      }
-      const list = loadMembers();
-      saveMembers(list.map((row) => (row.id === targetId ? { ...row, tables: next } : row)));
-    }, 400);
-  };
-
-  const bumpTables = (delta: number) => {
-    const n = Number(tablesDraft);
-    const cur = Number.isFinite(n) ? n : me.tables;
-    applyTables(cur + delta);
   };
 
   const toggleEdit = () => {
@@ -982,14 +986,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const mobileScheduleTools = touchLayout ? (
     <MobileScheduleDock
       me={me}
-      tables={tablesDraft}
-      onBump={bumpTables}
-      onDraft={(value) => {
-        setTablesDraft(value);
-        if (!value.trim()) return;
-        const n = Number(value);
-        if (Number.isFinite(n)) applyTables(n);
-      }}
+      tables={me.tables}
+      tablePresets={tablePresets}
+      onTableSelect={selectTablePreset}
       canActAs={mayActAs && mobileEditOn}
       players={actPlayers}
       selfId={selfId}
@@ -1233,14 +1232,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         </div>
         {!touchLayout ? <BarMark
           me={me}
-          tables={tablesDraft}
-          onBump={bumpTables}
-          onDraft={(value) => {
-            setTablesDraft(value);
-            if (!value.trim()) return;
-            const n = Number(value);
-            if (Number.isFinite(n)) applyTables(n);
-          }}
+          tables={me.tables}
+          tablePresets={tablePresets}
+          onTableSelect={selectTablePreset}
           canActAs={mayActAs && paintOn}
           players={actPlayers}
           selfId={selfId}

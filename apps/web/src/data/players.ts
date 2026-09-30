@@ -13,6 +13,7 @@ export type SchedulePlayer = {
   markBg: string;
   markFg: string;
   tables: number;
+  tablePresets?: number[];
   avatarUrl?: string;
   username?: string;
   globalName?: string;
@@ -118,6 +119,7 @@ function demoPlayers(): SchedulePlayer[] {
       markBg: row.mark.bg || MARK_CATALOG[row.mark.colorId]?.bg || ME.bg,
       markFg: row.mark.fg || MARK_FG_DEFAULT,
       tables: Math.min(30, Math.max(1, row.tables ?? 11)),
+      tablePresets: row.tablePresets,
       avatarUrl: row.avatar || "",
       username: row.discord || "",
       globalName: row.discordDisplay || row.discord || "",

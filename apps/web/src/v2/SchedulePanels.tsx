@@ -17,8 +17,8 @@ import { displayScheduleColumn } from "./variantSchedule";
 export function BarMark({
   me,
   tables,
-  onBump,
-  onDraft,
+  tablePresets,
+  onTableSelect,
   canActAs,
   players,
   selfId,
@@ -33,9 +33,9 @@ export function BarMark({
   onToggleBusy,
 }: {
   me: Mark;
-  tables: string;
-  onBump: (delta: number) => void;
-  onDraft: (value: string) => void;
+  tables: number;
+  tablePresets: readonly number[];
+  onTableSelect: (value: number) => void;
   canActAs?: boolean;
   players: SchedulePlayer[];
   selfId?: string;
@@ -53,14 +53,15 @@ export function BarMark({
   const boxRef = useRef<HTMLDivElement>(null);
   const hitRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [whoOpen, setWhoOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState<"presets" | "players">("presets");
   const [menuBox, setMenuBox] = useState<{ top: number; left: number; maxH: number } | null>(null);
-  const n = Number(tables) || me.tables;
+  const n = tables || me.tables;
   const isOther = Boolean(actingId && selfId && actingId !== selfId);
   const shown = [...players].sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 
   useEffect(() => {
-    if (!whoOpen) {
+    if (!menuOpen) {
       setMenuBox(null);
       return;
     }
@@ -84,10 +85,10 @@ export function BarMark({
     const close = (event: MouseEvent) => {
       const node = event.target as Node;
       if (boxRef.current?.contains(node) || menuRef.current?.contains(node)) return;
-      setWhoOpen(false);
+      setMenuOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setWhoOpen(false);
+      if (event.key === "Escape") setMenuOpen(false);
     };
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
@@ -99,7 +100,7 @@ export function BarMark({
       window.removeEventListener("mousedown", close);
       window.removeEventListener("keydown", onKey);
     };
-  }, [whoOpen]);
+  }, [menuOpen]);
 
   const slot = (
     <span className="v2-mark-sample">
@@ -113,15 +114,18 @@ export function BarMark({
       className={`v2-bar-pack v2-bar-mark${isOther ? " is-proxy" : ""}${countTables ? " is-tables" : ""}${editOn ? " is-edit" : ""}`}
       title={isOther ? t("schedule.actAsWarn") : me.t}
     >
-      {canActAs ? (
+      {canActAs || countTables ? (
         <button
           ref={hitRef}
           type="button"
           className={`v2-bar-mark-hit${isOther ? " is-other" : ""}`}
-          title={isOther ? t("schedule.actAsWarn") : t("schedule.actAsLabel")}
-          aria-label={me.t}
-          aria-expanded={whoOpen}
-          onClick={() => setWhoOpen((value) => !value)}
+          title={isOther ? t("schedule.actAsWarn") : countTables ? t("schedule.tableBrushMenu") : t("schedule.actAsLabel")}
+          aria-label={countTables ? t("schedule.tableBrushMenu") : me.t}
+          aria-expanded={menuOpen}
+          onClick={() => {
+            setMenuView(countTables ? "presets" : "players");
+            setMenuOpen((value) => !value);
+          }}
         >
           {slot}
         </button>
@@ -168,62 +172,91 @@ export function BarMark({
           ) : null}
         </span>
       ) : null}
-      {countTables ? (
-        <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
-          <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
-            <i className="fa-solid fa-minus" />
-          </button>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={30}
-            value={tables}
-            onChange={(event) => onDraft(event.target.value)}
-          />
-          <button type="button" aria-label="+1" onClick={() => onBump(1)}>
-            <i className="fa-solid fa-plus" />
-          </button>
-        </div>
-      ) : null}
-      {whoOpen && menuBox
+      {menuOpen && menuBox
         ? createPortal(
             <div
               ref={menuRef}
               className="v2-mark-dock-who-menu v2-bar-mark-who"
               style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxH }}
+              role="dialog"
+              aria-label={menuView === "presets" ? t("schedule.tableBrushMenu") : t("schedule.actAsLabel")}
             >
-              <ul>
-                {shown.length ? (
-                  shown.map((row) => {
-                    const names = whoLines(row);
-                    return (
-                      <li key={row.id}>
+              {menuView === "presets" && countTables ? (
+                <>
+                  <p className="v2-table-brush-title">{t("schedule.tableBrushPick")}</p>
+                  <ul className="v2-table-brush-list">
+                    {tablePresets.map((value) => (
+                      <li key={value}>
                         <button
                           type="button"
-                          className={row.id === actingId ? "is-on" : ""}
+                          className={value === n ? "is-on" : ""}
+                          aria-pressed={value === n}
+                          aria-label={t("schedule.tableBrushTables", { count: value })}
                           onClick={() => {
-                            onActAs(row.id);
-                            setWhoOpen(false);
+                            onTableSelect(value);
+                            setMenuOpen(false);
                           }}
                         >
-                          <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
                           <span className="v2-mark-sample">
-                            <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
+                            <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={value} showTables />
                           </span>
                           <span className="v2-mark-dock-who-copy">
-                            <b>{names.title}</b>
-                            {names.sub ? <small>{names.sub}</small> : null}
+                            <b>{t("schedule.tableBrushTables", { count: value })}</b>
                           </span>
-                          {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
+                          {value === n ? <i className="fa-solid fa-check" aria-hidden /> : null}
                         </button>
                       </li>
-                    );
-                  })
-                ) : (
-                  <li className="is-empty">{t("schedule.actAsEmpty")}</li>
-                )}
-              </ul>
+                    ))}
+                  </ul>
+                  {canActAs ? (
+                    <button type="button" className="v2-table-brush-other" onClick={() => setMenuView("players")}>
+                      <i className="fa-solid fa-users" aria-hidden />
+                      <span>{t("schedule.tableBrushOtherPlayer")}</span>
+                      <i className="fa-solid fa-angle-right" aria-hidden />
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {countTables ? (
+                    <button type="button" className="v2-table-brush-back" onClick={() => setMenuView("presets")}>
+                      <i className="fa-solid fa-angle-left" aria-hidden />
+                      <span>{t("schedule.tableBrushBack")}</span>
+                    </button>
+                  ) : null}
+                  <ul>
+                    {shown.length ? (
+                      shown.map((row) => {
+                        const names = whoLines(row);
+                        return (
+                          <li key={row.id}>
+                            <button
+                              type="button"
+                              className={row.id === actingId ? "is-on" : ""}
+                              onClick={() => {
+                                onActAs(row.id);
+                                setMenuOpen(false);
+                              }}
+                            >
+                              <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
+                              <span className="v2-mark-sample">
+                                <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
+                              </span>
+                              <span className="v2-mark-dock-who-copy">
+                                <b>{names.title}</b>
+                                {names.sub ? <small>{names.sub}</small> : null}
+                              </span>
+                              {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
+                            </button>
+                          </li>
+                        );
+                      })
+                    ) : (
+                      <li className="is-empty">{t("schedule.actAsEmpty")}</li>
+                    )}
+                  </ul>
+                </>
+              )}
             </div>,
             document.body,
           )

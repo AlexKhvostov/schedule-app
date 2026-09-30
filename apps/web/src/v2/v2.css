@@ -5384,6 +5384,54 @@ button.v2-bar-mark-hit[aria-expanded="true"] .v2-mark-sample {
   max-height: none;
 }
 
+.v2-table-brush-title {
+  margin: 0;
+  padding: 5px 7px 3px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.v2-mark-dock-who-menu .v2-table-brush-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px;
+}
+
+.v2-table-brush-list li,
+.v2-table-brush-list button {
+  min-width: 0;
+}
+
+.v2-mark-dock-who-menu .v2-table-brush-list button {
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 7px;
+}
+
+.v2-mark-dock-who-menu .v2-table-brush-list button.is-on {
+  border-color: color-mix(in srgb, var(--primary) 76%, white 8%);
+  background: color-mix(in srgb, var(--primary) 24%, var(--card));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--primary) 34%, transparent),
+    0 0 10px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.v2-table-brush-other,
+.v2-table-brush-back {
+  border-top: 1px solid var(--border);
+}
+
+.v2-table-brush-other > span,
+.v2-table-brush-back > span {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
 .v2-bar-mark .v2-mark-dock-who-menu {
   top: calc(100% + 6px);
   right: 0;

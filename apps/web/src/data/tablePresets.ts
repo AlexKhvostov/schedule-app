@@ -71,3 +71,19 @@ export async function saveMemberTablePresets(memberId: string, presets: readonly
   if (error) return { error: error.message, presets: [] as number[] };
   return loadMemberTablePresets(memberId, validation.values[0]);
 }
+
+export function subscribeMemberTablePresets(memberId: string, onChange: () => void) {
+  const db = getSupabase();
+  if (!db || !memberId) return () => {};
+  const channel = db
+    .channel(`member-table-presets-${memberId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "member_table_presets", filter: `member_id=eq.${memberId}` },
+      onChange,
+    )
+    .subscribe();
+  return () => {
+    void db.removeChannel(channel);
+  };
+}
