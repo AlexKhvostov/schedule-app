@@ -434,6 +434,12 @@ const MergedMark = memo(function MergedMark({
       ref={root}
       className={`v2-opt-merged${past ? " is-past" : ""}`}
       data-mark={short.toUpperCase()}
+      data-day={segment.day}
+      data-start-half={segment.startHalf}
+      data-end-half={segment.endHalf}
+      data-variant={segment.variant}
+      data-limit={segment.limit}
+      data-level={segment.level}
       aria-hidden
       style={
         {

@@ -1,4 +1,5 @@
 import { getSupabase } from "./client";
+import { isDevSandboxEnabled } from "./config";
 
 export type ScheduleVariant = "nitro" | "regular";
 
@@ -19,6 +20,9 @@ type DeadTimeRow = {
 };
 
 export type DeadTimeValidationError = "bounds" | "overlap";
+
+const DEMO_STORAGE_KEY = "redparty.demo.dead-time.v1";
+const DEMO_DEAD_TIME_EVENT = "redparty:demo-dead-time";
 
 export function deadTimeIntervalsFromRows(rows: unknown): DeadTimeInterval[] {
   if (!Array.isArray(rows)) return [];
@@ -101,7 +105,42 @@ function compareDeadTimeIntervals(left: DeadTimeInterval, right: DeadTimeInterva
     left.startHalf - right.startHalf || left.endHalf - right.endHalf;
 }
 
+function loadDemoDeadTimeIntervals(): DeadTimeInterval[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(stored)) return [];
+    const intervals = stored.flatMap((value, index) => {
+      if (!value || typeof value !== "object") return [];
+      const item = value as Partial<DeadTimeInterval>;
+      if (
+        (item.variant !== "nitro" && item.variant !== "regular") ||
+        typeof item.limit !== "string" ||
+        typeof item.startHalf !== "number" ||
+        typeof item.endHalf !== "number"
+      ) return [];
+      return [{
+        id: typeof item.id === "string" ? item.id : `demo-${index}`,
+        variant: item.variant,
+        limit: item.limit,
+        startHalf: item.startHalf,
+        endHalf: item.endHalf,
+      }];
+    }).sort(compareDeadTimeIntervals);
+    return validateDeadTimeIntervals(intervals) ? [] : intervals;
+  } catch {
+    return [];
+  }
+}
+
+function saveDemoDeadTimeIntervals(intervals: DeadTimeInterval[]) {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(intervals));
+  window.dispatchEvent(new Event(DEMO_DEAD_TIME_EVENT));
+}
+
 export async function loadDeadTimeIntervals() {
+  if (isDevSandboxEnabled()) return loadDemoDeadTimeIntervals();
   const db = getSupabase();
   if (!db) return [];
   const { data, error } = await db
@@ -115,10 +154,14 @@ export async function loadDeadTimeIntervals() {
 }
 
 export async function saveDeadTimeIntervals(intervals: DeadTimeInterval[]) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
   const validationError = validateDeadTimeIntervals(intervals);
   if (validationError) return { error: validationError };
+  if (isDevSandboxEnabled()) {
+    saveDemoDeadTimeIntervals([...intervals].sort(compareDeadTimeIntervals));
+    return { error: undefined };
+  }
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" as const };
   const { error } = await db.rpc("save_schedule_dead_intervals", {
     p_intervals: intervals.map(({ variant, limit, startHalf, endHalf }) => ({
       variant,
@@ -131,6 +174,18 @@ export async function saveDeadTimeIntervals(intervals: DeadTimeInterval[]) {
 }
 
 export function subscribeDeadTimeIntervals(onChange: () => void) {
+  if (isDevSandboxEnabled()) {
+    if (typeof window === "undefined") return () => {};
+    window.addEventListener(DEMO_DEAD_TIME_EVENT, onChange);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === DEMO_STORAGE_KEY) onChange();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(DEMO_DEAD_TIME_EVENT, onChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }
   const db = getSupabase();
   if (!db) return () => {};
   const channel = db

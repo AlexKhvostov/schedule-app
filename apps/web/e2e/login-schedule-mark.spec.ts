@@ -390,6 +390,54 @@ test("schedule-limit editor keeps tournament types independent and stays admin-o
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 });
 
+test("dead-time editor persists CRUD, blocks overlap and stays admin-only", async ({ page }) => {
+  await page.goto("/#admin-schedule");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-104");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await expect(page.getByRole("heading", { name: "Мёртвое время" })).toBeVisible();
+  const editor = page.locator(".v2-dead-time-editor");
+  const rows = editor.locator(".v2-dead-time-row");
+  const save = editor.getByRole("button", { name: "Сохранить", exact: true });
+  await expect(rows).toHaveCount(0);
+
+  await editor.getByRole("button", { name: /Добавить интервал/ }).click();
+  await editor.getByRole("button", { name: /Добавить интервал/ }).click();
+  await expect(rows).toHaveCount(2);
+  await rows.nth(1).locator("select").first().selectOption("1");
+  await expect(editor.getByRole("alert")).toContainText("пересекаться");
+  await expect(save).toBeDisabled();
+
+  await rows.nth(1).locator("select").first().selectOption("2");
+  await rows.nth(1).locator("select").nth(1).selectOption("6");
+  await expect(editor.getByRole("alert")).toHaveCount(0);
+  await save.click();
+  await expect(editor.getByRole("button", { name: "Сохранено", exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1).locator("select").nth(1)).toHaveValue("6");
+  await rows.nth(0).locator("select").nth(1).selectOption("1");
+  await save.click();
+  await expect(editor.getByRole("button", { name: "Сохранено", exact: true })).toBeVisible();
+
+  await rows.nth(1).getByRole("button", { name: /Удалить интервал/ }).click();
+  await expect(rows).toHaveCount(1);
+  await save.click();
+  await page.reload();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.nth(0).locator("select").nth(1)).toHaveValue("1");
+
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-221");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await expect(page.getByRole("heading", { name: "Мёртвое время" })).toHaveCount(0);
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+});
+
 test("schedule can show Nitro and Regular together with distinct N/E rows", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
@@ -643,4 +691,75 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await page.getByTitle("Редактирование").click();
   await page.getByRole("button", { name: "Выбор кисти столов" }).click();
   await expect(page.getByRole("button", { name: "Выбрать метку другого игрока" })).toHaveCount(0);
+});
+
+test("merged marks keep real half-hour editing and split at an edge or in the middle", async ({ page }) => {
+  await page.goto("/#admin-schedule");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-415");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  const mergeToggle = page.locator("button.v2-settings-row", { hasText: "Соединять рядом стоящие слоты одного игрока" });
+  await mergeToggle.click();
+  await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await page.getByTitle("Редактирование").click();
+
+  const run = await page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').evaluateAll((nodes) => {
+    const slots = nodes.map((node) => ({
+      day: node.getAttribute("data-d")!,
+      lane: node.getAttribute("data-lane")!,
+      half: Number(node.getAttribute("data-half")),
+      variant: node.getAttribute("data-variant")!,
+      limit: node.getAttribute("data-limit")!,
+      level: node.getAttribute("data-level")!,
+    }));
+    return slots.find((slot) =>
+      slots.some((next) => next.lane === slot.lane && next.half === slot.half + 1)
+      && slots.some((next) => next.lane === slot.lane && next.half === slot.half + 2),
+    ) ?? null;
+  });
+  expect(run).toBeTruthy();
+
+  const cell = (half: number) => page.locator(`[data-slot][data-lane="${run!.lane}"][data-half="${half}"]`);
+  const start = cell(run!.half);
+  const middle = cell(run!.half + 1);
+  const end = cell(run!.half + 2);
+  const [startBox, endBox] = await Promise.all([start.boundingBox(), end.boundingBox()]);
+  expect(startBox && endBox).toBeTruthy();
+  await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
+  await page.mouse.up();
+
+  const segment = (startHalf: number, endHalf: number) => page.locator(
+    `.v2-opt-merged[data-day="${run!.day}"][data-variant="${run!.variant}"][data-limit="${run!.limit}"][data-level="${run!.level}"][data-start-half="${startHalf}"][data-end-half="${endHalf}"]`,
+  );
+  await expect(segment(run!.half, run!.half + 3)).toHaveCount(1);
+  await expect(start).toHaveClass(/is-merged-source/);
+  await expect(middle).toHaveClass(/is-merged-source/);
+  await expect(end).toHaveClass(/is-merged-source/);
+
+  await start.click();
+  await expect(start).not.toHaveClass(/is-on/);
+  await expect(segment(run!.half + 1, run!.half + 3)).toHaveCount(1);
+  await start.click();
+  await expect(segment(run!.half, run!.half + 3)).toHaveCount(1);
+
+  await middle.click();
+  await expect(middle).not.toHaveClass(/is-on/);
+  await expect(start).toHaveClass(/is-on/);
+  await expect(end).toHaveClass(/is-on/);
+  await expect(segment(run!.half, run!.half + 1)).toHaveCount(1);
+  await expect(segment(run!.half + 2, run!.half + 3)).toHaveCount(1);
+
+  await page.goto("/#admin-schedule");
+  await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");
+  await mergeToggle.click();
+  await expect(mergeToggle).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await expect(page.locator(".v2-opt-merged")).toHaveCount(0);
+  await expect(start).toHaveClass(/is-on/);
+  await expect(middle).not.toHaveClass(/is-on/);
+  await expect(end).toHaveClass(/is-on/);
 });
