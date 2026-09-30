@@ -106,6 +106,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
   const [tablePresets, setTablePresets] = useState<number[]>([ME.tables]);
+  const [tablePresetOwnerId, setTablePresetOwnerId] = useState<string>();
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [kinds, setKinds] = useState(boot.kinds);
@@ -515,10 +516,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     let active = true;
     const player = players.find((row) => row.id === brushId);
     const fallback = brushId === selfId ? selfMarkRef.current.tables : player?.tables ?? 1;
+    setTablePresetOwnerId(undefined);
     const apply = (presets: readonly number[]) => {
       if (!active) return;
       const selected = loadTablePresetSelection(brushId, presets, fallback);
       setTablePresets(selected.values);
+      setTablePresetOwnerId(brushId);
       setMe((mark) => (mark.memberId && mark.memberId !== brushId ? mark : { ...mark, tables: selected.active }));
       if (brushId === selfId) {
         setSelfMark((mark) => ({ ...mark, tables: selected.active }));
@@ -895,11 +898,33 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   const shiftMonth = (delta: number) => onCursorChange(new Date(year, monthIndex + delta, 1));
 
-  const selectTablePreset = (value: number) => {
-    const targetId = actingRef.current;
-    if (!targetId || !tablePresets.includes(value)) return;
+  const loadTablePresetsForPlayer = async (memberId: string) => {
+    const player = players.find((row) => row.id === memberId);
+    const fallback = memberId === selfId ? selfMarkRef.current.tables : player?.tables ?? 1;
+    if (!isLiveData()) {
+      const member = loadMembers().find((row) => row.id === memberId);
+      return loadTablePresetSelection(memberId, member?.tablePresets ?? player?.tablePresets ?? [fallback], fallback);
+    }
+    try {
+      const result = await loadMemberTablePresets(memberId, fallback);
+      return loadTablePresetSelection(memberId, result.presets, fallback);
+    } catch {
+      return loadTablePresetSelection(memberId, [fallback], fallback);
+    }
+  };
+
+  const selectTablePreset = (value: number, requestedMemberId?: string, presets: readonly number[] = tablePresets) => {
+    const targetId = requestedMemberId || actingRef.current;
+    if (!targetId || !presets.includes(value)) return;
+    const player = players.find((row) => row.id === targetId);
+    const base = targetId === selfId ? selfMarkRef.current : player ? markFromPlayer(player) : null;
+    if (!base) return;
+    actingRef.current = targetId;
+    setActingId(targetId);
     saveTablePresetSelection(targetId, value);
-    setMe((mark) => ({ ...mark, tables: value }));
+    setTablePresets([...presets]);
+    setTablePresetOwnerId(targetId);
+    setMe({ ...base, tables: value });
     if (selfId && targetId === selfId) {
       setSelfMark((mark) => ({ ...mark, tables: value }));
     }
@@ -988,7 +1013,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       me={me}
       tables={me.tables}
       tablePresets={tablePresets}
+      tablePresetOwnerId={tablePresetOwnerId}
       onTableSelect={selectTablePreset}
+      onLoadTablePresets={loadTablePresetsForPlayer}
       canActAs={mayActAs && mobileEditOn}
       players={actPlayers}
       selfId={selfId}
@@ -1234,7 +1261,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           me={me}
           tables={me.tables}
           tablePresets={tablePresets}
+          tablePresetOwnerId={tablePresetOwnerId}
           onTableSelect={selectTablePreset}
+          onLoadTablePresets={loadTablePresetsForPlayer}
           canActAs={mayActAs && paintOn}
           players={actPlayers}
           selfId={selfId}

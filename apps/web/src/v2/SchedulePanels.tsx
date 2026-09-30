@@ -18,7 +18,9 @@ export function BarMark({
   me,
   tables,
   tablePresets,
+  tablePresetOwnerId,
   onTableSelect,
+  onLoadTablePresets,
   canActAs,
   players,
   selfId,
@@ -35,7 +37,9 @@ export function BarMark({
   me: Mark;
   tables: number;
   tablePresets: readonly number[];
-  onTableSelect: (value: number) => void;
+  tablePresetOwnerId?: string;
+  onTableSelect: (value: number, memberId?: string, presets?: readonly number[]) => void;
+  onLoadTablePresets: (memberId: string) => Promise<{ values: number[]; active: number }>;
   canActAs?: boolean;
   players: SchedulePlayer[];
   selfId?: string;
@@ -55,8 +59,20 @@ export function BarMark({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<"presets" | "players">("presets");
+  const [presetPlayer, setPresetPlayer] = useState<SchedulePlayer>();
+  const [otherPresets, setOtherPresets] = useState<number[]>([]);
+  const [otherActive, setOtherActive] = useState(1);
+  const [otherLoading, setOtherLoading] = useState(false);
+  const presetRequest = useRef(0);
   const [menuBox, setMenuBox] = useState<{ top: number; left: number; maxH: number } | null>(null);
   const n = tables || me.tables;
+  const ownPresetsReady = !me.memberId || tablePresetOwnerId === me.memberId;
+  const menuMark = presetPlayer
+    ? { t: presetPlayer.markTag, bg: presetPlayer.markBg, fg: presetPlayer.markFg, discord: presetPlayer.nick }
+    : me;
+  const menuPresets = presetPlayer ? otherPresets : tablePresets;
+  const menuActive = presetPlayer ? otherActive : n;
+  const presetsReady = presetPlayer ? !otherLoading : ownPresetsReady;
   const isOther = Boolean(actingId && selfId && actingId !== selfId);
   const shown = [...players].sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 
@@ -123,7 +139,10 @@ export function BarMark({
           aria-label={countTables ? t("schedule.tableBrushMenu") : me.t}
           aria-expanded={menuOpen}
           onClick={() => {
-            setMenuView(countTables ? "presets" : "players");
+            if (!menuOpen) {
+              setPresetPlayer(undefined);
+              setMenuView(countTables ? "presets" : "players");
+            }
             setMenuOpen((value) => !value);
           }}
         >
@@ -183,31 +202,35 @@ export function BarMark({
             >
               {menuView === "presets" && countTables ? (
                 <>
-                  <p className="v2-table-brush-title">{t("schedule.tableBrushPick")}</p>
-                  <ul className="v2-table-brush-list">
-                    {tablePresets.map((value) => (
-                      <li key={value}>
-                        <button
-                          type="button"
-                          className={value === n ? "is-on" : ""}
-                          aria-pressed={value === n}
-                          aria-label={t("schedule.tableBrushTables", { count: value })}
-                          onClick={() => {
-                            onTableSelect(value);
-                            setMenuOpen(false);
-                          }}
-                        >
-                          <span className="v2-mark-sample">
-                            <ScheduleSlot letters={me.t} bg={me.bg} fg={me.fg} tables={value} showTables />
-                          </span>
-                          <span className="v2-mark-dock-who-copy">
-                            <b>{t("schedule.tableBrushTables", { count: value })}</b>
-                          </span>
-                          {value === n ? <i className="fa-solid fa-check" aria-hidden /> : null}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="v2-table-brush-title">{t("schedule.tableBrushPickFor", { player: menuMark.discord || menuMark.t })}</p>
+                  {presetsReady ? (
+                    <ul className="v2-table-brush-list">
+                      {menuPresets.map((value) => (
+                        <li key={value}>
+                          <button
+                            type="button"
+                            className={value === menuActive ? "is-on" : ""}
+                            aria-pressed={value === menuActive}
+                            aria-label={t("schedule.tableBrushTables", { count: value })}
+                            onClick={() => {
+                              onTableSelect(value, presetPlayer?.id, menuPresets);
+                              setMenuOpen(false);
+                            }}
+                          >
+                            <span className="v2-mark-sample">
+                              <ScheduleSlot letters={menuMark.t} bg={menuMark.bg} fg={menuMark.fg} tables={value} showTables />
+                            </span>
+                            <span className="v2-mark-dock-who-copy">
+                              <b>{t("schedule.tableBrushTables", { count: value })}</b>
+                            </span>
+                            {value === menuActive ? <i className="fa-solid fa-check" aria-hidden /> : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="v2-table-brush-loading" role="status">{t("schedule.tableBrushLoading")}</p>
+                  )}
                   {canActAs ? (
                     <button type="button" className="v2-table-brush-other" onClick={() => setMenuView("players")}>
                       <i className="fa-solid fa-users" aria-hidden />
@@ -219,7 +242,10 @@ export function BarMark({
               ) : (
                 <>
                   {countTables ? (
-                    <button type="button" className="v2-table-brush-back" onClick={() => setMenuView("presets")}>
+                    <button type="button" className="v2-table-brush-back" onClick={() => {
+                      setPresetPlayer(undefined);
+                      setMenuView("presets");
+                    }}>
                       <i className="fa-solid fa-angle-left" aria-hidden />
                       <span>{t("schedule.tableBrushBack")}</span>
                     </button>
@@ -234,8 +260,23 @@ export function BarMark({
                               type="button"
                               className={row.id === actingId ? "is-on" : ""}
                               onClick={() => {
-                                onActAs(row.id);
-                                setMenuOpen(false);
+                                if (!countTables) {
+                                  onActAs(row.id);
+                                  setMenuOpen(false);
+                                  return;
+                                }
+                                const request = ++presetRequest.current;
+                                setPresetPlayer(row);
+                                setOtherPresets([]);
+                                setOtherActive(row.tables);
+                                setOtherLoading(true);
+                                setMenuView("presets");
+                                void onLoadTablePresets(row.id).then((selection) => {
+                                  if (presetRequest.current !== request) return;
+                                  setOtherPresets(selection.values);
+                                  setOtherActive(selection.active);
+                                  setOtherLoading(false);
+                                });
                               }}
                             >
                               <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />

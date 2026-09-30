@@ -5394,6 +5394,15 @@ button.v2-bar-mark-hit[aria-expanded="true"] .v2-mark-sample {
   text-transform: uppercase;
 }
 
+.v2-table-brush-loading {
+  margin: 2px 4px 8px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--v2-muted);
+  font-size: 12px;
+}
+
 .v2-mark-dock-who-menu .v2-table-brush-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
