@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayNick, markQuery, nowHeadLeft, packOwner, scheduleKindGroups, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
+import { displayNick, markQuery, markWithPlayerIdentity, nowHeadLeft, packOwner, scheduleKindGroups, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
 
 describe("opt field presentation model", () => {
   it("formats wrapped half-hour spans", () => {
@@ -17,6 +17,52 @@ describe("opt field presentation model", () => {
   it("keeps owner identity formatting in one place", () => {
     const owner = packOwner({ t: "AX", discord: "fallback", guildNick: "Server Alex", username: "alex", room: "PokerNick", bg: "#000", fg: "#fff", tables: 1 });
     expect(owner).toMatchObject({ discord: "Server Alex", username: "alex", room: "PokerNick" });
+  });
+
+  it("enriches an old slot snapshot from the current player directory", () => {
+    const enriched = markWithPlayerIdentity(
+      { t: "AX", discord: "old", room: "OldRoom", bg: "#000", fg: "#fff", tables: 6, memberId: "member-1" },
+      [{
+        id: "member-1",
+        nick: "Server Alex",
+        publicCode: "RP-1",
+        roomNick: "PokerAlex",
+        markTag: "AX",
+        markBg: "#123456",
+        markFg: "#ffffff",
+        tables: 8,
+        avatarUrl: "https://cdn.example/avatar.png",
+        username: "alex",
+        globalName: "Alex",
+        guildNick: "Server Alex",
+      }],
+    );
+
+    expect(enriched).toMatchObject({
+      discord: "Server Alex",
+      room: "PokerAlex",
+      avatarUrl: "https://cdn.example/avatar.png",
+      guildNick: "Server Alex",
+      tables: 6,
+      bg: "#000",
+    });
+  });
+
+  it("does not guess a player when an old two-letter mark is ambiguous", () => {
+    const mark = { t: "AX", discord: "", room: "", bg: "#000", fg: "#fff", tables: 6 };
+    const players = ["member-1", "member-2"].map((id) => ({
+      id,
+      nick: id,
+      publicCode: id,
+      roomNick: id,
+      markTag: "AX",
+      markBg: "#123456",
+      markFg: "#ffffff",
+      tables: 8,
+      avatarUrl: `https://cdn.example/${id}.png`,
+    }));
+
+    expect(markWithPlayerIdentity(mark, players)).toBe(mark);
   });
 
   it("formats table counts and clamps timeline progress", () => {

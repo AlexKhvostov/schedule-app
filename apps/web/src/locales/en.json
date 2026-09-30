@@ -1383,8 +1383,11 @@
       "room": "Room {{name}}",
       "cet": "CET",
       "msk": "MSK",
+      "nitro": "Nitro",
+      "regular": "Regular",
       "discord": "Discord",
       "winamax": "Winamax",
+      "gameNick": "Game nick",
       "tables": "Tables",
       "markTables": "Left click adds tables, right click removes them. The current number is saved on the slot and does not change later."
     },

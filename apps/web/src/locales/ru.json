@@ -1388,8 +1388,11 @@
       "room": "Рум {{name}}",
       "cet": "CET",
       "msk": "МСК",
+      "nitro": "Nitro",
+      "regular": "Regular",
       "discord": "Discord",
       "winamax": "Winamax",
+      "gameNick": "Игровой ник",
       "tables": "Столы",
       "markTables": "Левый клик — больше столов, правый — меньше. В слот ставится текущее число и потом не меняется."
     },

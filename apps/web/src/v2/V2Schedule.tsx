@@ -302,6 +302,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       nick: row.discord,
       publicCode: row.room,
       roomNick: row.room,
+      avatarUrl: row.avatar,
+      username: row.discord,
+      globalName: row.discordDisplay,
+      guildNick: row.discordGuildNick,
       markTag: row.mark.t,
       markBg: row.mark.bg || ME.bg,
       markFg: row.mark.fg || "#111827",
@@ -1355,6 +1359,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           pairRows={pairRows}
           capacity={capacity}
           grids={shownGridStore}
+          players={players}
           hourLoad={hourLoad}
           onGridChange={onGridChange}
           canRemoveForeign={canRemoveForeign}

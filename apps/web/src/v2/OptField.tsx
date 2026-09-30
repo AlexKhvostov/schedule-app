@@ -6,6 +6,7 @@ import { isSelfSeat, type Mark } from "../schedule/marks";
 import { hoursOf, lanesForDay, formatLimit, limitTone, weekdayOf, type CapacityMap } from "../schedule/capacity";
 import { daysInMonth, levelAllowed, seatsOf, shownLevels, type Occupancy } from "../schedule/plan";
 import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../data/slots";
+import type { SchedulePlayer } from "../data/players";
 import { loadGradient, type HourLoadMap } from "../schedule/hourLoad";
 import { visibleMonthDays, type DisplayRange } from "../schedule/displayRange";
 import { DEFAULT_WORK_HOURS, clampWorkRangeHalf, workGapBefore, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
@@ -14,6 +15,7 @@ import { mergeVisualSlots, type VisualSegment } from "../schedule/visualSegments
 import { loadTheme, type UiTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { MarkFace } from "./ScheduleSlot";
+import { PersonAvatar } from "./PersonAvatar";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
 import type { SchedulePairRow } from "./variantSchedule";
 import { clampScheduleCellWidth, fitScheduleCellWidth, scheduleCellStride, scheduleZoomScrollLeft } from "./scheduleZoom";
@@ -21,6 +23,7 @@ import {
   displayNick,
   findHitCss,
   markQuery,
+  markWithPlayerIdentity,
   nowHeadLeft,
   nowLineLeft,
   packOwner,
@@ -69,6 +72,7 @@ type Props = {
   onCellWidthChange?: (value: number) => void;
   onFitWidthChange?: (value: number) => void;
   footerTools?: ReactNode;
+  players?: SchedulePlayer[];
 };
 
 type SlotHit = {
@@ -814,6 +818,7 @@ function OptTip({
   capacity,
   showTip,
   countTables = false,
+  players = [],
   waitRef,
   skin,
 }: {
@@ -823,6 +828,7 @@ function OptTip({
   capacity: CapacityMap;
   showTip: boolean;
   countTables?: boolean;
+  players?: SchedulePlayer[];
   waitRef: MutableRefObject<TipApi>;
   skin?: "classic" | "theme";
 }) {
@@ -919,6 +925,8 @@ function OptTip({
     grids[monthGridKey(hover.variant, hover.limit)]?.[hover.dayIdx]?.[hover.half],
     hover.level + 1,
   )[hover.level];
+  const displayMark = mark ? markWithPlayerIdentity(mark, players) : null;
+  const owner = displayMark ? packOwner(displayMark) : null;
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
 
   return createPortal(
@@ -927,12 +935,16 @@ function OptTip({
       className={`v2-opt-tip theme-${theme}${skin === "theme" ? " is-kit" : ""}`}
       style={{ left: hover.x, top: hover.y }}
     >
+      <div className="v2-opt-tip-context">
+        <span className="v2-opt-tip-kind" data-variant={hover.variant}>
+          {t(`v2.tip.${hover.variant}`)}
+        </span>
+        <span className="v2-opt-tip-limit">{formatLimit(hover.limit)}</span>
+        <b>{slotSpan(hover.half)}</b>
+        <i>{t("v2.tip.cet")}</i>
+      </div>
       <div className="v2-opt-tip-when">
         <b>{tipDate(year, monthIndex, hover.day, i18n.language)}</b>
-        <span>
-          {slotSpan(hover.half)}{" "}
-          <i>{t("v2.tip.cet")}</i>
-        </span>
         {clock.showLocal ? (
           <small>
             {slotSpan(hover.half, clock.offset)}{" "}
@@ -945,27 +957,20 @@ function OptTip({
           <strong>{t("v2.tip.busy", { limit: hover.busyLimits.map((item) => formatLimit(item)).join(", ") })}</strong>
           <p>{t("v2.tip.busyHint")}</p>
         </div>
-      ) : mark ? (
+      ) : displayMark && owner ? (
         <div className="v2-opt-tip-who">
-          <span className="v2-opt-tip-mark" style={{ ["--mark" as string]: mark.bg, ["--mark-ink" as string]: mark.fg }}>
-            {mark.t.trim() || "—"}
+          <PersonAvatar src={owner.avatarUrl} label={owner.discord} size="sm" />
+          <div className="v2-opt-tip-person">
+            <b>{owner.discord}</b>
+            <span><i>{t("v2.tip.gameNick")}</i>{displayNick(owner.room)}</span>
+            {countTables ? <small>{tablesLabel(displayMark.tables, i18n.language)}</small> : null}
+          </div>
+          <span
+            className="v2-opt-tip-mark"
+            style={{ ["--mark" as string]: displayMark.bg, ["--mark-ink" as string]: displayMark.fg }}
+          >
+            <MarkFace letters={displayMark.t.trim() || "—"} tables={displayMark.tables} showTables={countTables} />
           </span>
-          <dl className="v2-opt-tip-facts">
-            <div>
-              <dt>{t("v2.tip.discord")}</dt>
-              <dd>{displayNick(mark.discord)}</dd>
-            </div>
-            <div>
-              <dt>{t("v2.tip.winamax")}</dt>
-              <dd>{displayNick(mark.room)}</dd>
-            </div>
-            {countTables ? (
-              <div>
-                <dt>{t("v2.tip.tables")}</dt>
-                <dd>{tablesLabel(mark.tables, i18n.language)}</dd>
-              </div>
-            ) : null}
-          </dl>
         </div>
       ) : locked ? (
         <div className="v2-opt-tip-note">
@@ -1015,6 +1020,7 @@ export const OptField = memo(function OptField({
   onFitWidthChange,
   footerTools,
   mergeAdjacentSlots = false,
+  players = [],
 }: Props) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
@@ -1584,6 +1590,7 @@ export const OptField = memo(function OptField({
         capacity={capacity}
         showTip={showTip}
         countTables={countTables}
+        players={players}
         waitRef={tipApi}
         skin={skin}
       />

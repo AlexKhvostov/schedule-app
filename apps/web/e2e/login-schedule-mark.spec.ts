@@ -684,6 +684,23 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   expect(desktopLayout.tablesTop).toBeGreaterThan(desktopLayout.lettersTop);
   expect(desktopLayout.tablesBottom).toBeLessThanOrEqual(desktopLayout.cellBottom);
 
+  const variant = await candidate.getAttribute("data-variant");
+  const limit = await candidate.getAttribute("data-limit");
+  const occupiedHalf = Number(half);
+  const formatHalf = (value: number) => `${String(Math.floor(value / 2)).padStart(2, "0")}:${value % 2 ? "30" : "00"}`;
+  await page.locator(sharedCell).click({ button: "right" });
+  const tip = page.locator(".v2-opt-tip");
+  await expect(tip).toBeVisible();
+  await expect(tip.locator(".v2-opt-tip-kind")).toHaveText(variant === "regular" ? "Regular" : "Nitro");
+  await expect(tip.locator(".v2-opt-tip-limit")).toHaveText(`${limit} €`);
+  await expect(tip.locator(".v2-opt-tip-context > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
+  await expect(tip.locator(".v2-opt-tip-who img.v2-ava")).toHaveAttribute("src", /cdn\.discordapp\.com/);
+  await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("you");
+  await expect(tip.locator(".v2-opt-tip-person > span")).toContainText("YouNick");
+  await expect(tip.locator(".v2-opt-tip-person > small")).toContainText("6");
+  await expect(tip.locator(".v2-opt-tip-mark b")).toHaveText("YO");
+  await expect(tip.locator(".v2-opt-tip-mark i")).toHaveText("6");
+
   await page.getByRole("button", { name: "Выбор кисти столов" }).click();
   await page.getByRole("button", { name: "8 столов" }).click();
   await expect(page.locator(sharedCell)).toContainText("6");

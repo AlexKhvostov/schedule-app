@@ -1,5 +1,6 @@
 import { formatDayLabel } from "../schedule/formatDate";
 import { formatVariantLimit } from "../schedule/capacity";
+import type { SchedulePlayer } from "../data/players";
 import type { Mark } from "../schedule/marks";
 import { seatsOf, type Occupancy } from "../schedule/plan";
 import type { ScheduleVariant } from "../data/slots";
@@ -78,6 +79,33 @@ export function displayNick(value?: string | null) {
   const text = value?.trim() ?? "";
   if (!text || /^RP-[0-9A-Fa-f]{6}$/i.test(text)) return "—";
   return text;
+}
+
+export function markWithPlayerIdentity(mark: Mark, players: readonly SchedulePlayer[]) {
+  const identity = [mark.guildNick, mark.globalName, mark.username, mark.discord]
+    .map((value) => value?.trim().toLocaleLowerCase())
+    .filter((value): value is string => Boolean(value));
+  const byIdentity = identity.length
+    ? players.find((row) => [row.guildNick, row.globalName, row.username, row.nick]
+      .some((value) => value?.trim() && identity.includes(value.trim().toLocaleLowerCase())))
+    : undefined;
+  const sameTag = mark.t.trim()
+    ? players.filter((row) => row.markTag.trim().toLocaleUpperCase() === mark.t.trim().toLocaleUpperCase())
+    : [];
+  const player = (mark.memberId ? players.find((row) => row.id === mark.memberId) : undefined)
+    ?? byIdentity
+    ?? (sameTag.length === 1 ? sameTag[0] : undefined);
+  if (!player) return mark;
+  return {
+    ...mark,
+    memberId: player.id,
+    avatarUrl: player.avatarUrl || mark.avatarUrl,
+    discord: player.nick || mark.discord,
+    room: player.roomNick || mark.room,
+    username: player.username || mark.username,
+    globalName: player.globalName || mark.globalName,
+    guildNick: player.guildNick || mark.guildNick,
+  };
 }
 
 function visibleNick(value?: string | null) {

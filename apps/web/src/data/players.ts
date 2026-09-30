@@ -50,6 +50,10 @@ export function markFromPlayer(row: SchedulePlayer): Mark {
     fg: row.markFg,
     tables: row.tables,
     memberId: row.id,
+    avatarUrl: row.avatarUrl,
+    username: row.username,
+    globalName: row.globalName,
+    guildNick: row.guildNick,
   };
 }
 
