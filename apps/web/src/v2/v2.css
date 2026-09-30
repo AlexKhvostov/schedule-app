@@ -15335,6 +15335,206 @@ button.v2-home-action:hover { transform: translateY(-2px); border-color: color-m
   .v2-home-action { min-height: 150px; }
 }
 
+/* Shared narrow-screen contract for modal, sheet and floating surfaces. */
+@media (max-width: 640px) {
+  .app-dialog-shell {
+    align-items: center;
+    padding: 6px;
+  }
+
+  .app-dialog-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 12px);
+    padding: 10px;
+    border-radius: 9px;
+  }
+
+  .app-dialog-head {
+    min-height: 28px;
+    margin-bottom: 7px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .app-dialog-head h2 {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .app-dialog-footer {
+    margin-top: 8px;
+    gap: 6px;
+  }
+
+  .app-dialog-footer > button {
+    min-height: 30px;
+  }
+
+  .v2-mem-overlay {
+    align-items: center;
+    padding: 6px;
+    overflow: hidden;
+  }
+
+  .v2-mem-overlay.is-sheet,
+  .v2-mem-overlay.is-sheet.is-wide {
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+  }
+
+  .v2-mem-modal,
+  .v2-mem-modal.is-mark,
+  .v2-role-editor-modal,
+  .v2-discord-snapshot-modal,
+  .v2-mem-modal.v2-cab-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 12px);
+    margin: 0;
+    padding: 10px;
+    overscroll-behavior: contain;
+    border-radius: 9px;
+  }
+
+  .v2-mem-modal.v2-cab-modal {
+    padding: 0 9px 9px;
+  }
+
+  .v2-cab-modal .v2-cab-head {
+    margin: 0 -9px 1px;
+  }
+
+  .v2-mark-fields {
+    gap: 6px 8px;
+    margin-top: 8px;
+  }
+
+  .v2-mem-step,
+  .v2-mem-demo {
+    gap: 5px;
+    margin-top: 9px;
+  }
+
+  .v2-mem-demo {
+    padding-top: 8px;
+  }
+
+  .v2-role-editor-permissions {
+    gap: 3px;
+    padding: 6px 0;
+  }
+
+  .v2-role-editor-permissions label {
+    min-height: 28px;
+    padding: 2px 5px;
+    font-size: 10px;
+  }
+
+  .v2-role-editor-limits {
+    gap: 4px;
+    padding-top: 6px;
+  }
+
+  .v2-role-editor-limits > div {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .v2-discord-facts {
+    margin: 6px 0;
+  }
+
+  .v2-discord-facts > div {
+    grid-template-columns: minmax(88px, 34%) minmax(0, 1fr);
+    min-height: 24px;
+    font-size: 11px;
+  }
+
+  .v2-discord-modal-actions {
+    margin-top: 6px;
+  }
+
+  .v2-mem-sheet,
+  .v2-mem-sheet.is-club,
+  .v2-mem-sheet.is-club.is-wide,
+  .v2-mem-sheet.is-club.is-wide.is-cablike {
+    width: 100%;
+    max-width: 100%;
+    height: calc(100dvh - 12px);
+    max-height: calc(100dvh - 12px);
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+    border-radius: 9px;
+  }
+
+  .v2-mem-sheet.is-cablike .v2-club-hero {
+    gap: 9px;
+    padding: 8px 9px 6px;
+  }
+
+  .v2-mem-sheet.is-cablike .v2-club-hero h3 {
+    margin-top: 2px;
+    font-size: 16px;
+  }
+
+  .v2-cablike-lead {
+    padding: 0 9px 6px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .v2-mem-sheet.is-cablike .v2-cab {
+    padding: 3px 7px 10px;
+  }
+
+  .v2-float,
+  .v2-mine-fit.is-float {
+    max-width: calc(100vw - 8px);
+    max-height: calc(100dvh - 8px);
+  }
+
+  .v2-modal-head {
+    height: 26px;
+    min-height: 26px;
+    padding-left: 6px;
+  }
+
+  .v2-modal-close {
+    width: 24px;
+    height: 24px;
+  }
+
+  .v2-mine-back {
+    padding: 4px;
+  }
+
+  .v2-mine-meta {
+    gap: 4px 6px;
+    padding: 4px 6px;
+  }
+
+  .v2-mine-who {
+    gap: 4px 7px;
+  }
+
+  .v2-mine-foot {
+    gap: 5px;
+    padding: 3px 6px 6px;
+  }
+
+  .v2-alarm-back {
+    padding: 6px;
+  }
+
+  .v2-alarm {
+    max-height: calc(100dvh - 12px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 
 
 

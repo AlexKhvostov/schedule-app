@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+async function expectInsideViewport(locator: import("@playwright/test").Locator, width: number, height: number, checkIntrinsicWidth = true) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+  if (checkIntrinsicWidth) {
+    await expect.poll(async () => locator.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-09-29T08:00:00Z"));
 });
@@ -604,6 +617,46 @@ test("cabinet hides payment details and default schedule settings", async ({ pag
   await expect(page.getByRole("button", { name: "Реквизиты" })).toHaveCount(0);
   await page.getByRole("button", { name: "Игра" }).click();
   await expect(page.getByRole("heading", { name: "Расписание по умолчанию" })).toHaveCount(0);
+});
+
+test("primary modal surfaces stay compact on a phone in both themes and languages", async ({ page }) => {
+  const viewport = { width: 390, height: 844 };
+  await page.setViewportSize(viewport);
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  const openTool = async (name: string) => {
+    await page.getByRole("button", { name: "Открыть инструменты" }).click();
+    await page.locator(".v2-tools-fold-menu").getByRole("button", { name, exact: true }).click();
+  };
+
+  await openTool("Настройки");
+  const settings = page.locator(".v2-float", { has: page.locator(".v2-settings-list") });
+  await expectInsideViewport(settings, viewport.width, viewport.height);
+  await settings.locator(".v2-modal-close").click();
+
+  await openTool("Мой календарь");
+  await expectInsideViewport(page.locator(".v2-mine-fit"), viewport.width, viewport.height, false);
+  await page.locator(".v2-mine .v2-modal-close").click();
+
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+  await page.getByRole("button", { name: "Игра" }).click();
+  await page.getByRole("button", { name: "Добавить рум" }).click();
+  const roomDialog = page.getByRole("dialog");
+  await expectInsideViewport(roomDialog, viewport.width, viewport.height);
+  await roomDialog.getByRole("button", { name: "Отмена" }).click();
+
+  await page.evaluate(() => {
+    localStorage.setItem("v2-ui-theme", "light");
+    localStorage.setItem("lang", "en");
+  });
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ui-theme", "light");
+  await page.getByRole("button", { name: "Game" }).click();
+  await page.getByRole("button", { name: "Add a room" }).click();
+  await expectInsideViewport(page.getByRole("dialog"), viewport.width, viewport.height);
 });
 
 test("cabinet saves and validates ordered table presets", async ({ page }) => {
