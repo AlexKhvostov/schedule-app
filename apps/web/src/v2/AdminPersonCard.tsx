@@ -20,6 +20,7 @@ import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
 import { Field, NotifyPicks } from "./cabinetUi";
 import { PermanentPriority } from "./PermanentPriority";
 import { ScheduleSlot } from "./ScheduleSlot";
+import { TablePresetsPanel } from "./TablePresetsPanel";
 import { PersonAvatar } from "./PersonAvatar";
 import { loadTheme } from "./theme";
 import { PayMethodsPanel } from "./PayMethodsPanel";
@@ -702,6 +703,15 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   onBindGoogle={bindGoogle}
                   onUnbindGoogle={unbindGoogle}
                 />
+
+                {person.memberId ? (
+                  <TablePresetsPanel
+                    memberId={person.memberId}
+                    fallback={person.tables ?? 1}
+                    live
+                    canEdit={canEdit}
+                  />
+                ) : null}
 
                 <CabinetPlaysPanel
                   plays={plays}

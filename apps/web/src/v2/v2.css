@@ -2203,6 +2203,35 @@ img.v2-cab-ava {
   justify-content: center;
 }
 
+.v2-table-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.v2-table-preset-grid .v2-ctrl {
+  min-width: 0;
+  text-align: center;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-table-preset-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.v2-table-preset-status.is-ok {
+  color: var(--success);
+}
+
+.v2-table-preset-status.is-error {
+  color: var(--destructive);
+}
+
 .v2-cab-login,
 .v2-cab-auth {
   display: grid;
@@ -2896,6 +2925,10 @@ img.v2-cab-ava {
 }
 
 @media (max-width: 820px) {
+  .v2-table-preset-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .v2-cab-grid,
   .v2-cab-pay-grid,
   .v2-cab-spread,
@@ -2931,6 +2964,10 @@ img.v2-cab-ava {
 }
 
 @media (max-width: 520px) {
+  .v2-table-preset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .v2-cab {
     width: calc(100% - 16px);
     margin-top: 6px;

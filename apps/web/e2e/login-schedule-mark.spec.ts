@@ -557,3 +557,45 @@ test("cabinet hides payment details and default schedule settings", async ({ pag
   await page.getByRole("button", { name: "Игра" }).click();
   await expect(page.getByRole("heading", { name: "Расписание по умолчанию" })).toHaveCount(0);
 });
+
+test("cabinet saves and validates ordered table presets", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+  await page.getByRole("button", { name: "Игра" }).click();
+
+  const panel = page.locator(".v2-table-presets");
+  await expect(panel.getByRole("heading", { name: "Пресеты столов" })).toBeVisible();
+  await expect(panel.getByLabel("Пресет 1")).toHaveValue("11");
+  await expect(panel.getByLabel("Пресет 2")).toHaveValue("8");
+  await expect(panel.getByLabel("Пресет 3")).toHaveValue("6");
+
+  await panel.getByLabel("Пресет 1").fill("10");
+  await panel.getByLabel("Пресет 2").fill("");
+  await panel.getByLabel("Пресет 3").fill("6");
+  await panel.getByLabel("Пресет 4").fill("12");
+  await panel.getByRole("button", { name: "Сохранить" }).click();
+  await expect(panel.getByRole("status")).toHaveText("Пресеты сохранены");
+
+  await page.reload();
+  await page.getByRole("button", { name: "Игра" }).click();
+  const restored = page.locator(".v2-table-presets");
+  await expect(restored.getByLabel("Пресет 1")).toHaveValue("10");
+  await expect(restored.getByLabel("Пресет 2")).toHaveValue("6");
+  await expect(restored.getByLabel("Пресет 3")).toHaveValue("12");
+  await expect(restored.getByLabel("Пресет 4")).toHaveValue("");
+
+  await restored.getByLabel("Пресет 2").fill("10");
+  await expect(restored.getByRole("alert")).toHaveText("Значения не должны повторяться.");
+  await expect(restored.getByRole("button", { name: "Сохранить" })).toBeDisabled();
+
+  for (let index = 1; index <= 5; index += 1) {
+    await restored.getByLabel(`Пресет ${index}`).fill("");
+  }
+  await expect(restored.getByRole("alert")).toHaveText("Оставьте хотя бы один пресет.");
+  await restored.getByRole("button", { name: "Отмена" }).click();
+  await expect(restored.getByLabel("Пресет 1")).toHaveValue("10");
+  await expect(restored.getByLabel("Пресет 2")).toHaveValue("6");
+});

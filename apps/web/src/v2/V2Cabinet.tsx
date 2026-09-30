@@ -27,6 +27,7 @@ import { BlockBar, Field, NotifyPicks } from "./cabinetUi";
 import { loadDiscordOrg } from "./discordOrg";
 import { PermanentPriority } from "./PermanentPriority";
 import { ScheduleSlot } from "./ScheduleSlot";
+import { TablePresetsPanel } from "./TablePresetsPanel";
 import type { Session } from "./session";
 import { showV2Toast } from "./V2Toast";
 import { R } from "./tokens";
@@ -194,6 +195,7 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const [channel, setChannel] = useState<NotifyChannel>("discord");
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>("discord");
   const [activeTab, setActiveTab] = useState<CabinetTab>("profile");
+  const [presetsDirty, setPresetsDirty] = useState(false);
 
   useEffect(() => {
     if (!live || !session.memberId) return;
@@ -415,7 +417,7 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const vipNitro = live ? card?.vipNitro : mine?.vipNitro;
   const vipRegular = live ? card?.vipRegular : mine?.vipRegular;
   const profileDirty = !sameJson(profile, savedProfile);
-  const gameDirty = !sameJson(plays, savedPlays);
+  const gameDirty = !sameJson(plays, savedPlays) || presetsDirty;
   const accountDirty =
     channel !== savedChannel ||
     !sameJson({ ...login, password: "" }, { ...savedLogin, password: "" }) ||
@@ -636,6 +638,18 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
       </div>
 
       <div className="v2-cab-tab-panel" hidden={activeTab !== "game"}>
+      <TablePresetsPanel
+        memberId={session.memberId}
+        fallback={live ? card?.tables ?? 1 : mine?.tables ?? 1}
+        live={live}
+        canEdit={canEditCard}
+        demoValues={mine?.tablePresets}
+        onDemoSave={(values) => {
+          const activeTables = values.includes(mine?.tables ?? 1) ? mine?.tables ?? 1 : values[0];
+          writeMember({ tablePresets: values, tables: activeTables });
+        }}
+        onDirtyChange={setPresetsDirty}
+      />
       <CabinetPlaysPanel
         plays={plays}
         savedPlays={savedPlays}

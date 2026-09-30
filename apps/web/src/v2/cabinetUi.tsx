@@ -26,6 +26,7 @@ export function BlockBar({
   saveLabel,
   cancelLabel,
   extra,
+  saveDisabled,
   onSave,
   onCancel,
 }: {
@@ -34,6 +35,7 @@ export function BlockBar({
   saveLabel: string;
   cancelLabel?: string;
   extra?: ReactNode;
+  saveDisabled?: boolean;
   onSave?: () => void;
   onCancel?: () => void;
 }) {
@@ -50,7 +52,7 @@ export function BlockBar({
           </button>
         ) : null}
         {showSave ? (
-          <button type="button" className={`v2-ctrl v2-save px-3${dirty ? " is-dirty" : ""}`} disabled={!dirty} onClick={onSave}>
+          <button type="button" className={`v2-ctrl v2-save px-3${dirty ? " is-dirty" : ""}`} disabled={!dirty || saveDisabled} onClick={onSave}>
             {saveLabel}
           </button>
         ) : null}
