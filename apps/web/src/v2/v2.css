@@ -10064,10 +10064,20 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt-tip-context > b {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   margin-left: auto;
   color: var(--foreground);
   font-size: 10px;
   font-weight: 700;
+}
+
+.v2-opt-tip-context > b > small {
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .v2-opt-tip-context > i {

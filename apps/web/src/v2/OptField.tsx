@@ -29,7 +29,7 @@ import {
   packOwner,
   scheduleKindGroups,
   slotRangeSpan,
-  slotSpan,
+  slotHoursValue,
   tablesLabel,
   tipDate,
   writeSeat,
@@ -86,6 +86,8 @@ type SlotHit = {
   limit: string;
   lane: string;
   busyLimits?: string[];
+  rangeStartHalf?: number;
+  rangeEndHalf?: number;
   x: number;
   y: number;
 };
@@ -149,6 +151,8 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     limit: el.dataset.limit ?? "",
     lane: el.dataset.lane ?? "",
     busyLimits: (el.dataset.busy || "").split(",").filter(Boolean),
+    rangeStartHalf: el.dataset.rangeStartHalf ? Number(el.dataset.rangeStartHalf) : undefined,
+    rangeEndHalf: el.dataset.rangeEndHalf ? Number(el.dataset.rangeEndHalf) : undefined,
     x,
     y,
   };
@@ -385,7 +389,11 @@ function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.row = row;
   root.dataset.lane = lane;
   root.dataset.half = slot;
-  if (hoverable) placeFrame(root, mem, hit, slotSpan(hit.half));
+  if (hoverable) {
+    const startHalf = hit.rangeStartHalf ?? hit.half;
+    const endHalf = hit.rangeEndHalf ?? hit.half + 1;
+    placeFrame(root, mem, hit, slotRangeSpan(startHalf, endHalf - 1));
+  }
   else hideFrame(mem);
 }
 
@@ -490,6 +498,8 @@ const OptCell = memo(function OptCell({
   workGap,
   gridColumn,
   mergedSource,
+  mergedStartHalf,
+  mergedEndHalf,
 }: {
   dayIdx: number;
   day: number;
@@ -513,6 +523,8 @@ const OptCell = memo(function OptCell({
   workGap?: boolean;
   gridColumn?: number;
   mergedSource?: boolean;
+  mergedStartHalf?: number;
+  mergedEndHalf?: number;
 }) {
   const on = Boolean(bg);
   const mark = tag?.trim().toUpperCase() || undefined;
@@ -531,6 +543,8 @@ const OptCell = memo(function OptCell({
       data-mark={mark}
       data-busy={busyLimits?.length ? busyLimits.join(",") : undefined}
       data-work-gap={workGap ? "before" : undefined}
+      data-range-start-half={mergedStartHalf}
+      data-range-end-half={mergedEndHalf}
       className={`v2-opt-cell${past ? " is-past" : ""}${locked ? " is-lock" : ""}${on ? " is-on" : ""}${muted ? " is-dim" : ""}${hit ? " is-hit" : ""}${nowPct != null ? " is-now" : ""}${busyHalf ? " is-busy" : ""}${workGap ? " is-work-gap" : ""}${mergedSource ? " is-merged-source" : ""}`}
       style={
         {
@@ -673,9 +687,10 @@ const OptBody = memo(function OptBody({
                           const mark = seatsOf(row[half], level + 1)[level];
                           return mark ? [{ day: day.d, half, variant: group.variant, limit: rowInfo.limit, level, mark }] : [];
                         }));
-                      const mergedHalves = new Set(segments.flatMap((segment) =>
-                        Array.from({ length: segment.endHalf - segment.startHalf }, (_, offset) => segment.startHalf + offset),
-                      ));
+                      const segmentByHalf = new Map<number, VisualSegment>();
+                      segments.forEach((segment) => {
+                        for (let half = segment.startHalf; half < segment.endHalf; half += 1) segmentByHalf.set(half, segment);
+                      });
                       return (
                         <OptLevelLane
                           key={lane}
@@ -699,6 +714,8 @@ const OptBody = memo(function OptBody({
                                   : undefined;
                               const mine = gone || locked ? undefined : busy?.[dayIdx]?.[half];
                               const hidden = mine?.filter((item) => !limits.includes(item));
+                              const mergedSegment = segmentByHalf.get(half);
+                              const mergedSpan = mergedSegment ? mergedSegment.endHalf - mergedSegment.startHalf : 0;
                               return (
                                 <OptCell
                                   key={half}
@@ -721,7 +738,9 @@ const OptBody = memo(function OptBody({
                                   busyHalf={Boolean(hidden?.length)}
                                   workGap={workGapBefore(visibleHalves, half)}
                                   gridColumn={workGridColumn(visibleHalves, half)}
-                                  mergedSource={mergedHalves.has(half)}
+                                  mergedSource={Boolean(mergedSegment)}
+                                  mergedStartHalf={mergedSpan > 1 ? mergedSegment?.startHalf : undefined}
+                                  mergedEndHalf={mergedSpan > 1 ? mergedSegment?.endHalf : undefined}
                                 />
                               );
                             })}
@@ -928,6 +947,10 @@ function OptTip({
   const displayMark = mark ? markWithPlayerIdentity(mark, players) : null;
   const owner = displayMark ? packOwner(displayMark) : null;
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
+  const rangeStartHalf = hover.rangeStartHalf ?? hover.half;
+  const rangeEndHalf = hover.rangeEndHalf ?? hover.half + 1;
+  const mergedRange = rangeEndHalf - rangeStartHalf > 1;
+  const timeSpan = slotRangeSpan(rangeStartHalf, rangeEndHalf - 1);
 
   return createPortal(
     <div
@@ -940,14 +963,17 @@ function OptTip({
           {t(`v2.tip.${hover.variant}`)}
         </span>
         <span className="v2-opt-tip-limit">{formatLimit(hover.limit)}</span>
-        <b>{slotSpan(hover.half)}</b>
+        <b>
+          {timeSpan}
+          {mergedRange ? <small>{t("v2.tip.duration", { hours: slotHoursValue(rangeStartHalf, rangeEndHalf, i18n.language) })}</small> : null}
+        </b>
         <i>{t("v2.tip.cet")}</i>
       </div>
       <div className="v2-opt-tip-when">
         <b>{tipDate(year, monthIndex, hover.day, i18n.language)}</b>
         {clock.showLocal ? (
           <small>
-            {slotSpan(hover.half, clock.offset)}{" "}
+            {slotRangeSpan(rangeStartHalf, rangeEndHalf - 1, clock.offset)}{" "}
             <i>{clock.label}</i>
           </small>
         ) : null}

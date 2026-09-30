@@ -802,6 +802,13 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await expect(start).toHaveClass(/is-merged-source/);
   await expect(middle).toHaveClass(/is-merged-source/);
   await expect(end).toHaveClass(/is-merged-source/);
+  const formatHalf = (value: number) => `${String(Math.floor(value / 2)).padStart(2, "0")}:${value % 2 ? "30" : "00"}`;
+  const mergedTime = `${formatHalf(run!.half)} – ${formatHalf(run!.half + 3)}`;
+  await middle.hover();
+  await expect(page.locator(".v2-opt-frame")).toHaveText(mergedTime);
+  await middle.click({ button: "right" });
+  await expect(page.locator(".v2-opt-tip-context > b")).toContainText(mergedTime);
+  await expect(page.locator(".v2-opt-tip-context > b > small")).toHaveText("· 1,5 ч");
 
   await start.click();
   await expect(start).not.toHaveClass(/is-on/);

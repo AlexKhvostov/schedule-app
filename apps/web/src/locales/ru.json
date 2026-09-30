@@ -1390,6 +1390,7 @@
       "msk": "МСК",
       "nitro": "Nitro",
       "regular": "Regular",
+      "duration": "· {{hours}} ч",
       "discord": "Discord",
       "winamax": "Winamax",
       "gameNick": "Игровой ник",

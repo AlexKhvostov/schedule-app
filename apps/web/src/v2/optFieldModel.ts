@@ -62,6 +62,11 @@ export function slotRangeSpan(fromHalf: number, toHalf: number, hourShift = 0) {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
+export function slotHoursValue(fromHalf: number, toHalfExclusive: number, lang: string) {
+  const hours = Math.max(0, toHalfExclusive - fromHalf) / 2;
+  return new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(hours);
+}
+
 export function tipDate(year: number, monthIndex: number, day: number, lang: string) {
   return formatDayLabel(year, monthIndex, day, lang);
 }

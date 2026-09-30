@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayNick, markQuery, markWithPlayerIdentity, nowHeadLeft, packOwner, scheduleKindGroups, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
+import { displayNick, markQuery, markWithPlayerIdentity, nowHeadLeft, packOwner, scheduleKindGroups, slotHoursValue, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
 
 describe("opt field presentation model", () => {
   it("formats wrapped half-hour spans", () => {
@@ -7,6 +7,8 @@ describe("opt field presentation model", () => {
     expect(slotSpan(0, 3)).toBe("03:00 – 03:30");
     expect(slotRangeSpan(1, 6)).toBe("00:30 – 03:30");
     expect(slotRangeSpan(6, 1)).toBe("00:30 – 03:30");
+    expect(slotHoursValue(4, 11, "ru")).toBe("3,5");
+    expect(slotHoursValue(4, 11, "en")).toBe("3.5");
   });
 
   it("normalizes search and hides internal club codes", () => {
