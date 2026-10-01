@@ -614,10 +614,24 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
 
+  await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await expect(page.locator(".v2-ctrl.v2-field-hit", { hasText: "Nitro" })).toBeVisible();
+  await expect(page.locator('[data-slot][data-variant="regular"]')).toHaveCount(0);
+
   await page.getByRole("button", { name: "Мой календарь", exact: true }).click();
   const calendar = page.locator(".v2-mine");
   await expect(calendar.locator(".v2-mine-legends")).toContainText("N50");
   await expect(calendar.locator(".v2-mine-legends")).toContainText("E50");
+  const nitroLegend = calendar.locator(".v2-mine-legend.is-nitro", { hasText: "N50" });
+  const regularLegend = calendar.locator(".v2-mine-legend.is-regular", { hasText: "E50" });
+  await expect(nitroLegend).toHaveCSS("font-family", /JetBrains Mono/);
+  await expect(nitroLegend).toHaveCSS("font-style", "normal");
+  await expect(regularLegend).toHaveCSS("font-family", /IBM Plex Sans/);
+  await expect(regularLegend).toHaveCSS("font-style", "italic");
+  await expect(calendar.locator(".v2-mine-chip.is-nitro")).not.toHaveCount(0);
+  await expect(calendar.locator(".v2-mine-chip.is-regular")).not.toHaveCount(0);
+  await expect(calendar.locator(".v2-mine-chip .v2-chip-ticks i.is-hour").first()).toHaveCSS("opacity", "0.2");
 });
 
 test("cabinet hides payment details and default schedule settings", async ({ page }) => {

@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import path from "node:path";
 
 const root = process.cwd();
-const nextDir = path.join(root, ".next");
+const nextDir = path.join(root, process.env.NEXT_DIST_DIR || ".next");
 const manifest = JSON.parse(await readFile(path.join(nextDir, "app-build-manifest.json"), "utf8"));
 const files = [...new Set([...(manifest.pages["/layout"] ?? []), ...(manifest.pages["/page"] ?? [])])]
   .filter((file) => file.endsWith(".js"));

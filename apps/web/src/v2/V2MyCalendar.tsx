@@ -112,6 +112,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
         ...run,
         label: column.label,
         rawLimit: column.limit,
+        variant: column.variant,
         lane: 0,
       })),
     ) as CalendarShiftRun[], [columns, grids, tag]);
@@ -273,7 +274,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                       <button
                         key={`${run.label}-${run.start}-${segmentIndex}`}
                         type="button"
-                        className={`v2-mine-chip${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
+                        className={`v2-mine-chip is-${run.variant}${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
                         style={{
                           left: box.left,
                           width: box.width,
@@ -312,7 +313,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
         <footer className="v2-mine-foot">
           <div className="v2-mine-legends">
             {usedColumns.map((column) => (
-              <span key={column.key} className="v2-mine-legend">
+              <span key={column.key} className={`v2-mine-legend is-${column.variant}`}>
                 <i style={{ background: mineTone(column.limit) }} />
                 {column.label}
               </span>
@@ -332,7 +333,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                 tag,
                 days,
                 runs,
-                usedColumns: usedColumns.map((column) => ({ label: column.label, limit: column.limit })),
+                usedColumns: usedColumns.map((column) => ({ label: column.label, limit: column.limit, variant: column.variant })),
                 today,
                 dimPast: dimPastShifts,
                 nowAt: cet.half + cet.slotProgress,

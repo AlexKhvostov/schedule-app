@@ -1,4 +1,5 @@
 import { limitTonePaint } from "../schedule/capacity";
+import type { ScheduleVariant } from "../data/slots";
 import type { ShiftRun } from "./myShifts";
 import { visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 
@@ -42,7 +43,7 @@ type Opts = {
   tag: string;
   days: Day[];
   runs: CalendarShiftRun[];
-  usedColumns: { label: string; limit: string }[];
+  usedColumns: { label: string; limit: string; variant: ScheduleVariant }[];
   today: number | null;
   dimPast: boolean;
   nowAt: number;
@@ -55,8 +56,15 @@ type Opts = {
 export type CalendarShiftRun = ShiftRun & {
   label: string;
   rawLimit: string;
+  variant: ScheduleVariant;
   lane: number;
 };
+
+function variantFont(variant: ScheduleVariant, size: number) {
+  return variant === "nitro"
+    ? `800 ${size}px JetBrains Mono, IBM Plex Mono, monospace`
+    : `italic 750 ${size}px IBM Plex Sans, Inter, sans-serif`;
+}
 
 function mineTone(limit: string) {
   if (limit === "25") return "#4ADE80";
@@ -222,7 +230,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
           for (let i = 1; i < len; i += 1) {
             if ((segment.start + i) % 2 !== 0) continue;
             const tx = x + (w * i) / len;
-            ctx.globalAlpha = dimPast && past ? 0.45 : 0.5;
+            ctx.globalAlpha = dimPast && past ? 0.2 : 0.22;
             ctx.beginPath();
             ctx.moveTo(tx + 0.5, cy + 2);
             ctx.lineTo(tx + 0.5, cy + CHIP_H - 2);
@@ -231,12 +239,8 @@ export async function downloadCalendarJpeg(opts: Opts) {
         }
         ctx.restore();
         ctx.save();
-        if (dimPast && past) {
-          ctx.filter = "saturate(0.12) grayscale(0.62)";
-          ctx.globalAlpha = 0.68;
-        }
         ctx.fillStyle = limitInk(run.rawLimit);
-        ctx.font = len <= 2 ? "700 8px JetBrains Mono, IBM Plex Mono, monospace" : "700 10px JetBrains Mono, IBM Plex Mono, monospace";
+        ctx.font = variantFont(run.variant, len <= 2 ? 8 : 10);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(len >= 6 ? run.label : run.label.slice(0, 1), x + w / 2, cy + CHIP_H / 2);
@@ -259,7 +263,6 @@ export async function downloadCalendarJpeg(opts: Opts) {
   }
 
   const footY = sheetY + sheetH + 14;
-  ctx.font = "600 11px JetBrains Mono, IBM Plex Mono, monospace";
   let legendX = PAD;
   for (const column of usedColumns) {
     ctx.fillStyle = mineTone(column.limit);
@@ -267,6 +270,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = paint.muted;
+    ctx.font = variantFont(column.variant, 11);
     const label = column.label;
     ctx.fillText(label, legendX + 14, footY);
     legendX += ctx.measureText(label).width + 28;

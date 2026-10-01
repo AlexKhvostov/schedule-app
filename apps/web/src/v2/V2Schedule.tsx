@@ -55,6 +55,8 @@ import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
 import { displayScheduleColumn, gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
 import { loadTablePresetSelection, saveTablePresetSelection } from "./tablePresetSelection";
 
+const CALENDAR_VARIANTS = ["nitro", "regular"] as const;
+
 type Props = {
   cursor: Date;
   onCursorChange: (value: Date) => void;
@@ -73,8 +75,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const monthIndex = cursor.getMonth();
   const boot = loadPrefs();
   const [gridStore, setGridStore] = useState<MonthGridStore>(() =>
-    Object.fromEntries(boot.kinds.flatMap((variant) =>
-      boot.limits.map((limit) => [monthGridKey(variant, limit), emptyMonth(year, monthIndex)]),
+    Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) =>
+      LIMIT_OPTIONS.map((limit) => [monthGridKey(variant, limit), emptyMonth(year, monthIndex)]),
     )),
   );
   const [readyStamp, setReadyStamp] = useState("");
@@ -176,19 +178,18 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const editGlow = touchLayout ? mobileEditOn : editByButton && canEdit;
   const mobileEditEnabled = scheduleZoomCanEdit(mobileCellWidth);
   const showBusy = isKit && busyHint;
-  const requestedLimits = isLiveData() ? [...LIMIT_OPTIONS] : limits;
+  const requestedLimits = [...LIMIT_OPTIONS];
   const fetchKey = requestedLimits.join("|");
-  const kindKey = kinds.join("+");
+  const kindKey = CALENDAR_VARIANTS.join("+");
   const loadStamp = `${year}-${monthIndex}-${kindKey}-${fetchKey}`;
-  const viewStamp = `${year}-${monthIndex}-${kindKey}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
   const shownGridStore = useMemo(() => {
-    if (!gridLoading || readyStamp.startsWith(`${viewStamp}-`)) return gridStore;
-    return Object.fromEntries(kinds.flatMap((variant) => requestedLimits.map((limit) => [
+    if (!gridLoading) return gridStore;
+    return Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
       monthGridKey(variant, limit),
       emptyMonth(year, monthIndex),
     ])));
-  }, [gridLoading, readyStamp, viewStamp, gridStore, kinds, fetchKey, year, monthIndex]);
+  }, [gridLoading, gridStore, fetchKey, year, monthIndex]);
   const pairRows = useMemo(
     () => schedulePairRows(filterLimits, kinds, limits, shownGridStore),
     [filterLimits, kinds, limits, shownGridStore],
@@ -203,11 +204,16 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   );
   const auxiliaryLabels = useMemo(() => auxiliaryItems.map((item) => item.label), [auxiliaryItems]);
   const auxiliaryGrids = useMemo(() => gridsByVariantLabel(auxiliaryItems), [auxiliaryItems]);
+  const calendarItems = useMemo(
+    () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
+    [shownGridStore, fetchKey],
+  );
+  const calendarGrids = useMemo(() => gridsByVariantLabel(calendarItems), [calendarItems]);
 
   const pullGrids = useCallback(
     (stamp: string) => {
       const gen = loadGen.current;
-      return loadMultiMonthGrids(year, monthIndex, kinds, requestedLimits).then((next) => {
+      return loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits).then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
         setGridStore((store) => next.loaded.reduce((result, variant) =>
@@ -218,7 +224,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         setReadyStamp(stamp);
       });
     },
-    [year, monthIndex, kinds, fetchKey, t],
+    [year, monthIndex, fetchKey, t],
   );
 
   useEffect(() => {
@@ -239,7 +245,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   useEffect(() => {
     if (!isLiveData()) {
-      setGridStore(Object.fromEntries(kinds.flatMap((variant) => requestedLimits.map((limit) => [
+      setGridStore(Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
         monthGridKey(variant, limit),
         loadDemoSchedule(year, monthIndex, variant, limit, () => demoMonthPlan(year, monthIndex, variant, limit)),
       ]))));
@@ -247,7 +253,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       return;
     }
     const gen = ++loadGen.current;
-    void loadMultiMonthGrids(year, monthIndex, kinds, requestedLimits)
+    void loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits)
       .then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
@@ -635,7 +641,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     },
     [showAnalytics, auxiliaryItems, year, monthIndex, cetTick, capacity],
   );
-  const mineGrids = auxiliaryGrids;
   const hoursGrids = auxiliaryGrids;
   const dockLimits = useMemo(() => {
     const marked = limitsWithMyMarks(hoursGrids, me, auxiliaryLabels);
@@ -1390,8 +1395,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             monthIndex={monthIndex}
             title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
-            columns={auxiliaryItems}
-            grids={mineGrids}
+            columns={calendarItems}
+            grids={calendarGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
             workHours={workHours}
             x={calPos.x}
