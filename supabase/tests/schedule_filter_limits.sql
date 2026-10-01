@@ -47,6 +47,11 @@ begin
   select count(*) into v_kind_count from schedule_kinds;
   select id into v_disabled_kind from schedule_kinds where variant_id = 'nitro' and limit_id = '25';
 
+  -- A clean reset applies migrations before seed data. The settings row can
+  -- therefore still contain its safe 50-only default after seed adds Nitro 25.
+  -- Enable the fixture kind explicitly before creating the pre-existing mark.
+  perform save_schedule_filter_limits(array['25', '50', '100'], array['25', '50']);
+
   perform apply_own_slots(
     v_disabled_kind,
     v_member_id,
