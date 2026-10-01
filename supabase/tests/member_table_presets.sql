@@ -30,6 +30,25 @@ select
   now()
 from member_table_preset_test_members;
 
+-- Production auth only links an already approved Discord member; it must not
+-- create a club card for an arbitrary auth.users row. Build isolated member
+-- fixtures explicitly and let the member preset trigger seed position 1.
+insert into members (auth_user_id, public_code, access_status, mark_tag)
+select
+  auth_id,
+  case role_name
+    when 'owner' then 'RP-I01OWN'
+    when 'stranger' then 'RP-I01STR'
+    when 'admin' then 'RP-I01ADM'
+  end,
+  'active',
+  case role_name
+    when 'owner' then 'O1'
+    when 'stranger' then 'S1'
+    when 'admin' then 'A1'
+  end
+from member_table_preset_test_members;
+
 update member_table_preset_test_members test_member
 set member_id = member.id
 from members member
@@ -45,7 +64,7 @@ begin
   where member_id is null;
 
   if missing_roles is not null then
-    raise exception 'auth member bootstrap failed for: %', missing_roles;
+    raise exception 'member fixture creation failed for: %', missing_roles;
   end if;
 
   if exists (
