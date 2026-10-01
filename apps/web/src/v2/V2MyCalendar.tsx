@@ -57,8 +57,8 @@ function mineTone(limit: string) {
   return limitTone(limit);
 }
 
-function limitInk(limit: string) {
-  return limit === "25" ? "#14532d" : "#071014";
+function limitInk(theme: "light" | "dark") {
+  return theme === "light" ? "#ffffff" : "#071014";
 }
 
 function HourCells({ workHours }: { workHours: number[] }) {
@@ -113,17 +113,12 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
         label: column.label,
         rawLimit: column.limit,
         variant: column.variant,
-        lane: 0,
       })),
     ) as CalendarShiftRun[], [columns, grids, tag]);
   const runs = useMemo(() => {
-    const found = allRuns.filter((run) => visibleWorkRuns(run.start, run.end, workHours).length);
-    const used = columns.filter((column) => found.some((run) => run.label === column.label));
-    const lanes = new Map(used.map((column, lane) => [column.label, lane]));
-    return found.map((run) => ({ ...run, lane: lanes.get(run.label) ?? 0 })) as CalendarShiftRun[];
-  }, [allRuns, columns, workHours]);
+    return allRuns.filter((run) => visibleWorkRuns(run.start, run.end, workHours).length);
+  }, [allRuns, workHours]);
   const usedColumns = columns.filter((column) => runs.some((run) => run.label === column.label));
-  const laneCount = Math.max(1, usedColumns.length);
   const physicalHours = uniqueShiftHours(allRuns);
   const hours = workHourSegments(workHours);
   const visibleSlotCount = workHalfSlots(workHours).length;
@@ -259,7 +254,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                 <div className="v2-mine-date v2-mono">
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
-                <div className="v2-mine-track" style={{ minHeight: `${laneCount * 14 + 4}px`, ["--mine-visible-slots" as string]: visibleSlotCount }}>
+                <div className="v2-mine-track" style={{ ["--mine-visible-slots" as string]: visibleSlotCount }}>
                   <HourCells workHours={workHours} />
                   {dayRuns.flatMap((run) => visibleWorkRuns(run.start, run.end, workHours).map((segment, segmentIndex) => {
                     const len = segment.span;
@@ -278,9 +273,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                         style={{
                           left: box.left,
                           width: box.width,
-                          top: `${2 + run.lane * 14}px`,
                           background: mineTone(run.rawLimit),
-                          color: limitInk(run.rawLimit),
+                          color: limitInk(theme),
                         }}
                         onMouseEnter={(event) => placeTip(event, day.d, segment.start, segment.end, run.rawLimit, run.label)}
                         onMouseLeave={() => setHover(null)}

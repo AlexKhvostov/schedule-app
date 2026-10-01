@@ -8347,7 +8347,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine-row {
-  min-height: 16px;
+  min-height: 18px;
   border-top: 1px solid var(--border);
 }
 
@@ -8381,6 +8381,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine-track {
+  min-height: 18px;
   overflow: hidden;
 }
 
@@ -8432,7 +8433,7 @@ textarea.v2-ctrl.v2-cab-area {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 12px;
+  height: 14px;
   padding: 0 3px;
   overflow: hidden;
   border: 0;
@@ -8453,11 +8454,20 @@ textarea.v2-ctrl.v2-cab-area {
   max-width: 100%;
   overflow: hidden;
   color: inherit;
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
+  text-shadow:
+    0 1px 0 rgb(255 255 255 / 0.62),
+    0 0 2px rgb(255 255 255 / 0.42);
 }
 
 .v2-mine-chip.is-past {
   box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--background) 58%, transparent);
+}
+
+.v2-mine-chip.is-past .v2-chip-face {
+  color: #fff;
+  text-shadow:
+    0 1px 1px rgb(7 16 20 / 0.95),
+    0 0 2px rgb(7 16 20 / 0.75);
 }
 
 .v2-mine-chip-dim {

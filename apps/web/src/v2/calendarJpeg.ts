@@ -21,6 +21,7 @@ function themePaint() {
   const light = document.documentElement.dataset.uiTheme === "light";
   const border = cssVar("--border", light ? "#d5dbe3" : "#1e2330");
   return {
+    light,
     page: cssVar("--header", light ? "#ffffff" : "#111620"),
     card: cssVar("--card", light ? "#ffffff" : "#151a24"),
     hours: cssVar("--muted", light ? "#e8ecf1" : "#1e2330"),
@@ -57,7 +58,6 @@ export type CalendarShiftRun = ShiftRun & {
   label: string;
   rawLimit: string;
   variant: ScheduleVariant;
-  lane: number;
 };
 
 function variantFont(variant: ScheduleVariant, size: number) {
@@ -71,8 +71,8 @@ function mineTone(limit: string) {
   return limitTonePaint(limit);
 }
 
-function limitInk(limit: string) {
-  return limit === "25" ? "#14532d" : "#071014";
+function limitInk() {
+  return document.documentElement.dataset.uiTheme === "light" ? "#ffffff" : "#071014";
 }
 
 function slotX(trackW: number, visibleSlot: number, slotCount: number) {
@@ -101,8 +101,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
   const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel, workHours } = opts;
   const visibleSlotCount = workHalfSlots(workHours).length;
-  const laneCount = Math.max(1, usedColumns.length);
-  const rowH = Math.max(22, laneCount * 18 + 4);
+  const rowH = 22;
   const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + PAD;
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * DPR;
@@ -211,7 +210,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
         const len = segment.span;
         const x = trackX + slotX(trackW, segment.visibleStart, visibleSlotCount);
         const w = Math.max(2, (trackW * len) / visibleSlotCount);
-        const cy = y + 2 + run.lane * 18;
+        const cy = y + 3;
         const past = runPast(day.d, segment.end, today, nowAt);
         ctx.save();
         if (dimPast && past) {
@@ -225,7 +224,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
           ctx.beginPath();
           roundRect(ctx, x, cy, w, CHIP_H, 2);
           ctx.clip();
-          ctx.strokeStyle = limitInk(run.rawLimit);
+          ctx.strokeStyle = limitInk();
           ctx.lineWidth = 1;
           for (let i = 1; i < len; i += 1) {
             if ((segment.start + i) % 2 !== 0) continue;
@@ -239,7 +238,9 @@ export async function downloadCalendarJpeg(opts: Opts) {
         }
         ctx.restore();
         ctx.save();
-        ctx.fillStyle = limitInk(run.rawLimit);
+        ctx.fillStyle = dimPast && past ? "#ffffff" : limitInk();
+        ctx.shadowColor = paint.light || (dimPast && past) ? "rgb(7 16 20 / 0.92)" : "rgb(255 255 255 / 0.55)";
+        ctx.shadowBlur = 2;
         ctx.font = variantFont(run.variant, len <= 2 ? 8 : 10);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";

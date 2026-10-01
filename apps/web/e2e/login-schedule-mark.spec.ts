@@ -631,6 +631,13 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(regularLegend).toHaveCSS("font-style", "italic");
   await expect(calendar.locator(".v2-mine-chip.is-nitro")).not.toHaveCount(0);
   await expect(calendar.locator(".v2-mine-chip.is-regular")).not.toHaveCount(0);
+  const sharedDay = calendar.locator(".v2-mine-row", {
+    has: page.locator(".v2-mine-chip.is-regular"),
+  }).filter({ has: page.locator(".v2-mine-chip.is-nitro") });
+  await expect(sharedDay).toHaveCount(1);
+  await expect(sharedDay.locator(".v2-mine-track")).toHaveCSS("height", "18px");
+  await expect(sharedDay.locator(".v2-mine-chip.is-nitro").first()).toHaveCSS("top", "2px");
+  await expect(sharedDay.locator(".v2-mine-chip.is-regular").first()).toHaveCSS("top", "2px");
   await expect(calendar.locator(".v2-mine-chip .v2-chip-ticks i.is-hour").first()).toHaveCSS("opacity", "0.2");
 });
 
