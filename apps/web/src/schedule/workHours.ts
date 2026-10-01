@@ -41,6 +41,40 @@ export function workGapBefore(visibleHalves: number[], half: number) {
   return index > 0 && visibleHalves[index - 1] !== half - 1;
 }
 
+export type HiddenWorkBoundary = {
+  key: string;
+  kind: "start" | "gap" | "end";
+  fromHalf: number;
+  toHalf: number;
+  beforeHalf?: number;
+};
+
+/** Boundaries of the hidden parts of a compressed 24-hour axis. */
+export function hiddenWorkBoundaries(visibleHalves: number[]): HiddenWorkBoundary[] {
+  if (!visibleHalves.length) return [];
+  const boundaries: HiddenWorkBoundary[] = [];
+  const first = visibleHalves[0];
+  if (first > 0) boundaries.push({ key: "start", kind: "start", fromHalf: 0, toHalf: first });
+  for (let index = 1; index < visibleHalves.length; index += 1) {
+    const half = visibleHalves[index];
+    const previous = visibleHalves[index - 1];
+    if (half > previous + 1) {
+      boundaries.push({
+        key: `gap-${half}`,
+        kind: "gap",
+        fromHalf: previous + 1,
+        toHalf: half,
+        beforeHalf: half,
+      });
+    }
+  }
+  const last = visibleHalves.at(-1) ?? DAY_HALF_SLOTS - 1;
+  if (last < DAY_HALF_SLOTS - 1) {
+    boundaries.push({ key: "end", kind: "end", fromHalf: last + 1, toHalf: DAY_HALF_SLOTS });
+  }
+  return boundaries;
+}
+
 export function clampWorkRangeHalf(originHalf: number, targetHalf: number, hours: WorkHours) {
   const visibleHalves = workHalfSlots(hours);
   const originIndex = visibleHalves.indexOf(originHalf);

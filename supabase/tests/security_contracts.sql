@@ -42,11 +42,18 @@ begin
   end if;
 
   if not has_function_privilege('authenticated', 'public.schedule_player_directory(text,text[])', 'EXECUTE')
+     or has_function_privilege('anon', 'public.schedule_player_directory(text,text[])', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.admin_people_snapshot()', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_member_plays(uuid,jsonb)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_payment_methods(uuid,jsonb)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_capacity_profiles(text,jsonb)', 'EXECUTE') then
     raise exception 'consolidated data-access RPC grants are incomplete';
+  end if;
+
+  if position(
+    'profile_name text' in pg_get_function_result('public.schedule_player_directory(text,text[])'::regprocedure)
+  ) = 0 then
+    raise exception 'schedule player directory must expose the public profile name';
   end if;
 
   if not has_function_privilege('authenticated', 'public.save_schedule_filter_limits(text[],text[])', 'EXECUTE')

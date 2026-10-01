@@ -675,6 +675,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         username: extra?.username || mark.username,
         globalName: extra?.globalName || mark.globalName,
         guildNick: extra?.guildNick || mark.guildNick,
+        profileName: extra?.profileName,
       });
     }
     return rows.sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));

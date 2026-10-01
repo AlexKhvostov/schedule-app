@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WORK_HOURS,
   clampWorkRangeHalf,
+  hiddenWorkBoundaries,
   normalizeWorkHours,
   visibleWorkRuns,
   workGapBefore,
@@ -51,5 +52,14 @@ describe("working-hour display selection", () => {
     expect(clampWorkRangeHalf(15, 18, [7, 9])).toBe(15);
     expect(clampWorkRangeHalf(18, 15, [7, 9])).toBe(18);
     expect(clampWorkRangeHalf(18, 19, [7, 9])).toBe(19);
+  });
+
+  it("describes leading, internal and trailing hidden ranges", () => {
+    expect(hiddenWorkBoundaries(workHalfSlots([2, 3, 8]))).toEqual([
+      { key: "start", kind: "start", fromHalf: 0, toHalf: 4 },
+      { key: "gap-16", kind: "gap", fromHalf: 8, toHalf: 16, beforeHalf: 16 },
+      { key: "end", kind: "end", fromHalf: 18, toHalf: 48 },
+    ]);
+    expect(hiddenWorkBoundaries(workHalfSlots(DEFAULT_WORK_HOURS))).toEqual([]);
   });
 });

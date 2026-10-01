@@ -118,6 +118,11 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByTitle("Редактирование").click();
+  const hiddenOwnCandidate = page.locator('[data-slot][data-half="24"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  await hiddenOwnCandidate.click();
+  const hiddenOwnDay = await hiddenOwnCandidate.getAttribute("data-day");
+  await page.getByTitle("Редактирование").click();
   await page.getByTitle("Настройки").click();
 
   for (let hour = 2; hour < 18; hour += 1) {
@@ -144,6 +149,9 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   expect(Math.abs(gapBox!.height - dayBox!.height)).toBeLessThanOrEqual(1);
   expect(gapBox!.width).toBeGreaterThanOrEqual(12);
   await expect(gapOverlay).toHaveCSS("background-image", "none");
+  const alertGap = page.locator(`.v2-opt-block[data-row="${hiddenOwnDay}"] [data-work-gap="overlay"][data-hidden-own="true"]`);
+  await expect(alertGap).toHaveCount(1);
+  await expect(alertGap).toHaveClass(/has-hidden-own/);
 
   await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
   await page.getByTitle("Редактирование").click();
@@ -211,7 +219,12 @@ test("schedule time hint works in view mode and drag shows the full range", asyn
   const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
   expect(cellBox && frameBox).toBeTruthy();
   await expect(candidate).toHaveClass(/is-hover/);
-  await expect(candidate).toHaveCSS("filter", /brightness\(1\.72\)/);
+  const hoverLayer = await candidate.evaluate((node) => ({
+    opacity: getComputedStyle(node, "::before").opacity,
+    background: getComputedStyle(node, "::before").backgroundColor,
+  }));
+  expect(hoverLayer.opacity).toBe("1");
+  expect(hoverLayer.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(Math.abs((frameBox!.x + frameBox!.width / 2) - (cellBox!.x + cellBox!.width / 2))).toBeLessThan(3);
   expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(cellBox!.y);
 
@@ -748,11 +761,17 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await expect(tip.locator(".v2-opt-tip-limit")).toHaveText(`${limit} €`);
   await expect(tip.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
   await expect(tip.locator(".v2-opt-tip-who img.v2-ava")).toHaveAttribute("src", /cdn\.discordapp\.com/);
-  await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("you");
-  await expect(tip.locator(".v2-opt-tip-person > span")).toContainText("YouNick");
+  await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("Ярослав");
+  await expect(tip.locator(".v2-opt-tip-nicks > span").nth(0)).toContainText("Discordyou");
+  await expect(tip.locator(".v2-opt-tip-nicks > span").nth(1)).toContainText("Игровой никYouNick");
   await expect(tip.locator(".v2-opt-tip-person > small")).toContainText("6");
   await expect(tip.locator(".v2-opt-tip-mark b")).toHaveText("YO");
   await expect(tip.locator(".v2-opt-tip-mark i")).toHaveText("6");
+  const tooltipIdentitySizes = await tip.locator(".v2-opt-tip-who").evaluate((node) => ({
+    avatar: node.querySelector(".v2-ava")!.getBoundingClientRect().width,
+    mark: node.querySelector(".v2-opt-tip-mark")!.getBoundingClientRect().width,
+  }));
+  expect(tooltipIdentitySizes.avatar).toBeGreaterThan(tooltipIdentitySizes.mark);
 
   await page.getByRole("button", { name: "Выбор кисти столов" }).click();
   await page.getByRole("button", { name: "8 столов" }).click();
@@ -859,9 +878,40 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   const mergedTime = `${formatHalf(run!.half)} – ${formatHalf(run!.half + 3)}`;
   await middle.hover();
   await expect(page.locator(".v2-opt-frame")).toHaveText(mergedTime);
+  await page.evaluate(() => {
+    localStorage.setItem("v2-ui-theme", "light");
+    document.documentElement.dataset.uiTheme = "light";
+  });
+  await middle.hover();
+  const merged = segment(run!.half, run!.half + 3);
+  await expect(merged).toHaveClass(/is-hover/);
+  await expect(merged.locator(".v2-opt-merged-label")).not.toHaveText("");
+  const hoverPaint = await merged.evaluate((node) => ({
+    opacity: getComputedStyle(node, "::before").opacity,
+    background: getComputedStyle(node, "::before").backgroundColor,
+  }));
+  expect(hoverPaint.opacity).toBe("1");
+  expect(hoverPaint.background).not.toBe("rgba(0, 0, 0, 0)");
   await middle.click({ button: "right" });
   await expect(page.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(mergedTime);
   await expect(page.locator(".v2-opt-tip-time.is-cet > small")).toHaveText("· 1,5 ч");
+  await expect(page.locator(".v2-opt-tip-person > b")).toHaveText("Ярослав");
+  await expect(page.locator(".v2-opt-tip-nicks")).toContainText("Discordyou");
+
+  const hiddenHour = Math.floor(run!.half / 2);
+  const hiddenHourLabel = `${String(hiddenHour).padStart(2, "0")}:00–${String(hiddenHour + 1).padStart(2, "0")}:00`;
+  await page.getByTitle("Настройки").click();
+  await page.getByRole("button", { name: hiddenHourLabel, exact: true }).click();
+  await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
+  await expect(end).toBeVisible();
+  await expect(end).toHaveAttribute("data-range-start-half", String(run!.half));
+  await expect(end).toHaveAttribute("data-range-end-half", String(run!.half + 3));
+  await end.click({ button: "right" });
+  await expect(page.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(mergedTime);
+  await expect(page.locator(".v2-opt-tip-time.is-cet > small")).toHaveText("· 1,5 ч");
+  await page.getByTitle("Настройки").click();
+  await page.getByRole("button", { name: hiddenHourLabel, exact: true }).click();
+  await page.locator(".v2-float").getByRole("button", { name: "close" }).click();
 
   await start.click();
   await expect(start).not.toHaveClass(/is-on/);

@@ -18,6 +18,7 @@ export type SchedulePlayer = {
   username?: string;
   globalName?: string;
   guildNick?: string;
+  profileName?: string;
 };
 
 type DirectoryRow = {
@@ -39,6 +40,7 @@ type DirectoryRow = {
   discord_guild_nick: string | null;
   discord_avatar_url: string | null;
   room_nick: string | null;
+  profile_name: string | null;
 };
 
 export function markFromPlayer(row: SchedulePlayer): Mark {
@@ -84,6 +86,7 @@ function playerOf(row: DirectoryRow): SchedulePlayer {
     username: row.discord_username || row.username || "",
     globalName: row.discord_global_name || row.display_name || "",
     guildNick: row.discord_guild_nick || row.guild_nick || "",
+    profileName: row.profile_name || "",
   };
 }
 
@@ -128,6 +131,7 @@ function demoPlayers(): SchedulePlayer[] {
       username: row.discord || "",
       globalName: row.discordDisplay || row.discord || "",
       guildNick: row.discordGuildNick || "",
+      profileName: row.name || "",
     }))
     .sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 }

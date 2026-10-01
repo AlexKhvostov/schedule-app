@@ -10153,23 +10153,23 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-tip-who {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 32px;
+  grid-template-columns: 32px minmax(0, 1fr) 24px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .v2-opt-tip-mark {
   flex: none;
   display: block;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   overflow: hidden;
-  border-radius: 7px;
+  border-radius: 5px;
   background: var(--mark);
   color: var(--mark-ink, #111827);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
-  --opt-letter: 10px;
-  --opt-tables: 7px;
+  --opt-letter: 8px;
+  --opt-tables: 5px;
 }
 
 .v2-opt-tip-person {
@@ -10188,22 +10188,38 @@ textarea.v2-ctrl.v2-cab-area {
   white-space: nowrap;
 }
 
-.v2-opt-tip-person > span {
-  display: flex;
+.v2-opt-tip-nicks {
+  display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 1px;
+}
+
+.v2-opt-tip-nicks > span {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  min-width: 0;
+  gap: 5px;
   color: var(--foreground);
   font-size: 10px;
   line-height: 1.2;
 }
 
-.v2-opt-tip-person > span > i {
-  flex: none;
+.v2-opt-tip-nicks > span > i {
   color: var(--muted-foreground);
   font-size: 8px;
   font-style: normal;
   font-weight: 650;
   letter-spacing: 0.03em;
+}
+
+.v2-opt-tip-nicks > span > em {
+  min-width: 0;
+  overflow: hidden;
+  font-style: normal;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .v2-opt-tip-person > small {
@@ -10297,6 +10313,29 @@ textarea.v2-ctrl.v2-cab-area {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--background) 56%, transparent);
   opacity: 0.9;
   transform: translateX(-50%);
+}
+
+.v2-opt-work-break.is-start::before {
+  left: 0;
+}
+
+.v2-opt-work-break.is-end::before {
+  left: 100%;
+}
+
+.v2-opt-work-break.has-hidden-own::before {
+  width: 5px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--destructive) 0 7px,
+    var(--hidden-own-mark, var(--destructive)) 7px 12px,
+    transparent 12px 15px
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--background) 65%, transparent),
+    0 0 9px color-mix(in srgb, var(--destructive) 78%, transparent),
+    0 0 15px color-mix(in srgb, var(--hidden-own-mark, var(--destructive)) 52%, transparent);
+  opacity: 1;
 }
 
 .v2-opt-hour b {
@@ -10438,6 +10477,30 @@ textarea.v2-ctrl.v2-cab-area {
   pointer-events: none;
 }
 
+.v2-opt-merged::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: var(--merged-hover-left, 0%);
+  width: var(--merged-hover-width, 0%);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.25);
+  box-shadow: inset 0 0 10px rgb(255 255 255 / 0.5), 0 0 8px color-mix(in srgb, var(--ring) 40%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.v2-opt-merged.is-hover::before {
+  opacity: 1;
+}
+
+html[data-ui-theme="light"] .v2-opt-merged::before {
+  background: rgb(15 23 42 / 0.18);
+  box-shadow: inset 0 0 9px rgb(15 23 42 / 0.32), 0 0 7px rgb(15 23 42 / 0.2);
+}
+
 .v2-opt-merged.is-past {
   background: color-mix(in srgb, var(--mark) 28%, var(--background));
   color: var(--slot-past-ink, color-mix(in srgb, var(--muted-foreground) 55%, var(--background)));
@@ -10446,7 +10509,7 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-merged-label,
 .v2-opt-merged > i {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -10810,14 +10873,36 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-cell.is-hover {
   z-index: 7;
-  filter: brightness(1.72) saturate(1.2);
-  box-shadow:
-    inset 0 0 15px color-mix(in srgb, var(--ring) 64%, transparent),
-    0 0 12px color-mix(in srgb, var(--ring) 44%, transparent);
+  filter: none;
+  box-shadow: none;
 }
 
-.v2-opt-cell.is-hover:not(.is-on):not(.is-lock) {
-  background: color-mix(in srgb, var(--ring) 48%, var(--slot-future-bg, var(--slot-cell, var(--background))));
+.v2-opt-cell.is-hover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 0.24);
+  box-shadow: inset 0 0 10px rgb(255 255 255 / 0.52), 0 0 8px color-mix(in srgb, var(--ring) 42%, transparent);
+  pointer-events: none;
+}
+
+html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
+  background: rgb(15 23 42 / 0.18);
+  box-shadow: inset 0 0 9px rgb(15 23 42 / 0.34), 0 0 7px rgb(15 23 42 / 0.2);
+}
+
+.v2-opt-cell.is-hover.is-merged-source {
+  z-index: 1;
+}
+
+.v2-opt-cell.is-hover.is-merged-source::before {
+  display: none;
+}
+
+.v2-opt-cell.is-hover > .v2-opt-face {
+  z-index: 2;
 }
 
 .v2-opt-face {

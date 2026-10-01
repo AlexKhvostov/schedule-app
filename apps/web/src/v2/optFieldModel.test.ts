@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayNick, markQuery, markWithPlayerIdentity, nowHeadLeft, packOwner, scheduleKindGroups, slotHoursValue, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
+import { displayNick, hiddenSelfHalves, markQuery, markWithPlayerIdentity, nowHeadLeft, packOwner, playerForMark, scheduleKindGroups, slotHoursValue, slotRangeSpan, slotSpan, tablesLabel } from "./optFieldModel";
 
 describe("opt field presentation model", () => {
   it("formats wrapped half-hour spans", () => {
@@ -65,6 +65,17 @@ describe("opt field presentation model", () => {
     }));
 
     expect(markWithPlayerIdentity(mark, players)).toBe(mark);
+  });
+
+  it("finds the profile behind a slot and detects own marks hidden by working hours", () => {
+    const self = { t: "AX", discord: "alex", room: "PokerAlex", bg: "#123456", fg: "#fff", tables: 6, memberId: "member-1" };
+    const player = {
+      id: "member-1", nick: "Server Alex", publicCode: "RP-1", roomNick: "PokerAlex", markTag: "AX",
+      markBg: "#123456", markFg: "#fff", tables: 6, profileName: "Алексей",
+    };
+    expect(playerForMark(self, [player])).toBe(player);
+    const grids = { "nitro:50": [[[], [self], [], [self]]] };
+    expect([...hiddenSelfHalves(grids, 0, [0, 1], self)]).toEqual([3]);
   });
 
   it("formats table counts and clamps timeline progress", () => {

@@ -1,9 +1,9 @@
 import { formatDayLabel } from "../schedule/formatDate";
 import { formatVariantLimit } from "../schedule/capacity";
 import type { SchedulePlayer } from "../data/players";
-import type { Mark } from "../schedule/marks";
+import { isSelfSeat, type Mark } from "../schedule/marks";
 import { seatsOf, type Occupancy } from "../schedule/plan";
-import type { ScheduleVariant } from "../data/slots";
+import type { MonthGridStore, ScheduleVariant } from "../data/slots";
 
 export type OverwriteSlot = { date: string; half: number; level: number };
 
@@ -86,7 +86,7 @@ export function displayNick(value?: string | null) {
   return text;
 }
 
-export function markWithPlayerIdentity(mark: Mark, players: readonly SchedulePlayer[]) {
+export function playerForMark(mark: Mark, players: readonly SchedulePlayer[]) {
   const identity = [mark.guildNick, mark.globalName, mark.username, mark.discord]
     .map((value) => value?.trim().toLocaleLowerCase())
     .filter((value): value is string => Boolean(value));
@@ -97,9 +97,13 @@ export function markWithPlayerIdentity(mark: Mark, players: readonly SchedulePla
   const sameTag = mark.t.trim()
     ? players.filter((row) => row.markTag.trim().toLocaleUpperCase() === mark.t.trim().toLocaleUpperCase())
     : [];
-  const player = (mark.memberId ? players.find((row) => row.id === mark.memberId) : undefined)
+  return (mark.memberId ? players.find((row) => row.id === mark.memberId) : undefined)
     ?? byIdentity
     ?? (sameTag.length === 1 ? sameTag[0] : undefined);
+}
+
+export function markWithPlayerIdentity(mark: Mark, players: readonly SchedulePlayer[]) {
+  const player = playerForMark(mark, players);
   if (!player) return mark;
   return {
     ...mark,
@@ -111,6 +115,22 @@ export function markWithPlayerIdentity(mark: Mark, players: readonly SchedulePla
     globalName: player.globalName || mark.globalName,
     guildNick: player.guildNick || mark.guildNick,
   };
+}
+
+export function hiddenSelfHalves(
+  grids: MonthGridStore,
+  dayIdx: number,
+  visibleHalves: readonly number[],
+  self: Mark,
+) {
+  const visible = new Set(visibleHalves);
+  const hidden = new Set<number>();
+  Object.values(grids).forEach((grid) => {
+    grid?.[dayIdx]?.forEach((cell, half) => {
+      if (!visible.has(half) && cell?.some((seat) => isSelfSeat(seat, self))) hidden.add(half);
+    });
+  });
+  return hidden;
 }
 
 function visibleNick(value?: string | null) {

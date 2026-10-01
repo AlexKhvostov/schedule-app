@@ -27,6 +27,8 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 Миграция I01 `20260930170000_member_table_presets.sql` вручную применена к Working 30 сентября 2026. Backfill дал по одному начальному preset всем 7 участникам; read-only проверка подтвердила RLS, запрет прямых записей, закрытый anon RPC и Realtime. Транзакционный smoke-test с полным `ROLLBACK` подтвердил запись владельца и администратора, отказ пользователю без `admin.people`, сохранение допустимой активной кисти и откат дубля. Чистая пересборка, новый `member_table_presets.sql`, security contracts и database lint выполняются в database CI.
 
+Миграция `20261001090000_schedule_directory_profile_name.sql` вручную применена к Working 1 октября 2026. Она совместимо пересоздаёт `schedule_player_directory(text, text[])` с дополнительным публичным `profile_name` из `profiles.display_name`, не раскрывая остальные поля анкеты. Контрольный запрос подтвердил новое поле результата, право `EXECUTE` у `authenticated` и отсутствие права у `anon`.
+
 ## Релизный барьер
 
 Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих RPC.
