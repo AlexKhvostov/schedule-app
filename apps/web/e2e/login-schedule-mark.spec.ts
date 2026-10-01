@@ -635,8 +635,10 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(regularChips).not.toHaveCount(0);
   const nitroInk = await nitroChips.first().locator(".v2-chip-face").evaluate((node) => getComputedStyle(node).color);
   const regularInk = await regularChips.first().locator(".v2-chip-face").evaluate((node) => getComputedStyle(node).color);
-  expect(nitroInk).not.toBe(regularInk);
-  await expect(nitroLegend).not.toHaveCSS("color", await regularLegend.evaluate((node) => getComputedStyle(node).color));
+  expect(nitroInk).toBe("rgb(7, 16, 20)");
+  expect(regularInk).toBe("rgb(255, 255, 255)");
+  await expect(nitroChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-color", "rgba(255, 255, 255, 0.96)");
+  await expect(regularChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-color", "rgba(7, 16, 20, 0.96)");
   const sharedDay = calendar.locator(".v2-mine-row", {
     has: page.locator(".v2-mine-chip.is-regular"),
   }).filter({ has: page.locator(".v2-mine-chip.is-nitro") });
@@ -644,6 +646,8 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(sharedDay.locator(".v2-mine-track")).toHaveCSS("height", "18px");
   await expect(sharedDay.locator(".v2-mine-chip.is-nitro").first()).toHaveCSS("top", "2px");
   await expect(sharedDay.locator(".v2-mine-chip.is-regular").first()).toHaveCSS("top", "2px");
+  expect(await sharedDay.locator(".v2-mine-chip.is-nitro").first().evaluate((node) => getComputedStyle(node).backgroundColor))
+    .toBe(await sharedDay.locator(".v2-mine-chip.is-regular").first().evaluate((node) => getComputedStyle(node).backgroundColor));
   await expect(calendar.locator(".v2-mine-chip .v2-chip-ticks i.is-hour").first()).toHaveCSS("opacity", "0.2");
 });
 
