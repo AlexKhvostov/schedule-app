@@ -8249,7 +8249,7 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-mine-legend.is-nitro {
   color: #071014;
-  -webkit-text-stroke: 0.35px rgb(255 255 255 / 0.96);
+  -webkit-text-stroke: 0.65px rgb(255 255 255 / 0.96);
   paint-order: stroke fill;
   text-shadow: 0 0 1px rgb(255 255 255 / 0.9);
 }
@@ -8271,7 +8271,7 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-mine-legend.is-regular {
   color: #fff;
-  -webkit-text-stroke: 0.35px rgb(7 16 20 / 0.96);
+  -webkit-text-stroke: 0.65px rgb(7 16 20 / 0.96);
   paint-order: stroke fill;
   text-shadow: 0 0 1px rgb(7 16 20 / 0.9);
 }

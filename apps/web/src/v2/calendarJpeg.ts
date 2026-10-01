@@ -278,7 +278,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.fill();
     ctx.fillStyle = variantInk(column.variant);
     ctx.strokeStyle = variantOutline(column.variant);
-    ctx.lineWidth = 1.1;
+    ctx.lineWidth = 1.6;
     ctx.lineJoin = "round";
     ctx.font = variantFont(column.variant, 11);
     const label = column.label;
