@@ -32,6 +32,12 @@ function themePaint() {
     line: border,
     lineStrong: border,
     now: cssVar("--now", "#e11d2e"),
+    nitroInk: light ? "#cffafe" : "#083344",
+    regularInk: light ? "#fae8ff" : "#581c87",
+    nitroLegend: light ? "#0e7490" : "#67e8f9",
+    regularLegend: light ? "#7e22ce" : "#d8b4fe",
+    pastNitroInk: "#cffafe",
+    pastRegularInk: "#fae8ff",
   };
 }
 
@@ -71,8 +77,9 @@ function mineTone(limit: string) {
   return limitTonePaint(limit);
 }
 
-function limitInk() {
-  return document.documentElement.dataset.uiTheme === "light" ? "#ffffff" : "#071014";
+function variantInk(paint: ReturnType<typeof themePaint>, variant: ScheduleVariant, past: boolean) {
+  if (past) return variant === "nitro" ? paint.pastNitroInk : paint.pastRegularInk;
+  return variant === "nitro" ? paint.nitroInk : paint.regularInk;
 }
 
 function slotX(trackW: number, visibleSlot: number, slotCount: number) {
@@ -224,7 +231,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
           ctx.beginPath();
           roundRect(ctx, x, cy, w, CHIP_H, 2);
           ctx.clip();
-          ctx.strokeStyle = limitInk();
+          ctx.strokeStyle = variantInk(paint, run.variant, dimPast && past);
           ctx.lineWidth = 1;
           for (let i = 1; i < len; i += 1) {
             if ((segment.start + i) % 2 !== 0) continue;
@@ -238,8 +245,8 @@ export async function downloadCalendarJpeg(opts: Opts) {
         }
         ctx.restore();
         ctx.save();
-        ctx.fillStyle = dimPast && past ? "#ffffff" : limitInk();
-        ctx.shadowColor = paint.light || (dimPast && past) ? "rgb(7 16 20 / 0.92)" : "rgb(255 255 255 / 0.55)";
+        ctx.fillStyle = variantInk(paint, run.variant, dimPast && past);
+        ctx.shadowColor = paint.light || (dimPast && past) ? "rgb(7 16 20 / 0.92)" : "rgb(255 255 255 / 0.64)";
         ctx.shadowBlur = 2;
         ctx.font = variantFont(run.variant, len <= 2 ? 8 : 10);
         ctx.textAlign = "center";
@@ -270,7 +277,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.beginPath();
     ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = paint.muted;
+    ctx.fillStyle = column.variant === "nitro" ? paint.nitroLegend : paint.regularLegend;
     ctx.font = variantFont(column.variant, 11);
     const label = column.label;
     ctx.fillText(label, legendX + 14, footY);

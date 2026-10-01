@@ -8161,6 +8161,10 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine {
+  --mine-nitro-ink: #083344;
+  --mine-regular-ink: #581c87;
+  --mine-nitro-label: #67e8f9;
+  --mine-regular-label: #d8b4fe;
   display: flex;
   width: max-content;
   max-width: none;
@@ -8174,6 +8178,13 @@ textarea.v2-ctrl.v2-cab-area {
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--title) 22%, transparent),
     0 12px 28px rgb(0 0 0 / 0.28);
+}
+
+.v2-mine.theme-light {
+  --mine-nitro-ink: #cffafe;
+  --mine-regular-ink: #fae8ff;
+  --mine-nitro-label: #0e7490;
+  --mine-regular-label: #7e22ce;
 }
 
 .v2-mine .v2-modal-head {
@@ -8240,12 +8251,28 @@ textarea.v2-ctrl.v2-cab-area {
   letter-spacing: 0.01em;
 }
 
+.v2-mine-chip.is-nitro .v2-chip-face {
+  color: var(--mine-nitro-ink);
+}
+
+.v2-mine-legend.is-nitro {
+  color: var(--mine-nitro-label);
+}
+
 .v2-mine-legend.is-regular,
 .v2-mine-chip.is-regular .v2-chip-face {
   font-family: "IBM Plex Sans", Inter, sans-serif;
   font-style: italic;
   font-weight: 750;
   letter-spacing: 0;
+}
+
+.v2-mine-chip.is-regular .v2-chip-face {
+  color: var(--mine-regular-ink);
+}
+
+.v2-mine-legend.is-regular {
+  color: var(--mine-regular-label);
 }
 
 .v2-mine-legend i {
@@ -8351,6 +8378,10 @@ textarea.v2-ctrl.v2-cab-area {
   border-top: 1px solid var(--border);
 }
 
+.v2-mine.theme-dark .v2-mine-row {
+  border-top-color: color-mix(in srgb, var(--foreground) 18%, var(--border));
+}
+
 .v2-mine-row.is-weekend .v2-mine-date {
   color: color-mix(in srgb, var(--warning) 55%, var(--foreground));
 }
@@ -8394,12 +8425,20 @@ textarea.v2-ctrl.v2-cab-area {
   border-right: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
 }
 
+.v2-mine.theme-dark .v2-mine-hcell {
+  border-right-color: color-mix(in srgb, var(--foreground) 16%, var(--border));
+}
+
 .v2-mine-hcell:last-child {
   border-right: 0;
 }
 
 .v2-mine-hcell.is-major {
   border-right-color: var(--border);
+}
+
+.v2-mine.theme-dark .v2-mine-hcell.is-major {
+  border-right-color: color-mix(in srgb, var(--foreground) 26%, var(--border));
 }
 
 .v2-mine-hour {
@@ -8459,12 +8498,25 @@ textarea.v2-ctrl.v2-cab-area {
     0 0 2px rgb(255 255 255 / 0.42);
 }
 
+.v2-mine.theme-light .v2-mine-chip .v2-chip-face {
+  text-shadow:
+    0 1px 1px rgb(7 16 20 / 0.92),
+    0 0 2px rgb(7 16 20 / 0.72);
+}
+
 .v2-mine-chip.is-past {
   box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--background) 58%, transparent);
 }
 
-.v2-mine-chip.is-past .v2-chip-face {
-  color: #fff;
+.v2-mine-chip.is-past.is-nitro .v2-chip-face {
+  color: #cffafe;
+  text-shadow:
+    0 1px 1px rgb(7 16 20 / 0.95),
+    0 0 2px rgb(7 16 20 / 0.75);
+}
+
+.v2-mine-chip.is-past.is-regular .v2-chip-face {
+  color: #fae8ff;
   text-shadow:
     0 1px 1px rgb(7 16 20 / 0.95),
     0 0 2px rgb(7 16 20 / 0.75);

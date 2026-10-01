@@ -57,10 +57,6 @@ function mineTone(limit: string) {
   return limitTone(limit);
 }
 
-function limitInk(theme: "light" | "dark") {
-  return theme === "light" ? "#ffffff" : "#071014";
-}
-
 function HourCells({ workHours }: { workHours: number[] }) {
   return (
     <>
@@ -274,7 +270,6 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                           left: box.left,
                           width: box.width,
                           background: mineTone(run.rawLimit),
-                          color: limitInk(theme),
                         }}
                         onMouseEnter={(event) => placeTip(event, day.d, segment.start, segment.end, run.rawLimit, run.label)}
                         onMouseLeave={() => setHover(null)}
