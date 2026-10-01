@@ -143,6 +143,7 @@ type MonthScheduleRow = {
 };
 
 export type MemberOccupiedSlot = {
+  variant: ScheduleVariant;
   limit: string;
   dayIdx: number;
   half: number;
@@ -180,7 +181,7 @@ export async function loadMemberOccupiedSlots(
     const dayIdx = Number(String(row.slot_date).slice(8, 10)) - 1;
     const half = Number(row.half);
     if (dayIdx < 0 || half < 0 || half > 47) continue;
-    rows.push({ limit: kind.limitId, dayIdx, half });
+    rows.push({ variant, limit: kind.limitId, dayIdx, half });
   }
   return rows;
 }

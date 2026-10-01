@@ -22,7 +22,13 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { BarMark, HoursPanel, MobileScheduleDock } from "./SchedulePanels";
 import { showV2Toast } from "./V2Toast";
-import { limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
+import {
+  limitsWithMyMarks,
+  mergeOccupiedPairs,
+  myHoursMatrix,
+  occupiedPairsFromSlots,
+  type OccupiedPairMatrix,
+} from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { loadPrefs, resetSchedulePrefs, savePrefs } from "./prefs";
 import { centerPos, useWindowPos } from "./windowPos";
@@ -105,7 +111,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [editByButton, setEditByButton] = useState(true);
   const [editPulse, setEditPulse] = useState(boot.editPulse);
   const [busyHint, setBusyHint] = useState(boot.busyHint);
-  const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
+  const [busyRemote, setBusyRemote] = useState<OccupiedPairMatrix | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
   const [tablePresets, setTablePresets] = useState<number[]>([ME.tables]);
   const [tablePresetOwnerId, setTablePresetOwnerId] = useState<string>();
@@ -158,13 +164,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const refreshTimer = useRef(0);
   const liveDebounce = useRef(0);
   const dirtyLive = useRef(false);
-  const grids = useMemo(() => {
-    const stored = gridsForVariant(gridStore, kind, limits);
-    return Object.fromEntries(limits.map((limit) => [
-      limit,
-      stored[limit] ?? emptyMonth(year, monthIndex),
-    ]));
-  }, [gridStore, kind, limits, year, monthIndex]);
   const gridStoreRef = useRef(gridStore);
   gridStoreRef.current = gridStore;
   const sessionNick = readSession()?.nick ?? "";
@@ -329,15 +328,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       }
       if (!who) return Promise.resolve();
       const gen = ++busyGen.current;
-      return Promise.all(kinds.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who))).then((groups) => {
+      return Promise.all(CALENDAR_VARIANTS.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who))).then((groups) => {
         if (gen !== busyGen.current) return;
         if (groups.some((rows) => rows === null)) return;
         const rows = groups.flatMap((group) => group ?? []);
-        const map = occupiedFromSlots(rows, busyDays);
+        const map = occupiedPairsFromSlots(rows, busyDays);
         if (who === actingRef.current) setBusyRemote(map);
       });
     },
-    [year, monthIndex, kinds, busyDays],
+    [year, monthIndex, busyDays],
   );
 
   const refreshBusy = useCallback(() => {
@@ -686,8 +685,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return rows.sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
   }, [limitMarks, players]);
   const busyMap = useMemo(
-    () => (showBusy ? mergeOccupiedLimits(busyRemote, grids, me, { year, monthIndex, cet: cetTick }) : undefined),
-    [showBusy, busyRemote, grids, me, year, monthIndex, cetTick],
+    () => (showBusy ? mergeOccupiedPairs(busyRemote, shownGridStore, me, { year, monthIndex, cet: cetTick }) : undefined),
+    [showBusy, busyRemote, shownGridStore, me, year, monthIndex, cetTick],
   );
 
   const applyActAs = (id: string) => {

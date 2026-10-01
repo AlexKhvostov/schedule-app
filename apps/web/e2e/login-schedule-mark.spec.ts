@@ -560,6 +560,38 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   else await expect(foreignNitro).not.toHaveClass(/is-on/);
 });
 
+test("other schedule highlight includes a hidden tournament kind", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await page.getByRole("button", { name: "Nitro", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.getByTitle("Редактирование").click();
+
+  const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"][data-level="0"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const day = await regularCell.getAttribute("data-day");
+  const half = await regularCell.getAttribute("data-half");
+  expect(day && half).toBeTruthy();
+  const regularTarget = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-level="0"][data-day="${day}"][data-half="${half}"]`);
+  const nitroCell = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-level="0"][data-day="${day}"][data-half="${half}"]`);
+  await expect(nitroCell).toBeVisible();
+
+  await regularTarget.click();
+  await expect(regularTarget).toHaveClass(/is-on/);
+  await page.getByRole("button", { name: "Другие лимиты" }).click();
+  expect((await nitroCell.getAttribute("data-busy")) ?? "").not.toContain("regular:50");
+
+  await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await expect(page.locator('.v2-opt-kind[data-variant="regular"]')).toHaveCount(0);
+  await expect(nitroCell).toHaveClass(/is-busy/);
+  await expect(nitroCell).toHaveAttribute("data-busy", /regular:50/);
+
+  await nitroCell.hover();
+  await expect(page.locator(".v2-opt-tip-note")).toContainText("Уже Regular · 50 €");
+});
+
 test("auxiliary schedule windows keep N/E separate without doubling physical hours", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();

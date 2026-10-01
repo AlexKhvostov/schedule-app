@@ -18,6 +18,7 @@ import { MarkFace } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { OptLevelLane, OptNlChip } from "./OptLevelLane";
 import type { SchedulePairRow } from "./variantSchedule";
+import type { OccupiedPairMatrix, OccupiedSchedulePair } from "./myShifts";
 import { clampScheduleCellWidth, fitScheduleCellWidth, scheduleCellStride, scheduleZoomScrollLeft } from "./scheduleZoom";
 import {
   displayNick,
@@ -65,7 +66,7 @@ type Props = {
   hourLoad?: HourLoadMap;
   onGridChange: (variant: ScheduleVariant, limit: string, next: Occupancy) => void;
   skin?: "classic" | "theme";
-  busy?: (string[] | null)[][];
+  busy?: OccupiedPairMatrix;
   canRemoveForeign?: boolean;
   onOverwriteAsk?: (ask: OverwriteAsk) => void;
   onForeignKept?: () => void;
@@ -87,7 +88,7 @@ type SlotHit = {
   variant: ScheduleVariant;
   limit: string;
   lane: string;
-  busyLimits?: string[];
+  busyPairs?: OccupiedSchedulePair[];
   rangeStartHalf?: number;
   rangeEndHalf?: number;
   mergedStartHalf?: number;
@@ -155,7 +156,10 @@ function hitFromEvent(target: EventTarget | null, root: HTMLElement | null, with
     variant: el.dataset.variant === "regular" ? "regular" : "nitro",
     limit: el.dataset.limit ?? "",
     lane: el.dataset.lane ?? "",
-    busyLimits: (el.dataset.busy || "").split(",").filter(Boolean),
+    busyPairs: (el.dataset.busy || "").split(",").flatMap((value) => {
+      const [variant, limit] = value.split(":", 2);
+      return (variant === "nitro" || variant === "regular") && limit ? [{ variant, limit }] : [];
+    }),
     rangeStartHalf: el.dataset.rangeStartHalf ? Number(el.dataset.rangeStartHalf) : undefined,
     rangeEndHalf: el.dataset.rangeEndHalf ? Number(el.dataset.rangeEndHalf) : undefined,
     mergedStartHalf: el.dataset.mergedStartHalf ? Number(el.dataset.mergedStartHalf) : undefined,
@@ -533,7 +537,7 @@ const OptCell = memo(function OptCell({
   muted,
   hit,
   nowPct,
-  busyLimits,
+  busyPairs,
   busyHalf,
   workGap,
   gridColumn,
@@ -560,7 +564,7 @@ const OptCell = memo(function OptCell({
   muted?: boolean;
   hit?: boolean;
   nowPct?: number;
-  busyLimits?: string[];
+  busyPairs?: OccupiedSchedulePair[];
   busyHalf?: boolean;
   workGap?: boolean;
   gridColumn?: number;
@@ -585,7 +589,7 @@ const OptCell = memo(function OptCell({
       data-limit={limit}
       data-lane={lane}
       data-mark={mark}
-      data-busy={busyLimits?.length ? busyLimits.join(",") : undefined}
+      data-busy={busyPairs?.length ? busyPairs.map((pair) => monthGridKey(pair.variant, pair.limit)).join(",") : undefined}
       data-work-gap={workGap ? "before" : undefined}
       data-range-start-half={mergedStartHalf}
       data-range-end-half={mergedEndHalf}
@@ -656,7 +660,7 @@ const OptBody = memo(function OptBody({
   days: { d: number; wd: string; weekend: boolean }[];
   cet: CetStamp;
   todayRef: RefObject<HTMLDivElement | null>;
-  busy?: (string[] | null)[][];
+  busy?: OccupiedPairMatrix;
   workHours: number[];
   mergeAdjacentSlots: boolean;
   self: Mark;
@@ -664,6 +668,8 @@ const OptBody = memo(function OptBody({
   const { t } = useTranslation();
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
   const groups = scheduleKindGroups(kinds, limits, pairRows);
+  const visiblePairs = new Set(groups.flatMap((group) =>
+    group.rows.map((row) => monthGridKey(group.variant, row.limit))));
   const visibleHalves = workHalfSlots(workHours);
   const nowVisible = workTrackProgress(cet.half, cet.slotProgress, workHours) != null;
 
@@ -772,7 +778,7 @@ const OptBody = memo(function OptBody({
                                   ? Math.min(100, Math.max(0, cet.slotProgress * 100))
                                   : undefined;
                               const mine = gone || locked ? undefined : busy?.[dayIdx]?.[half];
-                              const hidden = mine?.filter((item) => !limits.includes(item));
+                              const hidden = mine?.filter((item) => !visiblePairs.has(monthGridKey(item.variant, item.limit)));
                               const mergedSegment = segmentByHalf.get(half);
                               const fullSegment = fullSegmentByHalf.get(half);
                               const fullSpan = fullSegment ? fullSegment.endHalf - fullSegment.startHalf : 0;
@@ -794,7 +800,7 @@ const OptBody = memo(function OptBody({
                                   past={past}
                                   locked={locked}
                                   nowPct={nowPct}
-                                  busyLimits={hidden}
+                                  busyPairs={hidden}
                                   busyHalf={Boolean(hidden?.length)}
                                   workGap={workGapBefore(visibleHalves, half)}
                                   gridColumn={workGridColumn(visibleHalves, half)}
@@ -933,7 +939,7 @@ function OptTip({
         setHover(null);
       },
       show: (hit, rest, force) => {
-        if (!showTip && !hit.busyLimits?.length && !force) {
+        if (!showTip && !hit.busyPairs?.length && !force) {
           restRef.current = null;
           setHover(null);
           return;
@@ -1044,9 +1050,13 @@ function OptTip({
           </div>
         ) : null}
       </div>
-      {hover.busyLimits?.length ? (
+      {hover.busyPairs?.length ? (
         <div className="v2-opt-tip-note">
-          <strong>{t("v2.tip.busy", { limit: hover.busyLimits.map((item) => formatLimit(item)).join(", ") })}</strong>
+          <strong>{t("v2.tip.busy", {
+            limit: hover.busyPairs
+              .map((item) => `${t(`v2.tip.${item.variant}`)} · ${formatLimit(item.limit)}`)
+              .join(", "),
+          })}</strong>
           <p>{t("v2.tip.busyHint")}</p>
         </div>
       ) : displayMark && owner ? (
@@ -1402,7 +1412,7 @@ export const OptField = memo(function OptField({
       p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],
       hit.level + 1,
     )[hit.level];
-    if (hit.busyLimits?.length) {
+    if (hit.busyPairs?.length) {
       tipApi.current.show(hit, rest);
       return;
     }
@@ -1519,7 +1529,7 @@ export const OptField = memo(function OptField({
       return;
     }
     applyNav(root, hit);
-    if (hit.busyLimits?.length) {
+    if (hit.busyPairs?.length) {
       tipApi.current.show({ ...hit, x: event.clientX + 12, y: event.clientY + 10 });
     } else {
       tipApi.current.hide();
