@@ -639,8 +639,10 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   expect(regularInk).toBe("rgb(255, 255, 255)");
   await expect(nitroChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-color", "rgba(255, 255, 255, 0.96)");
   await expect(regularChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-color", "rgba(7, 16, 20, 0.96)");
-  await expect(nitroLegend).toHaveCSS("-webkit-text-stroke-width", "0.65px");
-  await expect(regularLegend).toHaveCSS("-webkit-text-stroke-width", "0.65px");
+  await expect(nitroChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-width", "0.75px");
+  await expect(regularChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-width", "0.75px");
+  await expect(nitroLegend).toHaveCSS("-webkit-text-stroke-width", "0.75px");
+  await expect(regularLegend).toHaveCSS("-webkit-text-stroke-width", "0.75px");
   const sharedDay = calendar.locator(".v2-mine-row", {
     has: page.locator(".v2-mine-chip.is-regular"),
   }).filter({ has: page.locator(".v2-mine-chip.is-nitro") });

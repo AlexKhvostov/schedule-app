@@ -243,7 +243,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
         ctx.save();
         ctx.fillStyle = variantInk(run.variant);
         ctx.strokeStyle = variantOutline(run.variant);
-        ctx.lineWidth = 1.1;
+        ctx.lineWidth = 1.6;
         ctx.lineJoin = "round";
         ctx.font = variantFont(run.variant, len <= 2 ? 8 : 10);
         ctx.textAlign = "center";
