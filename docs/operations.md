@@ -35,9 +35,11 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 Миграция `20261001090000_schedule_directory_profile_name.sql` вручную применена к Working 1 октября 2026. Она совместимо пересоздаёт `schedule_player_directory(text, text[])` с дополнительным публичным `profile_name` из `profiles.display_name`, не раскрывая остальные поля анкеты. Контрольный запрос подтвердил новое поле результата, право `EXECUTE` у `authenticated` и отсутствие права у `anon`.
 
+Миграция `20261003120000_player_limit_required_for_occupancy.sql` вручную применена к Working 3 октября 2026. Транзакционный smoke-test с полным `ROLLBACK` использовал действующего root и будущую дату: существующую метку после удаления пары из `player_limits` удалось снять, новая вставка была отклонена с SQLSTATE `42501` и сообщением `schedule-player-limit-not-selected`, после возврата пары вставка снова прошла. Локальные `supabase db reset` и `supabase db lint` в этой сессии не выполнялись из-за отсутствия Docker/Podman; их обязан повторить database-job GitHub Actions до публикации клиента.
+
 ## Релизный барьер
 
-Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих RPC.
+Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql`, `player_schedule_limits.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих правил и RPC.
 
 Базовый E2E всегда выполняет детерминированный локальный сценарий. Для smoke-теста реальной Discord-сессии на staging укажите `E2E_AUTH_STATE` — путь к некоммитящемуся Playwright storage-state. Мутационные тесты нельзя направлять в production.
 

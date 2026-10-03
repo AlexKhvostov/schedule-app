@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
@@ -8,7 +8,8 @@ import { monthShort, monthTitle } from "../schedule/formatDate";
 import { readCet } from "../schedule/cet";
 import { demoMonthPlan } from "../schedule/demoPlan";
 import { loadDemoSchedule, resetDemoSchedules, saveDemoSchedule } from "../schedule/demoScheduleStore";
-import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
+import { groupRosterRows, rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
+import { schedulePlayPairKeys } from "../schedule/playerScheduleLimits";
 import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadTimeStats";
 import { fieldFill, columnFill } from "../schedule/analytics";
 import { OptField, type OverwriteAsk } from "./OptField";
@@ -60,6 +61,8 @@ import { decorateDemoRoster, rowInitials, seatDiffs, showNick, type SeatDiff } f
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
 import { displayScheduleColumn, gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
 import { loadTablePresetSelection, saveTablePresetSelection } from "./tablePresetSelection";
+import { Dialog } from "../components/ui/dialog";
+import { Button } from "../components/ui/button";
 
 const CALENDAR_VARIANTS = ["nitro", "regular"] as const;
 
@@ -94,6 +97,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [players, setPlayers] = useState<SchedulePlayer[]>([]);
   const actingRef = useRef<string | undefined>(memberId);
   const accessRef = useRef<Set<string>>(new Set());
+  const selectedPlayPairsRef = useRef<Set<string> | null>(null);
   const selfMarkRef = useRef(selfMark);
   selfMarkRef.current = selfMark;
   const [hideTables, setHideTables] = useState(boot.hideTables);
@@ -141,6 +145,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [overwriteAsk, setOverwriteAsk] = useState<OverwriteAsk | null>(null);
   const [overwriteBusy, setOverwriteBusy] = useState(false);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
+  const [missingPlayPair, setMissingPlayPair] = useState<{ variant: "nitro" | "regular"; limit: string } | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
   const [analyticsPos, setAnalyticsPos] = useWindowPos("analytics", () => centerPos(560, 360));
   const [peoplePos, setPeoplePos] = useWindowPos("people", () => centerPos(420, 360));
@@ -228,14 +233,26 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   useEffect(() => {
     const id = actingId || selfId;
-    if (!isLiveData() || !id) {
+    selectedPlayPairsRef.current = null;
+    if (!id) {
       accessRef.current = new Set();
       return;
     }
+    if (!isLiveData()) {
+      accessRef.current = new Set();
+      const member = loadMembers().find((row) => row.id === id);
+      const selected = schedulePlayPairKeys(member?.plays ?? []);
+      if (!selected.size) {
+        for (const limit of member?.limits ?? []) selected.add(accessKey("nitro", limit));
+      }
+      selectedPlayPairsRef.current = selected;
+      return;
+    }
     let live = true;
-    void loadScheduleAccess(id).then((rows) => {
+    void Promise.all([loadScheduleAccess(id), loadMyPlays(id)]).then(([rows, plays]) => {
       if (!live) return;
       accessRef.current = new Set(rows.map((row) => accessKey(row.variant, row.limit)));
+      selectedPlayPairsRef.current = schedulePlayPairKeys(plays);
     });
     return () => {
       live = false;
@@ -591,26 +608,26 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     };
   }, [kinds, limits, paintOn, showPeople, mayActAs]);
 
-  const clubPlayerIds = useMemo(() => new Set(players.map((row) => row.id)), [players]);
-  const roster = useMemo(() => {
-    if (!showPeople) return [];
-    const rawRows = rosterFromGrids(
-      auxiliaryItems.map((item) => ({ limit: item.label, grid: item.grid })),
-      year,
-      monthIndex,
-      cetTick,
-      limitMarks ?? undefined,
-      kind,
-    );
-    const rows = isLiveData() ? rawRows : decorateDemoRoster(rawRows, loadMembers());
-    if (!isLiveData() || !clubPlayerIds.size) return rows;
-    return rows.filter((row) => !row.mark.memberId || clubPlayerIds.has(row.mark.memberId));
-  }, [showPeople, auxiliaryItems, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
+  const eligiblePlayerIds = useMemo(
+    () => new Set((limitMarks ?? []).map((mark) => mark.memberId).filter((id): id is string => Boolean(id))),
+    [limitMarks],
+  );
+  const rosterGroups = useMemo(() => {
+    if (!showPeople || limitMarks === null) return { active: [], historical: [] };
+    const items = auxiliaryItems.map((item) => ({ limit: item.label, grid: item.grid }));
+    const occupiedRows = rosterFromGrids(items, year, monthIndex, cetTick, undefined, kind);
+    const activeRows = rosterFromGrids(items, year, monthIndex, cetTick, limitMarks, kind);
+    const occupied = isLiveData() ? occupiedRows : decorateDemoRoster(occupiedRows, loadMembers());
+    const active = isLiveData() ? activeRows : decorateDemoRoster(activeRows, loadMembers());
+    return groupRosterRows(active, occupied, eligiblePlayerIds);
+  }, [showPeople, auxiliaryItems, year, monthIndex, cetTick, limitMarks, kind, eligiblePlayerIds]);
+  const roster = rosterGroups.active;
+  const historicalRoster = rosterGroups.historical;
 
   const peopleIdsKey = useMemo(() => {
     if (!showPeople) return "";
-    return [...new Set(roster.map((row) => row.mark.memberId).filter((id): id is string => Boolean(id)))].sort().join(",");
-  }, [showPeople, roster]);
+    return [...new Set([...roster, ...historicalRoster].map((row) => row.mark.memberId).filter((id): id is string => Boolean(id)))].sort().join(",");
+  }, [showPeople, roster, historicalRoster]);
 
   useEffect(() => {
     if (!showPeople) {
@@ -765,6 +782,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         showV2Toast("err", t("schedule.toastNoAccess"));
         return;
       }
+      if (
+        diffs.some((diff) => diff.placed)
+        && selectedPlayPairsRef.current !== null
+        && !selectedPlayPairsRef.current.has(accessKey(variant, limit))
+      ) {
+        setGridStore((store) => ({ ...store, [key]: prevGrid }));
+        setMissingPlayPair({ variant, limit });
+        return;
+      }
       if (diffs.some((diff) => diff.placed) && !filterLimits[variant].includes(limit)) {
         setGridStore((store) => ({ ...store, [key]: prevGrid }));
         showV2Toast("err", t("schedule.toastLimitDisabled"));
@@ -782,7 +808,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           inflight.current = Math.max(0, inflight.current - 1);
           if (error) {
             setGridStore((store) => ({ ...store, [key]: prevGrid }));
-            showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
+            if (error.includes("schedule-player-limit-not-selected")) setMissingPlayPair({ variant, limit });
+            else showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
             return;
           }
           refreshBusy();
@@ -823,6 +850,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       setOverwriteAsk(null);
       return;
     }
+    if (
+      ask.kind === "place"
+      && selectedPlayPairsRef.current !== null
+      && !selectedPlayPairsRef.current.has(accessKey(ask.variant, ask.limit))
+    ) {
+      setMissingPlayPair({ variant: ask.variant, limit: ask.limit });
+      setOverwriteAsk(null);
+      return;
+    }
     if (ask.kind === "place" && !filterLimits[ask.variant].includes(ask.limit)) {
       showV2Toast("err", t("schedule.toastLimitDisabled"));
       setOverwriteAsk(null);
@@ -846,12 +882,16 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         setOverwriteBusy(false);
         setOverwriteAsk(null);
         if (error) {
-          showV2Toast(
-            "err",
-            error.includes("overwrite-off")
-              ? t("schedule.overwrite.off")
-              : t("schedule.toastSaveError"),
-          );
+          if (error.includes("schedule-player-limit-not-selected")) {
+            setMissingPlayPair({ variant: ask.variant, limit: ask.limit });
+          } else {
+            showV2Toast(
+              "err",
+              error.includes("overwrite-off")
+                ? t("schedule.overwrite.off")
+                : t("schedule.toastSaveError"),
+            );
+          }
           return;
         }
         if (action === "wipe") pingOwners();
@@ -1527,7 +1567,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
           >
-            {roster.length ? (
+            {roster.length || historicalRoster.length ? (
               <table
                 className="v2-people-table"
                 style={{ minWidth: 240 + auxiliaryLabels.length * 84 }}
@@ -1567,16 +1607,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                   </tr>
                 </thead>
                 <tbody>
-                  {roster.map((row) => {
+                  {[...roster, ...historicalRoster].map((row) => {
+                    const historical = row.n === 0;
                     const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
                     const guild = showNick(row.mark.discord) || "—";
                     const room = showNick(row.mark.room);
-                    const vip = vipOf(row.mark, kind);
+                    const vip = historical ? null : vipOf(row.mark, kind);
                     return (
+                      <Fragment key={row.mark.memberId || markKey(row.mark)}>
+                      {historical && row === historicalRoster[0] ? (
+                        <tr className="v2-people-historical-head">
+                          <td colSpan={5 + auxiliaryLabels.length}>{t("schedule.playersHistorical")}</td>
+                        </tr>
+                      ) : null}
                       <tr
-                        key={row.mark.memberId || markKey(row.mark)}
-                        className={`v2-people-row${vip ? " is-vip" : ""}`}
-                        title={vip ? t("cabinet.vipLabel") : undefined}
+                        className={`v2-people-row${vip ? " is-vip" : ""}${historical ? " is-historical" : ""}`}
+                        title={historical ? t("schedule.playersHistoricalHint") : vip ? t("cabinet.vipLabel") : undefined}
                         tabIndex={0}
                         onClick={() => {
                           setPeek(row);
@@ -1591,7 +1637,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                         }}
                       >
                         <td className={`v2-people-rank${vip ? " is-vip" : ""}`}>
-                          <b>{row.n}</b>
+                          <b>{historical ? null : row.n}</b>
                         </td>
                         <td>
                           <span className="v2-people-who">
@@ -1655,6 +1701,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                           </button>
                         </td>
                       </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1678,6 +1725,33 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             showTables={countTables && !hideTables}
           />
         ) : null}
+        <Dialog
+          open={Boolean(missingPlayPair)}
+          title={t("schedule.playLimitRequiredTitle")}
+          onClose={() => setMissingPlayPair(null)}
+          footer={(
+            <>
+              <Button variant="outline" onClick={() => setMissingPlayPair(null)}>{t("schedule.close")}</Button>
+              <Button
+                onClick={() => {
+                  setMissingPlayPair(null);
+                  window.location.hash = "cabinet-game";
+                }}
+              >
+                {t("schedule.openGameSettings")}
+              </Button>
+            </>
+          )}
+        >
+          {missingPlayPair ? (
+            <p className="v2-play-limit-required">
+              {t("schedule.playLimitRequiredBody", {
+                variant: missingPlayPair.variant === "nitro" ? "Nitro" : "Regular",
+                limit: formatLimit(missingPlayPair.limit),
+              })}
+            </p>
+          ) : null}
+        </Dialog>
         {overwriteAsk
           ? createPortal(
               <OverwriteConfirm

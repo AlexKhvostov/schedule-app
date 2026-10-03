@@ -13956,6 +13956,28 @@ img.v2-people-ava {
   background: color-mix(in srgb, #d4a017 28%, transparent);
 }
 
+.v2-people-historical-head td {
+  padding: 9px 6px 5px;
+  border-top: 2px solid color-mix(in srgb, var(--warning) 42%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  background: color-mix(in srgb, var(--warning) 7%, var(--card));
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.v2-people-row.is-historical td {
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+  color: var(--muted-foreground);
+}
+
+.v2-people-row.is-historical:hover td,
+.v2-people-row.is-historical:focus-visible td {
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+}
+
 .v2-people-rank {
   width: 24px;
   color: var(--muted-foreground);
@@ -13974,6 +13996,13 @@ img.v2-people-ava {
 .v2-people-rank.is-vip,
 .v2-people-rank.is-vip b {
   color: #c4920a;
+}
+
+.v2-play-limit-required {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .v2-people-who {

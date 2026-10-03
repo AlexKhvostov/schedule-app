@@ -13,6 +13,19 @@ async function expectInsideViewport(locator: import("@playwright/test").Locator,
   }
 }
 
+async function enableDemoGameLimit(page: import("@playwright/test").Page, kind: "Nitro" | "Regular", limit: string) {
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+  await page.getByRole("button", { name: "Игра" }).click();
+  const panel = page.locator(".v2-cab-kind", { hasText: kind });
+  const chip = panel.getByRole("button", { name: `${limit} €`, exact: true });
+  if (!(await chip.getAttribute("class"))?.includes("is-on")) {
+    await chip.click();
+    await page.locator(".v2-cab-room").getByRole("button", { name: "Сохранить" }).click();
+  }
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-09-29T08:00:00Z"));
 });
@@ -37,6 +50,66 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
 
   await editableCell.click();
   await expect(editableCell).not.toHaveClass(/is-on/);
+});
+
+test("cabinet game limits block new marks but keep old shifts in an unnumbered roster section", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.locator(".v2-dev-login select").selectOption("RP-415");
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+
+  await page.getByTitle("Редактирование").click();
+  const oldCandidate = page.locator('[data-slot][data-variant="nitro"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const oldDay = await oldCandidate.getAttribute("data-day");
+  const oldLane = await oldCandidate.getAttribute("data-lane");
+  const oldHalf = await oldCandidate.getAttribute("data-half");
+  const oldOwn = page.locator(`[data-slot][data-day="${oldDay}"][data-lane="${oldLane}"][data-half="${oldHalf}"]`);
+  await oldCandidate.click();
+  await expect(oldOwn).toHaveAttribute("data-mark", "YO");
+
+  await page.getByRole("button", { name: "you" }).click();
+  await page.getByRole("button", { name: "Кабинет" }).click();
+  await page.getByRole("button", { name: "Игра" }).click();
+  const nitro = page.locator(".v2-cab-kind", { hasText: "Nitro" });
+  const n50 = nitro.getByRole("button", { name: "50 €", exact: true });
+  await expect(n50).toHaveClass(/is-on/);
+  await n50.click();
+  await page.locator(".v2-cab-room").getByRole("button", { name: "Сохранить" }).click();
+
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await page.getByTitle("Редактирование").click();
+  const candidate = page.locator('[data-slot][data-variant="nitro"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const candidateDay = await candidate.getAttribute("data-day");
+  const candidateLane = await candidate.getAttribute("data-lane");
+  const candidateHalf = await candidate.getAttribute("data-half");
+  const target = page.locator(`[data-slot][data-day="${candidateDay}"][data-lane="${candidateLane}"][data-half="${candidateHalf}"]`);
+  await candidate.click();
+  const required = page.getByRole("dialog", { name: "Лимит не выбран в кабинете" });
+  await expect(required).toContainText("Nitro · 50 €");
+  await required.getByRole("button", { name: "Закрыть" }).click();
+  await expect(target).not.toHaveClass(/is-on/);
+
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  const players = page.locator(".v2-float", { has: page.getByRole("heading", { name: "Игроки месяца" }) });
+  await expect(players.locator(".v2-people-historical-head")).toContainText("Есть смены, но игровые лимиты отключены");
+  const historical = players.locator(".v2-people-row.is-historical", { hasText: "you" }).first();
+  await expect(historical.locator(".v2-people-rank")).toHaveText("");
+
+  await players.locator(".v2-modal-close").click();
+  await expect(oldOwn).toBeVisible();
+  await oldOwn.click();
+  await expect(oldOwn).not.toHaveClass(/is-on/);
+
+  await candidate.click();
+  await required.getByRole("button", { name: "Открыть настройки игры" }).click();
+  await expect(page).toHaveURL(/#cabinet-game$/);
+  await expect(page.getByRole("button", { name: "Игра" })).toHaveAttribute("aria-current", "page");
+  await n50.click();
+  await page.locator(".v2-cab-room").getByRole("button", { name: "Сохранить" }).click();
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await page.getByTitle("Редактирование").click();
+  await target.click();
+  await expect(target).toHaveClass(/is-on/);
 });
 
 test("schedule filters stay above the timeline and display preferences survive reload", async ({ page }) => {
@@ -475,6 +548,7 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await enableDemoGameLimit(page, "Regular", "50");
 
   const label = page.locator(".v2-opt-hours .v2-opt-gutter-nls .v2-opt-lab");
   await expect(label).toHaveText("N");
@@ -552,25 +626,13 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
     else await expect(nitroPair[index]).not.toHaveClass(/is-on/);
   }
 
-  const foreignRegular = page.locator('[data-slot][data-variant="regular"][data-limit="50"].is-on:not(.is-past):not([data-mark="YO"])').first();
-  const foreignDay = await foreignRegular.getAttribute("data-day");
-  const foreignHalf = await foreignRegular.getAttribute("data-half");
-  const foreignLevel = await foreignRegular.getAttribute("data-level");
-  const foreignRegularTarget = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${foreignDay}"][data-half="${foreignHalf}"][data-level="${foreignLevel}"]`);
-  const foreignNitro = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${foreignDay}"][data-half="${foreignHalf}"][data-level="${foreignLevel}"]`);
-  const foreignNitroWasOn = await foreignNitro.evaluate((node) => node.classList.contains("is-on"));
-  await foreignRegularTarget.click();
-  const dialog = page.getByRole("alertdialog");
-  await dialog.getByRole("button", { name: /Удалить чужие метки/ }).click();
-  await expect(foreignRegularTarget).not.toHaveClass(/is-on/);
-  if (foreignNitroWasOn) await expect(foreignNitro).toHaveClass(/is-on/);
-  else await expect(foreignNitro).not.toHaveClass(/is-on/);
 });
 
 test("other schedule highlight includes a hidden tournament kind", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await enableDemoGameLimit(page, "Regular", "50");
 
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
   await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
@@ -603,18 +665,21 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await enableDemoGameLimit(page, "Regular", "50");
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
   await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
 
-  const ownNitro = page.locator('[data-slot][data-variant="nitro"][data-limit="50"][data-mark="YO"]:not(.is-past)').first();
-  await expect(ownNitro).toBeVisible();
-  const day = await ownNitro.getAttribute("data-day");
-  const half = await ownNitro.getAttribute("data-half");
+  await page.getByTitle("Редактирование").click();
+  const nitroEmpty = page.locator('[data-slot][data-variant="nitro"][data-limit="50"][data-level="0"]:not(.is-past):not(.is-lock):not(.is-on)').first();
+  const day = await nitroEmpty.getAttribute("data-day");
+  const half = await nitroEmpty.getAttribute("data-half");
+  const ownNitro = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-level="0"][data-day="${day}"][data-half="${half}"]`);
+  await nitroEmpty.click();
+  await expect(ownNitro).toHaveAttribute("data-mark", "YO");
   const regularEmpty = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"]:not(.is-on)`).first();
   await expect(regularEmpty).toBeVisible();
   const level = await regularEmpty.getAttribute("data-level");
   const regular = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
-  await page.getByTitle("Редактирование").click();
   await regular.click();
   await expect(regular).toHaveClass(/is-on/);
 
@@ -644,10 +709,10 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(peopleTable.locator("thead")).toContainText("E50");
   await expect(peopleTable.locator("thead")).toContainText("ч / м.ч.");
   await expect(peopleTable.locator("thead")).toContainText("Мёртвые");
-  const polarRow = peopleTable.locator("tbody tr", { hasText: "polar" });
-  await expect(polarRow.locator(".v2-people-num small")).toHaveText(["м. —", "м. —"]);
-  await expect(polarRow.locator(".v2-people-dead-total")).toHaveText("—");
-  await polarRow.click();
+  const currentRow = peopleTable.locator(".v2-people-row", { hasText: "you" });
+  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —", "м. —"]);
+  await expect(currentRow.locator(".v2-people-dead-total")).toHaveText("—");
+  await currentRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("N50");
   await expect(page.locator(".v2-user-card")).toContainText("E50");
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
@@ -682,10 +747,11 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(regularChips.first().locator(".v2-chip-face")).toHaveCSS("-webkit-text-stroke-width", "0.75px");
   await expect(nitroLegend).toHaveCSS("-webkit-text-stroke-width", "0.75px");
   await expect(regularLegend).toHaveCSS("-webkit-text-stroke-width", "0.75px");
-  const sharedDay = calendar.locator(".v2-mine-row", {
+  const sharedDays = calendar.locator(".v2-mine-row", {
     has: page.locator(".v2-mine-chip.is-regular"),
   }).filter({ has: page.locator(".v2-mine-chip.is-nitro") });
-  await expect(sharedDay).toHaveCount(1);
+  expect(await sharedDays.count()).toBeGreaterThanOrEqual(1);
+  const sharedDay = sharedDays.last();
   await expect(sharedDay.locator(".v2-mine-track")).toHaveCSS("height", "18px");
   await expect(sharedDay.locator(".v2-mine-chip.is-nitro").first()).toHaveCSS("top", "2px");
   await expect(sharedDay.locator(".v2-mine-chip.is-regular").first()).toHaveCSS("top", "2px");

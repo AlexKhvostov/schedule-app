@@ -19,6 +19,25 @@ export type RosterRow = {
   left: number;
 };
 
+export type RosterGroups = {
+  active: RosterRow[];
+  historical: RosterRow[];
+};
+
+export function groupRosterRows(
+  activeRows: readonly RosterRow[],
+  occupiedRows: readonly RosterRow[],
+  eligibleMemberIds: ReadonlySet<string>,
+): RosterGroups {
+  const active = activeRows.map((row, index) => ({ ...row, n: index + 1 }));
+  const activeKeys = new Set(active.map((row) => personKey(row.mark)));
+  const historical = occupiedRows
+    .filter((row) => !activeKeys.has(personKey(row.mark)))
+    .filter((row) => !row.mark.memberId || !eligibleMemberIds.has(row.mark.memberId))
+    .map((row) => ({ ...row, n: 0 }));
+  return { active, historical };
+}
+
 export function hoursFromSlots(slots: number) {
   return Math.round((slots / 2) * 10) / 10;
 }

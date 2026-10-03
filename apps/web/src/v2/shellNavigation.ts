@@ -48,6 +48,6 @@ export function resolveShellPage(context: NavigationContext, hash: string): Shel
   if (can("admin.people") && (hash === "#admin" || hash === "#admin-people")) return "admin-people";
   if (context.access === "active" && can("schedule") && hash === "#schedule") return "schedule";
   if (context.access === "active" && can("priorities") && hash === "#priorities") return "priorities";
-  if (can("profile") && hash === "#cabinet") return "cabinet";
+  if (can("profile") && (hash === "#cabinet" || hash === "#cabinet-game")) return "cabinet";
   return defaultShellPage(context);
 }

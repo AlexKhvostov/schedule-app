@@ -142,6 +142,19 @@ begin
     raise exception 'notification delivery audit must remain service-role only';
   end if;
 
+  if not exists (
+    select 1
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'occupancy'
+      and t.tgname = 'occupancy_player_limit_insert'
+      and not t.tgisinternal
+  ) then
+    raise exception 'new occupancy must require the target player cabinet limit';
+  end if;
+
   if not has_table_privilege('authenticated', 'public.app_roles', 'SELECT')
      or has_table_privilege('authenticated', 'public.app_roles', 'INSERT')
      or has_table_privilege('authenticated', 'public.app_roles', 'UPDATE')

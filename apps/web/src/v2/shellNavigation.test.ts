@@ -10,6 +10,7 @@ describe("shell navigation", () => {
   it("keeps allowed direct links", () => {
     const context = { isRoot: false, permissions: ["profile", "schedule", "priorities", "admin.people"], access: "active" as const };
     expect(resolveShellPage(context, "#cabinet")).toBe("cabinet");
+    expect(resolveShellPage(context, "#cabinet-game")).toBe("cabinet");
     expect(resolveShellPage(context, "#priorities")).toBe("priorities");
     expect(resolveShellPage(context, "#admin-distance")).toBe("admin-distance");
   });

@@ -10,6 +10,7 @@ declare
   v_member_id uuid;
   v_kind_count bigint;
   v_disabled_kind uuid;
+  v_player_id uuid;
   v_slot_date date := current_date + 7;
   v_nitro text[];
   v_regular text[];
@@ -43,9 +44,17 @@ begin
   insert into member_roles (member_id, role_id)
   values (v_member_id, 'root');
 
-  perform set_config('request.jwt.claim.sub', v_auth_id::text, true);
   select count(*) into v_kind_count from schedule_kinds;
   select id into v_disabled_kind from schedule_kinds where variant_id = 'nitro' and limit_id = '25';
+
+  insert into players (member_id, room_id)
+  select v_member_id, room_id from schedule_kinds where id = v_disabled_kind
+  returning id into v_player_id;
+
+  insert into player_limits (player_id, variant_id, limit_id)
+  values (v_player_id, 'nitro', '25');
+
+  perform set_config('request.jwt.claim.sub', v_auth_id::text, true);
 
   -- A clean reset applies migrations before seed data. The settings row can
   -- therefore still contain its safe 50-only default after seed adds Nitro 25.

@@ -194,7 +194,9 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const [playId, setPlayId] = useState(() => plays[0]?.id ?? "");
   const [channel, setChannel] = useState<NotifyChannel>("discord");
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>("discord");
-  const [activeTab, setActiveTab] = useState<CabinetTab>("profile");
+  const [activeTab, setActiveTab] = useState<CabinetTab>(() =>
+    typeof window !== "undefined" && window.location.hash === "#cabinet-game" ? "game" : "profile",
+  );
   const [presetsDirty, setPresetsDirty] = useState(false);
 
   useEffect(() => {
