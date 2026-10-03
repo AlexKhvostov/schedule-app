@@ -1,23 +1,26 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { formatLimit } from "../schedule/capacity";
 import { weekdayLabelsMonFirst } from "../schedule/formatDate";
 import type { Mark } from "../schedule/marks";
 import { formatHours } from "../schedule/roster";
 import type { SchedulePlayer } from "../data/players";
 import { myHoursMatrix } from "./myShifts";
+import type { DeadTimeBreakdown } from "../schedule/deadTimeStats";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { heatFill, rowInitials, whoLines } from "./schedulePresentation";
 import { V2Float } from "./V2Float";
 import { scheduleZoomPercent } from "./scheduleZoom";
+import { displayScheduleColumn } from "./variantSchedule";
 
 export function BarMark({
   me,
   tables,
-  onBump,
-  onDraft,
+  tablePresets,
+  tablePresetOwnerId,
+  onTableSelect,
+  onLoadTablePresets,
   canActAs,
   players,
   selfId,
@@ -32,9 +35,11 @@ export function BarMark({
   onToggleBusy,
 }: {
   me: Mark;
-  tables: string;
-  onBump: (delta: number) => void;
-  onDraft: (value: string) => void;
+  tables: number;
+  tablePresets: readonly number[];
+  tablePresetOwnerId?: string;
+  onTableSelect: (value: number, memberId?: string, presets?: readonly number[]) => void;
+  onLoadTablePresets: (memberId: string) => Promise<{ values: number[]; active: number }>;
   canActAs?: boolean;
   players: SchedulePlayer[];
   selfId?: string;
@@ -52,14 +57,27 @@ export function BarMark({
   const boxRef = useRef<HTMLDivElement>(null);
   const hitRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [whoOpen, setWhoOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState<"presets" | "players">("presets");
+  const [presetPlayer, setPresetPlayer] = useState<SchedulePlayer>();
+  const [otherPresets, setOtherPresets] = useState<number[]>([]);
+  const [otherActive, setOtherActive] = useState(1);
+  const [otherLoading, setOtherLoading] = useState(false);
+  const presetRequest = useRef(0);
   const [menuBox, setMenuBox] = useState<{ top: number; left: number; maxH: number } | null>(null);
-  const n = Number(tables) || me.tables;
+  const n = tables || me.tables;
+  const ownPresetsReady = !me.memberId || tablePresetOwnerId === me.memberId;
+  const menuMark = presetPlayer
+    ? { t: presetPlayer.markTag, bg: presetPlayer.markBg, fg: presetPlayer.markFg, discord: presetPlayer.nick }
+    : me;
+  const menuPresets = presetPlayer ? otherPresets : tablePresets;
+  const menuActive = presetPlayer ? otherActive : n;
+  const presetsReady = presetPlayer ? !otherLoading : ownPresetsReady;
   const isOther = Boolean(actingId && selfId && actingId !== selfId);
   const shown = [...players].sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
 
   useEffect(() => {
-    if (!whoOpen) {
+    if (!menuOpen) {
       setMenuBox(null);
       return;
     }
@@ -83,10 +101,10 @@ export function BarMark({
     const close = (event: MouseEvent) => {
       const node = event.target as Node;
       if (boxRef.current?.contains(node) || menuRef.current?.contains(node)) return;
-      setWhoOpen(false);
+      setMenuOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setWhoOpen(false);
+      if (event.key === "Escape") setMenuOpen(false);
     };
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
@@ -98,7 +116,7 @@ export function BarMark({
       window.removeEventListener("mousedown", close);
       window.removeEventListener("keydown", onKey);
     };
-  }, [whoOpen]);
+  }, [menuOpen]);
 
   const slot = (
     <span className="v2-mark-sample">
@@ -112,15 +130,21 @@ export function BarMark({
       className={`v2-bar-pack v2-bar-mark${isOther ? " is-proxy" : ""}${countTables ? " is-tables" : ""}${editOn ? " is-edit" : ""}`}
       title={isOther ? t("schedule.actAsWarn") : me.t}
     >
-      {canActAs ? (
+      {canActAs || countTables ? (
         <button
           ref={hitRef}
           type="button"
           className={`v2-bar-mark-hit${isOther ? " is-other" : ""}`}
-          title={isOther ? t("schedule.actAsWarn") : t("schedule.actAsLabel")}
-          aria-label={me.t}
-          aria-expanded={whoOpen}
-          onClick={() => setWhoOpen((value) => !value)}
+          title={isOther ? t("schedule.actAsWarn") : countTables ? t("schedule.tableBrushMenu") : t("schedule.actAsLabel")}
+          aria-label={countTables ? t("schedule.tableBrushMenu") : me.t}
+          aria-expanded={menuOpen}
+          onClick={() => {
+            if (!menuOpen) {
+              setPresetPlayer(undefined);
+              setMenuView(countTables ? "presets" : "players");
+            }
+            setMenuOpen((value) => !value);
+          }}
         >
           {slot}
         </button>
@@ -167,62 +191,113 @@ export function BarMark({
           ) : null}
         </span>
       ) : null}
-      {countTables ? (
-        <div className="v2-mark-dock-step" title={t("schedule.markCardTables")}>
-          <button type="button" aria-label="−1" onClick={() => onBump(-1)}>
-            <i className="fa-solid fa-minus" />
-          </button>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={30}
-            value={tables}
-            onChange={(event) => onDraft(event.target.value)}
-          />
-          <button type="button" aria-label="+1" onClick={() => onBump(1)}>
-            <i className="fa-solid fa-plus" />
-          </button>
-        </div>
-      ) : null}
-      {whoOpen && menuBox
+      {menuOpen && menuBox
         ? createPortal(
             <div
               ref={menuRef}
               className="v2-mark-dock-who-menu v2-bar-mark-who"
               style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxH }}
+              role="dialog"
+              aria-label={menuView === "presets" ? t("schedule.tableBrushMenu") : t("schedule.actAsLabel")}
             >
-              <ul>
-                {shown.length ? (
-                  shown.map((row) => {
-                    const names = whoLines(row);
-                    return (
-                      <li key={row.id}>
-                        <button
-                          type="button"
-                          className={row.id === actingId ? "is-on" : ""}
-                          onClick={() => {
-                            onActAs(row.id);
-                            setWhoOpen(false);
-                          }}
-                        >
-                          <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
-                          <span className="v2-mark-sample">
-                            <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
-                          </span>
-                          <span className="v2-mark-dock-who-copy">
-                            <b>{names.title}</b>
-                            {names.sub ? <small>{names.sub}</small> : null}
-                          </span>
-                          {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
-                        </button>
-                      </li>
-                    );
-                  })
-                ) : (
-                  <li className="is-empty">{t("schedule.actAsEmpty")}</li>
-                )}
-              </ul>
+              {menuView === "presets" && countTables ? (
+                <>
+                  <p className="v2-table-brush-title">{t("schedule.tableBrushPickFor", { player: menuMark.discord || menuMark.t })}</p>
+                  {presetsReady ? (
+                    <ul className="v2-table-brush-list">
+                      {menuPresets.map((value) => (
+                        <li key={value}>
+                          <button
+                            type="button"
+                            className={value === menuActive ? "is-on" : ""}
+                            aria-pressed={value === menuActive}
+                            aria-label={t("schedule.tableBrushTables", { count: value })}
+                            onClick={() => {
+                              onTableSelect(value, presetPlayer?.id, menuPresets);
+                              setMenuOpen(false);
+                            }}
+                          >
+                            <span className="v2-mark-sample">
+                              <ScheduleSlot letters={menuMark.t} bg={menuMark.bg} fg={menuMark.fg} tables={value} showTables />
+                            </span>
+                            <span className="v2-mark-dock-who-copy">
+                              <b>{t("schedule.tableBrushTables", { count: value })}</b>
+                            </span>
+                            {value === menuActive ? <i className="fa-solid fa-check" aria-hidden /> : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="v2-table-brush-loading" role="status">{t("schedule.tableBrushLoading")}</p>
+                  )}
+                  {canActAs ? (
+                    <button type="button" className="v2-table-brush-other" onClick={() => setMenuView("players")}>
+                      <i className="fa-solid fa-users" aria-hidden />
+                      <span>{t("schedule.tableBrushOtherPlayer")}</span>
+                      <i className="fa-solid fa-angle-right" aria-hidden />
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {countTables ? (
+                    <button type="button" className="v2-table-brush-back" onClick={() => {
+                      setPresetPlayer(undefined);
+                      setMenuView("presets");
+                    }}>
+                      <i className="fa-solid fa-angle-left" aria-hidden />
+                      <span>{t("schedule.tableBrushBack")}</span>
+                    </button>
+                  ) : null}
+                  <ul>
+                    {shown.length ? (
+                      shown.map((row) => {
+                        const names = whoLines(row);
+                        return (
+                          <li key={row.id}>
+                            <button
+                              type="button"
+                              className={row.id === actingId ? "is-on" : ""}
+                              onClick={() => {
+                                if (!countTables) {
+                                  onActAs(row.id);
+                                  setMenuOpen(false);
+                                  return;
+                                }
+                                const request = ++presetRequest.current;
+                                setPresetPlayer(row);
+                                setOtherPresets([]);
+                                setOtherActive(row.tables);
+                                setOtherLoading(true);
+                                setMenuView("presets");
+                                void onLoadTablePresets(row.id).then((selection) => {
+                                  if (presetRequest.current !== request) return;
+                                  setOtherPresets(selection.values);
+                                  setOtherActive(selection.active);
+                                  setOtherLoading(false);
+                                });
+                              }}
+                            >
+                              <PersonAvatar src={row.avatarUrl} label={rowInitials(names.title, row.markTag)} size="sm" />
+                              <span className="v2-mark-sample">
+                                <ScheduleSlot letters={row.markTag} bg={row.markBg} fg={row.markFg} tables={row.tables} showTables={countTables} />
+                              </span>
+                              <span className="v2-mark-dock-who-copy">
+                                <b>{names.title}</b>
+                                {names.sub ? <small>{names.sub}</small> : null}
+                              </span>
+                              {row.id === selfId ? <i>{t("schedule.actAsSelf")}</i> : null}
+                            </button>
+                          </li>
+                        );
+                      })
+                    ) : (
+                      <li className="is-empty">{t("schedule.actAsEmpty")}</li>
+                    )}
+                  </ul>
+                </>
+              )}
             </div>,
             document.body,
           )
@@ -296,6 +371,7 @@ export function MobileScheduleDock({
 
 export function HoursPanel({
   matrix,
+  deadTime,
   year,
   monthIndex,
   x,
@@ -306,6 +382,7 @@ export function HoursPanel({
   onClose,
 }: {
   matrix: ReturnType<typeof myHoursMatrix>;
+  deadTime: DeadTimeBreakdown | null;
   year: number;
   monthIndex: number;
   x: number;
@@ -344,8 +421,8 @@ export function HoursPanel({
             <thead>
               <tr>
                 <th>{t("schedule.hoursStatLimit")}</th>
-                <th title={t("schedule.hoursStatMarksHint")}>{t("schedule.hoursStatMarks")}</th>
                 <th title={t("schedule.hoursStatHoursHint")}>{t("schedule.hoursStatHours")}</th>
+                <th className="is-dead" title={t("schedule.hoursStatDeadHint")}>{t("schedule.hoursStatDead")}</th>
                 <th className="is-left" title={t("schedule.hoursStatLeftHint")}>
                   {t("schedule.hoursStatLeft")}
                 </th>
@@ -354,9 +431,11 @@ export function HoursPanel({
             <tbody>
               {cols.map((limit) => (
                 <tr key={limit}>
-                  <th>{formatLimit(limit)}</th>
-                  <td className={matrix.counts[limit] ? "is-on" : ""}>{matrix.counts[limit] || 0}</td>
+                  <th>{displayScheduleColumn(limit)}</th>
                   <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
+                  <td className={`is-dead${deadTime?.byPair[limit] ? " is-on" : ""}`}>
+                    {deadTime ? formatHours(deadTime.byPair[limit] || 0) : "—"}
+                  </td>
                   <td className={`is-left${matrix.left[limit] ? " is-on" : ""}`}>{formatHours(matrix.left[limit] || 0)}</td>
                 </tr>
               ))}
@@ -364,8 +443,10 @@ export function HoursPanel({
             <tfoot>
               <tr>
                 <th>{t("schedule.hoursStatTotal")}</th>
-                <td className={matrix.countGrand ? "is-on" : ""}>{matrix.countGrand || 0}</td>
                 <td className={matrix.grand ? "is-on" : ""}>{formatHours(matrix.grand || 0)}</td>
+                <td className={`is-dead${deadTime?.total ? " is-on" : ""}`}>
+                  {deadTime ? formatHours(deadTime.total) : "—"}
+                </td>
                 <td className={`is-left is-grand${matrix.leftGrand ? " is-on" : ""}`}>{formatHours(matrix.leftGrand || 0)}</td>
               </tr>
             </tfoot>

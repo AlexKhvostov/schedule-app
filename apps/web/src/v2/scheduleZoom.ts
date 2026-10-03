@@ -17,8 +17,8 @@ export function scheduleZoomScrollLeft(contentHalf: number, cellWidth: number, f
   return Math.max(0, fixedWidth + contentHalf * scheduleCellStride(cellWidth) - focalX);
 }
 
-export function fitScheduleCellWidth(viewportWidth: number, fixedWidth = 70, safety = 16) {
-  return clampScheduleCellWidth((viewportWidth - fixedWidth - safety) / (48 + 47 * 0.15));
+export function fitScheduleCellWidth(viewportWidth: number, fixedWidth = 70, safety = 16, slotCount = 48) {
+  return clampScheduleCellWidth((viewportWidth - fixedWidth - safety) / (slotCount + Math.max(0, slotCount - 1) * 0.15));
 }
 
 export function scheduleZoomCanEdit(cellWidth: number) {

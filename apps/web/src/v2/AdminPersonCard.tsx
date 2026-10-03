@@ -20,6 +20,7 @@ import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
 import { Field, NotifyPicks } from "./cabinetUi";
 import { PermanentPriority } from "./PermanentPriority";
 import { ScheduleSlot } from "./ScheduleSlot";
+import { TablePresetsPanel } from "./TablePresetsPanel";
 import { PersonAvatar } from "./PersonAvatar";
 import { loadTheme } from "./theme";
 import { PayMethodsPanel } from "./PayMethodsPanel";
@@ -166,7 +167,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const [channel, setChannel] = useState<NotifyChannel>(person.notifyChannel ?? "discord");
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>(person.notifyChannel ?? "discord");
 
-  const [tables, setTables] = useState(String(person.tables ?? 1));
   const [vipNitro, setVipNitro] = useState(vipText(person.vipNitro));
   const [vipRegular, setVipRegular] = useState(vipText(person.vipRegular));
   const [community, setCommunity] = useState<"school" | "club">(person.communityStatus === "school" ? "school" : "club");
@@ -192,7 +192,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     setExtraUtc(person.extraUtc ?? 3);
     setChannel(person.notifyChannel ?? "discord");
     setSavedChannel(person.notifyChannel ?? "discord");
-    setTables(String(person.tables ?? 1));
     setVipNitro(vipText(person.vipNitro));
     setVipRegular(vipText(person.vipRegular));
     setCommunity(person.communityStatus === "school" ? "school" : "club");
@@ -248,7 +247,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   };
   const profileDirty = !sameJson(profileDraft, profileSaved);
   const clubDirty =
-    Number(tables) !== (person.tables ?? 1) ||
     vipNitro !== vipText(person.vipNitro) ||
     vipRegular !== vipText(person.vipRegular) ||
     community !== (person.communityStatus === "school" ? "school" : "club") ||
@@ -324,7 +322,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     if (!person.memberId) return;
     setSaving(true);
     const club = await saveMemberClub(person.memberId, {
-      tables: Number(tables) || 1,
       vipNitro: Number(vipNitro) || 0,
       vipRegular: Number(vipRegular) || 0,
       communityStatus: community,
@@ -384,7 +381,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
           </div>
           {person.markTag ? (
             <span className="v2-mark-chip">
-              <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
+              <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} tables={person.tables ?? 1} showTables={countTables} />
             </span>
           ) : null}
           <button type="button" className="v2-ctrl px-3" onClick={onClose}>
@@ -487,7 +484,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                 <div className="v2-cab-spread">
                   <div className="v2-cab-idline is-mark">
                     <span className="v2-mark-chip">
-                      <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
+                      <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} tables={person.tables ?? 1} showTables={countTables} />
                     </span>
                     <div className="v2-cab-idcopy">
                       <b>{person.markTag || t("cabinet.markNone")}</b>
@@ -509,18 +506,13 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   <StaffOnly>
                     <div className="v2-club-mark-row mt-0">
                       <span className="v2-mark-chip">
-                        <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} showTables={countTables} />
+                        <ScheduleSlot letters={person.markTag} bg={person.markBg} fg={person.markFg} tables={person.tables ?? 1} showTables={countTables} />
                       </span>
                       <button type="button" className="v2-ctrl px-3" onClick={onMark}>
                         {t("admin.people.markEdit")}
                       </button>
                     </div>
                     <div className="v2-club-form">
-                      {countTables ? (
-                        <Field label={t("cabinet.tables")} hint={t("admin.people.tablesHint")}>
-                          <input className="v2-ctrl w-full px-3" inputMode="numeric" value={tables} onChange={(event) => setTables(event.target.value.replace(/[^\d]/g, "").slice(0, 2))} />
-                        </Field>
-                      ) : null}
                       <Field label={t("cabinet.communityTitle")} hint={t("cabinet.communityHint")}>
                         <select className="v2-ctrl w-full px-2" value={community} onChange={(event) => setCommunity(event.target.value as "school" | "club")}>
                           <option value="club">{t("cabinet.community.club")}</option>
@@ -590,7 +582,6 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       busy={saving}
                       onSave={() => void saveClub()}
                       onCancel={() => {
-                        setTables(String(person.tables ?? 1));
                         setVipNitro(vipText(person.vipNitro));
                         setVipRegular(vipText(person.vipRegular));
                         setCommunity(person.communityStatus === "school" ? "school" : "club");
@@ -702,6 +693,15 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   onBindGoogle={bindGoogle}
                   onUnbindGoogle={unbindGoogle}
                 />
+
+                {person.memberId ? (
+                  <TablePresetsPanel
+                    memberId={person.memberId}
+                    fallback={person.tables ?? 1}
+                    live
+                    canEdit={canEdit}
+                  />
+                ) : null}
 
                 <CabinetPlaysPanel
                   plays={plays}

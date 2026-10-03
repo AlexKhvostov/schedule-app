@@ -2,20 +2,23 @@ import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type Point
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { readCet, isPastDay } from "../schedule/cet";
-import { LIMIT_OPTIONS, formatLimit, limitTone } from "../schedule/capacity";
+import { limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { formatDayLong } from "../schedule/formatDate";
-import { downloadCalendarJpeg } from "./calendarJpeg";
+import { DEFAULT_WORK_HOURS, visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
+import { downloadCalendarJpeg, type CalendarShiftRun } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
-import { myShifts, myTimeline, runsFromLane, shiftHours } from "./myShifts";
-import { fitFloat } from "./windowPos";
+import { hourBoundaries, myShifts, uniqueShiftHours } from "./myShifts";
+import { fitBox, fitFloat } from "./windowPos";
+import type { VariantGridItem } from "./variantSchedule";
 
 type Props = {
   year: number;
   monthIndex: number;
   title: string;
   tag: string;
+  columns: VariantGridItem[];
   grids: Record<string, Occupancy>;
   today: number | null;
   x: number;
@@ -26,20 +29,17 @@ type Props = {
   onClose: () => void;
 };
 
-const SLOT_COUNT = 48;
+type Hover = { day: number; start: number; end: number; limit: string; label: string; x: number; y: number };
 
-type Hover = { day: number; start: number; end: number; limit: string; x: number; y: number };
-
-function runBox(start: number, len: number) {
+function runBox(visibleStart: number, span: number, slotCount: number) {
   return {
-    left: `${(start / SLOT_COUNT) * 100}%`,
-    width: `${(len / SLOT_COUNT) * 100}%`,
+    left: `${(visibleStart / slotCount) * 100}%`,
+    width: `${(span / slotCount) * 100}%`,
   };
 }
 
-function nowLineLeft(half: number, progress: number) {
-  const t = half + Math.min(1, Math.max(0, progress));
-  return `${(t / SLOT_COUNT) * 100}%`;
+function nowLineLeft(half: number, progress: number, workHours: number[]) {
+  return `${(workTrackProgress(half, progress, workHours) ?? 0) * 100}%`;
 }
 
 function clock(half: number, hourShift = 0) {
@@ -56,15 +56,15 @@ function mineTone(limit: string) {
   return limitTone(limit);
 }
 
-function limitInk(limit: string) {
-  return limit === "25" ? "#14532d" : "#071014";
+function endsSixHourSection(hour: number) {
+  return (hour + 1) % 6 === 0 && hour < 23;
 }
 
 function HourCells() {
   return (
     <>
-      {Array.from({ length: 24 }, (_, hour) => (
-        <i key={hour} className={`v2-mine-hcell${hour === 5 || hour === 11 || hour === 17 ? " is-major" : ""}`} />
+      {workHourSegments(DEFAULT_WORK_HOURS).map((segment) => (
+        <i key={segment.hour} className={`v2-mine-hcell${endsSixHourSection(segment.hour) ? " is-major" : ""}`} style={{ gridColumn: `span ${segment.span}` }} />
       ))}
     </>
   );
@@ -95,7 +95,7 @@ function useFitScale(ref: RefObject<HTMLElement | null>) {
   return box;
 }
 
-export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
+export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
   const { t, i18n } = useTranslation();
   const mineRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ ox: number; oy: number } | null>(null);
@@ -106,20 +106,32 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
   const [cet] = useState(() => readCet());
   const playerClock = usePlayerClock();
   const days = useMemo(() => daysInMonth(year, monthIndex, i18n.language), [year, monthIndex, i18n.language]);
-  const lanes = useMemo(() => myTimeline(grids, tag), [grids, tag]);
-  const runs = useMemo(() => myShifts(grids, tag), [grids, tag]);
-  const usedLimits = LIMIT_OPTIONS.filter((limit) => runs.some((run) => run.limit === limit));
-  const hours = Array.from({ length: 24 }, (_, hour) => hour);
+  const allRuns = useMemo(() => columns.flatMap((column) =>
+      myShifts(grids, tag, [column.label]).map((run) => ({
+        ...run,
+        label: column.label,
+        rawLimit: column.limit,
+        variant: column.variant,
+      })),
+    ) as CalendarShiftRun[], [columns, grids, tag]);
+  const runs = allRuns;
+  const usedColumns = columns.filter((column) => runs.some((run) => run.label === column.label));
+  const physicalHours = uniqueShiftHours(allRuns);
+  const hours = workHourSegments(DEFAULT_WORK_HOURS);
+  const visibleSlotCount = workHalfSlots(DEFAULT_WORK_HOURS).length;
   const hoverHour = hover ? Math.floor(hover.start / 2) : null;
   const theme = loadTheme();
+  const placed = fit.w && typeof window !== "undefined"
+    ? fitBox(x, y, fit.w * fit.scale, fit.h * fit.scale, window.innerWidth, window.innerHeight)
+    : { x, y };
 
-  const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string) => {
+  const placeTip = (event: MouseEvent<HTMLElement>, day: number, start: number, end: number, limit: string, label: string) => {
     const box = event.currentTarget.getBoundingClientRect();
     let x = box.right + 8;
     let y = box.top;
     if (x + 220 > window.innerWidth - 8) x = Math.max(8, box.left - 228);
     if (y + 110 > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 118);
-    setHover({ day, start, end, limit, x, y });
+    setHover({ day, start, end, limit, label, x, y });
   };
 
   const tip = hover ? (
@@ -143,7 +155,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
         ) : null}
       </div>
       <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-        {formatLimit(hover.limit)}
+        {hover.label}
       </div>
     </div>
   ) : null;
@@ -155,8 +167,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
           className={`v2-mine-fit is-float is-kit theme-${theme}`}
           style={{
             position: "fixed",
-            left: x,
-            top: y,
+            left: placed.x,
+            top: placed.y,
             zIndex: z,
             ...(fit.w ? { width: fit.w * fit.scale, height: fit.h * fit.scale } : {}),
           }}
@@ -172,7 +184,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
           onPointerDown={(event: PointerEvent<HTMLElement>) => {
             if ((event.target as HTMLElement).closest("button")) return;
             event.currentTarget.setPointerCapture(event.pointerId);
-            drag.current = { ox: event.clientX - x, oy: event.clientY - y };
+            const box = event.currentTarget.closest(".v2-mine-fit")?.getBoundingClientRect();
+            drag.current = { ox: event.clientX - (box?.left ?? placed.x), oy: event.clientY - (box?.top ?? placed.y) };
           }}
           onPointerMove={(event: PointerEvent<HTMLElement>) => {
             if (!drag.current) return;
@@ -197,8 +210,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
           <div className="v2-mine-who">
             <strong>{title}</strong>
             <span className="v2-mine-tag">{tag}</span>
-            <span className="v2-mine-stat">{t("schedule.myShifts", { n: runs.length })}</span>
-            <span className="v2-mine-stat">{t("schedule.myHours", { n: shiftHours(runs) })}</span>
+            <span className="v2-mine-stat">{t("schedule.myShifts", { n: allRuns.length })}</span>
+            <span className="v2-mine-stat">{t("schedule.myHours", { n: physicalHours })}</span>
           </div>
           <label className="v2-mine-toggle">
             <input
@@ -216,75 +229,71 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
               {t("v2.day")}
               <small>CET</small>
             </div>
-            <div className="v2-mine-hours-grid">
-              {hours.map((h) => (
-                <span key={h} className={`v2-mine-hour${hoverHour === h ? " is-on" : ""}`}>
-                  {h}
+            <div className="v2-mine-hours-grid" style={{ ["--mine-visible-slots" as string]: visibleSlotCount }}>
+              {hours.map((segment) => (
+                <span key={segment.hour} className={`v2-mine-hour${endsSixHourSection(segment.hour) ? " is-major" : ""}${hoverHour === segment.hour ? " is-on" : ""}`} style={{ gridColumn: `span ${segment.span}` }}>
+                  {segment.hour}
                 </span>
               ))}
             </div>
           </div>
 
-          {days.map((day, dayIdx) => {
+          {days.map((day) => {
             const isToday = today === day.d;
             const past = isPastDay(year, monthIndex, day.d, cet);
-            const dayRuns = runsFromLane(lanes[dayIdx] ?? [], day.d);
+            const dayRuns = runs.filter((run) => run.day === day.d);
             const hovered = hover?.day === day.d;
             return (
               <div
                 key={day.d}
-                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}`}
+                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}${day.d > 1 && day.dow === 1 ? " is-week-start" : ""}`}
               >
                 <div className="v2-mine-date v2-mono">
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
-                <div className="v2-mine-track">
+                <div className="v2-mine-track" style={{ ["--mine-visible-slots" as string]: visibleSlotCount }}>
                   <HourCells />
-                  {dayRuns.map((run) => {
-                    const len = run.end - run.start;
-                    const box = runBox(run.start, len);
+                  {dayRuns.flatMap((run) => visibleWorkRuns(run.start, run.end, DEFAULT_WORK_HOURS).map((segment, segmentIndex) => {
+                    const len = segment.span;
+                    const box = runBox(segment.visibleStart, segment.span, visibleSlotCount);
                     const nowAt = cet.half + cet.slotProgress;
-                    const runPast = past || (isToday && run.end <= nowAt);
+                    const runPast = past || (isToday && segment.end <= nowAt);
                     const liveCut =
-                      isToday && !runPast && run.start < nowAt && run.end > nowAt
-                        ? `${((nowAt - run.start) / len) * 100}%`
+                      isToday && !runPast && segment.start < nowAt && segment.end > nowAt
+                        ? `${((nowAt - segment.start) / len) * 100}%`
                         : null;
                     return (
                       <button
-                        key={`${run.limit}-${run.start}`}
+                        key={`${run.label}-${run.start}-${segmentIndex}`}
                         type="button"
-                        className={`v2-mine-chip${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
+                        className={`v2-mine-chip is-${run.variant}${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
                         style={{
                           left: box.left,
                           width: box.width,
-                          background: mineTone(run.limit),
-                          color: limitInk(run.limit),
+                          background: mineTone(run.rawLimit),
                         }}
-                        onMouseEnter={(event) => placeTip(event, day.d, run.start, run.end, run.limit)}
+                        onMouseEnter={(event) => placeTip(event, day.d, segment.start, segment.end, run.rawLimit, run.label)}
                         onMouseLeave={() => setHover(null)}
                       >
                         {liveCut && dimPastShifts && <span className="v2-mine-chip-dim" style={{ width: liveCut }} aria-hidden />}
                         {len > 1 && (
                           <span className="v2-chip-ticks" aria-hidden>
-                            {Array.from({ length: len - 1 }, (_, i) => {
-                              const at = run.start + i + 1;
-                              return (
-                                <i
-                                  key={i}
-                                  className={at % 2 === 0 ? "is-hour" : undefined}
-                                  style={{ left: `${((i + 1) / len) * 100}%` }}
-                                />
-                              );
-                            })}
+                            {hourBoundaries(segment.start, segment.end).map((at) => (
+                              <i
+                                key={at}
+                                className="is-hour"
+                                style={{ left: `${((at - segment.start) / len) * 100}%` }}
+                              />
+                            ))}
                           </span>
                         )}
                         <span className="v2-chip-face">
-                          {len >= 6 ? `NL ${run.limit}` : run.limit}
+                          {len >= 4 ? run.label : run.label.slice(0, 1)}
                         </span>
                       </button>
                     );
-                  })}
-                  {isToday && dimPastShifts && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress) }} aria-hidden />}
+                  }))}
+                  {isToday && dimPastShifts && workTrackProgress(cet.half, cet.slotProgress, DEFAULT_WORK_HOURS) != null && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress, DEFAULT_WORK_HOURS) }} aria-hidden />}
                 </div>
               </div>
             );
@@ -293,10 +302,10 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
 
         <footer className="v2-mine-foot">
           <div className="v2-mine-legends">
-            {usedLimits.map((limit) => (
-              <span key={limit} className="v2-mine-legend">
-                <i style={{ background: mineTone(limit) }} />
-                {formatLimit(limit)}
+            {usedColumns.map((column) => (
+              <span key={column.key} className={`v2-mine-legend is-${column.variant}`}>
+                <i style={{ background: mineTone(column.limit) }} />
+                {column.label}
               </span>
             ))}
           </div>
@@ -314,12 +323,12 @@ export function V2MyCalendar({ year, monthIndex, title, tag, grids, today, x, y,
                 tag,
                 days,
                 runs,
-                usedLimits,
+                usedColumns: usedColumns.map((column) => ({ label: column.label, limit: column.limit, variant: column.variant })),
                 today,
                 dimPast: dimPastShifts,
                 nowAt: cet.half + cet.slotProgress,
                 kicker: t("schedule.myCalendar"),
-                meta: `${tag} · ${t("schedule.myShifts", { n: runs.length })} · ${t("schedule.myHours", { n: shiftHours(runs) })}`,
+                meta: `${tag} · ${t("schedule.myShifts", { n: allRuns.length })} · ${t("schedule.myHours", { n: physicalHours })}`,
                 dayLabel: t("v2.day"),
               }).finally(() => setSaving(false));
             }}

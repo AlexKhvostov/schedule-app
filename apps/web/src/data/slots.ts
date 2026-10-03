@@ -19,6 +19,37 @@ export type MonthGridsResult = {
   error?: string;
 };
 
+export type ScheduleVariant = "nitro" | "regular";
+export type MonthGridStore = Record<string, Occupancy>;
+export type MultiMonthGridsResult = {
+  grids: MonthGridStore;
+  loaded: ScheduleVariant[];
+  errors: Partial<Record<ScheduleVariant, string>>;
+};
+
+export function monthGridKey(variant: ScheduleVariant, limit: string) {
+  return `${variant}:${limit}`;
+}
+
+export function gridsForVariant(store: MonthGridStore, variant: ScheduleVariant, limits: string[]) {
+  return Object.fromEntries(
+    limits.flatMap((limit) => {
+      const grid = store[monthGridKey(variant, limit)];
+      return grid ? [[limit, grid] as const] : [];
+    }),
+  );
+}
+
+export function replaceVariantGrids(
+  store: MonthGridStore,
+  variant: ScheduleVariant,
+  grids: Record<string, Occupancy>,
+) {
+  const next = { ...store };
+  for (const [limit, grid] of Object.entries(grids)) next[monthGridKey(variant, limit)] = grid;
+  return next;
+}
+
 export type OccupancyChange = {
   kindId?: string;
   slotDate?: string;
@@ -112,6 +143,7 @@ type MonthScheduleRow = {
 };
 
 export type MemberOccupiedSlot = {
+  variant: ScheduleVariant;
   limit: string;
   dayIdx: number;
   half: number;
@@ -149,7 +181,7 @@ export async function loadMemberOccupiedSlots(
     const dayIdx = Number(String(row.slot_date).slice(8, 10)) - 1;
     const half = Number(row.half);
     if (dayIdx < 0 || half < 0 || half > 47) continue;
-    rows.push({ limit: kind.limitId, dayIdx, half });
+    rows.push({ variant, limit: kind.limitId, dayIdx, half });
   }
   return rows;
 }
@@ -266,7 +298,7 @@ async function loadMonthGridsLegacy(
 export async function loadMonthGrids(
   year: number,
   monthIndex: number,
-  variant: "nitro" | "regular",
+  variant: ScheduleVariant,
   limits: string[],
 ): Promise<MonthGridsResult | null> {
   const db = getSupabase();
@@ -285,6 +317,47 @@ export async function loadMonthGrids(
   }
   if (!missingMonthRpc(error.message)) return { grids, error: error.message };
   return loadMonthGridsLegacy(year, monthIndex, variant, limits, grids);
+}
+
+export async function loadMultiMonthGrids(
+  year: number,
+  monthIndex: number,
+  variants: ScheduleVariant[],
+  limits: string[],
+  loader: typeof loadMonthGrids = loadMonthGrids,
+): Promise<MultiMonthGridsResult> {
+  const selected = [...new Set(variants)].filter((variant): variant is ScheduleVariant =>
+    variant === "nitro" || variant === "regular",
+  );
+  const results = await Promise.all(
+    selected.map(async (variant) => {
+      try {
+        return { variant, result: await loader(year, monthIndex, variant, limits) };
+      } catch (error) {
+        return { variant, error: error instanceof Error ? error.message : String(error) };
+      }
+    }),
+  );
+  let grids: MonthGridStore = {};
+  const loaded: ScheduleVariant[] = [];
+  const errors: Partial<Record<ScheduleVariant, string>> = {};
+  for (const item of results) {
+    if ("error" in item) {
+      errors[item.variant] = item.error;
+      continue;
+    }
+    if (!item.result) {
+      errors[item.variant] = "not-configured";
+      continue;
+    }
+    if (item.result.error) {
+      errors[item.variant] = item.result.error;
+      continue;
+    }
+    grids = replaceVariantGrids(grids, item.variant, item.result.grids);
+    loaded.push(item.variant);
+  }
+  return { grids, loaded, errors };
 }
 
 function missingOwnRpc(message?: string) {

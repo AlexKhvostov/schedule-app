@@ -8,13 +8,14 @@ export type Occupancy = Seat[][][];
 export const LEVEL_COUNT = 2;
 
 export function daysInMonth(year: number, monthIndex: number, locale: string) {
-  const list: { d: number; wd: string; weekend: boolean }[] = [];
+  const list: { d: number; wd: string; dow: number; weekend: boolean }[] = [];
   const last = new Date(year, monthIndex + 1, 0).getDate();
   for (let d = 1; d <= last; d += 1) {
     const dow = new Date(year, monthIndex, d).getDay();
     list.push({
       d,
       wd: weekdayShort(dow, locale),
+      dow,
       weekend: dow === 0 || dow === 6,
     });
   }

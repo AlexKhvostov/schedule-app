@@ -44,7 +44,7 @@ const TYPE: { key: string; size: string; sample: string; style: CSSProperties }[
   { key: "Body", size: "13 / 400", sample: "Ярослав · Москва", style: { fontSize: 13, fontWeight: 400, color: "var(--ink)" } },
   { key: "Label", size: "11 / 500", sample: "Почта", style: { fontSize: 11, fontWeight: 500, color: "var(--mute)" } },
   { key: "Meta", size: "11 / 400", sample: "18.09.2026, 18:22", style: { fontSize: 11, fontWeight: 400, color: "var(--mute)" } },
-  { key: "Mono", size: "12 / 600", sample: "YO · NL 50", style: { fontSize: 12, fontWeight: 600, fontFamily: "JetBrains Mono, ui-monospace, monospace", color: "var(--ink)" } },
+  { key: "Mono", size: "12 / 600", sample: "YO · N50", style: { fontSize: 12, fontWeight: 600, fontFamily: "JetBrains Mono, ui-monospace, monospace", color: "var(--ink)" } },
 ];
 
 const SPACE = [2, 4, 6, 8, 10, 12];
@@ -293,7 +293,7 @@ export function V2UiKit() {
           <div className="rp-kit-row">
             {["25", "50", "100", "250", "500"].map((limit) => (
               <button key={limit} type="button" className={`rp-kit-chip${limit === "50" || limit === "100" ? " is-on" : ""}`}>
-                NL {limit}
+                N{limit}
               </button>
             ))}
             <button type="button" className="rp-kit-chip is-on">

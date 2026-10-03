@@ -16,8 +16,9 @@
 | Вход в приложение | `auth.users` → `members.auth_user_id` | uuid сессии Supabase |
 | Метка на сетке (YO, цвета) | поля `members`: `mark_tag`, `mark_bg`, `mark_fg` | **необязательна**. Если есть — уникальна без учёта регистра. Буквы система не резервирует. Отдельной таблицы меток нет |
 | Последнее число столов в окне правки | `members.tables` | 1–30. Кисть по умолчанию, не снимок уже стоящих меток |
+| Пресеты числа столов | `member_table_presets` | От одной до пяти упорядоченных уникальных кистей 1–30 на участника. Владелец меняет свои, пользователь с `admin.people` — любого участника, только через атомарную RPC `save_member_table_presets` |
 | Столы на конкретной метке | `occupancy.tables` | 1–30. Пишется в момент постановки, дальше не меняется |
-| Анкета (имя, город, часовой пояс) | `profiles` | `member_id` = `members.id`, строго 1:1. `extra_utc` — пояс. `telegram`, `contact_alt` — связь. Читает себя и SQL `is_staff()` (admin/root). Имя в продукте видят все (функция `public_display_names`); телефон и остальное — нет |
+| Анкета (имя, город, часовой пояс) | `profiles` | `member_id` = `members.id`, строго 1:1. `extra_utc` — пояс. `telegram`, `contact_alt` — связь. Читает себя и SQL `is_staff()` (admin/root). Имя в продукте видят все: точечные экраны используют `public_display_names`, а единый справочник расписания возвращает его как `profile_name`; телефон и остальное — нет |
 | Платежные реквизиты | `payment_methods` | Несколько на человека, один `is_primary`. Сервис, счёт/кошелёк, комментарий. Читает и пишет владелец или SQL `is_staff()` (admin/root) |
 | Ник и лимиты рума в кабинете | `players` + `player_nicks` + `player_limits` | Игрок = человек на руме. Nitro и Regular — разные наборы бай-инов. Текущий ник — последняя строка истории; `source` отличает ручное изменение от импорта дистанции, `distance_month` хранит месяц выгрузки |
 | Ник и аватар Discord после входа | `identities` | `provider` + `provider_uid`. Для Discord `provider_uid` = Discord ID |
@@ -35,9 +36,22 @@
 | Правило «заменять чужие метки» | `schedule_settings.allow_replace_marks` | По умолчанию выкл. Пишет admin/root. Протяжка: RPC `replace_foreign_slots` сначала DELETE чужих, затем INSERT кисти. Клик по чужой остаётся снятием |
 | Правило «работа со столами» | `schedule_settings.count_tables` | По умолчанию выкл. Пишет admin/root. Выкл — продукт столы не показывает и не правит. Колонки `members.tables` / `occupancy.tables` в схеме остаются |
 | Постоянное редактирование на компьютере | `schedule_settings.edit_by_button` | Историческое обратное имя: `false` разрешает desktop-пользователям менять сетку сразу, `true` требует карандаш. На touch-устройствах клиент всегда требует явного включения после достаточного увеличения |
+| Доступные лимиты фильтра | `schedule_settings.filter_limits_nitro` + `filter_limits_regular` | Два непустых массива ID из `limits`, отдельно по виду. Читает расписание; роль с `schedule.manage` заменяет оба массива одной RPC `save_schedule_filter_limits`. Прямая запись массивов закрыта |
+| Объединение соседних слотов | `schedule_settings.merge_adjacent_slots` | Булев флаг, по умолчанию выкл. Пишет роль с `schedule.manage`; realtime уже входит в публикацию всей строки `schedule_settings`. Флаг меняет только визуальную проекцию, не строки `occupancy` и не расчёт часов |
+| Мёртвое время | `schedule_dead_intervals` | Ежедневные полуоткрытые диапазоны `[start_half, end_half)` в CET/Europe/Madrid для пары вариант + лимит. Клиент только читает; роль с `schedule.manage` атомарно заменяет весь набор через `save_schedule_dead_intervals(jsonb)` |
 | Турниры за месяц (дистанции) | `distance_entries` + `distance_values` | запись: участник + снимки ID/ника + рум + месяц + Nitro/Regular + part + комментарий; значения — отдельные ненулевые строки лимитов. Пишут импорт и staff-RPC |
 | Куда бот пишет человеку | `profiles.notify_channel` | `discord` (по умолчанию), `telegram`, `email`. Пишет владелец и SQL `is_staff()` (admin/root) из карточки человека |
 | Настройки ботов | `bot_settings` + `bot_secrets` | Две строки: Discord и Telegram. Публичные поля читает клуб, пишет root. Токен — только запись через RPC `set_bot_token`, SELECT клиенту закрыт. Автоуведомления: `notify_mark_removed`, `notify_fill_queue`. Канал клуба — `notice_chat`. Писать от имени бота может только root |
+
+Модель доступных лимитов выше реализована миграцией `20260929160000_schedule_filter_limits.sql` и вручную применена к Working 30 сентября 2026. Backfill временно отключает только защитный trigger `schedule_settings_stamp`, потому что SQL Editor не имеет пользовательского `auth.uid()`; после записи trigger включается в той же транзакции. На Working проверены чтение, атомарная запись и откат, неизвестные/пустые массивы, запрет прямой записи и анонимного RPC.
+
+Миграция `20260930110000_disabled_filter_limits.sql` добавляет `BEFORE INSERT`-trigger на `occupancy`: новый слот разрешён только для пары, присутствующей в соответствующем массиве Nitro/Regular. `DELETE` намеренно не ограничен этим правилом, поэтому существующую смену отключённого лимита можно снять. Миграция применена к Working 30 сентября 2026; авторизованный транзакционный smoke-test подтвердил удаление существующей смены и отказ новой вставки с SQLSTATE `42501`, после чего полностью откатил тестовые данные и настройки.
+
+Миграция `20260930130000_merge_adjacent_slots.sql` добавляет визуальный флаг объединения и право точечного UPDATE для authenticated; фактическая возможность записи по-прежнему проверяется RLS и `schedule_settings_stamp` через `schedule.manage`. Миграция применена к Working 30 сентября 2026, включение и возврат в `false` проверены через живую админку. Дополнительная совместимая миграция `20261001154000_revoke_anon_schedule_settings_update.sql` удаляет у `anon` возможный унаследованный табличный UPDATE: RLS и раньше отклонял такую запись, но grants теперь также явно соответствуют security contract. Она применена к Working 1 октября; контроль показал `anon UPDATE = false` и `authenticated merge_adjacent_slots UPDATE = true`.
+
+Миграция `20260930170000_member_table_presets.sql` создаёт серверные пресеты столов и переносит текущее `members.tables` в позицию 1. Новая карточка автоматически получает такой же начальный preset. Полная замена набора выполняется `save_member_table_presets(uuid, jsonb)`: сервер принимает 1–5 уникальных целых значений 1–30, сохраняет прежнюю активную кисть, если она осталась в наборе, иначе выбирает первую. Миграция применена к Working 30 сентября 2026; backfill, RLS, гранты, Realtime и транзакционные сценарии владельца, администратора, отказа постороннему и отката ошибки проверены без сохранения тестовых изменений.
+
+Миграция `20260930150000_schedule_dead_intervals.sql` добавляет серверные интервалы мёртвого времени. Ограничения таблицы проверяют границы суток, trigger запрещает пересечения одной пары, а RPC валидирует существование `schedule_kind`, сериализует конкурентные замены advisory-lock и выполняет полную замену одной транзакцией. Прямые INSERT/UPDATE/DELETE для `authenticated` закрыты; чтение разрешено пользователям расписания. Таблица включена в Realtime для последующего обновления статистики без перезагрузки.
 
 Слот в базе — не лист 48×31. Это список регистраций.
 
@@ -64,6 +78,7 @@ erDiagram
   APP_ROLES ||--o{ MEMBER_ROLES : role_id
   MEMBERS ||--o{ PLAYERS : member_id
   MEMBERS ||--o{ PAYMENT_METHODS : member_id
+  MEMBERS ||--o{ MEMBER_TABLE_PRESETS : member_id
   MEMBERS ||--o{ DISTANCE_ENTRIES : member_id
   DISTANCE_BATCHES ||--o{ DISTANCE_ENTRIES : batch_id
   ROOMS ||--o{ DISTANCE_ENTRIES : room_id
@@ -90,6 +105,8 @@ erDiagram
     boolean allow_overwrite_marks
     boolean allow_replace_marks
     boolean count_tables
+    text[] filter_limits_nitro
+    text[] filter_limits_regular
   }
   DISCORD_GUILD {
     text id PK
@@ -115,12 +132,13 @@ erDiagram
 | Таблица | Сейчас | Зачем |
 |---|---|---|
 | `members` | живые карточки, не снимок «1» | Участник: заявка `pending/active/blocked`, метка, столы, VIP Nitro/Regular, тип Training/RedParty, поручитель, заготовка `grid_priority`, `distance_ext_id` |
+| `member_table_presets` | 1–5 на человека | Упорядоченные уникальные значения столов 1–30; прямой INSERT/UPDATE/DELETE для клиента закрыт |
 | `profiles` | 1:1 с `members` | Анкета. Не права. `notify_channel`: куда бот пишет человеку |
 | `identities` | привязки входа | Discord / позже Google / почта + кэш ника и аватара |
 | `app_roles` | 4 | `member`, `admin` (Administrator), `staff`, `root` |
 | `member_roles` | несколько на человека | Игроки: `member` или `member`+`admin`. Сопровождение: `staff`. Root — overlay, **не** носит `member`/`admin`. SQL `is_staff()` = admin **или** root, клубный staff туда не входит |
 
-При первом входе триггер сам заводит `members` + `profiles` + `identities` + роль `member`, статус `pending`.
+При первом входе триггер сам заводит `members` + `profiles` + `identities` + роль `member`, статус `pending`; следующий trigger создаёт начальный preset из `members.tables`.
 
 ### Справочники игры
 
@@ -171,7 +189,7 @@ erDiagram
 | `capacity_flags` | 22: включены ли правила месяца и недели |
 | `capacity_rules` | 22 базовых: **сейчас все единицы**. Сид и сброс матрицы в админке — день 1, ночь 22–06 = 2. Не путать сид с боем |
 | `occupancy` | живые записи с поля |
-| `schedule_settings` | одна строка: галка **удалять чужие метки**, галка **заменять чужие метки**, галка **работа со столами** (сейчас выкл). Пишет SQL `is_staff()` (admin/root), читает вошедший |
+| `schedule_settings` | одна строка: клубные галки сетки и два непустых набора лимитов фильтра Nitro/Regular. Читает вошедший с доступом к расписанию; галки меняет роль с `schedule.manage`, лимиты — только атомарная RPC `save_schedule_filter_limits` |
 
 ### Снимок Discord
 
@@ -197,6 +215,7 @@ erDiagram
 - **Один вход — один участник:** `members.auth_user_id` уникален.
 - **Один Discord ID на провайдера:** `identities (provider, provider_uid)` уникален.
 - **Метка**, если задана, уникальна в группе (`lower(mark_tag)`). Пустая — норма.
+- **Пресеты столов** уникальны внутри участника и занимают позиции 1–5 без повторов значения; публичная RPC требует непустой набор.
 - **ID в дистанциях**, если задан, уникален (`distance_ext_id`, только цифры). Пустой — норма. Пишет SQL `is_staff()` (admin/root), в кабинете нет.
 - **Вид** уникален как набор рум + лимит + формат + вариант.
 - **На уровне одна метка:** `occupancy (kind_id, slot_date, half, level)` уникален. Один человек может стоять на нескольких уровнях и видах **в тот же получас**. Часы считаем по уникальной паре дата+получас. Месяц сетки ищется по `(kind_id, slot_date)`. Слоты человека за месяц — индекс `(member_id, slot_date)`.
@@ -209,7 +228,9 @@ erDiagram
 - Ставить слот может только `active`.
 - На закрытый уровень поставить нельзя (триггер смотрит `hours_of`).
 - Если на час заданы и число месяца, и день недели — берётся **минимум**.
-- Живое обновление: Realtime на `occupancy`, `members` и `schedule_settings`. Журнал `occupancy_events` в realtime не входит. Клиент грузит месяц одной функцией `load_month_schedule`. После **своей** успешной записи месяц целиком не качает — иначе метка мигает. Чужие изменения подтягивает realtime.
+- `save_schedule_filter_limits` проверяет `schedule.manage`, известность каждого ID в справочнике и наличие соответствующего `schedule_kind`; нормализует порядок по `limits.sort` и меняет оба вида в одной транзакции. Ошибка оставляет прежние массивы без изменений.
+- `save_member_table_presets` проверяет владельца или `admin.people`, валидирует весь набор до записи и заменяет его атомарно. Прямые записи клиента в `member_table_presets` запрещены.
+- Живое обновление: Realtime на `occupancy`, `members`, `member_table_presets` и `schedule_settings`. Журнал `occupancy_events` в realtime не входит. Клиент грузит месяц одной функцией `load_month_schedule`. После **своей** успешной записи месяц целиком не качает — иначе метка мигает. Чужие изменения подтягивает realtime.
 - Постановка и снятие пишут строку в `occupancy_events` (триггер). Сетка этот журнал не читает. Строки старше 2 месяцев удаляет ночной cron. Снятие чужой через `remove_foreign_slots` и замена через `replace_foreign_slots` тоже пишут журнал.
 - Если чужую метку сняли (клик или замена), Edge Function `notify-mark-removed` пишет в клубный Discord-канал: какая метка, слот, кто снял — и в личку обоим. Галка в Root. Канал человека в кабинете и в карточке участника: Discord / Telegram / почта.
 

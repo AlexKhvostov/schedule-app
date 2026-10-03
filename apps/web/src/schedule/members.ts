@@ -117,6 +117,7 @@ export type ClubMember = {
   community?: CommunityKind;
   avatar?: string;
   tables?: number;
+  tablePresets?: number[];
   passwordSet?: boolean;
   pays?: PayMethod[];
   plays?: RoomPlay[];
@@ -218,6 +219,7 @@ export const SEED_MEMBERS: ClubMember[] = [
     poolShare: 80,
     community: "club",
     tables: 11,
+    tablePresets: [11, 8, 6],
     passwordSet: false,
     pays: [
       { id: "pay-you-usdt", kind: "usdt_trc20", title: "USDT TRC20", details: "T…sandbox", comment: "", primary: true },
@@ -485,6 +487,10 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
         : [asPlay({ ...emptyRoomPlay("winamax"), nick: row.room || row.discord || "", limits: row.limits }, 0, row.room || row.discord || "")];
   const extraUtc = Number(row.extraUtc ?? seed?.extraUtc ?? 3);
   const tables = Number(row.tables ?? seed?.tables);
+  const safeTables = Number.isFinite(tables) && tables >= 1 ? Math.min(30, Math.round(tables)) : 1;
+  const tablePresets = [...new Set((Array.isArray(row.tablePresets) ? row.tablePresets : seed?.tablePresets ?? [safeTables])
+    .map(Number)
+    .filter((value) => Number.isInteger(value) && value >= 1 && value <= 30))].slice(0, 5);
   return {
     ...row,
     discordDisplay: String(row.discordDisplay ?? seed?.discordDisplay ?? row.discord ?? ""),
@@ -504,7 +510,8 @@ function withAccess(row: ClubMember, fallback: boolean): ClubMember {
     poolShare: Number.isFinite(Number(row.poolShare ?? seed?.poolShare)) ? Math.min(100, Math.max(0, Math.round(Number(row.poolShare ?? seed?.poolShare ?? 80)))) : 80,
     community: row.community === "school" || row.community === "club" ? row.community : seed?.community === "school" ? "school" : row.status === "pending" ? "school" : "club",
     avatar: String(row.avatar || seed?.avatar || ""),
-    tables: Number.isFinite(tables) && tables >= 1 ? Math.min(30, Math.round(tables)) : 1,
+    tables: safeTables,
+    tablePresets: tablePresets.length ? tablePresets : [safeTables],
     vipNitro: asVip(row.vipNitro) || asVip((row as ClubMember & { vip?: number }).vip),
     vipRegular: asVip(row.vipRegular),
     passwordSet: Boolean(row.passwordSet),

@@ -65,7 +65,7 @@ export function V2Priorities() {
             {board.stakes.map((stake, index) => (
               <span key={stake.label}>
                 {index > 0 ? " · " : null}
-                NL{stake.label} ×{stake.weight.replace(/\.0$/, "")}
+                N{stake.label} ×{stake.weight.replace(/\.0$/, "")}
               </span>
             ))}
           </p>

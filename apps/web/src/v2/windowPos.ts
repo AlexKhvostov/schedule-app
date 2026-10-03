@@ -56,9 +56,16 @@ export function fitFloat(x: number, y: number, width = 240) {
   const vh = window.innerHeight;
   const w = Math.min(width, Math.max(168, vw - 16));
   return {
-    x: Math.min(Math.max(8, x), Math.max(8, vw - 72)),
+    x: Math.min(Math.max(8, x), Math.max(8, vw - w - 8)),
     y: Math.min(Math.max(8, y), Math.max(8, vh - 48)),
     width: w,
+  };
+}
+
+export function fitBox(x: number, y: number, width: number, height: number, viewportWidth: number, viewportHeight: number) {
+  return {
+    x: Math.max(8, Math.min(x, viewportWidth - width - 8)),
+    y: Math.max(8, Math.min(y, viewportHeight - height - 8)),
   };
 }
 

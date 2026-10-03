@@ -3,6 +3,14 @@ import { isOwnMark, type Mark } from "../schedule/marks";
 import { emptyMonth, type Occupancy } from "../schedule/plan";
 import { hoursFromSlots } from "../schedule/roster";
 import { isPastSlot, type CetStamp } from "../schedule/cet";
+import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../data/slots";
+
+export type OccupiedSchedulePair = {
+  variant: ScheduleVariant;
+  limit: string;
+};
+
+export type OccupiedPairMatrix = (OccupiedSchedulePair[] | null)[][];
 
 export type ShiftRun = {
   day: number;
@@ -10,6 +18,11 @@ export type ShiftRun = {
   start: number;
   end: number;
 };
+
+export function hourBoundaries(start: number, end: number) {
+  return Array.from({ length: Math.max(0, end - start - 1) }, (_, index) => start + index + 1)
+    .filter((half) => half % 2 === 0);
+}
 
 function seatIsMine(seat: Mark | null | undefined, who: Mark | string) {
   if (typeof who === "string") return Boolean(seat && who && seat.t === who);
@@ -52,76 +65,96 @@ export function gridsWithMySlots(
   return next;
 }
 
-function blankOccupied(days: number): (string[] | null)[][] {
-  return Array.from({ length: days }, () => Array.from({ length: 48 }, () => null));
-}
-
-function limitsOf(set: Set<string>) {
-  const found = LIMIT_OPTIONS.filter((limit) => set.has(limit));
-  return found.length ? found : null;
-}
-
 type SlotClock = { year: number; monthIndex: number; cet: CetStamp };
 
 function isGone(dayIdx: number, half: number, at?: SlotClock) {
   return Boolean(at && isPastSlot(at.year, at.monthIndex, dayIdx + 1, half, at.cet));
 }
 
-/** Лимиты, где в этом получасе стоит своя метка — только по уже загруженной сетке. */
-export function myOccupiedLimits(
-  grids: Record<string, Occupancy>,
+function blankOccupiedPairs(days: number) {
+  return Array.from({ length: days }, () =>
+    Array.from({ length: 48 }, () => new Map<string, OccupiedSchedulePair>()),
+  );
+}
+
+function pairValues(pairs: Map<string, OccupiedSchedulePair>) {
+  const found = [...pairs.values()].sort((a, b) => {
+    const variant = (a.variant === "nitro" ? 0 : 1) - (b.variant === "nitro" ? 0 : 1);
+    return variant || Number(a.limit) - Number(b.limit);
+  });
+  return found.length ? found : null;
+}
+
+function pairKey(pair: OccupiedSchedulePair) {
+  return monthGridKey(pair.variant, pair.limit);
+}
+
+/** Свои занятые пары «вид + лимит» по всем загруженным сеткам. */
+export function myOccupiedPairs(
+  grids: MonthGridStore,
   who: Mark | string,
   at?: SlotClock,
-): (string[] | null)[][] {
-  const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length));
-  const names = LIMIT_OPTIONS.filter((limit) => grids[limit]);
+): OccupiedPairMatrix {
+  const entries = Object.entries(grids).flatMap(([key, grid]) => {
+    const [variant, limit] = key.split(":", 2);
+    if ((variant !== "nitro" && variant !== "regular") || !limit) return [];
+    return [{ variant, limit, grid } satisfies OccupiedSchedulePair & { grid: Occupancy }];
+  });
+  const days = Math.max(0, ...entries.map((item) => item.grid.length));
   return Array.from({ length: days }, (_, dayIdx) =>
     Array.from({ length: 48 }, (_, half) => {
       if (isGone(dayIdx, half, at)) return null;
-      const found = names.filter((limit) => grids[limit]?.[dayIdx]?.[half]?.some((mark) => seatIsMine(mark, who)));
-      return found.length ? found : null;
+      const found = entries
+        .filter((item) => item.grid[dayIdx]?.[half]?.some((mark) => seatIsMine(mark, who)))
+        .map(({ variant, limit }) => ({ variant, limit }));
+      const map = new Map(found.map((pair) => [pairKey(pair), pair]));
+      return pairValues(map);
     }),
   );
 }
 
-export function occupiedFromSlots(
-  slots: { limit: string; dayIdx: number; half: number }[],
+export function occupiedPairsFromSlots(
+  slots: { variant: ScheduleVariant; limit: string; dayIdx: number; half: number }[],
   days: number,
-): (string[] | null)[][] {
-  const buckets = blankOccupied(days).map((row) => row.map(() => new Set<string>()));
+): OccupiedPairMatrix {
+  const buckets = blankOccupiedPairs(days);
   for (const slot of slots) {
     const cell = buckets[slot.dayIdx]?.[slot.half];
-    if (cell) cell.add(slot.limit);
+    if (cell) cell.set(pairKey(slot), { variant: slot.variant, limit: slot.limit });
   }
-  return buckets.map((row) => row.map((set) => limitsOf(set)));
+  return buckets.map((row) => row.map(pairValues));
 }
 
-/** Слоты с сервера по всем лимитам + правки по тем лимитам, что уже на экране. */
-export function mergeOccupiedLimits(
-  remote: (string[] | null)[][] | undefined,
-  grids: Record<string, Occupancy>,
+/** Серверные пары по обоим видам + локальные optimistic-правки загруженных сеток. */
+export function mergeOccupiedPairs(
+  remote: OccupiedPairMatrix | undefined,
+  grids: MonthGridStore,
   who: Mark | string,
   at?: SlotClock,
-): (string[] | null)[][] {
-  const local = myOccupiedLimits(grids, who, at);
-  const loaded = new Set(LIMIT_OPTIONS.filter((limit) => grids[limit]));
+): OccupiedPairMatrix {
+  const local = myOccupiedPairs(grids, who, at);
+  const loaded = new Set(Object.keys(grids));
   const days = Math.max(remote?.length ?? 0, local.length);
   return Array.from({ length: days }, (_, dayIdx) =>
     Array.from({ length: 48 }, (_, half) => {
       if (isGone(dayIdx, half, at)) return null;
-      const set = new Set(remote?.[dayIdx]?.[half] ?? []);
-      for (const limit of loaded) set.delete(limit);
-      for (const limit of local[dayIdx]?.[half] ?? []) set.add(limit);
-      return limitsOf(set);
+      const set = new Map((remote?.[dayIdx]?.[half] ?? []).map((pair) => [pairKey(pair), pair]));
+      for (const key of loaded) set.delete(key);
+      for (const pair of local[dayIdx]?.[half] ?? []) set.set(pairKey(pair), pair);
+      return pairValues(set);
     }),
   );
 }
 
-export function myTimeline(grids: Record<string, Occupancy>, who: Mark | string): (string | null)[][] {
+export function myTimeline(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+): (string | null)[][] {
   const days = Math.max(0, ...Object.values(grids).map((grid) => grid.length));
   return Array.from({ length: days }, (_, dayIdx) =>
     Array.from({ length: 48 }, (_, half) => {
-      for (const limit of LIMIT_OPTIONS) {
+      for (const limit of keys) {
         if (grids[limit]?.[dayIdx]?.[half]?.some((mark) => seatIsMine(mark, who))) return limit;
       }
       return null;
@@ -149,8 +182,12 @@ export function runsFromLane(lane: (string | null)[], day: number): ShiftRun[] {
   return runs;
 }
 
-export function myShifts(grids: Record<string, Occupancy>, who: Mark | string): ShiftRun[] {
-  return myTimeline(grids, who).flatMap((lane, dayIdx) => runsFromLane(lane, dayIdx + 1));
+export function myShifts(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+): ShiftRun[] {
+  return myTimeline(grids, who, keys).flatMap((lane, dayIdx) => runsFromLane(lane, dayIdx + 1));
 }
 
 export function formatHalf(half: number) {
@@ -161,6 +198,15 @@ export function formatHalf(half: number) {
 
 export function shiftHours(runs: ShiftRun[]) {
   return hoursFromSlots(runs.reduce((sum, run) => sum + (run.end - run.start), 0));
+}
+
+/** Фактическое время: пересекающиеся виды и лимиты не удваивают один получас. */
+export function uniqueShiftHours(runs: ShiftRun[]) {
+  const halves = new Set<string>();
+  for (const run of runs) {
+    for (let half = run.start; half < run.end; half += 1) halves.add(`${run.day}:${half}`);
+  }
+  return hoursFromSlots(halves.size);
 }
 
 export function myPlayStats(
@@ -186,8 +232,12 @@ export function myPlayStats(
   };
 }
 
-export function limitsWithMyMarks(grids: Record<string, Occupancy>, who: Mark | string) {
-  return LIMIT_OPTIONS.filter((limit) =>
+export function limitsWithMyMarks(
+  grids: Record<string, Occupancy>,
+  who: Mark | string,
+  keys: readonly string[] = LIMIT_OPTIONS,
+) {
+  return keys.filter((limit) =>
     (grids[limit] ?? []).some((day) => day.some((cell) => cell?.some((mark) => seatIsMine(mark, who)))),
   );
 }

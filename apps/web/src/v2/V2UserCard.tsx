@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { formatLimit } from "../schedule/capacity";
 import { formatHours, type RosterRow } from "../schedule/roster";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScheduleSlot } from "./ScheduleSlot";
 import { V2Float } from "./V2Float";
+import { displayScheduleColumn } from "./variantSchedule";
 
 type Props = {
   row: RosterRow;
@@ -85,7 +85,7 @@ export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocu
           </div>
           {Object.entries(row.byLimit).map(([limit, stat]) => (
             <div key={limit} className="v2-club-fact">
-              <span>{t("schedule.limitCol", { limit: formatLimit(limit) })}</span>
+              <span>{t("schedule.limitCol", { limit: displayScheduleColumn(limit) })}</span>
               <b>{t("schedule.limitMonthStat", { marks: stat.slots, hours: formatHours(stat.hours), left: formatHours(stat.left) })}</b>
             </div>
           ))}

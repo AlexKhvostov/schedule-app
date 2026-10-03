@@ -42,11 +42,97 @@ begin
   end if;
 
   if not has_function_privilege('authenticated', 'public.schedule_player_directory(text,text[])', 'EXECUTE')
+     or has_function_privilege('anon', 'public.schedule_player_directory(text,text[])', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.admin_people_snapshot()', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_member_plays(uuid,jsonb)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_payment_methods(uuid,jsonb)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.save_capacity_profiles(text,jsonb)', 'EXECUTE') then
     raise exception 'consolidated data-access RPC grants are incomplete';
+  end if;
+
+  if position(
+    'profile_name text' in pg_get_function_result('public.schedule_player_directory(text,text[])'::regprocedure)
+  ) = 0 then
+    raise exception 'schedule player directory must expose the public profile name';
+  end if;
+
+  if not has_function_privilege('authenticated', 'public.save_schedule_filter_limits(text[],text[])', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_schedule_filter_limits(text[],text[])', 'EXECUTE') then
+    raise exception 'schedule filter limit RPC grants are incorrect';
+  end if;
+
+  if not has_function_privilege('authenticated', 'public.save_schedule_dead_intervals(jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_schedule_dead_intervals(jsonb)', 'EXECUTE') then
+    raise exception 'schedule dead interval RPC grants are incorrect';
+  end if;
+
+  if not has_function_privilege('authenticated', 'public.save_member_table_presets(uuid,jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_member_table_presets(uuid,jsonb)', 'EXECUTE') then
+    raise exception 'member table preset RPC grants are incorrect';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.member_table_presets', 'SELECT')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'INSERT')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.member_table_presets', 'DELETE') then
+    raise exception 'member table presets must be read-only outside the atomic RPC';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'SELECT')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'INSERT')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.schedule_dead_intervals', 'DELETE') then
+    raise exception 'schedule dead intervals must be read-only outside the atomic RPC';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'filter_limits_nitro' and data_type = 'ARRAY'
+  ) or not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'filter_limits_regular' and data_type = 'ARRAY'
+  ) then
+    raise exception 'schedule filter limit columns are missing';
+  end if;
+
+  if has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'filter_limits_nitro',
+       'UPDATE'
+     )
+     or has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'filter_limits_regular',
+       'UPDATE'
+     ) then
+    raise exception 'schedule filter limit arrays must only be writable through the atomic RPC';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'schedule_settings'
+      and column_name = 'merge_adjacent_slots' and data_type = 'boolean'
+  ) then
+    raise exception 'merge adjacent slots setting is missing';
+  end if;
+
+  if not has_column_privilege(
+       'authenticated',
+       'public.schedule_settings',
+       'merge_adjacent_slots',
+       'UPDATE'
+     )
+     or has_column_privilege(
+       'anon',
+       'public.schedule_settings',
+       'merge_adjacent_slots',
+       'UPDATE'
+     ) then
+    raise exception 'merge adjacent slots update grants are incorrect';
   end if;
 
   if has_table_privilege('authenticated', 'public.occupancy_event_notifications', 'SELECT')

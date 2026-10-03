@@ -446,18 +446,9 @@ export async function saveMemberMark(memberId: string, mark: { tag: string | nul
   return { error: error?.message ?? null };
 }
 
-export async function saveMemberTables(memberId: string, tables: number) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
-  const next = Math.min(30, Math.max(1, Math.round(tables)));
-  const { error } = await db.from("members").update({ tables: next }).eq("id", memberId);
-  return { error: error?.message ?? null };
-}
-
 export async function saveMemberClub(
   memberId: string,
   patch: {
-    tables?: number;
     vipNitro?: number;
     vipRegular?: number;
     communityStatus?: "school" | "club" | null;
@@ -471,7 +462,6 @@ export async function saveMemberClub(
     return Number.isFinite(v) && v > 0 ? Math.min(999, Math.round(v)) : 0;
   };
   const row: Record<string, unknown> = {};
-  if ("tables" in patch && patch.tables != null) row.tables = Math.min(30, Math.max(1, Math.round(patch.tables)));
   if ("vipNitro" in patch) row.vip_nitro = asVip(patch.vipNitro);
   if ("vipRegular" in patch) row.vip_regular = asVip(patch.vipRegular);
   if ("communityStatus" in patch) {

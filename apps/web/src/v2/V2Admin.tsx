@@ -25,7 +25,19 @@ import { FoldHead } from "./FoldHead";
 import { V2Root } from "./V2Root";
 import { V2SaveButton } from "./V2SaveButton";
 import { showV2Toast } from "./V2Toast";
-import { loadScheduleSettings, saveActAs, saveCountTables, saveEditByButton, saveOverwriteMarks, subscribeScheduleSettings } from "../data/scheduleSettings";
+import { DeadTimeEditor } from "./DeadTimeEditor";
+import {
+  loadScheduleSettings,
+  saveActAs,
+  saveCountTables,
+  saveEditByButton,
+  saveMergeAdjacentSlots,
+  saveOverwriteMarks,
+  saveScheduleFilterLimits,
+  subscribeScheduleSettings,
+  toggleScheduleFilterLimit,
+  type ScheduleFilterLimits,
+} from "../data/scheduleSettings";
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -94,6 +106,18 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   const [tablesSaving, setTablesSaving] = useState(false);
   const [editByButton, setEditByButton] = useState(true);
   const [editByButtonSaving, setEditByButtonSaving] = useState(false);
+  const [mergeAdjacentSlots, setMergeAdjacentSlots] = useState(false);
+  const [mergeAdjacentSlotsSaving, setMergeAdjacentSlotsSaving] = useState(false);
+  const [filterLimits, setFilterLimits] = useState<ScheduleFilterLimits>({
+    nitro: [...LIMIT_OPTIONS],
+    regular: [...LIMIT_OPTIONS],
+  });
+  const [savedFilterLimits, setSavedFilterLimits] = useState<ScheduleFilterLimits>({
+    nitro: [...LIMIT_OPTIONS],
+    regular: [...LIMIT_OPTIONS],
+  });
+  const [filterLimitsSaving, setFilterLimitsSaving] = useState(false);
+  const [filterLimitsSaved, setFilterLimitsSaved] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
   const [loadSaved, setLoadSaved] = useState(false);
@@ -144,6 +168,10 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
         setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
         setEditByButton(next.editByButton);
+        setMergeAdjacentSlots(next.mergeAdjacentSlots);
+        setFilterLimits(next.filterLimits);
+        setSavedFilterLimits(next.filterLimits);
+        setFilterLimitsSaved(false);
       });
     };
     apply();
@@ -181,6 +209,9 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   baselineRef.current = baseline;
 
   const matrix = draft ?? baseline;
+  const filterLimitsDirty =
+    filterLimits.nitro.join("|") !== savedFilterLimits.nitro.join("|") ||
+    filterLimits.regular.join("|") !== savedFilterLimits.regular.join("|");
   const flagsDirty = weekOn !== profile.weekOn || monthOn !== profile.monthOn;
   const dirty = (draft != null && !sameMatrix(draft, baseline)) || flagsDirty;
   const extremes = useMemo(() => extremesOf(matrix), [matrix]);
@@ -404,6 +435,100 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
             </span>
             <span className={`v2-settings-switch${!editByButton ? " is-on" : ""}`} aria-hidden />
           </button>
+          <button
+            type="button"
+            className={`v2-settings-row${mergeAdjacentSlots ? " is-on" : ""}`}
+            aria-pressed={mergeAdjacentSlots}
+            disabled={mergeAdjacentSlotsSaving}
+            title={t("admin.control.mergeAdjacentHint")}
+            onClick={() => {
+              const next = !mergeAdjacentSlots;
+              setMergeAdjacentSlots(next);
+              setMergeAdjacentSlotsSaving(true);
+              void saveMergeAdjacentSlots(next).then((result) => {
+                setMergeAdjacentSlotsSaving(false);
+                if (result.error) {
+                  setMergeAdjacentSlots(!next);
+                  showV2Toast("err", t("admin.people.saveErr"));
+                  return;
+                }
+                showV2Toast("ok", t("admin.saved"));
+              });
+            }}
+          >
+            <span className="v2-settings-ico">
+              <i className="fa-solid fa-link" />
+            </span>
+            <span className="v2-settings-copy">
+              <b>{t("admin.control.mergeAdjacent")}</b>
+              <small>{t("admin.control.mergeAdjacentHint")}</small>
+            </span>
+            <span className={`v2-settings-switch${mergeAdjacentSlots ? " is-on" : ""}`} aria-hidden />
+          </button>
+        </div>
+      </section>
+      <DeadTimeEditor />
+      <section className="v2-admin-card">
+        <div className="v2-admin-section-head">
+          <span className="v2-admin-kicker">{t("admin.filterLimits.kicker")}</span>
+          <h2>{t("admin.filterLimits.title")}</h2>
+          <p>{t("admin.filterLimits.lead")}</p>
+        </div>
+        <div className="v2-filter-limit-editor">
+          {(["nitro", "regular"] as const).map((kind) => (
+            <fieldset key={kind} className={`v2-filter-limit-kind is-${kind}`}>
+              <legend>{kind === "nitro" ? "Nitro" : "Regular"}</legend>
+              <div className="v2-filter-limit-options">
+                {LIMIT_OPTIONS.map((value) => {
+                  const active = filterLimits[kind].includes(value);
+                  return (
+                    <button
+                      key={`${kind}-${value}`}
+                      type="button"
+                      className={active ? "is-on" : undefined}
+                      aria-pressed={active}
+                      aria-label={`${kind === "nitro" ? "Nitro" : "Regular"} ${formatLimit(value)}`}
+                      disabled={filterLimitsSaving}
+                      onClick={() => {
+                        const next = toggleScheduleFilterLimit(filterLimits, kind, value);
+                        if (next === filterLimits) {
+                          showV2Toast("err", t("admin.filterLimits.needOne"));
+                          return;
+                        }
+                        setFilterLimits(next);
+                        setFilterLimitsSaved(false);
+                      }}
+                    >
+                      {formatLimit(value)}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <V2SaveButton
+              dirty={filterLimitsDirty}
+              saved={filterLimitsSaved}
+              disabled={filterLimitsSaving}
+              label={filterLimitsSaving ? t("admin.filterLimits.saving") : t("admin.save")}
+              doneLabel={t("admin.saved")}
+              onClick={() => {
+                setFilterLimitsSaving(true);
+                void saveScheduleFilterLimits(filterLimits).then((result) => {
+                  setFilterLimitsSaving(false);
+                  if (result.error) {
+                    showV2Toast("err", t("admin.filterLimits.saveErr"));
+                    return;
+                  }
+                  setSavedFilterLimits(filterLimits);
+                  setFilterLimitsSaved(true);
+                  showV2Toast("ok", t("admin.saved"));
+                });
+              }}
+            />
+            <span className="v2-muted text-[11px]">{t("admin.filterLimits.hint")}</span>
+          </div>
         </div>
       </section>
       <section className="v2-admin-card">

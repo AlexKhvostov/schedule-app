@@ -10,7 +10,6 @@ import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
 import { loadPrefs } from "./prefs";
 import { setAppLanguage } from "../i18n";
-import { V2Home } from "./V2Home";
 import { V2Wait } from "./V2Wait";
 import { writeSession, type Session } from "./session";
 import { PersonAvatar } from "./PersonAvatar";
@@ -18,6 +17,7 @@ import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
+import { defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
 import "./v2.css";
 
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
@@ -61,27 +61,7 @@ function V2HeaderClock() {
   );
 }
 
-type StaffItem = { key: string; label: string; icon: string; hint?: string };
-
-function bootPage(isRoot: boolean, permissions: string[] = []) {
-  const allowed = new Set(permissions);
-  const can = (permission: string) => isRoot || allowed.has(permission);
-  if (typeof window !== "undefined") {
-    const hash = window.location.hash;
-    if (isRoot && hash === "#blocks") return "blocks";
-    if (isRoot && hash === "#uikit") return "uikit";
-    if (isRoot && hash === "#guild") return "guild";
-    if (isRoot && hash === "#admin-root") return "admin-root";
-    if (isRoot && (hash === "#root-distance" || hash === "#root-import")) return "root-distance";
-    if (can("admin.people") && hash === "#admin-distance") return "admin-distance";
-    if (can("schedule.manage") && hash === "#admin-schedule") return "admin-schedule";
-    if (can("admin.people") && (hash === "#admin" || hash === "#admin-people")) return "admin-people";
-    if (can("schedule") && hash === "#schedule") return "schedule";
-    if (can("priorities") && hash === "#priorities") return "priorities";
-    if (can("profile") && hash === "#cabinet") return "cabinet";
-  }
-  return "home";
-}
+type StaffItem = { key: ShellPage; label: string; icon: string; hint?: string };
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
   const { t, i18n } = useTranslation();
@@ -99,14 +79,18 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const canPeople = can("admin.people");
   const canScheduleAdmin = can("schedule.manage");
   const isAdmin = isRoot || canPeople || canScheduleAdmin;
-  const [page, setPage] = useState(() => bootPage(isRoot, menuPermissions));
+  const navigationContext = useMemo(
+    () => ({ isRoot, permissions: menuPermissions, access: session.access }),
+    [isRoot, menuPermissions, session.access],
+  );
+  const [page, setPage] = useState(() => resolveShellPage(navigationContext, typeof window === "undefined" ? "" : window.location.hash));
   const [menuOpen, setMenuOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
   const [slotTheme, setSlotTheme] = useState(() => (typeof window === "undefined" ? null : loadSlotTheme()));
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminCapacity, setAdminCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
-  const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kind));
+  const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
   const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
@@ -117,13 +101,12 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const adminRef = useRef<HTMLDivElement>(null);
   const adminPaneRef = useRef<HTMLDivElement>(null);
 
-  const goPage = (key: string) => {
+  const goPage = (key: ShellPage) => {
     setPage(key);
     setMenuOpen(false);
     setAdminOpen(false);
     if (typeof window === "undefined") return;
     const hashes: Record<string, string> = {
-      home: "home",
       schedule: "schedule",
       priorities: "priorities",
       cabinet: "cabinet",
@@ -142,14 +125,16 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   };
 
   const pages: StaffItem[] = [
-    ...(canGrid ? [{ key: "schedule", label: t("nav.schedule"), icon: "fa-calendar-days" }] : []),
-    ...(canPriorities ? [{ key: "priorities", label: t("nav.priorities"), icon: "fa-ranking-star" }] : []),
+    ...(canGrid ? [{ key: "schedule" as const, label: t("nav.schedule"), icon: "fa-calendar-days" }] : []),
+    ...(canPriorities ? [{ key: "priorities" as const, label: t("nav.priorities"), icon: "fa-ranking-star" }] : []),
   ];
+  const brandTarget = defaultShellPage(navigationContext);
+  const brandLabel = brandTarget === "schedule" ? t("nav.schedule") : brandTarget === "cabinet" ? t("nav.cabinet") : t("nav.menu");
 
   const clubItems: StaffItem[] = [
-    ...(canPeople ? [{ key: "admin-people", label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") }] : []),
-    ...(canPeople ? [{ key: "admin-distance", label: t("nav.adminDistance"), icon: "fa-chart-column", hint: t("nav.adminDistanceHint") }] : []),
-    ...(canScheduleAdmin ? [{ key: "admin-schedule", label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") }] : []),
+    ...(canPeople ? [{ key: "admin-people" as const, label: t("nav.adminPeople"), icon: "fa-users", hint: t("nav.adminPeopleHint") }] : []),
+    ...(canPeople ? [{ key: "admin-distance" as const, label: t("nav.adminDistance"), icon: "fa-chart-column", hint: t("nav.adminDistanceHint") }] : []),
+    ...(canScheduleAdmin ? [{ key: "admin-schedule" as const, label: t("nav.adminSchedule"), icon: "fa-sliders", hint: t("nav.adminScheduleHint") }] : []),
   ];
   const rootItems: StaffItem[] = isRoot
     ? [
@@ -163,18 +148,20 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const staffOn = page.startsWith("admin") || page === "root-distance" || page === "uikit" || page === "blocks" || page === "guild";
 
   useEffect(() => {
-    if (page === "wait" && session.access === "active") setPage("home");
-    if (page === "cabinet" && !canProfile) setPage("home");
-    if (page === "schedule" && !canGrid) setPage("home");
-    if (page === "priorities" && !canPriorities) setPage("home");
-    if (page === "admin-distance" && !canPeople) setPage("home");
-  }, [session.access, page, canProfile, canGrid, canPriorities]);
+    const fallback = defaultShellPage(navigationContext);
+    if (page === "wait" && session.access === "active") setPage(fallback);
+    if (page === "cabinet" && !canProfile) setPage(fallback);
+    if (page === "schedule" && !canGrid) setPage(fallback);
+    if (page === "priorities" && !canPriorities) setPage(fallback);
+    if ((page === "admin-people" || page === "admin-distance") && !canPeople) setPage(fallback);
+    if (page === "admin-schedule" && !canScheduleAdmin) setPage(fallback);
+  }, [navigationContext, session.access, page, canProfile, canGrid, canPriorities, canPeople, canScheduleAdmin]);
 
   useEffect(() => {
-    const sync = () => setPage(bootPage(isRoot, menuPermissions));
+    const sync = () => setPage(resolveShellPage(navigationContext, window.location.hash));
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
-  }, [isRoot, menuPermissions]);
+  }, [navigationContext]);
 
   useEffect(() => {
     if (isLiveData()) {
@@ -190,7 +177,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
 
   useEffect(() => {
     if (!isLiveData()) return;
-    void loadCapacityLive(loadPrefs().kind).then((next) => {
+    void loadCapacityLive(loadPrefs().kinds[0]).then((next) => {
       if (next) {
         setCapacity(next);
         setAdminCapacity(next);
@@ -235,10 +222,10 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           <div className="v2-top-start">
             <button
               type="button"
-              className={`v2-brand${page === "home" ? " is-home" : ""}`}
-              aria-label={t("nav.home")}
-              title={t("nav.home")}
-              onClick={() => goPage("home")}
+              className={`v2-brand${page === brandTarget ? " is-home" : ""}`}
+              aria-label={brandLabel}
+              title={brandLabel}
+              onClick={() => goPage(brandTarget)}
             >
               <span className="v2-brand-mark v2-mono">RP</span>
               <span className="v2-brand-name">Red Party</span>
@@ -399,10 +386,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
           <Suspense fallback={<div className="min-h-0 flex-1" aria-busy="true" />}>
-          {page === "home" && (
-            <V2Home nick={nick} canProfile={canProfile} canSchedule={canGrid} canPriorities={canPriorities} onNavigate={goPage} />
-          )}
-          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : "home")} />}
+          {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : brandTarget)} />}
           {canProfile && page === "cabinet" && (
             <div className="v2-cab-stage min-h-0 flex-1 overflow-auto">
               <V2Cabinet
@@ -476,7 +460,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                 onCapacityChange={(next) => {
                   setAdminCapacity(next);
                   saveCapacity(next);
-                  if (adminVariant === loadPrefs().kind) setCapacity(next);
+                  if (adminVariant === loadPrefs().kinds[0]) setCapacity(next);
                   if (isLiveData()) void saveCapacityLive(adminVariant, next);
                 }}
                 onHourLoadChange={(next) => {

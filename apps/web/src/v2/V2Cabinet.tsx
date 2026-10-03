@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { LIMIT_OPTIONS } from "../schedule/capacity";
 import { UTC_OFFSETS, utcLabel, savePlayerUtc } from "../schedule/cet";
 import {
   loadMembers,
@@ -26,10 +25,9 @@ import { CabinetLoginPanel, type LoginDraft } from "./CabinetLoginPanel";
 import { CabinetPlaysPanel } from "./CabinetPlaysPanel";
 import { BlockBar, Field, NotifyPicks } from "./cabinetUi";
 import { loadDiscordOrg } from "./discordOrg";
-import { PayMethodsPanel } from "./PayMethodsPanel";
 import { PermanentPriority } from "./PermanentPriority";
-import { loadPrefs, savePrefs } from "./prefs";
 import { ScheduleSlot } from "./ScheduleSlot";
+import { TablePresetsPanel } from "./TablePresetsPanel";
 import type { Session } from "./session";
 import { showV2Toast } from "./V2Toast";
 import { R } from "./tokens";
@@ -51,7 +49,7 @@ type ProfileDraft = {
   extraUtc: number;
 };
 
-type CabinetTab = "profile" | "game" | "payments" | "account";
+type CabinetTab = "profile" | "game" | "account";
 
 function packProfile(row: ClubMember | undefined, nick: string): ProfileDraft {
   return {
@@ -193,14 +191,11 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const [savedLogin, setSavedLogin] = useState(() => (live ? { email: "", google: "", password: "" } : packLogin(mine)));
   const [plays, setPlays] = useState(() => playsForSession(mine, session));
   const [savedPlays, setSavedPlays] = useState(() => clonePlays(plays));
-  const [prefs, setPrefs] = useState(loadPrefs);
-  const [savedPrefs, setSavedPrefs] = useState(loadPrefs);
   const [playId, setPlayId] = useState(() => plays[0]?.id ?? "");
-  const [limitsOpen, setLimitsOpen] = useState(false);
-  const limitsRef = useRef<HTMLDivElement>(null);
   const [channel, setChannel] = useState<NotifyChannel>("discord");
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>("discord");
   const [activeTab, setActiveTab] = useState<CabinetTab>("profile");
+  const [presetsDirty, setPresetsDirty] = useState(false);
 
   useEffect(() => {
     if (!live || !session.memberId) return;
@@ -235,7 +230,6 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
     const nextPlays = playsForSession(mine, session);
     setPlays(nextPlays);
     setSavedPlays(clonePlays(nextPlays));
-    setLimitsOpen(false);
     setPlayId((prev) => (nextPlays.some((row) => row.id === prev) ? prev : nextPlays[0]?.id ?? ""));
   }, [live, mine?.id, session.nick]);
 
@@ -252,14 +246,6 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
     setChannel(nextChannel);
     setSavedChannel(nextChannel);
   }, [live, cardReady, card, session.nick]);
-
-  useEffect(() => {
-    const onDoc = (event: MouseEvent) => {
-      if (!limitsRef.current?.contains(event.target as Node)) setLimitsOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
 
   const ping = () => {
     if (waiting) onSent();
@@ -413,15 +399,6 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
     return true;
   };
 
-  const saveSchedule = () => {
-    const next = { ...prefs, month: "now" as const, pin: "" };
-    savePrefs(next);
-    setPrefs(next);
-    setSavedPrefs({ ...next, limits: [...next.limits] });
-    showV2Toast("ok", t("cabinet.saved"));
-    ping();
-  };
-
   const patchPlay = (id: string, part: Partial<RoomPlay>) => {
     setPlays((prev) => prev.map((row) => (row.id === id ? { ...row, ...part } : row)));
   };
@@ -439,9 +416,8 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const roomNick = savedPlays[0]?.nick || mine?.room || "—";
   const vipNitro = live ? card?.vipNitro : mine?.vipNitro;
   const vipRegular = live ? card?.vipRegular : mine?.vipRegular;
-  const prefsDirty = prefs.limits.join() !== savedPrefs.limits.join() || prefs.kind !== savedPrefs.kind;
   const profileDirty = !sameJson(profile, savedProfile);
-  const gameDirty = prefsDirty || !sameJson(plays, savedPlays);
+  const gameDirty = !sameJson(plays, savedPlays) || presetsDirty;
   const accountDirty =
     channel !== savedChannel ||
     !sameJson({ ...login, password: "" }, { ...savedLogin, password: "" }) ||
@@ -540,7 +516,6 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         {([
           ["profile", "fa-user", profileDirty],
           ["game", "fa-spade", gameDirty],
-          ["payments", "fa-wallet", false],
           ["account", "fa-shield-halved", accountDirty],
         ] as const).map(([tab, icon, dirty]) => (
           <button
@@ -663,6 +638,18 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
       </div>
 
       <div className="v2-cab-tab-panel" hidden={activeTab !== "game"}>
+      <TablePresetsPanel
+        memberId={session.memberId}
+        fallback={live ? card?.tables ?? 1 : mine?.tables ?? 1}
+        live={live}
+        canEdit={canEditCard}
+        demoValues={mine?.tablePresets}
+        onDemoSave={(values) => {
+          const activeTables = values.includes(mine?.tables ?? 1) ? mine?.tables ?? 1 : values[0];
+          writeMember({ tablePresets: values, tables: activeTables });
+        }}
+        onDirtyChange={setPresetsDirty}
+      />
       <CabinetPlaysPanel
         plays={plays}
         savedPlays={savedPlays}
@@ -674,79 +661,6 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
         onPersist={persistPlays}
         onCancel={() => setPlays(clonePlays(savedPlays))}
       />
-      </div>
-
-      <div className="v2-cab-tab-panel" hidden={activeTab !== "payments"}>
-      <PayMethodsPanel
-        memberId={session.memberId}
-        canEdit={canEditCard}
-        live={live}
-        demoPays={live ? undefined : mine?.pays}
-        seedKey={mine?.id ?? session.memberId}
-        onDemoSave={(next) => writeMember({ pays: next })}
-        onSaved={ping}
-      />
-      </div>
-
-      <div className="v2-cab-tab-panel" hidden={activeTab !== "game"}>
-      <section className="v2-block v2-cab-card">
-        <div className="v2-cab-head">
-          <h2>{t("cabinet.filterTitle")}</h2>
-        </div>
-        <div className="v2-cab-body">
-        <p className="v2-cab-hint">{t("cabinet.filterLead")}</p>
-        <div className="v2-cab-filter">
-          <div className="relative" ref={limitsRef}>
-            <button type="button" className="v2-ctrl px-3" onClick={() => setLimitsOpen((open) => !open)}>
-              {t("schedule.limit")}: <span className="v2-mono ml-1">{prefs.limits.join(" · ")}</span>
-              <i className="fa-solid fa-angle-down ml-2" />
-            </button>
-            {limitsOpen ? (
-              <div className="v2-cab-pop absolute z-40 mt-1 w-full overflow-hidden rounded border p-1">
-                {LIMIT_OPTIONS.map((value) => {
-                  const on = prefs.limits.includes(value);
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`v2-cab-pop-item${on ? " is-on" : ""}`}
-                      onClick={() =>
-                        setPrefs({
-                          ...prefs,
-                          limits: on && prefs.limits.length > 1 ? prefs.limits.filter((item) => item !== value) : on ? prefs.limits : [...prefs.limits, value].sort((a, b) => Number(a) - Number(b)),
-                        })
-                      }
-                    >
-                      <i className={`fa-solid ${on ? "fa-check-square" : "fa-square"}`} />
-                      <span className="v2-mono">{value}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-          <label className="relative">
-            <span className="v2-ctrl flex items-center px-3">
-              {prefs.kind === "nitro" ? "Nitro" : "Regular"}
-              <i className="fa-solid fa-angle-down ml-2" />
-          </span>
-            <select className="absolute inset-0 cursor-pointer opacity-0" value={prefs.kind} onChange={(event) => setPrefs({ ...prefs, kind: event.target.value === "regular" ? "regular" : "nitro" })}>
-              <option value="nitro">Nitro</option>
-              <option value="regular">Regular</option>
-            </select>
-          </label>
-        </div>
-        <p className="v2-cab-hint">{t("cabinet.filterNote")}</p>
-        <BlockBar
-          editing
-          dirty={prefsDirty}
-          saveLabel={t("cabinet.save")}
-          cancelLabel={t("cabinet.cancel")}
-          onSave={saveSchedule}
-          onCancel={() => setPrefs({ ...savedPrefs, limits: [...savedPrefs.limits] })}
-        />
-        </div>
-      </section>
       </div>
 
       <div className="v2-cab-tab-panel is-actions" hidden={activeTab !== "account"}>

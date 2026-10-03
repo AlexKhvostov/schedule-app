@@ -4,7 +4,7 @@ async function enterDemoDistanceBook(page: Page) {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await expect(page.getByText("Добро пожаловать, you")).toBeVisible();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
   await page.goto("/#admin-distance");
   await expect(page.getByRole("heading", { name: "Контроль дистанций" })).toBeVisible();
 }

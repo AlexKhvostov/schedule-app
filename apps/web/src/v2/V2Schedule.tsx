@@ -9,6 +9,7 @@ import { readCet } from "../schedule/cet";
 import { demoMonthPlan } from "../schedule/demoPlan";
 import { loadDemoSchedule, resetDemoSchedules, saveDemoSchedule } from "../schedule/demoScheduleStore";
 import { rosterFromGrids, formatHours, type RosterRow } from "../schedule/roster";
+import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadTimeStats";
 import { fieldFill, columnFill } from "../schedule/analytics";
 import { OptField, type OverwriteAsk } from "./OptField";
 import { FillByHourChart } from "./FillByHourChart";
@@ -21,23 +22,46 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { PersonAvatar } from "./PersonAvatar";
 import { BarMark, HoursPanel, MobileScheduleDock } from "./SchedulePanels";
 import { showV2Toast } from "./V2Toast";
-import { gridsWithMySlots, limitsWithMyMarks, mergeOccupiedLimits, myHoursMatrix, occupiedFromSlots } from "./myShifts";
+import {
+  limitsWithMyMarks,
+  mergeOccupiedPairs,
+  myHoursMatrix,
+  occupiedPairsFromSlots,
+  type OccupiedPairMatrix,
+} from "./myShifts";
 import { type HourLoadMap } from "../schedule/hourLoad";
-import { loadPrefs, savePrefs } from "./prefs";
+import { loadPrefs, resetSchedulePrefs, savePrefs } from "./prefs";
 import { centerPos, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadLiveMember } from "../data/auth";
-import { saveMemberTables, loadPublicNames } from "../data/people";
+import { loadPublicNames } from "../data/people";
 import { listLimitMarks, listSchedulePlayers, markFromPlayer, type SchedulePlayer } from "../data/players";
+import { loadMemberTablePresets, subscribeMemberTablePresets } from "../data/tablePresets";
 import { loadMyPlays } from "../data/plays";
 import { accessKey, loadScheduleAccess } from "../data/scheduleAccess";
-import { applyOwnSlots, loadMemberOccupiedSlots, loadMonthGrids, removeForeignSlots, subscribeOccupancy, ymRange } from "../data/slots";
-import { loadScheduleSettings, subscribeScheduleSettings } from "../data/scheduleSettings";
+import {
+  applyOwnSlots,
+  gridsForVariant,
+  loadMemberOccupiedSlots,
+  loadMultiMonthGrids,
+  monthGridKey,
+  removeForeignSlots,
+  replaceVariantGrids,
+  subscribeOccupancy,
+  ymRange,
+  type MonthGridStore,
+} from "../data/slots";
+import { loadScheduleSettings, subscribeScheduleSettings, type ScheduleFilterLimits } from "../data/scheduleSettings";
+import { loadDeadTimeIntervals, subscribeDeadTimeIntervals, type DeadTimeInterval } from "../data/deadTime";
 import { notifyMarkRemoved } from "../data/notifyMark";
-import { loadMembers, memberOfSession, saveMembers, winamaxPlayLimits } from "../schedule/members";
+import { loadMembers, memberOfSession } from "../schedule/members";
 import { readSession } from "./session";
 import { decorateDemoRoster, rowInitials, seatDiffs, showNick, type SeatDiff } from "./schedulePresentation";
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
+import { displayScheduleColumn, gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
+import { loadTablePresetSelection, saveTablePresetSelection } from "./tablePresetSelection";
+
+const CALENDAR_VARIANTS = ["nitro", "regular"] as const;
 
 type Props = {
   cursor: Date;
@@ -56,8 +80,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
   const boot = loadPrefs();
-  const [grids, setGrids] = useState<Record<string, Occupancy>>(() =>
-    Object.fromEntries(boot.limits.map((limit) => [limit, emptyMonth(year, monthIndex)])),
+  const [gridStore, setGridStore] = useState<MonthGridStore>(() =>
+    Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) =>
+      LIMIT_OPTIONS.map((limit) => [monthGridKey(variant, limit), emptyMonth(year, monthIndex)]),
+    )),
   );
   const [readyStamp, setReadyStamp] = useState("");
   const [showMine, setShowMine] = useState(false);
@@ -70,10 +96,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const accessRef = useRef<Set<string>>(new Set());
   const selfMarkRef = useRef(selfMark);
   selfMarkRef.current = selfMark;
-  const [hideTables, setHideTables] = useState(false);
-  const [dimPast, setDimPast] = useState(true);
-  const [hidePastDays, setHidePastDays] = useState(false);
-  const [showTip, setShowTip] = useState(true);
+  const [hideTables, setHideTables] = useState(boot.hideTables);
+  const [dimPast, setDimPast] = useState(boot.dimPast);
+  const [hidePastDays, setHidePastDays] = useState(boot.hidePastDays);
+  const [displayRange, setDisplayRange] = useState(boot.displayRange);
+  const [workHours, setWorkHours] = useState(boot.workHours);
+  const [showTip, setShowTip] = useState(boot.showTip);
   const [canEdit, setCanEdit] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
   const [mobileEditOn, setMobileEditOn] = useState(false);
@@ -83,13 +111,14 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [editByButton, setEditByButton] = useState(true);
   const [editPulse, setEditPulse] = useState(boot.editPulse);
   const [busyHint, setBusyHint] = useState(boot.busyHint);
-  const [busyRemote, setBusyRemote] = useState<(string[] | null)[][] | undefined>();
-  const [mineRemote, setMineRemote] = useState<(string[] | null)[][] | undefined>();
+  const [busyRemote, setBusyRemote] = useState<OccupiedPairMatrix | undefined>();
   const [showExtraTz, setShowExtraTz] = useState(boot.showExtraTz !== false);
-  const [tablesDraft, setTablesDraft] = useState("11");
+  const [tablePresets, setTablePresets] = useState<number[]>([ME.tables]);
+  const [tablePresetOwnerId, setTablePresetOwnerId] = useState<string>();
   const [limits, setLimits] = useState<string[]>(boot.limits);
   const [limitsOpen, setLimitsOpen] = useState(false);
-  const [kind, setKind] = useState(boot.kind);
+  const [kinds, setKinds] = useState(boot.kinds);
+  const [kind, setKind] = useState(boot.kinds[0]);
   const [kindOpen, setKindOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [pickYear, setPickYear] = useState(year);
@@ -103,6 +132,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [allowOverwrite, setAllowOverwrite] = useState(false);
   const [allowActAs, setAllowActAs] = useState(false);
   const [countTables, setCountTables] = useState(false);
+  const [mergeAdjacentSlots, setMergeAdjacentSlots] = useState(false);
+  const [deadTimeIntervals, setDeadTimeIntervals] = useState<DeadTimeInterval[] | null>(null);
+  const [filterLimits, setFilterLimits] = useState<ScheduleFilterLimits>({
+    nitro: [...LIMIT_OPTIONS],
+    regular: [...LIMIT_OPTIONS],
+  });
   const [overwriteAsk, setOverwriteAsk] = useState<OverwriteAsk | null>(null);
   const [overwriteBusy, setOverwriteBusy] = useState(false);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
@@ -121,64 +156,75 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const toolsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const loadGen = useRef(0);
-  const gridsRef = useRef(grids);
+  const kindsRef = useRef(kinds);
+  kindsRef.current = kinds;
   const inflight = useRef(0);
   const busyGen = useRef(0);
   const quietUntil = useRef(0);
   const refreshTimer = useRef(0);
   const liveDebounce = useRef(0);
   const dirtyLive = useRef(false);
-  const tablesSaveTimer = useRef(0);
-  gridsRef.current = grids;
+  const gridStoreRef = useRef(gridStore);
+  gridStoreRef.current = gridStore;
   const sessionNick = readSession()?.nick ?? "";
   const selfId = memberId ?? memberOfSession(loadMembers(), { memberId, nick: sessionNick })?.id;
   actingRef.current = actingId || selfId;
   const selfIdRef = useRef(selfId);
   selfIdRef.current = selfId;
-  const [playLimits, setPlayLimits] = useState<string[]>(() =>
-    winamaxPlayLimits({ memberId: actingRef.current, nick: sessionNick }),
-  );
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const mayActAs = canActAs || allowActAs;
   const canRemoveForeign = canActAs || allowOverwrite;
   const editGlow = touchLayout ? mobileEditOn : editByButton && canEdit;
   const mobileEditEnabled = scheduleZoomCanEdit(mobileCellWidth);
   const showBusy = isKit && busyHint;
-  const fetchKey = limits.join("|");
-  const loadStamp = `${year}-${monthIndex}-${kind}-${fetchKey}`;
-  const viewStamp = `${year}-${monthIndex}-${kind}`;
+  const requestedLimits = [...LIMIT_OPTIONS];
+  const fetchKey = requestedLimits.join("|");
+  const kindKey = CALENDAR_VARIANTS.join("+");
+  const loadStamp = `${year}-${monthIndex}-${kindKey}-${fetchKey}`;
   const gridLoading = isLiveData() && readyStamp !== loadStamp;
-  const shownGrids = useMemo(() => {
-    if (!gridLoading) return grids;
-    if (readyStamp.startsWith(`${viewStamp}-`)) return grids;
-    return Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
-  }, [gridLoading, grids, limits, year, monthIndex, readyStamp, viewStamp]);
+  const shownGridStore = useMemo(() => {
+    if (!gridLoading) return gridStore;
+    return Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
+      monthGridKey(variant, limit),
+      emptyMonth(year, monthIndex),
+    ])));
+  }, [gridLoading, gridStore, fetchKey, year, monthIndex]);
+  const pairRows = useMemo(
+    () => schedulePairRows(filterLimits, kinds, limits, shownGridStore),
+    [filterLimits, kinds, limits, shownGridStore],
+  );
+  const filterOptionLimits = useMemo(
+    () => LIMIT_OPTIONS.filter((limit) => kinds.some((variant) => filterLimits[variant].includes(limit))),
+    [filterLimits, kinds],
+  );
+  const auxiliaryItems = useMemo(
+    () => variantGridItems(shownGridStore, kinds, limits, pairRows),
+    [shownGridStore, kinds, limits, pairRows],
+  );
+  const auxiliaryLabels = useMemo(() => auxiliaryItems.map((item) => item.label), [auxiliaryItems]);
+  const auxiliaryGrids = useMemo(() => gridsByVariantLabel(auxiliaryItems), [auxiliaryItems]);
+  const calendarItems = useMemo(
+    () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
+    [shownGridStore, fetchKey],
+  );
+  const calendarGrids = useMemo(() => gridsByVariantLabel(calendarItems), [calendarItems]);
 
   const pullGrids = useCallback(
     (stamp: string) => {
       const gen = loadGen.current;
-      return loadMonthGrids(year, monthIndex, kind, limits).then((next) => {
+      return loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits).then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (!next) {
-          setReadyStamp(stamp);
-          return;
-        }
-        if (next.error) {
+        setGridStore((store) => next.loaded.reduce((result, variant) =>
+          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, requestedLimits)), store));
+        if (Object.keys(next.errors).length) {
           showV2Toast("err", t("schedule.toastLoadError"));
-          setReadyStamp(stamp);
-          return;
         }
-        setGrids(next.grids);
         setReadyStamp(stamp);
       });
     },
-    [year, monthIndex, kind, limits, t],
+    [year, monthIndex, fetchKey, t],
   );
-
-  useEffect(() => {
-    setPlayLimits(winamaxPlayLimits({ memberId: actingId || selfId, nick: me.discord || sessionNick }));
-  }, [actingId, selfId, me.discord, sessionNick, canEdit]);
 
   useEffect(() => {
     const id = actingId || selfId;
@@ -197,31 +243,24 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, [actingId, selfId]);
 
   useEffect(() => {
-    const blank = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
     if (!isLiveData()) {
-      setGrids(Object.fromEntries(limits.map((limit) => [
-        limit,
-        loadDemoSchedule(year, monthIndex, kind, limit, () => demoMonthPlan(year, monthIndex, kind, limit)),
-      ])));
+      setGridStore(Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
+        monthGridKey(variant, limit),
+        loadDemoSchedule(year, monthIndex, variant, limit, () => demoMonthPlan(year, monthIndex, variant, limit)),
+      ]))));
       setReadyStamp(loadStamp);
       return;
     }
     const gen = ++loadGen.current;
-    void loadMonthGrids(year, monthIndex, kind, limits)
+    void loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits)
       .then((next) => {
         if (gen !== loadGen.current) return;
         if (inflight.current > 0) return;
-        if (!next) {
-          setGrids(blank);
-          setReadyStamp(loadStamp);
-          return;
-        }
-        if (next.error) {
+        setGridStore((store) => next.loaded.reduce((result, variant) =>
+          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, requestedLimits)), store));
+        if (Object.keys(next.errors).length) {
           showV2Toast("err", t("schedule.toastLoadError"));
-          setReadyStamp(loadStamp);
-          return;
         }
-        setGrids(next.grids);
         setReadyStamp(loadStamp);
       })
       .catch(() => {
@@ -230,7 +269,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         showV2Toast("err", t("schedule.toastLoadError"));
         setReadyStamp(loadStamp);
       });
-  }, [year, monthIndex, kind, fetchKey, t]);
+  }, [year, monthIndex, kindKey, fetchKey, t]);
 
   useEffect(() => {
     const applySelf = (mark: Mark, id?: string) => {
@@ -238,7 +277,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       setActingId((current) => {
         if (current && id && current !== id) return current;
         setMe(mark);
-        setTablesDraft(String(mark.tables));
         return id ?? current;
       });
     };
@@ -269,6 +307,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       nick: row.discord,
       publicCode: row.room,
       roomNick: row.room,
+      avatarUrl: row.avatar,
+      username: row.discord,
+      globalName: row.discordDisplay,
+      guildNick: row.discordGuildNick,
       markTag: row.mark.t,
       markBg: row.mark.bg || ME.bg,
       markFg: row.mark.fg || "#111827",
@@ -282,25 +324,23 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     (who: string | undefined) => {
       if (!isLiveData()) {
         setBusyRemote(undefined);
-        setMineRemote(undefined);
         return Promise.resolve();
       }
       if (!who) return Promise.resolve();
       const gen = ++busyGen.current;
-      return loadMemberOccupiedSlots(year, monthIndex, kind, who).then((rows) => {
+      return Promise.all(CALENDAR_VARIANTS.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who))).then((groups) => {
         if (gen !== busyGen.current) return;
-        if (!rows) return;
-        const map = occupiedFromSlots(rows, busyDays);
+        if (groups.some((rows) => rows === null)) return;
+        const rows = groups.flatMap((group) => group ?? []);
+        const map = occupiedPairsFromSlots(rows, busyDays);
         if (who === actingRef.current) setBusyRemote(map);
-        if (who === selfIdRef.current) setMineRemote(map);
       });
     },
-    [year, monthIndex, kind, busyDays],
+    [year, monthIndex, busyDays],
   );
 
   const refreshBusy = useCallback(() => {
     void pullBusy(actingRef.current);
-    if (selfIdRef.current && selfIdRef.current !== actingRef.current) void pullBusy(selfIdRef.current);
   }, [pullBusy]);
 
   useEffect(() => {
@@ -377,7 +417,17 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         setAllowOverwrite(next.allowOverwriteMarks);
         setAllowActAs(next.allowActAs);
         setCountTables(next.countTables);
+        setMergeAdjacentSlots(next.mergeAdjacentSlots);
         setEditByButton(next.editByButton);
+        setFilterLimits(next.filterLimits);
+        setLimits((current) => {
+          const selectedKinds = kindsRef.current;
+          const available = new Set(selectedKinds.flatMap((variant) => next.filterLimits[variant]));
+          const normalized = current.filter((limit) => available.has(limit));
+          const result = normalized.length ? normalized : [selectedKinds.flatMap((variant) => next.filterLimits[variant])[0] ?? "50"];
+          if (result.join("|") !== current.join("|")) savePrefs({ ...loadPrefs(), limits: result });
+          return result;
+        });
       });
     };
     apply();
@@ -389,10 +439,30 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   }, []);
 
   useEffect(() => {
+    let live = true;
+    const apply = () => {
+      void loadDeadTimeIntervals()
+        .then((next) => {
+          if (live) setDeadTimeIntervals(next);
+        })
+        .catch(() => {
+          if (!live) return;
+          setDeadTimeIntervals(null);
+          showV2Toast("err", t("schedule.deadTimeLoadError"));
+        });
+    };
+    apply();
+    const off = subscribeDeadTimeIntervals(apply);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [t]);
+
+  useEffect(() => {
     return () => {
       window.clearTimeout(refreshTimer.current);
       window.clearTimeout(liveDebounce.current);
-      window.clearTimeout(tablesSaveTimer.current);
     };
   }, []);
 
@@ -436,7 +506,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (!editByButton || canEdit) return;
     setActingId(selfId);
     setMe(selfMarkRef.current);
-    setTablesDraft(String(selfMarkRef.current.tables));
   }, [canEdit, selfId, editByButton]);
 
   useEffect(() => {
@@ -444,16 +513,46 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     if (!selfId) return;
     setActingId(selfId);
     setMe(selfMarkRef.current);
-    setTablesDraft(String(selfMarkRef.current.tables));
   }, [mayActAs, selfId]);
 
   useEffect(() => {
     void listSchedulePlayers().then(setPlayers);
   }, []);
 
+  const brushId = actingId || selfId;
   useEffect(() => {
-    setTablesDraft(String(me.tables));
-  }, [me.tables]);
+    if (!brushId) return;
+    let active = true;
+    const player = players.find((row) => row.id === brushId);
+    const fallback = brushId === selfId ? selfMarkRef.current.tables : player?.tables ?? 1;
+    setTablePresetOwnerId(undefined);
+    const apply = (presets: readonly number[]) => {
+      if (!active) return;
+      const selected = loadTablePresetSelection(brushId, presets, fallback);
+      setTablePresets(selected.values);
+      setTablePresetOwnerId(brushId);
+      setMe((mark) => (mark.memberId && mark.memberId !== brushId ? mark : { ...mark, tables: selected.active }));
+      if (brushId === selfId) {
+        setSelfMark((mark) => ({ ...mark, tables: selected.active }));
+      }
+    };
+    if (!isLiveData()) {
+      const member = loadMembers().find((row) => row.id === brushId);
+      apply(member?.tablePresets ?? player?.tablePresets ?? [fallback]);
+      return () => {
+        active = false;
+      };
+    }
+    const reload = () => {
+      void loadMemberTablePresets(brushId, fallback).then((result) => apply(result.presets));
+    };
+    reload();
+    const off = subscribeMemberTablePresets(brushId, reload);
+    return () => {
+      active = false;
+      off();
+    };
+  }, [brushId, selfId, players]);
 
   useEffect(() => {
     const onDoc = (event: MouseEvent) => {
@@ -463,7 +562,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const visibleGrids = useMemo(() => limits.map((limit) => shownGrids[limit]).filter(Boolean), [shownGrids, limits]);
+  const visibleGrids = useMemo(() => auxiliaryItems.map((item) => item.grid), [auxiliaryItems]);
   const fieldMarks = useMemo(() => {
     const seen = new Map<string, Mark>();
     for (const grid of visibleGrids) {
@@ -481,21 +580,22 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   useEffect(() => {
     if (!paintOn && !showPeople && !mayActAs) return;
     let alive = true;
-    void listLimitMarks(kind, limits).then((rows) => {
-      if (alive) setLimitMarks(rows);
+    void Promise.all(kinds.map((variant) => listLimitMarks(variant, limits))).then((groups) => {
+      if (!alive) return;
+      const seen = new Map<string, Mark>();
+      for (const mark of groups.flat()) seen.set(markKey(mark), mark);
+      setLimitMarks([...seen.values()]);
     });
     return () => {
       alive = false;
     };
-  }, [kind, limits, paintOn, showPeople, mayActAs]);
+  }, [kinds, limits, paintOn, showPeople, mayActAs]);
 
   const clubPlayerIds = useMemo(() => new Set(players.map((row) => row.id)), [players]);
   const roster = useMemo(() => {
     if (!showPeople) return [];
     const rawRows = rosterFromGrids(
-      limits
-        .map((limit) => ({ limit, grid: shownGrids[limit] }))
-        .filter((row): row is { limit: string; grid: Occupancy } => Boolean(row.grid)),
+      auxiliaryItems.map((item) => ({ limit: item.label, grid: item.grid })),
       year,
       monthIndex,
       cetTick,
@@ -505,7 +605,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const rows = isLiveData() ? rawRows : decorateDemoRoster(rawRows, loadMembers());
     if (!isLiveData() || !clubPlayerIds.size) return rows;
     return rows.filter((row) => !row.mark.memberId || clubPlayerIds.has(row.mark.memberId));
-  }, [showPeople, shownGrids, limits, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
+  }, [showPeople, auxiliaryItems, year, monthIndex, cetTick, limitMarks, kind, clubPlayerIds]);
 
   const peopleIdsKey = useMemo(() => {
     if (!showPeople) return "";
@@ -530,38 +630,33 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const fillByLimit = useMemo(
     () => {
       if (!showAnalytics) return [];
-      return limits.flatMap((limit) => {
-        const grid = shownGrids[limit];
-        if (!grid) return [];
-        return [
-          {
-            limit,
-            fill: fieldFill(grid, year, monthIndex, cetTick, limit, undefined, capacity),
-            cols: columnFill(shownGrids, [limit], capacity, year, monthIndex),
-          },
-        ];
-      });
+      return auxiliaryItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        limit: item.limit,
+        fill: fieldFill(item.grid, year, monthIndex, cetTick, item.limit, undefined, capacity),
+        cols: columnFill({ [item.limit]: item.grid }, [item.limit], capacity, year, monthIndex),
+      }));
     },
-    [showAnalytics, shownGrids, limits, year, monthIndex, cetTick, capacity],
+    [showAnalytics, auxiliaryItems, year, monthIndex, cetTick, capacity],
   );
-  const mineGrids = useMemo(
-    () => gridsWithMySlots(shownGrids, mineRemote, selfMark, year, monthIndex),
-    [shownGrids, mineRemote, selfMark, year, monthIndex],
-  );
-  const hoursGrids = useMemo(
-    () => gridsWithMySlots(shownGrids, busyRemote, me, year, monthIndex),
-    [shownGrids, busyRemote, me, year, monthIndex],
-  );
+  const hoursGrids = auxiliaryGrids;
   const dockLimits = useMemo(() => {
-    const marked = limitsWithMyMarks(hoursGrids, me);
-    const source = playLimits.length ? playLimits : marked.length ? marked : limits;
-    const set = new Set([...source, ...marked]);
-    return LIMIT_OPTIONS.filter((limit) => set.has(limit));
-  }, [playLimits, hoursGrids, me, limits]);
+    const marked = limitsWithMyMarks(hoursGrids, me, auxiliaryLabels);
+    return marked.length ? marked : auxiliaryLabels;
+  }, [hoursGrids, me, auxiliaryLabels]);
   const hoursMatrix = useMemo(
     () => (showHours ? myHoursMatrix(hoursGrids, me, dockLimits, { year, monthIndex, cet: cetTick }) : null),
     [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
   );
+  const deadTimeByMember = useMemo(
+    () => deadTimeIntervals ? deadTimeBreakdownsByMember(auxiliaryItems, deadTimeIntervals) : null,
+    [auxiliaryItems, deadTimeIntervals],
+  );
+  const myDeadTime = useMemo(() => {
+    if (!deadTimeByMember) return null;
+    return deadTimeByMember[deadTimeMemberKey(me)] ?? { byPair: {}, total: 0 };
+  }, [deadTimeByMember, me]);
   const actPlayers = useMemo(() => {
     const known = new Map(players.map((row) => [row.id, row]));
     const seen = new Set<string>();
@@ -584,20 +679,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         username: extra?.username || mark.username,
         globalName: extra?.globalName || mark.globalName,
         guildNick: extra?.guildNick || mark.guildNick,
+        profileName: extra?.profileName,
       });
     }
     return rows.sort((a, b) => a.nick.localeCompare(b.nick, undefined, { sensitivity: "base" }));
   }, [limitMarks, players]);
   const busyMap = useMemo(
-    () => (showBusy ? mergeOccupiedLimits(busyRemote, grids, me, { year, monthIndex, cet: cetTick }) : undefined),
-    [showBusy, busyRemote, grids, me, year, monthIndex, cetTick],
+    () => (showBusy ? mergeOccupiedPairs(busyRemote, shownGridStore, me, { year, monthIndex, cet: cetTick }) : undefined),
+    [showBusy, busyRemote, shownGridStore, me, year, monthIndex, cetTick],
   );
 
   const applyActAs = (id: string) => {
     if (selfId && id === selfId) {
       setActingId(selfId);
       setMe(selfMarkRef.current);
-      setTablesDraft(String(selfMarkRef.current.tables));
       return;
     }
     const row = players.find((item) => item.id === id);
@@ -605,18 +700,16 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       const mark = markFromPlayer(row);
       setActingId(row.id);
       setMe(mark);
-      setTablesDraft(String(mark.tables));
       return;
     }
     const mark = (limitMarks ?? []).find((item) => item.memberId === id);
     if (!mark?.memberId) return;
     setActingId(mark.memberId);
     setMe(mark);
-    setTablesDraft(String(mark.tables));
   };
 
   const writeDiffs = useCallback(
-    async (limit: string, diffs: SeatDiff[]) => {
+    async (variant: "nitro" | "regular", limit: string, diffs: SeatDiff[]) => {
       const selfWrite = selfIdRef.current;
       const brushWrite = actingRef.current;
       const place = diffs.filter((diff) => diff.placed).map((diff) => ({
@@ -634,7 +727,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         const { error } = await applyOwnSlots({
           memberId: selfWrite,
           limit,
-          variant: kind,
+          variant,
           year,
           monthIndex,
           place: [],
@@ -646,7 +739,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         const { error } = await applyOwnSlots({
           memberId: brushWrite,
           limit,
-          variant: kind,
+          variant,
           year,
           monthIndex,
           place,
@@ -656,19 +749,25 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       }
       return undefined;
     },
-    [kind, year, monthIndex],
+    [year, monthIndex],
   );
 
   const onGridChange = useCallback(
-    (limit: string, next: Occupancy) => {
-      const prevGrid = gridsRef.current[limit] ?? [];
+    (variant: "nitro" | "regular", limit: string, next: Occupancy) => {
+      const key = monthGridKey(variant, limit);
+      const prevGrid = gridStoreRef.current[key] ?? [];
       const diffs = seatDiffs(prevGrid, next);
-      setGrids((prev) => ({ ...prev, [limit]: next }));
-      if (!isLiveData()) saveDemoSchedule(year, monthIndex, kind, limit, next);
+      setGridStore((store) => ({ ...store, [key]: next }));
+      if (!isLiveData()) saveDemoSchedule(year, monthIndex, variant, limit, next);
       if (!diffs.length) return;
-      if (isLiveData() && diffs.some((diff) => diff.placed) && !accessRef.current.has(accessKey(kind, limit))) {
-        setGrids((prev) => ({ ...prev, [limit]: prevGrid }));
+      if (isLiveData() && diffs.some((diff) => diff.placed) && !accessRef.current.has(accessKey(variant, limit))) {
+        setGridStore((store) => ({ ...store, [key]: prevGrid }));
         showV2Toast("err", t("schedule.toastNoAccess"));
+        return;
+      }
+      if (diffs.some((diff) => diff.placed) && !filterLimits[variant].includes(limit)) {
+        setGridStore((store) => ({ ...store, [key]: prevGrid }));
+        showV2Toast("err", t("schedule.toastLimitDisabled"));
         return;
       }
       showV2Toast(diffs[0].placed ? "ok" : "off", t(diffs[0].placed ? "schedule.toastPlaced" : "schedule.toastRemoved"));
@@ -678,11 +777,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
       loadGen.current += 1;
       quietUntil.current = Date.now() + 800;
       inflight.current += 1;
-      void writeDiffs(limit, diffs)
+      void writeDiffs(variant, limit, diffs)
         .then((error) => {
           inflight.current = Math.max(0, inflight.current - 1);
           if (error) {
-            setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+            setGridStore((store) => ({ ...store, [key]: prevGrid }));
             showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess") : t("schedule.toastSaveError"));
             return;
           }
@@ -690,11 +789,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         })
         .catch(() => {
           inflight.current = Math.max(0, inflight.current - 1);
-          setGrids((curr) => ({ ...curr, [limit]: prevGrid }));
+          setGridStore((store) => ({ ...store, [key]: prevGrid }));
           showV2Toast("err", t("schedule.toastSaveError"));
         });
     },
-    [kind, t, writeDiffs, refreshBusy],
+    [year, monthIndex, t, writeDiffs, refreshBusy, filterLimits],
   );
 
   const confirmOverwrite = (action: "wipe" | "empty" = "wipe") => {
@@ -713,30 +812,35 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           ? "schedule.toastReplaced"
           : "schedule.toastRemoved";
     if (!isLiveData()) {
-      setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
-      saveDemoSchedule(year, monthIndex, kind, ask.limit, chosen);
+      setGridStore((store) => ({ ...store, [monthGridKey(ask.variant, ask.limit)]: chosen }));
+      saveDemoSchedule(year, monthIndex, ask.variant, ask.limit, chosen);
       setOverwriteAsk(null);
       showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
       return;
     }
-    if (ask.kind === "place" && !accessRef.current.has(accessKey(kind, ask.limit))) {
+    if (ask.kind === "place" && !accessRef.current.has(accessKey(ask.variant, ask.limit))) {
       showV2Toast("err", t("schedule.toastNoAccess"));
       setOverwriteAsk(null);
       return;
     }
+    if (ask.kind === "place" && !filterLimits[ask.variant].includes(ask.limit)) {
+      showV2Toast("err", t("schedule.toastLimitDisabled"));
+      setOverwriteAsk(null);
+      return;
+    }
     setOverwriteBusy(true);
-    const prevGrid = gridsRef.current[ask.limit] ?? [];
+    const prevGrid = gridStoreRef.current[monthGridKey(ask.variant, ask.limit)] ?? [];
     const diffs = seatDiffs(prevGrid, chosen);
     void (async () => {
       if (action === "wipe" && ask.slots.length) {
         const { error } = await removeForeignSlots({
           limit: ask.limit,
-          variant: kind,
+          variant: ask.variant,
           slots: ask.slots,
         });
         if (error) return error;
       }
-      return writeDiffs(ask.limit, diffs);
+      return writeDiffs(ask.variant, ask.limit, diffs);
     })()
       .then((error) => {
         setOverwriteBusy(false);
@@ -754,7 +858,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
         loadGen.current += 1;
         quietUntil.current = Date.now() + 800;
-        setGrids((prev) => ({ ...prev, [ask.limit]: chosen }));
+        setGridStore((store) => ({ ...store, [monthGridKey(ask.variant, ask.limit)]: chosen }));
         refreshBusy();
       })
       .catch(() => {
@@ -766,41 +870,73 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
 
   const toggleLimit = (value: string) => {
     setLimits((prev) => {
-      if (prev.includes(value)) return prev.length === 1 ? prev : prev.filter((item) => item !== value);
-      return [...prev, value].sort((a, b) => Number(a) - Number(b));
+      const next = prev.includes(value)
+        ? prev.length === 1 ? prev : prev.filter((item) => item !== value)
+        : [...prev, value].sort((a, b) => Number(a) - Number(b));
+      savePrefs({ ...loadPrefs(), limits: next });
+      return next;
     });
-    setGrids((prev) => (prev[value] ? prev : { ...prev, [value]: emptyMonth(year, monthIndex) }));
+    setGridStore((store) => {
+      let next = store;
+      for (const variant of kinds) {
+        const key = monthGridKey(variant, value);
+        if (!next[key]) next = { ...next, [key]: emptyMonth(year, monthIndex) };
+      }
+      return next;
+    });
+  };
+
+  const toggleKind = (value: "nitro" | "regular") => {
+    setKinds((current) => {
+      const next = current.includes(value)
+        ? current.length === 1 ? current : current.filter((item) => item !== value)
+        : (["nitro", "regular"] as const).filter((item) => current.includes(item) || item === value);
+      const available = new Set(next.flatMap((variant) => filterLimits[variant]));
+      setLimits((currentLimits) => {
+        const normalized = currentLimits.filter((limit) => available.has(limit));
+        const result = normalized.length ? normalized : [next.flatMap((variant) => filterLimits[variant])[0] ?? "50"];
+        savePrefs({ ...loadPrefs(), kinds: next, limits: result });
+        return result;
+      });
+      const primary = next.includes(kind) ? kind : next[0];
+      setKind(primary);
+      onKindChange?.(primary);
+      return next;
+    });
   };
 
   const shiftMonth = (delta: number) => onCursorChange(new Date(year, monthIndex + delta, 1));
 
-  const applyTables = (raw: number) => {
-    const next = Math.min(30, Math.max(1, Math.round(raw)));
-    const targetId = actingRef.current;
-    setMe((mark) => (mark.tables === next ? mark : { ...mark, tables: next }));
-    setTablesDraft(String(next));
-    if (selfId && targetId === selfId) {
-      setSelfMark((mark) => (mark.tables === next ? mark : { ...mark, tables: next }));
+  const loadTablePresetsForPlayer = async (memberId: string) => {
+    const player = players.find((row) => row.id === memberId);
+    const fallback = memberId === selfId ? selfMarkRef.current.tables : player?.tables ?? 1;
+    if (!isLiveData()) {
+      const member = loadMembers().find((row) => row.id === memberId);
+      return loadTablePresetSelection(memberId, member?.tablePresets ?? player?.tablePresets ?? [fallback], fallback);
     }
-    setPlayers((list) => list.map((row) => (row.id === targetId ? { ...row, tables: next } : row)));
-    window.clearTimeout(tablesSaveTimer.current);
-    tablesSaveTimer.current = window.setTimeout(() => {
-      if (!targetId) return;
-      if (isLiveData()) {
-        void saveMemberTables(targetId, next).then((result) => {
-          if (result.error) showV2Toast("err", t("schedule.toastSaveError"));
-        });
-        return;
-      }
-      const list = loadMembers();
-      saveMembers(list.map((row) => (row.id === targetId ? { ...row, tables: next } : row)));
-    }, 400);
+    try {
+      const result = await loadMemberTablePresets(memberId, fallback);
+      return loadTablePresetSelection(memberId, result.presets, fallback);
+    } catch {
+      return loadTablePresetSelection(memberId, [fallback], fallback);
+    }
   };
 
-  const bumpTables = (delta: number) => {
-    const n = Number(tablesDraft);
-    const cur = Number.isFinite(n) ? n : me.tables;
-    applyTables(cur + delta);
+  const selectTablePreset = (value: number, requestedMemberId?: string, presets: readonly number[] = tablePresets) => {
+    const targetId = requestedMemberId || actingRef.current;
+    if (!targetId || !presets.includes(value)) return;
+    const player = players.find((row) => row.id === targetId);
+    const base = targetId === selfId ? selfMarkRef.current : player ? markFromPlayer(player) : null;
+    if (!base) return;
+    actingRef.current = targetId;
+    setActingId(targetId);
+    saveTablePresetSelection(targetId, value);
+    setTablePresets([...presets]);
+    setTablePresetOwnerId(targetId);
+    setMe({ ...base, tables: value });
+    if (selfId && targetId === selfId) {
+      setSelfMark((mark) => ({ ...mark, tables: value }));
+    }
   };
 
   const toggleEdit = () => {
@@ -884,14 +1020,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const mobileScheduleTools = touchLayout ? (
     <MobileScheduleDock
       me={me}
-      tables={tablesDraft}
-      onBump={bumpTables}
-      onDraft={(value) => {
-        setTablesDraft(value);
-        if (!value.trim()) return;
-        const n = Number(value);
-        if (Number.isFinite(n)) applyTables(n);
-      }}
+      tables={me.tables}
+      tablePresets={tablePresets}
+      tablePresetOwnerId={tablePresetOwnerId}
+      onTableSelect={selectTablePreset}
+      onLoadTablePresets={loadTablePresetsForPlayer}
       canActAs={mayActAs && mobileEditOn}
       players={actPlayers}
       selfId={selfId}
@@ -1006,7 +1139,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           </button>
           {limitsOpen && (
             <div className="v2-bar-menu">
-              {LIMIT_OPTIONS.map((value) => {
+              {filterOptionLimits.map((value) => {
                 const on = limits.includes(value);
                 return (
                   <button key={value} type="button" className={on ? "is-on" : ""} onClick={() => toggleLimit(value)}>
@@ -1028,7 +1161,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setMonthOpen(false);
             }}
           >
-            {kind === "nitro" ? "Nitro" : "Regular"}
+            {kinds.map((variant) => variant === "nitro" ? "Nitro" : "Regular").join(" · ")}
             <i className="fa-solid fa-angle-down v2-muted ml-2" />
           </button>
           {kindOpen && (
@@ -1042,14 +1175,13 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                 <button
                   key={value}
                   type="button"
-                  className={kind === value ? "is-on" : ""}
+                  className={kinds.includes(value) ? "is-on" : ""}
+                  aria-pressed={kinds.includes(value)}
                   onClick={() => {
-                    setKind(value);
-                    setKindOpen(false);
-                    savePrefs({ ...loadPrefs(), kind: value });
-                    onKindChange?.(value);
+                    toggleKind(value);
                   }}
                 >
+                  <i className={`fa-solid ${kinds.includes(value) ? "fa-check-square" : "fa-square"}`} />
                   {label}
                 </button>
               ))}
@@ -1136,14 +1268,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         </div>
         {!touchLayout ? <BarMark
           me={me}
-          tables={tablesDraft}
-          onBump={bumpTables}
-          onDraft={(value) => {
-            setTablesDraft(value);
-            if (!value.trim()) return;
-            const n = Number(value);
-            if (Number.isFinite(n)) applyTables(n);
-          }}
+          tables={me.tables}
+          tablePresets={tablePresets}
+          tablePresetOwnerId={tablePresetOwnerId}
+          onTableSelect={selectTablePreset}
+          onLoadTablePresets={loadTablePresetsForPlayer}
           canActAs={mayActAs && paintOn}
           players={actPlayers}
           selfId={selfId}
@@ -1221,15 +1350,21 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           self={selfMark}
           showTables={countTables && !hideTables}
           countTables={countTables}
+          mergeAdjacentSlots={mergeAdjacentSlots}
           dimPast={dimPast}
           hidePastDays={hidePastDays}
+          displayRange={displayRange}
+          workHours={workHours}
           showTip={showTip}
           canEdit={paintOn && !gridLoading}
           quietEdit={!editGlow || !editPulse}
           focus={focus}
+          kinds={kinds}
           limits={limits}
+          pairRows={pairRows}
           capacity={capacity}
-          grids={shownGrids}
+          grids={shownGridStore}
+          players={players}
           hourLoad={hourLoad}
           onGridChange={onGridChange}
           canRemoveForeign={canRemoveForeign}
@@ -1259,7 +1394,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             monthIndex={monthIndex}
             title={monthTitle(year, monthIndex, i18n.language)}
             tag={selfMark.t}
-            grids={mineGrids}
+            columns={calendarItems}
+            grids={calendarGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
             x={calPos.x}
             y={calPos.y}
@@ -1273,6 +1409,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <V2Settings
             dimPast={dimPast}
             hidePastDays={hidePastDays}
+            displayRange={displayRange}
+            workHours={workHours}
+            showDisplayRange={cetTick.year === year && cetTick.monthIndex === monthIndex}
             showTables={!hideTables}
             countTables={countTables}
             showTip={showTip}
@@ -1283,10 +1422,30 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             z={zOf("settings")}
             onMove={setSettingsPos}
             onFocus={() => setFront("settings")}
-            onDimPast={setDimPast}
-            onHidePastDays={setHidePastDays}
-            onShowTables={(value) => setHideTables(!value)}
-            onShowTip={setShowTip}
+            onDimPast={(value) => {
+              setDimPast(value);
+              savePrefs({ ...loadPrefs(), dimPast: value });
+            }}
+            onHidePastDays={(value) => {
+              setHidePastDays(value);
+              savePrefs({ ...loadPrefs(), hidePastDays: value });
+            }}
+            onDisplayRange={(value) => {
+              setDisplayRange(value);
+              savePrefs({ ...loadPrefs(), displayRange: value });
+            }}
+            onWorkHours={(hours) => {
+              setWorkHours(hours);
+              savePrefs({ ...loadPrefs(), workHours: hours });
+            }}
+            onShowTables={(value) => {
+              setHideTables(!value);
+              savePrefs({ ...loadPrefs(), hideTables: !value });
+            }}
+            onShowTip={(value) => {
+              setShowTip(value);
+              savePrefs({ ...loadPrefs(), showTip: value });
+            }}
             onEditPulse={(value) => {
               setEditPulse(value);
               savePrefs({ ...loadPrefs(), editPulse: value });
@@ -1295,12 +1454,28 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               setShowExtraTz(value);
               savePrefs({ ...loadPrefs(), showExtraTz: value });
             }}
+            onResetPrefs={() => {
+              const next = resetSchedulePrefs();
+              setLimits(next.limits);
+              setKinds(next.kinds);
+              setKind(next.kinds[0]);
+              setEditPulse(next.editPulse);
+              setShowExtraTz(next.showExtraTz);
+              setBusyHint(next.busyHint);
+              setDimPast(next.dimPast);
+              setHidePastDays(next.hidePastDays);
+              setDisplayRange(next.displayRange);
+              setWorkHours(next.workHours);
+              setHideTables(next.hideTables);
+              setShowTip(next.showTip);
+              onKindChange?.(next.kinds[0]);
+            }}
             onResetDemo={!isLiveData() ? () => {
               resetDemoSchedules();
-              setGrids(Object.fromEntries(limits.map((limit) => [
-                limit,
-                demoMonthPlan(year, monthIndex, kind, limit),
-              ])));
+              setGridStore(Object.fromEntries(kinds.flatMap((variant) => limits.map((limit) => [
+                monthGridKey(variant, limit),
+                demoMonthPlan(year, monthIndex, variant, limit),
+              ]))));
               showV2Toast("ok", t("schedule.demoResetDone"));
             } : undefined}
             onClose={() => setShowSettings(false)}
@@ -1309,6 +1484,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {showHours && hoursMatrix ? (
           <HoursPanel
             matrix={hoursMatrix}
+            deadTime={myDeadTime}
             year={year}
             monthIndex={monthIndex}
             x={hoursPos.x}
@@ -1334,7 +1510,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             <div className="v2-analytics">
               <p className="v2-analytics-lead">{t("schedule.fillByHourHint")}</p>
               {fillByLimit.map((row) => (
-                <FillByHourChart key={row.limit} limit={row.limit} cols={row.cols} fill={row.fill} />
+                <FillByHourChart key={row.key} limit={row.limit} label={row.label} cols={row.cols} fill={row.fill} />
               ))}
             </div>
           </V2Float>
@@ -1344,7 +1520,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             title={t("schedule.playersTitle")}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(640, 240 + Math.max(1, limits.length) * 76)}
+            width={Math.min(880, 310 + Math.max(1, auxiliaryLabels.length) * 88)}
             compact
             z={zOf("people")}
             onMove={setPeoplePos}
@@ -1352,14 +1528,18 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onClose={() => setShowPeople(false)}
           >
             {roster.length ? (
-              <table className="v2-people-table">
+              <table
+                className="v2-people-table"
+                style={{ minWidth: 240 + auxiliaryLabels.length * 84 }}
+              >
                 <colgroup>
                   <col className="v2-people-col-n" />
                   <col />
                   <col className="v2-people-col-mark" />
-                  {limits.map((limit) => (
+                  {auxiliaryLabels.map((limit) => (
                     <col key={limit} className="v2-people-col-limit" />
                   ))}
+                  <col className="v2-people-col-dead" />
                   <col className="v2-people-col-tick" />
                 </colgroup>
                 <thead>
@@ -1367,15 +1547,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                     <th title={t("schedule.colRankHint")}>{t("schedule.colRank")}</th>
                     <th>{t("schedule.colPlayer")}</th>
                     <th>{t("schedule.colMark")}</th>
-                    {limits.map((limit) => (
+                    {auxiliaryLabels.map((limit) => (
                       <th
                         key={limit}
                         className="v2-people-limit"
-                        title={t("schedule.colHoursHint", { limit: formatLimit(limit) })}
+                        title={t("schedule.colHoursHint", { limit: displayScheduleColumn(limit) })}
                       >
-                        {formatLimit(limit)}, {t("schedule.colHoursUnit")}
+                        <span>{displayScheduleColumn(limit)}</span>
+                        <small>{t("schedule.colHoursDeadUnits")}</small>
                       </th>
                     ))}
+                    <th className="v2-people-dead-total" title={t("schedule.deadTotalHint")}>
+                      <span>{t("schedule.deadTotal")}</span>
+                      <small>{t("schedule.colHoursUnit")}</small>
+                    </th>
                     <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
                       <i className="fa-solid fa-check" aria-hidden />
                     </th>
@@ -1383,6 +1568,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                 </thead>
                 <tbody>
                   {roster.map((row) => {
+                    const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
                     const guild = showNick(row.mark.discord) || "—";
                     const room = showNick(row.mark.room);
                     const vip = vipOf(row.mark, kind);
@@ -1423,9 +1609,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                             <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={countTables && !hideTables} />
                           </span>
                         </td>
-                        {limits.map((limit) => {
+                        {auxiliaryLabels.map((limit) => {
                           const stat = row.byLimit[limit];
-                          const label = formatLimit(limit);
+                          const deadHours = memberDeadTime?.byPair[limit] || 0;
+                          const label = displayScheduleColumn(limit);
                           if (!stat) {
                             return (
                               <td
@@ -1443,10 +1630,17 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                               className="v2-people-num"
                               title={t("schedule.colHoursHint", { limit: label })}
                             >
-                              {formatHours(stat.hours)}
+                              <b>{formatHours(stat.hours)}</b>
+                              <small>{t("schedule.deadHoursShort")} {deadTimeByMember && deadHours ? formatHours(deadHours) : "—"}</small>
                             </td>
                           );
                         })}
+                        <td
+                          className={`v2-people-num v2-people-dead-total${memberDeadTime?.total ? " is-on" : ""}`}
+                          title={t("schedule.deadTotalHint")}
+                        >
+                          {deadTimeByMember && memberDeadTime?.total ? formatHours(memberDeadTime.total) : "—"}
+                        </td>
                         <td className="v2-people-tick-cell">
                           <button
                             type="button"
