@@ -8375,12 +8375,29 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine-row {
+  position: relative;
   min-height: 18px;
   border-top: 1px solid var(--border);
 }
 
 .v2-mine.theme-dark .v2-mine-row {
   border-top-color: color-mix(in srgb, var(--foreground) 18%, var(--border));
+}
+
+.v2-mine-row.is-week-start::before {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--border);
+  content: "";
+  pointer-events: none;
+}
+
+.v2-mine.theme-dark .v2-mine-row.is-week-start::before {
+  background: color-mix(in srgb, var(--foreground) 26%, var(--border));
 }
 
 .v2-mine-row.is-weekend .v2-mine-date {
@@ -8421,6 +8438,37 @@ textarea.v2-ctrl.v2-cab-area {
   background: var(--muted);
 }
 
+.v2-mine-hours-grid::before,
+.v2-mine-hours-grid::after,
+.v2-mine-track::before,
+.v2-mine-track::after {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  content: "";
+  pointer-events: none;
+}
+
+.v2-mine-hours-grid::before,
+.v2-mine-track::before {
+  left: 0;
+}
+
+.v2-mine-hours-grid::after,
+.v2-mine-track::after {
+  right: 0;
+}
+
+.v2-mine.theme-dark .v2-mine-hours-grid::before,
+.v2-mine.theme-dark .v2-mine-hours-grid::after,
+.v2-mine.theme-dark .v2-mine-track::before,
+.v2-mine.theme-dark .v2-mine-track::after {
+  background: color-mix(in srgb, var(--foreground) 26%, var(--border));
+}
+
 .v2-mine-hcell {
   pointer-events: none;
   border-right: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
@@ -8435,6 +8483,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine-hcell.is-major {
+  border-right-width: 2px;
   border-right-color: var(--border);
 }
 
@@ -8458,6 +8507,15 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-mine-hour:last-child {
   border-right: 0;
+}
+
+.v2-mine-hour.is-major {
+  border-right-width: 2px;
+  border-right-color: var(--border);
+}
+
+.v2-mine.theme-dark .v2-mine-hour.is-major {
+  border-right-color: color-mix(in srgb, var(--foreground) 26%, var(--border));
 }
 
 .v2-mine-hour.is-on {

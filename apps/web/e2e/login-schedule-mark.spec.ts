@@ -176,9 +176,16 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
 
   await page.getByTitle("Мой календарь").click();
   const calendarHours = page.locator(".v2-mine-hours-grid .v2-mine-hour");
-  await expect(calendarHours).toHaveCount(8);
+  await expect(calendarHours).toHaveCount(24);
   await expect(calendarHours.first()).toHaveText("0");
   await expect(calendarHours.last()).toHaveText("23");
+  await expect(page.locator(".v2-mine-hours-grid .v2-mine-hour.is-major")).toHaveCount(3);
+  await expect(page.locator(".v2-mine-track").first().locator(".v2-mine-hcell.is-major")).toHaveCount(3);
+  await expect(page.locator(".v2-mine-row.is-week-start")).toHaveCount(4);
+  await expect.poll(() => page.locator(".v2-mine-track").first().evaluate((node) => [
+    getComputedStyle(node, "::before").width,
+    getComputedStyle(node, "::after").width,
+  ])).toEqual(["2px", "2px"]);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать" }).click();
   await download;

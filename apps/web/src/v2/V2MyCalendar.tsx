@@ -5,7 +5,7 @@ import { readCet, isPastDay } from "../schedule/cet";
 import { limitTone } from "../schedule/capacity";
 import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { formatDayLong } from "../schedule/formatDate";
-import { visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
+import { DEFAULT_WORK_HOURS, visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 import { downloadCalendarJpeg, type CalendarShiftRun } from "./calendarJpeg";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
@@ -21,7 +21,6 @@ type Props = {
   columns: VariantGridItem[];
   grids: Record<string, Occupancy>;
   today: number | null;
-  workHours: number[];
   x: number;
   y: number;
   z: number;
@@ -57,11 +56,15 @@ function mineTone(limit: string) {
   return limitTone(limit);
 }
 
-function HourCells({ workHours }: { workHours: number[] }) {
+function endsSixHourSection(hour: number) {
+  return (hour + 1) % 6 === 0 && hour < 23;
+}
+
+function HourCells() {
   return (
     <>
-      {workHourSegments(workHours).map((segment) => (
-        <i key={segment.hour} className={`v2-mine-hcell${segment.hour === 5 || segment.hour === 11 || segment.hour === 17 ? " is-major" : ""}`} style={{ gridColumn: `span ${segment.span}` }} />
+      {workHourSegments(DEFAULT_WORK_HOURS).map((segment) => (
+        <i key={segment.hour} className={`v2-mine-hcell${endsSixHourSection(segment.hour) ? " is-major" : ""}`} style={{ gridColumn: `span ${segment.span}` }} />
       ))}
     </>
   );
@@ -92,7 +95,7 @@ function useFitScale(ref: RefObject<HTMLElement | null>) {
   return box;
 }
 
-export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, today, workHours, x, y, z, onMove, onFocus, onClose }: Props) {
+export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, today, x, y, z, onMove, onFocus, onClose }: Props) {
   const { t, i18n } = useTranslation();
   const mineRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ ox: number; oy: number } | null>(null);
@@ -111,13 +114,11 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
         variant: column.variant,
       })),
     ) as CalendarShiftRun[], [columns, grids, tag]);
-  const runs = useMemo(() => {
-    return allRuns.filter((run) => visibleWorkRuns(run.start, run.end, workHours).length);
-  }, [allRuns, workHours]);
+  const runs = allRuns;
   const usedColumns = columns.filter((column) => runs.some((run) => run.label === column.label));
   const physicalHours = uniqueShiftHours(allRuns);
-  const hours = workHourSegments(workHours);
-  const visibleSlotCount = workHalfSlots(workHours).length;
+  const hours = workHourSegments(DEFAULT_WORK_HOURS);
+  const visibleSlotCount = workHalfSlots(DEFAULT_WORK_HOURS).length;
   const hoverHour = hover ? Math.floor(hover.start / 2) : null;
   const theme = loadTheme();
   const placed = fit.w && typeof window !== "undefined"
@@ -230,7 +231,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
             </div>
             <div className="v2-mine-hours-grid" style={{ ["--mine-visible-slots" as string]: visibleSlotCount }}>
               {hours.map((segment) => (
-                <span key={segment.hour} className={`v2-mine-hour${hoverHour === segment.hour ? " is-on" : ""}`} style={{ gridColumn: `span ${segment.span}` }}>
+                <span key={segment.hour} className={`v2-mine-hour${endsSixHourSection(segment.hour) ? " is-major" : ""}${hoverHour === segment.hour ? " is-on" : ""}`} style={{ gridColumn: `span ${segment.span}` }}>
                   {segment.hour}
                 </span>
               ))}
@@ -245,14 +246,14 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
             return (
               <div
                 key={day.d}
-                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}`}
+                className={`v2-mine-row${isToday ? " is-today" : ""}${hovered ? " is-on" : ""}${day.weekend ? " is-weekend" : ""}${day.d > 1 && day.dow === 1 ? " is-week-start" : ""}`}
               >
                 <div className="v2-mine-date v2-mono">
                   {String(day.d).padStart(2, "0")} {day.wd}
                 </div>
                 <div className="v2-mine-track" style={{ ["--mine-visible-slots" as string]: visibleSlotCount }}>
-                  <HourCells workHours={workHours} />
-                  {dayRuns.flatMap((run) => visibleWorkRuns(run.start, run.end, workHours).map((segment, segmentIndex) => {
+                  <HourCells />
+                  {dayRuns.flatMap((run) => visibleWorkRuns(run.start, run.end, DEFAULT_WORK_HOURS).map((segment, segmentIndex) => {
                     const len = segment.span;
                     const box = runBox(segment.visibleStart, segment.span, visibleSlotCount);
                     const nowAt = cet.half + cet.slotProgress;
@@ -292,7 +293,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                       </button>
                     );
                   }))}
-                  {isToday && dimPastShifts && workTrackProgress(cet.half, cet.slotProgress, workHours) != null && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress, workHours) }} aria-hidden />}
+                  {isToday && dimPastShifts && workTrackProgress(cet.half, cet.slotProgress, DEFAULT_WORK_HOURS) != null && <span className="v2-now-line" style={{ left: nowLineLeft(cet.half, cet.slotProgress, DEFAULT_WORK_HOURS) }} aria-hidden />}
                 </div>
               </div>
             );
@@ -329,7 +330,6 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                 kicker: t("schedule.myCalendar"),
                 meta: `${tag} · ${t("schedule.myShifts", { n: allRuns.length })} · ${t("schedule.myHours", { n: physicalHours })}`,
                 dayLabel: t("v2.day"),
-                workHours,
               }).finally(() => setSaving(false));
             }}
           >

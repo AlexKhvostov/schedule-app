@@ -1397,7 +1397,6 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             columns={calendarItems}
             grids={calendarGrids}
             today={cetTick.year === year && cetTick.monthIndex === monthIndex ? cetTick.day : null}
-            workHours={workHours}
             x={calPos.x}
             y={calPos.y}
             z={zOf("calendar")}
