@@ -47,9 +47,16 @@ begin
   select count(*) into v_kind_count from schedule_kinds;
   select id into v_disabled_kind from schedule_kinds where variant_id = 'nitro' and limit_id = '25';
 
-  insert into players (member_id, room_id)
-  select v_member_id, room_id from schedule_kinds where id = v_disabled_kind
-  returning id into v_player_id;
+  -- Active member creation already seeds its Winamax player through
+  -- members_default_play. Reuse that row instead of creating a duplicate.
+  select p.id into v_player_id
+  from players p
+  join schedule_kinds k on k.room_id = p.room_id
+  where p.member_id = v_member_id and k.id = v_disabled_kind;
+
+  if v_player_id is null then
+    raise exception 'active member fixture is missing its default player';
+  end if;
 
   insert into player_limits (player_id, variant_id, limit_id)
   values (v_player_id, 'nitro', '25');
