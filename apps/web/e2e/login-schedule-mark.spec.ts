@@ -52,6 +52,54 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
   await expect(editableCell).not.toHaveClass(/is-on/);
 });
 
+test("cancelled schedule drag keeps cells empty and the next drag still works", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByTitle("Редактирование").click();
+
+  const pair = await page.locator(".v2-opt").evaluate((root) => {
+    for (const track of root.querySelectorAll(".v2-opt-track")) {
+      const cells = [...track.querySelectorAll<HTMLElement>("[data-slot]")];
+      for (let index = 0; index < cells.length - 1; index += 1) {
+        const start = cells[index];
+        const end = cells[index + 1];
+        const empty = (cell: HTMLElement) => !cell.matches(".is-past, .is-lock, .is-on");
+        if (empty(start) && empty(end) && Number(end.dataset.half) === Number(start.dataset.half) + 1) {
+          return { lane: start.dataset.lane, start: start.dataset.half, end: end.dataset.half };
+        }
+      }
+    }
+    return null;
+  });
+  expect(pair).not.toBeNull();
+  const start = page.locator(`[data-slot][data-lane="${pair!.lane}"][data-half="${pair!.start}"]`);
+  const end = page.locator(`[data-slot][data-lane="${pair!.lane}"][data-half="${pair!.end}"]`);
+  await start.scrollIntoViewIfNeeded();
+  const startBox = await start.boundingBox();
+  const endBox = await end.boundingBox();
+  expect(startBox).not.toBeNull();
+  expect(endBox).not.toBeNull();
+  const beginDrag = async () => {
+    await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
+  };
+
+  await beginDrag();
+  await expect(page.locator(".v2-opt-pick")).toBeVisible();
+  await page.locator(".v2-opt").dispatchEvent("pointercancel", { pointerId: 1, pointerType: "mouse" });
+  await page.mouse.up();
+  await expect(start).not.toHaveClass(/is-on/);
+  await expect(end).not.toHaveClass(/is-on/);
+  await expect(page.locator(".v2-opt-pick")).toHaveCount(0);
+
+  await beginDrag();
+  await page.mouse.up();
+  await expect(start).toHaveClass(/is-on/);
+  await expect(end).toHaveClass(/is-on/);
+});
+
 test("cabinet game limits block new marks but keep old shifts in an unnumbered roster section", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
