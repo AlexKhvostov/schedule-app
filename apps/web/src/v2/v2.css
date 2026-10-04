@@ -10577,6 +10577,10 @@ textarea.v2-ctrl.v2-cab-area {
   padding-right: 14px;
 }
 
+.v2-opt-merged.is-single {
+  padding-inline: 2px;
+}
+
 .v2-opt-merged.has-tables.is-single {
   padding-right: 2px;
 }

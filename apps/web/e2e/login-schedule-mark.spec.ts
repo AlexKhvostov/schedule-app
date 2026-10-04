@@ -1127,6 +1127,27 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   expect(singleLayout.tablesTop).toBeGreaterThan(singleLayout.lettersTop);
   expect(singleLayout.tablesBottom).toBeLessThanOrEqual(singleLayout.cellBottom);
 
+  const expectFullTag = async (mark: import("@playwright/test").Locator, labelSelector: string) => {
+    const label = mark.locator(labelSelector);
+    await expect(label).toHaveText("YO");
+    await expect.poll(() => label.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+    const bounds = await mark.evaluate((node, selector) => {
+      const cell = node.getBoundingClientRect();
+      const label = node.querySelector(selector)!.getBoundingClientRect();
+      return { left: label.left - cell.left, right: cell.right - label.right };
+    }, labelSelector);
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeGreaterThanOrEqual(0);
+  };
+  await expectFullTag(single, ".v2-opt-merged-label");
+
+  await page.goto("/#admin-schedule");
+  await tablesToggle.click();
+  await expect(tablesToggle).not.toHaveClass(/is-on/);
+  await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
+  await expect(single.locator(":scope > i")).toHaveCount(0);
+  await expectFullTag(single, ".v2-opt-merged-label");
+
   await page.goto("/#admin-schedule");
   await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");
   await mergeToggle.click();
@@ -1136,4 +1157,5 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await expect(start).toHaveClass(/is-on/);
   await expect(middle).not.toHaveClass(/is-on/);
   await expect(end).toHaveClass(/is-on/);
+  await expectFullTag(start, ":scope > .v2-opt-face > b");
 });
