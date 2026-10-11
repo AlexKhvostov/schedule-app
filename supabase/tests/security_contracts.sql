@@ -71,6 +71,16 @@ begin
     raise exception 'member table preset RPC grants are incorrect';
   end if;
 
+  if not has_function_privilege('authenticated', 'public.apply_schedule_edit(uuid,uuid,jsonb,jsonb,jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.apply_schedule_edit(uuid,uuid,jsonb,jsonb,jsonb)', 'EXECUTE') then
+    raise exception 'atomic schedule edit RPC grants are incorrect';
+  end if;
+
+  if not exists (select 1 from pg_trigger where tgrelid = 'public.occupancy'::regclass
+      and tgname = 'occupancy_mark_insert' and not tgisinternal) then
+    raise exception 'new occupancy must require a nonempty mark';
+  end if;
+
   if not has_table_privilege('authenticated', 'public.member_table_presets', 'SELECT')
      or has_table_privilege('authenticated', 'public.member_table_presets', 'INSERT')
      or has_table_privilege('authenticated', 'public.member_table_presets', 'UPDATE')

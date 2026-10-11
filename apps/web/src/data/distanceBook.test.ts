@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDistanceEntry, demoDistanceBook, distanceBookCsv, sortDistancePeople, updateDistanceEntry, type DistancePersonRow } from "./distanceBook";
+import { createDistanceEntry, demoDistanceBook, distanceBookCsv, filterDistancePeople, sortDistancePeople, updateDistanceEntry, type DistancePersonRow } from "./distanceBook";
 
 function person(patch: Partial<DistancePersonRow> = {}): DistancePersonRow {
   return {
     key: "member:1", playerId: "101", nick: "DiscordNick", discordNick: "DiscordNick", gameNick: "RoomNick",
-    discordId: "406139198957944843", memberId: "member-1", avatarUrl: null, onGuild: true, redParty: true, orphan: false,
+    discordId: "406139198957944843", memberId: "member-1", avatarUrl: null, onGuild: true, redParty: true, hasActiveProfile: true, orphan: false,
     slices: [{ id: "entry-1", key: "entry-1", variant: "nitro", part: 1, comment: "manual note", source: "manual",
       createdAt: "2026-09-25T10:00:00Z", updatedAt: "2026-09-25T11:00:00Z", createdBy: "Root", updatedBy: "Admin", byLimit: { "25": { id: "entry-1:25", hands: 120 } }, total: 120 }],
     at: { nitro: { "25": 120 }, regular: {} }, nitroTotal: 120, regularTotal: 0, total: 120,
@@ -38,6 +38,21 @@ describe("sortDistancePeople", () => {
   it("sorts numeric distance IDs and leaves missing IDs last", () => {
     const rows = [person({ key: "3", playerId: "" }), person({ key: "2", playerId: "20" }), person({ key: "1", playerId: "100" })];
     expect(sortDistancePeople(rows, "distanceId", ["nitro"], "ru").map((row) => row.playerId)).toEqual(["20", "100", ""]);
+  });
+});
+
+describe("distance people filters", () => {
+  const filters = { variants: ["nitro" as const], query: "", onlyRedParty: false, onlyActiveProfiles: false, id: "all" as const, presence: "all" as const };
+  it("keeps RedParty history without an active profile unless the profile filter is enabled", () => {
+    const rows = [person(), person({ key: "history", memberId: null, orphan: true, hasActiveProfile: false }), person({ key: "outsider", redParty: false })];
+    expect(filterDistancePeople(rows, { ...filters, onlyRedParty: true }).map((row) => row.key)).toEqual(["member:1", "history"]);
+    expect(filterDistancePeople(rows, { ...filters, onlyRedParty: true, onlyActiveProfiles: true }).map((row) => row.key)).toEqual(["member:1"]);
+  });
+  it("matches presence to selected tournament kinds and combines it with ID/search", () => {
+    const rows = [person(), person({ key: "zero", playerId: "", gameNick: "Zero", slices: [] })];
+    expect(filterDistancePeople(rows, { ...filters, variants: ["regular"], presence: "without" })).toHaveLength(2);
+    expect(filterDistancePeople(rows, { ...filters, presence: "with" }).map((row) => row.key)).toEqual(["member:1"]);
+    expect(filterDistancePeople(rows, { ...filters, presence: "without", id: "missing", query: " ZERO " }).map((row) => row.key)).toEqual(["zero"]);
   });
 });
 

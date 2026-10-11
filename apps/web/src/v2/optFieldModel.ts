@@ -22,11 +22,14 @@ export type OverwritePerson = {
 
 export type OverwriteAsk = {
   kind: "remove" | "place";
+  year: number;
+  monthIndex: number;
   variant: ScheduleVariant;
   limit: string;
   people: OverwritePerson[];
   memberIds: string[];
   slots: OverwriteSlot[];
+  before: Occupancy;
   next: Occupancy;
   empty?: Occupancy;
 };

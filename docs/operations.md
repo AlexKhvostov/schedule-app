@@ -4,6 +4,8 @@
 
 Vercel подключён к GitHub. Каждый push в `main` автоматически запускает production-деплой `apps/web`; отдельного deploy-job в GitHub Actions нет. Pull request может создавать preview-деплой по настройкам Vercel.
 
+Тестовая ветка — `preview/schedule-ui`. Если у неё нет открытого pull request, существующий CI запускают через `workflow_dispatch` на этой ветке: push-trigger workflow ограничен `main`. Проверки и Vercel preview сверяют по SHA отправленного коммита, а миграции Working применяют отдельно после успешной чистой database-проверки.
+
 Production-сборка не показывает локальный выбор Demo / Working / Production и не разрешает тестовый вход от имени другого пользователя. Она открывает только настоящий Discord-вход и использует проект Supabase из переменных Vercel.
 
 Vercel production обязан иметь:
@@ -39,7 +41,17 @@ GitHub Actions и Vercel решают разные задачи: CI провер
 
 ## Релизный барьер
 
-Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. Сейчас после `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql`, `player_schedule_limits.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих правил и RPC.
+Каждый pull request должен пройти `.github/workflows/ci.yml`: lint, TypeScript, unit-тесты, production build, Chromium E2E, чистую сборку локальной Supabase из миграций, SQL-контракты RLS, поведенческие SQL-тесты новых RPC и database lint. После `security_contracts.sql` отдельно выполняются `schedule_filter_limits.sql`, `player_schedule_limits.sql`, `atomic_schedule_edit.sql` и `member_table_presets.sql`: они проверяют атомарность, откат и серверные права соответствующих правил и RPC.
+
+Миграция `20261012010000_atomic_schedule_edit.sql` подготовлена локально 12 октября и ещё не применена к Working. Она добавляет `apply_schedule_edit` и INSERT-guard непустой метки, сохраняя старые RPC. Порядок релиза: полный CI Supabase 15 reset/security/behavior/lint → совместимая миграция → проверка на Working → клиент. Без новой RPC клиент не переходит к раздельным удалениям и постановкам.
+
+Локально транзакции и все пять SQL-наборов дополнительно проверены на изолированном PostgreSQL 12: Supabase auth/default grants/publication эмулированы, cron/net отключены; alias `value` в временных копиях двух старых функций взят в кавычки для совместимости. Это проверка SQL-логики, не замена полного Supabase 15 reset/lint и настоящего Realtime. Working при ней не использовался.
+
+Дополнительно 12 октября подготовлена `20261012020000_distance_filter_metadata.sql`, ещё не применённая к Working. До публикации клиента контроля дистанций нужно применить её после полного CI: старый read-model без `people_filters_version=1` новый клиент считает недоступной метаинформацией и предлагает повторить загрузку. В database job добавлен `supabase/tests/distance_filter_metadata.sql`: роль Discord для несвязанных/заблокированных профилей, активная анкета через identity, вышедший участник и запрет постороннего чтения проверяются с ROLLBACK. Перед публикацией остаются обе локальные миграции расписания и контроля дистанций; автоматический Vercel-деплой их не применяет.
+
+Чистая изолированная пересборка после этой миграции прошла 69 миграций+seed и все шесть SQL-наборов на PostgreSQL 12 с той же эмуляцией платформы. На Windows полный Chromium-прогон при 8 workers во время параллельной сборки упёрся в память; после сборки `node node_modules/@playwright/test/cli.js test --workers=2` успешно завершил 27 сценариев и один штатный skip. Повторный unit-прогон через `node node_modules/vitest/vitest.mjs run src --pool=threads --maxWorkers=2` прошёл 136 тестов без предупреждений остановки forks. Это настройки конкретной локальной проверки; конфигурация CI не ослаблена.
+
+До первого применения миграция метаданных дополнена текущим аватаром/ником для исторических строк. SQL-контракт проверяет эти поля вместе с ролью и анкетой. Достаточно двух ранее подготовленных миграций; дополнительной отдельной миграции для фото нет. После доработки выполнена ещё одна чистая изолированная пересборка 69 миграций+seed и все шесть SQL-наборов, без подключения к Working.
 
 Базовый E2E всегда выполняет детерминированный локальный сценарий. Для smoke-теста реальной Discord-сессии на staging укажите `E2E_AUTH_STATE` — путь к некоммитящемуся Playwright storage-state. Мутационные тесты нельзя направлять в production.
 

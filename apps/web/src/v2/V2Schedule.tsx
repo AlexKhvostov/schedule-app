@@ -459,10 +459,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           />
           {gridLoading ? (
             <div className="v2-sched-load">
-              <div className="v2-sched-load-card">
-                <span className="v2-sched-spin" aria-hidden />
-                <b>{t("schedule.loading")}</b>
-                <p>{t("schedule.loadingHint")}</p>
+              <div className="v2-sched-load-card" role={month.gridLoadError ? "alert" : "status"}>
+                {!month.gridLoadError ? <span className="v2-sched-spin" aria-hidden /> : null}
+                <b>{t(month.gridLoadError ? "schedule.loadErrorTitle" : "schedule.loading")}</b>
+                <p>{t(month.gridLoadError ? "schedule.loadErrorHint" : "schedule.loadingHint")}</p>
+                {month.gridLoadError ? <Button onClick={() => void month.retryLoad()}>{t("schedule.retryLoad")}</Button> : null}
               </div>
             </div>
           ) : null}

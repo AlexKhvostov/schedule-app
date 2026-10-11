@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatLimit } from "../schedule/capacity";
 import {
-  createDistanceEntry, currentMonthStart, distanceBookCsv, formatHands, loadDistanceBook, loadDistanceMonths,
+  createDistanceEntry, currentMonthStart, distanceBookCsv, filterDistancePeople, formatHands, loadDistanceBook, loadDistanceMonths,
   loadDistanceRooms, monthInputValue, monthStartFromInput, personHands, personTotal, sortDistancePeople,
   updateDistanceEntry, type DistanceBook, type DistanceIdFilter, type DistancePersonRow,
   type DistancePresenceFilter, type DistanceSlice, type DistanceSort,
@@ -34,33 +34,38 @@ export function V2DistanceBook() {
   const [book, setBook] = useState<DistanceBook | null>(null); const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState(""); const [showNitro, setShowNitro] = useState(true); const [showRegular, setShowRegular] = useState(true);
   const [onlyRedParty, setOnlyRedParty] = useState(false); const [sort, setSort] = useState<DistanceSort>("total");
+  const [onlyActiveProfiles, setOnlyActiveProfiles] = useState(false);
   const [idFilter, setIdFilter] = useState<DistanceIdFilter>("all"); const [presenceFilter, setPresenceFilter] = useState<DistancePresenceFilter>("all");
   const [openKey, setOpenKey] = useState<string | null>(null); const [editor, setEditor] = useState<Editor | null>(null);
+  const currentEditor = useRef(editor);
+  currentEditor.current = editor;
+  const requestId = useRef(0);
+  const selection = useRef({ monthStart, roomSlug });
+  selection.current = { monthStart, roomSlug };
 
   const variants = useMemo(() => [showNitro ? "nitro" : null, showRegular ? "regular" : null].filter(Boolean) as DistanceVariant[], [showNitro, showRegular]);
-  const reload = async (month: string, room: string) => {
+  const reload = useCallback(async () => {
+    if (!monthStart || selection.current.monthStart !== monthStart || selection.current.roomSlug !== roomSlug) return;
+    const request = ++requestId.current;
     setBusy(true);
-    try { setBook(await loadDistanceBook(month, room)); }
-    catch (error) { setBook({ monthStart: month, roomSlug: room, months: [], limits: [], people: [], rowCount: 0, error: error instanceof Error ? error.message : "load failed" }); }
-    finally { setBusy(false); }
-  };
+    const active = () => request === requestId.current && selection.current.monthStart === monthStart && selection.current.roomSlug === roomSlug;
+    try { const next = await loadDistanceBook(monthStart, roomSlug); if (active()) setBook(next); }
+    catch (error) { if (active()) setBook({ monthStart, roomSlug, months: [], limits: [], people: [], rowCount: 0, error: error instanceof Error ? error.message : "load failed" }); }
+    finally { if (active()) setBusy(false); }
+  }, [monthStart, roomSlug]);
   useEffect(() => { let live = true; void Promise.all([loadDistanceMonths(), loadDistanceRooms()]).then(([months, roomRows]) => { if (!live) return; setRooms(roomRows.length ? roomRows : [{ slug: "winamax", title: "Winamax" }]); setMonthStart(months[0] || currentMonthStart()); }); return () => { live = false; }; }, []);
-  useEffect(() => { if (monthStart) void reload(monthStart, roomSlug); }, [monthStart, roomSlug]);
+  useEffect(() => { setOpenKey(null); setEditor(null); void reload(); return () => { ++requestId.current; }; }, [reload]);
 
-  const q = query.trim().toLowerCase();
+  const ready = Boolean(book && !book.error && book.monthStart === monthStart && book.roomSlug === roomSlug && !busy);
+  const shownBook = ready ? book : null;
   const people = useMemo(() => {
-    if (!book) return [];
-    const filtered = book.people.filter((person) => {
-      if (onlyRedParty && !person.redParty) return false;
-      if (idFilter === "set" && !person.playerId) return false; if (idFilter === "missing" && person.playerId) return false;
-      const visibleSlices = person.slices.filter((slice) => variants.includes(slice.variant));
-      if (presenceFilter === "with" && !visibleSlices.length) return false; if (presenceFilter === "without" && visibleSlices.length) return false;
-      if (q && !`${person.nick} ${person.discordNick} ${person.gameNick} ${person.playerId} ${person.discordId ?? ""}`.toLowerCase().includes(q)) return false;
-      return true;
+    if (!shownBook) return [];
+    const filtered = filterDistancePeople(shownBook.people, {
+      onlyRedParty, onlyActiveProfiles, id: idFilter, presence: presenceFilter, variants, query,
     });
     return sortDistancePeople(filtered, sort, variants, locale);
-  }, [book, onlyRedParty, idFilter, presenceFilter, variants, q, sort, locale]);
-  const limits = book?.limits ?? [];
+  }, [shownBook, onlyRedParty, onlyActiveProfiles, idFilter, presenceFilter, variants, query, sort, locale]);
+  const limits = shownBook?.limits ?? [];
   const sums = useMemo(() => {
     const byLimit: Record<string, number> = {}; for (const limit of limits) byLimit[limit] = 0;
     let nitro = 0; let regular = 0; let records = 0; let without = 0;
@@ -71,7 +76,6 @@ export function V2DistanceBook() {
     }
     return { byLimit, nitro, regular, total: nitro + regular, records, without };
   }, [people, limits, variants, showNitro, showRegular]);
-  const ready = Boolean(book && !book.error && book.monthStart === monthStart && book.roomSlug === roomSlug && !busy);
   const roomTitle = rooms.find((room) => room.slug === roomSlug)?.title ?? roomSlug;
   const onDownload = () => {
     if (!ready || !people.length) return;
@@ -91,28 +95,36 @@ export function V2DistanceBook() {
       <button type="button" className="v2-dist-download" disabled={!ready || !people.length} onClick={onDownload}><i className="fa-solid fa-download" aria-hidden />{t("admin.distanceBook.download")}</button></div>
     <p className="v2-dbook-lead">{t("admin.distanceBook.lead")}</p>
     <div className="v2-dbook-tools">
+      <fieldset className="v2-dbook-filter-group"><legend>{t("admin.distanceBook.groups.period")}</legend><div className="v2-dbook-filter-fields">
       <CompactField label={t("admin.distanceBook.room")}><NativeSelect value={roomSlug} onChange={(e) => setRoomSlug(e.target.value)}>{rooms.map((room) => <option key={room.slug} value={room.slug}>{room.title}</option>)}</NativeSelect></CompactField>
-      <CompactField label={t("admin.distanceBook.month")}><Input type="month" value={monthStart ? monthInputValue(monthStart) : ""} onChange={(e) => { const next = monthStartFromInput(e.target.value); if (next) { setBusy(true); setMonthStart(next); setOpenKey(null); } }} /></CompactField>
+      <CompactField label={t("admin.distanceBook.month")}><Input type="month" value={monthStart ? monthInputValue(monthStart) : ""} onChange={(e) => { const next = monthStartFromInput(e.target.value); if (next) setMonthStart(next); }} /></CompactField>
+      </div></fieldset>
+      <fieldset className="v2-dbook-filter-group"><legend>{t("admin.distanceBook.groups.distance")}</legend>
+        <div className="v2-dbook-checks">{(["nitro", "regular"] as const).map((key) => { const on = key === "nitro" ? showNitro : showRegular; return <button key={key} type="button" className={`v2-dbook-check${on ? " is-on" : ""}${key === "nitro" ? " is-nitro" : ""}`} aria-pressed={on} onClick={() => toggleVariant(key)}><i className={`fa-solid ${on ? "fa-check" : "fa-minus"}`} /><span>{t(`admin.distance.filter.${key}`)}</span></button>; })}</div>
+        <CompactField label={t("admin.distanceBook.distanceStatus")} hint={t("admin.distanceBook.presenceHint")}><NativeSelect value={presenceFilter} onChange={(e) => setPresenceFilter(e.target.value as DistancePresenceFilter)}>{(["all", "with", "without"] as DistancePresenceFilter[]).map((key) => <option key={key} value={key}>{t(`admin.distanceBook.presenceFilter.${key}`)}</option>)}</NativeSelect></CompactField>
+      </fieldset>
+      <fieldset className="v2-dbook-filter-group"><legend>{t("admin.distanceBook.groups.people")}</legend><div className="v2-dbook-checks is-people">
+        <button type="button" className={`v2-dbook-check${onlyRedParty ? " is-on" : ""}`} aria-pressed={onlyRedParty} title={t("admin.distance.onlyRedPartyHint")} onClick={() => setOnlyRedParty((v) => !v)}><i className={`fa-solid ${onlyRedParty ? "fa-check" : "fa-minus"}`} /><span>{t("admin.distance.onlyRedParty")}</span></button>
+        <button type="button" className={`v2-dbook-check${onlyActiveProfiles ? " is-on" : ""}`} aria-pressed={onlyActiveProfiles} title={t("admin.distanceBook.activeProfilesHint")} onClick={() => setOnlyActiveProfiles((v) => !v)}><i className={`fa-solid ${onlyActiveProfiles ? "fa-check" : "fa-minus"}`} /><span>{t("admin.distanceBook.activeProfiles")}</span></button>
+      </div><CompactField label={t("admin.distanceBook.idStatus")}><NativeSelect value={idFilter} onChange={(e) => setIdFilter(e.target.value as DistanceIdFilter)}>{(["all", "set", "missing"] as DistanceIdFilter[]).map((key) => <option key={key} value={key}>{t(`admin.distanceBook.idFilter.${key}`)}</option>)}</NativeSelect></CompactField></fieldset>
+      <fieldset className="v2-dbook-filter-group"><legend>{t("admin.distanceBook.groups.search")}</legend>
       <CompactField label={t("admin.people.filterNick")}><Input value={query} placeholder={t("admin.distanceBook.search")} onChange={(e) => setQuery(e.target.value)} /></CompactField>
       <CompactField label={t("admin.distanceBook.sortLabel")}><NativeSelect value={sort} onChange={(e) => setSort(e.target.value as DistanceSort)}>{(["total", "discord", "game", "distanceId", "updated"] as DistanceSort[]).map((key) => <option key={key} value={key}>{t(`admin.distanceBook.sort.${key}`)}</option>)}</NativeSelect></CompactField>
-      <CompactField label={t("admin.distanceBook.idStatus")}><NativeSelect value={idFilter} onChange={(e) => setIdFilter(e.target.value as DistanceIdFilter)}>{(["all", "set", "missing"] as DistanceIdFilter[]).map((key) => <option key={key} value={key}>{t(`admin.distanceBook.idFilter.${key}`)}</option>)}</NativeSelect></CompactField>
-      <CompactField label={t("admin.distanceBook.distanceStatus")}><NativeSelect value={presenceFilter} onChange={(e) => setPresenceFilter(e.target.value as DistancePresenceFilter)}>{(["all", "with", "without"] as DistancePresenceFilter[]).map((key) => <option key={key} value={key}>{t(`admin.distanceBook.presenceFilter.${key}`)}</option>)}</NativeSelect></CompactField>
-      <div className="v2-dbook-checks" role="group">{(["nitro", "regular"] as const).map((key) => { const on = key === "nitro" ? showNitro : showRegular; return <button key={key} type="button" className={`v2-dbook-check${on ? " is-on" : ""}${key === "nitro" ? " is-nitro" : ""}`} aria-pressed={on} onClick={() => toggleVariant(key)}><i className={`fa-solid ${on ? "fa-check" : "fa-minus"}`} /><span>{t(`admin.distance.filter.${key}`)}</span></button>; })}
-        <button type="button" className={`v2-dbook-check${onlyRedParty ? " is-on" : ""}`} aria-pressed={onlyRedParty} onClick={() => setOnlyRedParty((v) => !v)}><i className={`fa-solid ${onlyRedParty ? "fa-check" : "fa-minus"}`} /><span>{t("admin.distance.onlyRedParty")}</span></button></div>
+      </fieldset>
     </div>
-    {book?.error ? <div className="v2-dbook-load-error" role="alert"><div><b>{t("admin.distanceBook.loadError")}</b><small>{book.error}</small></div><Button size="sm" variant="outline" onClick={() => void reload(monthStart, roomSlug)}>{t("admin.distanceBook.retry")}</Button></div> : null}
+    {book?.error && book.monthStart === monthStart && book.roomSlug === roomSlug && !busy ? <div className="v2-dbook-load-error" role="alert"><div><b>{t("admin.distanceBook.loadError")}</b><small>{book.error === "distance-filter-metadata-unavailable" ? t("admin.distanceBook.filterMetadataError") : book.error}</small></div><Button size="sm" variant="outline" onClick={() => void reload()}>{t("admin.distanceBook.retry")}</Button></div> : null}
     <div className="v2-dbook-facts"><div className="v2-dbook-stat is-nitro"><small>{t("admin.distance.sumNitro")}</small><b>{formatHands(sums.nitro, locale)}</b></div><div className="v2-dbook-stat"><small>{t("admin.distance.sumRegular")}</small><b>{formatHands(sums.regular, locale)}</b></div><div className="v2-dbook-stat is-all"><small>{t("admin.distanceBook.monthTotal")}</small><b>{formatHands(sums.total, locale)}</b></div><div className="v2-dbook-stat"><small>{t("admin.distanceBook.people")}</small><b>{busy ? "…" : people.length}</b><em>{t("admin.distanceBook.peopleStats", { records: sums.records, without: sums.without })}</em></div></div>
     <div className="v2-club-scroll v2-dist-scroll v2-dbook-scroll"><table className="v2-dist-table v2-dbook-table"><thead><tr><th className="is-nick">{t("admin.distance.colNick")}</th><th>{t("admin.distanceBook.distanceId")}</th><th className="is-kind">{t("admin.distanceBook.colKind")}</th>{limits.map((limit) => <th key={limit} className="is-num" title={formatLimit(limit)}>{limit}</th>)}<th className="is-num is-total">{t("admin.distance.colTotal")}</th><th>{t("admin.distanceBook.updated")}</th><th className="is-act" /></tr></thead>
-      <tbody>{people.length ? people.map((person) => <PersonBlock key={person.key} person={person} open={openKey === person.key} slices={person.slices.filter((slice) => variants.includes(slice.variant))} limits={limits} variants={variants} locale={locale} onToggle={() => setOpenKey(openKey === person.key ? null : person.key)} onAdd={() => person.memberId && setEditor({ person, slice: null })} onEdit={(slice) => setEditor({ person, slice })} />) : <tr><td colSpan={limits.length + 6} className="v2-muted">{busy ? t("admin.distanceBook.loading") : t("admin.distanceBook.empty")}</td></tr>}</tbody>
+      {people.length ? people.map((person) => <PersonBlock key={person.key} person={person} open={openKey === person.key} slices={person.slices.filter((slice) => variants.includes(slice.variant))} limits={limits} variants={variants} locale={locale} onToggle={() => setOpenKey(openKey === person.key ? null : person.key)} onAdd={() => person.memberId && setEditor({ person, slice: null })} onEdit={(slice) => setEditor({ person, slice })} />) : <tbody><tr><td colSpan={limits.length + 6} className="v2-muted">{busy ? t("admin.distanceBook.loading") : t("admin.distanceBook.empty")}</td></tr></tbody>}
       {people.length ? <tfoot><tr><td className="is-nick">{t("admin.distance.colSum")}</td><td /><td className="is-kind">{t("admin.distanceBook.kindAll")}</td>{limits.map((limit) => <HandsView key={limit} value={sums.byLimit[limit] ?? 0} locale={locale} />)}<HandsView value={sums.total} locale={locale} tone="total" /><td /><td /></tr></tfoot> : null}</table></div>
-    {editor ? <DistanceEntryDialog editor={editor} limits={limits} rooms={rooms} defaultMonth={monthStart} defaultRoom={roomSlug} locale={locale} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await reload(monthStart, roomSlug); }} /> : null}
+    {editor && ready ? <DistanceEntryDialog editor={editor} limits={limits} rooms={rooms} defaultMonth={monthStart} defaultRoom={roomSlug} locale={locale} onClose={() => setEditor(null)} onSaved={async () => { if (currentEditor.current !== editor) return; setEditor(null); await reload(); }} /> : null}
   </div>;
 }
 
 function PersonBlock({ person, open, slices, limits, variants, locale, onToggle, onAdd, onEdit }: { person: DistancePersonRow; open: boolean; slices: DistanceSlice[]; limits: string[]; variants: DistanceVariant[]; locale: string; onToggle: () => void; onAdd: () => void; onEdit: (slice: DistanceSlice) => void }) {
   const { t } = useTranslation(); const total = personTotal(person, variants);
-  return <><tr className={`v2-dbook-person${open ? " is-open" : ""}`} onClick={onToggle}><td className="is-nick"><button type="button" className="v2-dbook-fold" aria-expanded={open}><i className={`fa-solid fa-angle-${open ? "down" : "right"}`} /><PersonChip src={person.avatarUrl} name={person.nick} sub={person.gameNick || person.discordId || ""} size="sm" />{slices.length > 1 ? <span className="v2-dbook-recs">{slices.length}</span> : null}</button></td><td><span className={`v2-distance-id${person.playerId ? "" : " is-missing"}`}>{person.playerId || t("admin.distanceBook.idMissing")}</span></td><td className="is-kind">{variants.length === 2 ? t("admin.distanceBook.kindAll") : t(`admin.distance.filter.${variants[0]}`)}</td>{limits.map((limit) => <HandsView key={limit} value={personHands(person, variants, limit)} locale={locale} />)}<HandsView value={total} locale={locale} tone="total" /><td>{stamp(person.updatedAt, locale)}</td><td className="is-act">{person.memberId ? <button type="button" className="v2-dbook-ico" title={t("admin.distanceBook.add")} onClick={(e) => { e.stopPropagation(); onAdd(); }}><i className="fa-solid fa-plus" /></button> : null}</td></tr>
-    {open ? slices.length ? <>{slices.map((slice) => <tr key={slice.id} className="v2-dbook-leaf" onClick={(e) => e.stopPropagation()}><td className="is-nick"><span className="v2-dbook-leaf-nick"><i /><span>{t("admin.distanceBook.partN", { n: slice.part })}<small>{t(`admin.distance.filter.${slice.variant}`)}{slice.comment ? ` · ${slice.comment}` : ""}</small></span></span></td><td>{person.playerId || "—"}</td><td className={`is-kind is-${slice.variant}`}>{t(`admin.distance.filter.${slice.variant}`)}</td>{limits.map((limit) => <HandsView key={limit} value={slice.byLimit[limit]?.hands ?? 0} locale={locale} />)}<HandsView value={slice.total} locale={locale} tone="total" /><td title={`${t("admin.distanceBook.created")}: ${stamp(slice.createdAt, locale)}`}>{stamp(slice.updatedAt, locale)}</td><td className="is-act"><button type="button" className="v2-dbook-ico" title={t("admin.distanceBook.edit")} onClick={() => onEdit(slice)}><i className="fa-solid fa-pen" /></button></td></tr>)}{person.memberId ? <tr className="v2-dbook-add-row"><td colSpan={limits.length + 6}><button type="button" onClick={onAdd}><i className="fa-solid fa-plus" /> {t("admin.distanceBook.add")}</button></td></tr> : null}</> : <tr className="v2-dbook-leaf"><td colSpan={limits.length + 6} className="v2-muted"><span>{t("admin.distanceBook.noSlices")}</span>{person.memberId ? <button type="button" className="v2-dist-download is-tools" onClick={onAdd}><i className="fa-solid fa-plus" />{t("admin.distanceBook.add")}</button> : null}</td></tr> : null}</>;
+  return <tbody className={`v2-dbook-group${open ? " is-open" : ""}`}><tr className={`v2-dbook-person${open ? " is-open" : ""}`} onClick={onToggle}><td className="is-nick"><button type="button" className="v2-dbook-fold" aria-expanded={open}><i className={`fa-solid fa-angle-${open ? "down" : "right"}`} /><PersonChip src={person.avatarUrl} name={person.nick} sub={person.gameNick || person.discordId || ""} size="sm" />{slices.length > 1 ? <span className="v2-dbook-recs">{slices.length}</span> : null}</button></td><td><span className={`v2-distance-id${person.playerId ? "" : " is-missing"}`}>{person.playerId || t("admin.distanceBook.idMissing")}</span></td><td className="is-kind is-summary" title={t("admin.distanceBook.summaryHint")}>{t("admin.distanceBook.rowSummary")}</td>{limits.map((limit) => <HandsView key={limit} value={personHands(person, variants, limit)} locale={locale} />)}<HandsView value={total} locale={locale} tone="total" /><td>{stamp(person.updatedAt, locale)}</td><td className="is-act">{person.memberId ? <button type="button" className="v2-dbook-ico" title={t("admin.distanceBook.add")} onClick={(e) => { e.stopPropagation(); onAdd(); }}><i className="fa-solid fa-plus" /></button> : null}</td></tr>
+    {open ? slices.length ? <>{slices.map((slice, index) => <tr key={slice.id} className={`v2-dbook-leaf is-editable${index === 0 ? " is-first" : ""}${index === slices.length - 1 ? " is-last" : ""}`} onClick={(e) => e.stopPropagation()}><td className="is-nick"><span className="v2-dbook-leaf-nick"><i /><span>{t("admin.distanceBook.entryPartN", { n: slice.part })}<small>{t(`admin.distance.filter.${slice.variant}`)}{slice.comment ? ` · ${slice.comment}` : ""}</small></span></span></td><td>{person.playerId || "—"}</td><td className={`is-kind is-${slice.variant}`}>{t(`admin.distance.filter.${slice.variant}`)}</td>{limits.map((limit) => <HandsView key={limit} value={slice.byLimit[limit]?.hands ?? 0} locale={locale} />)}<HandsView value={slice.total} locale={locale} tone="total" /><td title={`${t("admin.distanceBook.created")}: ${stamp(slice.createdAt, locale)}`}>{stamp(slice.updatedAt, locale)}</td><td className="is-act"><button type="button" className="v2-dbook-edit" title={t("admin.distanceBook.edit")} aria-label={t("admin.distanceBook.edit")} onClick={() => onEdit(slice)}><i className="fa-solid fa-pen" />{t("admin.distanceBook.editShort")}</button></td></tr>)}{person.memberId ? <tr className="v2-dbook-add-row"><td colSpan={limits.length + 6}><button type="button" onClick={onAdd}><i className="fa-solid fa-plus" /> {t("admin.distanceBook.add")}</button></td></tr> : null}</> : <tr className="v2-dbook-leaf is-first is-last"><td colSpan={limits.length + 6} className="v2-muted"><span>{t("admin.distanceBook.noSlices")}</span>{person.memberId ? <button type="button" className="v2-dist-download is-tools" onClick={onAdd}><i className="fa-solid fa-plus" />{t("admin.distanceBook.add")}</button> : null}</td></tr> : null}</tbody>;
 }
 
 function DistanceEntryDialog({ editor, limits, rooms, defaultMonth, defaultRoom, locale, onClose, onSaved }: { editor: Editor; limits: string[]; rooms: RoomOption[]; defaultMonth: string; defaultRoom: string; locale: string; onClose: () => void; onSaved: () => void }) {

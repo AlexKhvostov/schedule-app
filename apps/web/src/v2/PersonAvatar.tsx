@@ -1,3 +1,5 @@
+import * as React from "react";
+
 function initialsOf(label: string) {
   return label.replace(/[^a-zA-Zа-яА-Я0-9]/g, "").slice(0, 2).toUpperCase() || "?";
 }
@@ -11,8 +13,14 @@ export function PersonAvatar({
   label: string;
   size?: "sm" | "md" | "lg";
 }) {
-  if (src) return <img className={`v2-ava is-${size}`} src={src} alt="" />;
-  return <span className={`v2-ava is-${size} is-empty`}>{initialsOf(label)}</span>;
+  const image = src?.trim() || null;
+  return <AvatarImage key={image ?? "empty"} src={image} label={label} size={size} />;
+}
+
+function AvatarImage({ src, label, size }: { src: string | null; label: string; size: "sm" | "md" | "lg" }) {
+  const [failed, setFailed] = React.useState(false);
+  if (src && !failed) return <img className={`v2-ava is-${size}`} src={src} alt="" decoding="async" onError={() => setFailed(true)} />;
+  return <span className={`v2-ava is-${size} is-empty`} aria-hidden="true">{initialsOf(label)}</span>;
 }
 
 export function PersonChip({

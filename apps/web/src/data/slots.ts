@@ -518,6 +518,33 @@ export async function removeForeignSlots(input: {
   return { error: error?.message };
 }
 
+/** A confirmed mixed range is one transaction. Never fall back to separate writes. */
+export async function applyScheduleEdit(input: {
+  memberId: string;
+  limit: string;
+  variant: ScheduleVariant;
+  year: number;
+  monthIndex: number;
+  place: OwnSlot[];
+  remove: OwnSlot[];
+  foreign: { date: string; half: number; level: number; memberId: string }[];
+}) {
+  const db = getSupabase();
+  if (!db) return { error: "not-configured" };
+  const kindId = await kindIdOf(input.limit, input.variant);
+  if (!kindId) return { error: "unknown-kind" };
+  const { error } = await db.rpc("apply_schedule_edit", {
+    p_kind_id: kindId,
+    p_member_id: input.memberId,
+    p_place: asSlotJson(input.year, input.monthIndex, input.place),
+    p_remove: asSlotJson(input.year, input.monthIndex, input.remove),
+    p_foreign: input.foreign.map((slot) => ({
+      date: slot.date, half: slot.half, level: slot.level, member_id: slot.memberId,
+    })),
+  });
+  return { error: error?.message };
+}
+
 export function subscribeOccupancy(onChange: (change: OccupancyChange) => void) {
   const db = getSupabase();
   if (!db) return () => {};

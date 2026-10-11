@@ -1,27 +1,16 @@
 import type { TFunction } from "i18next";
-import type { MutableRefObject } from "react";
+import type { MutableRefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLiveData } from "../../data/config";
-import {
-  gridsForVariant,
-  loadMemberOccupiedSlots,
-  loadMultiMonthGrids,
-  monthGridKey,
-  replaceVariantGrids,
-  subscribeOccupancy,
-  ymRange,
-  type MonthGridStore
-} from "../../data/slots";
+import { loadMemberOccupiedSlots, loadMultiMonthGrids, monthGridKey, subscribeOccupancy, ymRange, type MonthGridStore } from "../../data/slots";
 import { LIMIT_OPTIONS } from "../../schedule/capacity";
 import { demoMonthPlan } from "../../schedule/demoPlan";
 import { loadDemoSchedule } from "../../schedule/demoScheduleStore";
 import { emptyMonth } from "../../schedule/plan";
 import { showV2Toast } from "../V2Toast";
-import {
-  occupiedPairsFromSlots,
-  type OccupiedPairMatrix
-} from "../myShifts";
+import { occupiedPairsFromSlots, type OccupiedPairMatrix } from "../myShifts";
 import { CALENDAR_VARIANTS } from "./constants";
+import { ScheduleMonthState } from "./scheduleMonthState";
 
 export function useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef, t }: {
   year: number;
@@ -31,177 +20,101 @@ export function useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef
   actingRef: MutableRefObject<string | undefined>;
   t: TFunction;
 }) {
-
-  const [gridStore, setGridStore] = useState<MonthGridStore>(() =>
-    Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) =>
-      LIMIT_OPTIONS.map((limit) => [monthGridKey(variant, limit), emptyMonth(year, monthIndex)]),
-    )),
-  );
-
-  const [readyStamp, setReadyStamp] = useState("");
-
-  const [busyRemote, setBusyRemote] = useState<OccupiedPairMatrix | undefined>();
-
-  const loadGen = useRef(0);
-
-  const inflight = useRef(0);
-
+  const controller = useMemo(() => new ScheduleMonthState(
+    Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => LIMIT_OPTIONS.map((limit) => [
+      monthGridKey(variant, limit), emptyMonth(year, monthIndex),
+    ]))), CALENDAR_VARIANTS,
+  ), [year, monthIndex]);
+  const current = useRef(controller);
+  current.current = controller;
+  const [observed, setObserved] = useState({ controller, snapshot: controller.snapshot });
+  const snapshot = observed.controller === controller ? observed.snapshot : controller.snapshot;
+  const [busyState, setBusyState] = useState<{ controller: ScheduleMonthState; who: string; map: OccupiedPairMatrix }>();
   const busyGen = useRef(0);
-
-  const quietUntil = useRef(0);
-
-  const refreshTimer = useRef(0);
-
-  const liveDebounce = useRef(0);
-
-  const dirtyLive = useRef(false);
-
-  const gridStoreRef = useRef(gridStore);
-
-  gridStoreRef.current = gridStore;
-
   const requestedLimits = [...LIMIT_OPTIONS];
-
   const fetchKey = requestedLimits.join("|");
-
-  const kindKey = CALENDAR_VARIANTS.join("+");
-
-  const loadStamp = `${year}-${monthIndex}-${kindKey}-${fetchKey}`;
-
-  const gridLoading = isLiveData() && readyStamp !== loadStamp;
-
-  const shownGridStore = useMemo(() => {
-    if (!gridLoading) return gridStore;
-    return Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
-      monthGridKey(variant, limit),
-      emptyMonth(year, monthIndex),
-    ])));
-  }, [gridLoading, gridStore, fetchKey, year, monthIndex]);
-
-  const pullGrids = useCallback(
-    (stamp: string) => {
-      const gen = loadGen.current;
-      return loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits).then((next) => {
-        if (gen !== loadGen.current) return;
-        if (inflight.current > 0) return;
-        setGridStore((store) => next.loaded.reduce((result, variant) =>
-          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, requestedLimits)), store));
-        if (Object.keys(next.errors).length) {
-          showV2Toast("err", t("schedule.toastLoadError"));
-        }
-        setReadyStamp(stamp);
-      });
-    },
-    [year, monthIndex, fetchKey, t],
-  );
-
-  useEffect(() => {
-    if (!isLiveData()) {
-      setGridStore(Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => requestedLimits.map((limit) => [
-        monthGridKey(variant, limit),
-        loadDemoSchedule(year, monthIndex, variant, limit, () => demoMonthPlan(year, monthIndex, variant, limit)),
-      ]))));
-      setReadyStamp(loadStamp);
-      return;
-    }
-    const gen = ++loadGen.current;
-    void loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], requestedLimits)
-      .then((next) => {
-        if (gen !== loadGen.current) return;
-        if (inflight.current > 0) return;
-        setGridStore((store) => next.loaded.reduce((result, variant) =>
-          replaceVariantGrids(result, variant, gridsForVariant(next.grids, variant, requestedLimits)), store));
-        if (Object.keys(next.errors).length) {
-          showV2Toast("err", t("schedule.toastLoadError"));
-        }
-        setReadyStamp(loadStamp);
-      })
-      .catch(() => {
-        if (gen !== loadGen.current) return;
-        if (inflight.current > 0) return;
-        showV2Toast("err", t("schedule.toastLoadError"));
-        setReadyStamp(loadStamp);
-      });
-  }, [year, monthIndex, kindKey, fetchKey, t]);
-
+  const loadStamp = `${year}-${monthIndex}`;
   const busyWhoId = actingId || selfId;
 
-  const busyDays = new Date(year, monthIndex + 1, 0).getDate();
+  const pullGrids = useCallback(async () => {
+    if (current.current !== controller || controller.pendingCount) return;
+    const generation = controller.startLoad();
+    const next = await loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], [...LIMIT_OPTIONS]);
+    if (current.current !== controller) return;
+    if (controller.acceptLoad(generation, next) && Object.keys(next.errors).length) {
+      showV2Toast("err", t("schedule.toastLoadError"));
+    }
+  }, [controller, year, monthIndex, t]);
 
-  const pullBusy = useCallback(
-    (who: string | undefined) => {
-      if (!isLiveData()) {
-        setBusyRemote(undefined);
-        return Promise.resolve();
-      }
-      if (!who) return Promise.resolve();
-      const gen = ++busyGen.current;
-      return Promise.all(CALENDAR_VARIANTS.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who))).then((groups) => {
-        if (gen !== busyGen.current) return;
-        if (groups.some((rows) => rows === null)) return;
-        const rows = groups.flatMap((group) => group ?? []);
-        const map = occupiedPairsFromSlots(rows, busyDays);
-        if (who === actingRef.current) setBusyRemote(map);
-      });
-    },
-    [year, monthIndex, busyDays],
-  );
-
-  const refreshBusy = useCallback(() => {
-    void pullBusy(actingRef.current);
-  }, [pullBusy]);
+  const pullBusy = useCallback(async () => {
+    const who = actingRef.current;
+    if (!isLiveData() || !who) return;
+    const gen = ++busyGen.current;
+    const groups = await Promise.all(CALENDAR_VARIANTS.map((variant) => loadMemberOccupiedSlots(year, monthIndex, variant, who)));
+    if (gen !== busyGen.current || current.current !== controller || who !== actingRef.current || groups.some((rows) => rows === null)) return;
+    setBusyState({ controller, who, map: occupiedPairsFromSlots(groups.flatMap((group) => group ?? []), new Date(year, monthIndex + 1, 0).getDate()) });
+  }, [controller, year, monthIndex, actingRef]);
 
   useEffect(() => {
-    void pullBusy(selfId);
-  }, [selfId, pullBusy]);
-
-  useEffect(() => {
-    if (busyWhoId && busyWhoId !== selfId) void pullBusy(busyWhoId);
-  }, [busyWhoId, selfId, pullBusy]);
-
-  useEffect(() => {
-    if (!isLiveData()) return;
-    const { from, to } = ymRange(year, monthIndex);
-    const catchUp = (delay: number) => {
-      window.clearTimeout(refreshTimer.current);
-      refreshTimer.current = window.setTimeout(() => {
-        if (inflight.current > 0) return;
-        if (!dirtyLive.current) return;
-        dirtyLive.current = false;
-        void pullGrids(loadStamp);
-        refreshBusy();
-      }, delay);
-    };
-    return subscribeOccupancy((change) => {
-      if (change.slotDate && (change.slotDate < from || change.slotDate > to)) return;
-      if (change.memberId && change.memberId === actingRef.current) {
-        refreshBusy();
-        return;
-      }
-      dirtyLive.current = true;
-      if (inflight.current > 0 || Date.now() < quietUntil.current) {
-        catchUp(Math.max(250, quietUntil.current - Date.now()));
-        return;
-      }
-      window.clearTimeout(liveDebounce.current);
-      liveDebounce.current = window.setTimeout(() => {
-        if (inflight.current > 0 || Date.now() < quietUntil.current) {
-          catchUp(Math.max(250, quietUntil.current - Date.now()));
-          return;
-        }
-        dirtyLive.current = false;
-        void pullGrids(loadStamp);
-        refreshBusy();
+    let active = true;
+    let timer = 0;
+    let dirty = false;
+    let previousPending = controller.pendingCount;
+    const scheduleRefresh = () => {
+      dirty = true;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (!active || controller.pendingCount || !dirty) return;
+        dirty = false;
+        void pullGrids();
+        void pullBusy();
       }, 250);
+    };
+    const offState = controller.subscribe(() => {
+      if (!active) return;
+      setObserved({ controller, snapshot: controller.snapshot });
+      const pending = controller.pendingCount;
+      if (previousPending > 0 && pending === 0 && isLiveData()) scheduleRefresh();
+      previousPending = pending;
     });
-  }, [year, monthIndex, loadStamp, pullGrids, refreshBusy]);
+    if (!isLiveData()) {
+      controller.replaceLocal(Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => LIMIT_OPTIONS.map((limit) => [
+        monthGridKey(variant, limit), loadDemoSchedule(year, monthIndex, variant, limit, () => demoMonthPlan(year, monthIndex, variant, limit)),
+      ]))));
+    } else {
+      void pullGrids();
+    }
+    const { from, to } = ymRange(year, monthIndex);
+    const offLive = isLiveData() ? subscribeOccupancy((change) => {
+      if (change.slotDate && (change.slotDate < from || change.slotDate > to)) return;
+      // The owner is not the writer: another session/admin can change our seats.
+      scheduleRefresh();
+    }) : () => {};
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      offState();
+      offLive();
+    };
+  }, [controller, year, monthIndex, pullGrids, pullBusy]);
 
   useEffect(() => {
-    return () => {
-      window.clearTimeout(refreshTimer.current);
-      window.clearTimeout(liveDebounce.current);
-    };
-  }, []);
+    void pullBusy();
+    return () => { ++busyGen.current; };
+  }, [busyWhoId, pullBusy]);
 
-  return { gridStore, setGridStore, gridStoreRef, busyRemote, loadGen, inflight, quietUntil, refreshTimer, liveDebounce, requestedLimits, fetchKey, loadStamp, gridLoading, shownGridStore, refreshBusy };
+  const setGridStore = useCallback((update: SetStateAction<MonthGridStore>) => {
+    controller.updateLocal(update);
+  }, [controller]);
+  const gridStoreRef = useRef(snapshot.grids);
+  gridStoreRef.current = snapshot.grids;
+
+  return {
+    controller, gridStore: snapshot.grids, shownGridStore: snapshot.grids, setGridStore, gridStoreRef,
+    busyRemote: busyState?.controller === controller && busyState.who === busyWhoId ? busyState.map : undefined,
+    requestedLimits, fetchKey, loadStamp,
+    gridLoading: isLiveData() && !snapshot.ready,
+    gridLoadError: snapshot.error && !snapshot.ready,
+    retryLoad: pullGrids,
+  };
 }

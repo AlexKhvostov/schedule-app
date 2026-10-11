@@ -77,6 +77,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     const visible = new Set(workHalfSlots(p.workHours));
     const self = p.self ?? p.me;
     const brush = p.me;
+    if (mode === "place" && !brush.t.trim()) return;
     const brushIsSelf = isSelfSeat(brush, self);
     const canForeign = Boolean(p.canRemoveForeign);
     const date = `${p.year}-${String(p.monthIndex + 1).padStart(2, "0")}-${String(origin.day).padStart(2, "0")}`;
@@ -156,11 +157,14 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
       }
       p.onOverwriteAsk?.({
         kind: "place",
+        year: p.year,
+        monthIndex: p.monthIndex,
         variant: origin.variant,
         limit: origin.limit,
         people: [...wipePass.displaced.values()],
         memberIds: [...wipePass.memberIds],
         slots: wipePass.slots,
+        before: grid,
         next: wipePass.next,
         empty: emptyPass.changed ? emptyPass.next : undefined,
       });
@@ -178,11 +182,14 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     }
     p.onOverwriteAsk?.({
       kind: "remove",
+      year: p.year,
+      monthIndex: p.monthIndex,
       variant: origin.variant,
       limit: origin.limit,
       people: [...wipePass.displaced.values()],
       memberIds: [...wipePass.memberIds],
       slots: wipePass.slots,
+      before: grid,
       next: wipePass.next,
       empty: emptyPass.changed ? emptyPass.next : undefined,
     });

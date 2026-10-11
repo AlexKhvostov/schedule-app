@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { SchedulePlayer } from "../data/players";
 import type { ClubMember } from "../schedule/members";
 import type { Occupancy } from "../schedule/plan";
+import { gridEdits } from "../schedule/gridEdits";
 import type { RosterRow } from "../schedule/roster";
 
 export type SeatDiff = {
@@ -14,27 +15,14 @@ export type SeatDiff = {
 };
 
 export function seatDiffs(prev: Occupancy, next: Occupancy) {
-  const out: SeatDiff[] = [];
-  for (let dayIdx = 0; dayIdx < next.length; dayIdx += 1) {
-    for (let half = 0; half < 48; half += 1) {
-      const before = prev[dayIdx]?.[half] ?? [];
-      const after = next[dayIdx]?.[half] ?? [];
-      const max = Math.max(before.length, after.length);
-      for (let level = 0; level < max; level += 1) {
-        if ((before[level]?.t ?? "") !== (after[level]?.t ?? "")) {
-          out.push({
-            day: dayIdx + 1,
-            half,
-            level,
-            placed: Boolean(after[level]),
-            tables: after[level]?.tables ?? before[level]?.tables ?? 1,
-            undone: before[level] ?? null,
-          });
-        }
-      }
-    }
-  }
-  return out;
+  return gridEdits(prev, next).map((edit): SeatDiff => ({
+    day: edit.dayIdx + 1,
+    half: edit.half,
+    level: edit.level,
+    placed: Boolean(edit.after),
+    tables: edit.after?.tables ?? edit.before?.tables ?? 1,
+    undone: edit.before,
+  }));
 }
 export function decorateDemoRoster(rows: RosterRow[], people: ClubMember[]): RosterRow[] {
   return rows.map((row) => {
