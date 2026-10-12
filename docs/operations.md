@@ -110,3 +110,5 @@ order by delivery_status;
 5. Повторно выполнить security contracts, smoke Edge Function и web E2E.
 
 Миграцию `20260924235900_security_hardening.sql` нельзя откатывать возвратом прямой записи `authenticated` в `distances`; необходимые операции добавляются только узкими RPC.
+
+Приоритеты выпущены в preview/schedule-ui после полного [CI38239868788](https://github.com/AlexKhvostov/schedule-app/actions/runs/38239868788). Working smoke проверяет реальные агрегаты/права/снимок и откатывает тестовые записи; безопасный [SQL](../memory/tasks/2026-10-12-working-priorities-smoke.sql) не содержит реальных идентификаторов. Main не изменялся. Не публиковать реальные скриншоты/ID в git; UI-проверка использует постоянный OAuth-совместимый preview.

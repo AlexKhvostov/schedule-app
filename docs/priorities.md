@@ -1,6 +1,6 @@
 # Живые приоритеты Team50+
 
-Правила согласованы Алексеем 12 октября 2026. Реализация находится только во вкладке «Приоритеты»; автоматическая очередь и расписание не изменены. Для Working нужна миграция [20261012030000_live_priorities.sql](../supabase/migrations/20261012030000_live_priorities.sql); она применена к Working 12 октября 2026 после полного [CI38237681319](https://github.com/AlexKhvostov/schedule-app/actions/runs/38237681319). Состояние клиентского выпуска — в [отчёте](../memory/tasks/2026-10-12-priorities-working-release.md).
+Правила согласованы Алексеем 12 октября 2026. Реализация находится только во вкладке «Приоритеты»; автоматическая очередь и расписание не изменены. Для Working нужна миграция [20261012030000_live_priorities.sql](../supabase/migrations/20261012030000_live_priorities.sql); она применена к Working 12 октября 2026 после полного [CI38237681319](https://github.com/AlexKhvostov/schedule-app/actions/runs/38237681319). Клиент опубликован в preview/schedule-ui; полный [CI38239868788](https://github.com/AlexKhvostov/schedule-app/actions/runs/38239868788), Vercel и проверка реального входа прошли. Итог выпуска — в [отчёте](../memory/tasks/2026-10-12-priorities-working-release.md).
 
 ## Расчёт и периоды
 
@@ -49,3 +49,7 @@
 - Входной компонент: [V2Priorities.tsx](../apps/web/src/v2/V2Priorities.tsx), экран [LivePriorities.tsx](../apps/web/src/v2/LivePriorities.tsx), детализация [PriorityCalculation.tsx](../apps/web/src/v2/PriorityCalculation.tsx).
 - Серверный контракт: [live_priorities.sql](../supabase/tests/live_priorities.sql), включён в database CI; браузерные сценарии: [priorities.spec.ts](../apps/web/e2e/priorities.spec.ts).
 - Demo использует вымышленные записи для проверки формулы и существующую книгу дистанций для polar/nina. Заявки и исключения сохраняются только в локальном хранилище Demo. Это не доказательство облачного доступа или Realtime.
+
+## Проверка Working
+
+12 октября 2026 независимый подсчёт по реальным дистанциям и транзакционный цикл заявки прошли с полным откатом. Исходные157 members/3044 entries/5913 values и сумма33759970 не изменились. Для Winamax заполнены игровые настройки6 игроков,5 входят в игровой состав; все выбрали Nitro, Regular не выбран. Исторические дистанции сами по себе не добавляют человека в состав: нужно заполнить игровые настройки. Эта причина пустого Regular-списка проверена отдельно.
