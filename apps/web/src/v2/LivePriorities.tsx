@@ -119,6 +119,12 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
     return () => { cancelled = true; };
   }, [requestList, canManage, canManageDemo, requestIds, t]);
   const periods = Array.from({ length: 16 }, (_, i) => shiftPriorityMonth(currentPriorityPeriod(today), 3 - i * 3));
+  const summary = {
+    players: visible.length,
+    points: visible.reduce((sum, row) => sum + row.total, 0),
+    vip: visible.filter((row) => row.vip > 0 && !row.excluded).length,
+    excluded: visible.filter((row) => row.excluded).length,
+  };
   const errorText = (code: string) => t(code === "priority-stale" ? "priorities.stale" : code === "priority-vip-exclusion-conflict" ? "priorities.vipConflict" : "priorities.operationError", { reason: code });
   const run = async (operation: () => Promise<{ error: string | null }>, onSuccess?: () => void) => {
     const epoch = viewEpoch.current;
@@ -141,14 +147,17 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
         <Button size="sm" variant="outline" onClick={() => setRequestList(true)} disabled={!current || busy}>{t("priorities.requests")} · {requests.length}{requests.some((r) => !r.closedAt) && <b className="v2-prio-new">{t("priorities.new")} {requests.filter((r) => !r.closedAt).length}</b>}</Button></header>
       <div className="v2-prio-report">
         <label>{t("priorities.room")}<input aria-label={t("priorities.room")} value="Winamax" readOnly disabled /></label>
-        <label>{t("priorities.reportMonth")}<select aria-label={t("priorities.reportMonth")} value={chosenPeriod} disabled={busy || composing} onChange={(e) => setChosenPeriod(e.target.value)}><option value="">{monthFormat.format(new Date(currentPriorityPeriod(today)))}</option>{periods.filter((p) => p !== currentPriorityPeriod(today)).map((p) => <option key={p} value={p}>{monthFormat.format(new Date(p))}</option>)}</select></label>
+        <label>{t("priorities.reportMonth")}<select aria-label={t("priorities.reportMonth")} value={chosenPeriod} disabled={busy || composing} onChange={(e) => setChosenPeriod(e.target.value)}>{periods.map((p) => <option key={p} value={p === currentPriorityPeriod(today) ? "" : p}>{monthFormat.format(new Date(p))}</option>)}</select></label>
         <div className="v2-prio-window"><span>{t("priorities.calculationMonths")}</span><div>{[0, 3].map((i) => <span key={i}>({monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))}) <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b></span>)}</div></div>
       </div>
-      <div className="v2-prio-filters">
+      <div className="v2-prio-controls"><div className="v2-prio-filters">
         <label className="v2-prio-check"><input type="checkbox" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
         {(["redParty", "team50", "active"] as const).map((key) => <label key={key} className="v2-prio-check"><input type="checkbox" checked={filters[key]} onChange={(e) => setFilters({ ...filters, [key]: e.target.checked })} />{t(`priorities.filters.${key}`)}</label>)}
         <span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span>
       </div>
+      <aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>
+        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? num(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
+      </aside></div>
       <div className="v2-prio-tabs" role="tablist" aria-label={t("priorities.kind")}>{(["nitro", "regular"] as const).map((k) => <button key={k} ref={(node) => { kindTabs.current[k] = node; }} id={`priority-tab-${k}`} type="button" role="tab" aria-selected={kind === k} aria-controls={`priority-panel-${k}`} tabIndex={kind === k ? 0 : -1} disabled={busy || composing} onClick={() => { setKind(k); setHover(null); }} onKeyDown={(e) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
         e.preventDefault(); const next = e.key === "Home" ? "nitro" : e.key === "End" ? "regular" : k === "nitro" ? "regular" : "nitro";

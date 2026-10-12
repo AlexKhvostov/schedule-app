@@ -114,6 +114,15 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   await expect(page.getByLabel("Покер-рум", { exact: true })).toHaveValue("Winamax");
   await expect(page.locator(".v2-prio-report select")).toHaveCount(1);
   const month = page.getByLabel("Отчётный месяц", { exact: true });
+  const periods = await month.locator("option").evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
+  expect(periods).toHaveLength(16);
+  expect(periods.filter((p) => p === "")).toHaveLength(1);
+  expect(periods[1]).toBe("");
+  const newest = new Date(periods[0]);
+  for (let i = 2; i < periods.length; i++) {
+    const expected = new Date(Date.UTC(newest.getUTCFullYear(), newest.getUTCMonth() - i * 3, 1)).toISOString().slice(0, 10);
+    expect(periods[i]).toBe(expected);
+  }
   await month.selectOption("2026-02-01");
   await expect(page.locator(".v2-prio-window")).toContainText("август");
   await expect(page.locator(".v2-prio-window")).toContainText("октябрь 2025");
@@ -156,6 +165,39 @@ test("report row and shared filters stay above mutually exclusive tournament tab
     await page.screenshot({ path: testInfo.outputPath(`request-below-table-${width}.png`) });
     await page.getByRole("button", { name: "Отменить заявку", exact: true }).click();
   }
+});
+
+test("compact summary follows the visible kind, filters and VIP display", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await enter(page);
+  const number = (value: string) => Number(value.replace(/[^\d,.-]/g, "").replace(",", "."));
+  const checkSummary = async () => {
+    const rows = page.locator(".v2-prio-table tbody tr");
+    const points = (await rows.locator("td.is-total").allTextContents()).reduce((sum, value) => sum + number(value), 0);
+    const summary = page.locator(".v2-prio-summary");
+    await expect(summary.locator('[data-metric="players"] dd')).toHaveText(String(await rows.count()));
+    expect(number(await summary.locator('[data-metric="points"] dd').innerText())).toBe(points);
+    await expect(summary.locator('[data-metric="vip"] dd')).toHaveText(String(await rows.filter({ has: page.locator(".is-nick small", { hasText: /VIP/ }) }).count()));
+    await expect(summary.locator('[data-metric="excluded"] dd')).toHaveText(String(await page.locator(".v2-prio-table tbody tr.is-excluded").count()));
+  };
+  await checkSummary();
+  const filters = await page.locator(".v2-prio-filters").boundingBox();
+  const summary = await page.locator(".v2-prio-summary").boundingBox();
+  const controls = await page.locator(".v2-prio-controls").boundingBox();
+  expect(summary!.x).toBeGreaterThanOrEqual(filters!.x + filters!.width);
+  expect(controls!.height).toBeLessThanOrEqual(filters!.height + 1);
+  await page.screenshot({ path: testInfo.outputPath("priority-summary-desktop.png") });
+  await page.getByLabel("Активная карточка", { exact: true }).uncheck();
+  await checkSummary();
+  await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Сводка · Регулярные" })).toBeVisible();
+  await checkSummary();
+  await page.getByLabel("Учитывать VIP", { exact: true }).uncheck();
+  await checkSummary();
+  await expect(page.locator('[data-metric="vip"] dd')).toHaveText("0");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.locator(".v2-prio-controls").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath("priority-summary-mobile.png") });
 });
 
 test("grouped request snapshots, public replies, private comments and admin deletion", async ({ page }, testInfo) => {
@@ -267,8 +309,10 @@ test("outside ranking is per kind and incompatible with a positive VIP", async (
   await settings.getByLabel("Вне рейтинга · Nitro", { exact: true }).check();
   await settings.getByRole("button", { name: "✕", exact: true }).click();
   await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("—");
+  await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("1");
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("2");
+  await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("0");
   await page.locator('tr[data-member="demo-priority-2"] .v2-prio-person').click();
   const vip = page.getByRole("dialog", { name: "Vera", exact: true });
   await vip.getByLabel("Вне рейтинга · Regular", { exact: true }).click();
@@ -285,6 +329,7 @@ test("priority table and touch calculation fit phones in both themes and languag
     await expect.poll(() => page.locator(".v2-prio-report").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
     await expect.poll(() => page.locator(".v2-prio-tabs").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
     await expect.poll(() => page.locator(".v2-prio-filters").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
+    await expect.poll(() => page.locator(".v2-prio-summary").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: testInfo.outputPath(`priorities-mobile-${theme}.png`) });
   }
   await page.locator('tr[data-member="demo-priority-0"] td.is-num button').first().click();
@@ -295,6 +340,8 @@ test("priority table and touch calculation fit phones in both themes and languag
   await page.evaluate(() => localStorage.setItem("lang", "en")); await page.reload();
   await expect(page.getByLabel("Poker room", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Submit request", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Summary · Nitro" })).toBeVisible();
+  await expect.poll(() => page.locator(".v2-prio-summary").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("priorities-mobile-en.png") });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: testInfo.outputPath("priorities-desktop.png") });

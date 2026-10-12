@@ -1319,6 +1319,20 @@ html[data-ui-theme="light"],
 .v2-prio-window { display: grid; gap: 4px; min-width: 0; flex: 1; color: var(--muted-foreground); }
 .v2-prio-window > div { display: flex; flex-wrap: wrap; gap: 5px 18px; min-height: 30px; align-items: center; color: var(--foreground); }
 .v2-prio-window b { color: var(--title); white-space: nowrap; }
+.v2-prio-controls { display: grid; grid-template-columns: minmax(0,1fr) 340px; align-items: center; }
+.v2-prio-summary { margin: 5px 9px 5px 0; padding: 5px 9px; border: 1px solid var(--border); border-radius: 5px; background: color-mix(in srgb,var(--title) 4%,var(--card)); }
+.v2-prio-summary dl { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin: 0; }
+.v2-prio-summary dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 0; }
+.v2-prio-summary dt { color: var(--muted-foreground); font-size: 10px; line-height: 14px; white-space: nowrap; }
+.v2-prio-summary dd { margin: 0; color: var(--title); font-size: 12px; line-height: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 850px) {
+  .v2-prio-controls { grid-template-columns: 1fr; }
+  .v2-prio-summary { margin: 0 7px 5px; padding: 4px 7px; }
+  .v2-prio-summary dl { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+  .v2-prio-summary dl > div { display: grid; gap: 0; }
+  .v2-prio-summary dt { font-size: 9px; white-space: normal; }
+  .v2-prio-summary dd { font-size: 11px; }
+}
 .v2-prio-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 9px; font-size: 11px; }
 .v2-prio-rule { width: 100%; font-size: 10px; color: var(--muted-foreground); }
 .v2-prio-check { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; cursor: pointer; }

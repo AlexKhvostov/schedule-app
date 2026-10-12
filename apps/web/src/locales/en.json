@@ -155,6 +155,7 @@
     "reviewHint": "Make corrections in Distance control. Saving updates current priorities; the request snapshot stays unchanged.",
     "reportMonth": "Report month",
     "calculationMonths": "Calculation months",
+    "summary": { "title": "Summary", "players": "Players", "points": "Total points", "vip": "VIP", "excluded": "Outside ranking" },
     "kinds": { "nitro": "Nitro", "regular": "Regular" },
     "count": "{{n}} players",
     "denied": "This section is closed for your role.",
