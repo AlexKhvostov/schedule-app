@@ -1030,6 +1030,8 @@
       }
     },
     "distanceBook": {
+      "filtersTitle": "Filters",
+      "summaryTitle": "Overview",
       "groups": { "period": "Period and room", "distance": "Distance", "people": "People", "search": "Search and order" },
       "activeProfiles": "Active with a profile",
       "rowSummary": "Summary",

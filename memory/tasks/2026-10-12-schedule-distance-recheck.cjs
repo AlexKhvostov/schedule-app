@@ -125,11 +125,18 @@ async function run() {
   assert.equal(missing.people[0].playerId, '101');
   check('Historical ID substitutes current missing profile ID', { profileId: null, filterId: missing.people[0].playerId });
 
-  const slotsDb = { rpc: async () => ({ data: 1, error: null }), from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'kind' }, error: null }) }) }) }) }) };
+  const slotCalls = [];
+  const slotsDb = { rpc: async (name, args) => {
+    slotCalls.push({ name, args });
+    return { data: null, error: { message: 'schedule-conflict', code: '40001' } };
+  } };
   const slots = loader({ './client': { getSupabase: () => slotsDb }, './kinds': { kindIdOf: async () => 'kind' }, './config': { isLiveData: () => true } })('src/data/slots.ts');
   const response = await slots.applyOwnSlots({ memberId: 'self', variant: 'nitro', limit: '50', year: 2026, monthIndex: 9, place: [{ day: 12, half: 10, level: 0 }, { day: 12, half: 11, level: 0 }], remove: [] });
-  assert.equal(response.error, undefined);
-  check('Own-slot client ignores affected row count', { requested: 2, affected: 1, treatedAsSuccess: response.error === undefined });
+  assert.equal(response.error, 'schedule-conflict');
+  assert.equal(slotCalls.length, 1);
+  assert.equal(slotCalls[0].name, 'apply_schedule_edit');
+  assert.equal(slotCalls[0].args.p_place.length, 2);
+  check('FIXED: own-slot client uses the strict transaction and reports its conflict', { requested: 2, rpc: slotCalls[0].name, error: response.error, treatedAsSuccess: false });
   console.log(JSON.stringify(result, null, 2));
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

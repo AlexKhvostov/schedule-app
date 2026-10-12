@@ -1035,6 +1035,8 @@
       }
     },
     "distanceBook": {
+      "filtersTitle": "Фильтры",
+      "summaryTitle": "Сводка",
       "groups": { "period": "Период и рум", "distance": "Дистанция", "people": "Участники", "search": "Поиск и порядок" },
       "activeProfiles": "Активные с анкетой",
       "rowSummary": "Итог",

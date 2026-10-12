@@ -30,12 +30,13 @@ test("distance control shows zero members and supports demo create/edit", async 
   await ninaRow.getByRole("button", { name: "Добавить запись" }).click();
   const createDialog = page.getByRole("dialog", { name: "Новая запись дистанции" });
   await expect(createDialog.getByText("Введите ID дистанции")).toBeVisible();
-  await createDialog.getByLabel("ID дистанции").fill("54321");
+  await createDialog.getByLabel("ID дистанции").fill("123456789012");
   await createDialog.getByLabel("10 €").fill("125");
   await expect(createDialog.getByRole("button", { name: "Сохранить" })).toBeEnabled();
   await createDialog.getByRole("button", { name: "Сохранить" }).click();
   await expect(createDialog).toBeHidden();
-  await expect(ninaRow.getByText("54321")).toBeVisible();
+  await expect(ninaRow.getByText("123456789012")).toBeVisible();
+  await expect(ninaRow.locator("td.is-distance-id")).toHaveAttribute("title", "123456789012");
 });
 
 test("distance control modal fits a narrow viewport", async ({ page }) => {
@@ -88,10 +89,26 @@ test("distance filters distinguish Discord role from an active club profile and 
 });
 
 test("distance filter groups fit mobile widths in both languages", async ({ page }, testInfo) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.setViewportSize({ width: 390, height: 844 });
   await enterDemoDistanceBook(page);
   const groups = page.locator(".v2-dbook-filter-group");
   await expect(groups).toHaveCount(4);
+  const filters = page.getByRole("region", { name: "Фильтры", exact: true });
+  const overview = page.getByRole("region", { name: "Сводка", exact: true });
+  await expect(filters).toBeVisible();
+  await expect(overview).toBeVisible();
+  const firstDistance = page.locator("tr.v2-dbook-person").filter({ hasText: "polar" }).locator("td.is-num").first();
+  const pinnedActions = page.locator("tr.v2-dbook-person").filter({ hasText: "polar" }).locator("td.is-act");
+  const numberBox = (await firstDistance.boundingBox())!;
+  const actionsBox = (await pinnedActions.boundingBox())!;
+  expect(numberBox.width).toBeGreaterThanOrEqual(76);
+  expect(numberBox.x + numberBox.width).toBeLessThanOrEqual(actionsBox.x);
+  const filtersBox = (await filters.boundingBox())!;
+  const overviewBox = (await overview.boundingBox())!;
+  expect(filtersBox.y + filtersBox.height).toBeLessThan(overviewBox.y);
+  expect(overviewBox.height).toBeLessThanOrEqual(110);
   await expect.poll(() => page.locator(".v2-dbook-tools").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   for (const group of await groups.all()) {
     const box = await group.boundingBox();
@@ -101,8 +118,11 @@ test("distance filter groups fit mobile widths in both languages", async ({ page
   await page.evaluate(() => { localStorage.setItem("lang", "en"); localStorage.setItem("v2-ui-theme", "light"); });
   await page.reload();
   await expect(page.getByRole("group", { name: "People", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Filters", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Overview", exact: true })).toBeVisible();
   await expect.poll(() => page.locator(".v2-dbook-tools").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("distance-filters-mobile-en.png") });
+  expect(pageErrors).toEqual([]);
 });
 
 test("compact distance rows keep parent summaries distinct from nested parts in both themes", async ({ page }, testInfo) => {
@@ -110,6 +130,10 @@ test("compact distance rows keep parent summaries distinct from nested parts in 
   for (const theme of ["dark", "light"]) {
     await page.evaluate((value) => localStorage.setItem("v2-ui-theme", value), theme);
     await page.reload();
+    const filtersPanel = await page.getByRole("region", { name: "Фильтры", exact: true }).boundingBox();
+    const summaryPanel = await page.getByRole("region", { name: "Сводка", exact: true }).boundingBox();
+    expect(filtersPanel!.height).toBeLessThanOrEqual(130);
+    expect(summaryPanel!.height).toBeLessThanOrEqual(52);
     const parent = page.locator("tr.v2-dbook-person").filter({ hasText: "polar" });
     const closedBackground = await parent.locator("td").first().evaluate((node) => getComputedStyle(node).backgroundColor);
     await parent.getByRole("button", { name: /polar/ }).press("Enter");
@@ -134,6 +158,18 @@ test("compact distance rows keep parent summaries distinct from nested parts in 
     expect(parentBackground).not.toBe(partBackground);
     const summaryNumber = parent.locator("td.is-num").first();
     const entryNumber = part.locator("td.is-num").first();
+    await expect(page.locator(".v2-dbook-table").getByRole("columnheader", { name: "Изменено", exact: true })).toHaveCount(0);
+    await expect(parent.locator("td.is-distance-id")).toHaveAttribute("title", "10234");
+    const tableWidth = (await page.locator(".v2-dbook-table").boundingBox())!.width;
+    const numberWidths = await parent.locator("td.is-num").evaluateAll((cells) => cells.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0));
+    expect(numberWidths / tableWidth).toBeGreaterThan(0.65);
+    expect((await parent.locator("td.is-distance-id").boundingBox())!.width).toBeLessThanOrEqual(46);
+    expect((await parent.locator("td.is-kind").boundingBox())!.width).toBeLessThanOrEqual(62);
+    await expect(parent.locator("td.is-distance-id")).toHaveCSS("text-align", "left");
+    await expect(parent.locator("td.is-kind")).toHaveCSS("font-weight", "500");
+    await expect(summaryNumber).toHaveCSS("font-variant-numeric", "tabular-nums");
+    await expect(summaryNumber).toHaveCSS("text-align", "right");
+    await expect.poll(() => page.locator(".v2-dbook-scroll").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
     await expect(summaryNumber).toHaveCSS("font-size", "12px");
     await expect(summaryNumber).toHaveCSS("font-weight", "700");
     await expect(entryNumber).toHaveCSS("font-size", "10px");

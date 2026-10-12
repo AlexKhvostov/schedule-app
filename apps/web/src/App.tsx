@@ -90,7 +90,7 @@ export function App() {
   }, [live]);
 
   if (!hydrated || booting) {
-    return <V2BootScreen />;
+    return <V2BootScreen languageReady={hydrated} />;
   }
 
   if (gate) {

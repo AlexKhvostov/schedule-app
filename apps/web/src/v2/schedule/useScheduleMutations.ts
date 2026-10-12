@@ -5,7 +5,7 @@ import { isLiveData } from "../../data/config";
 import { notifyMarkRemoved } from "../../data/notifyMark";
 import { accessKey } from "../../data/scheduleAccess";
 import type { ScheduleFilterLimits } from "../../data/scheduleSettings";
-import { applyOwnSlots, applyScheduleEdit, monthGridKey, type ScheduleVariant } from "../../data/slots";
+import { applyScheduleEdit, monthGridKey, type ScheduleVariant } from "../../data/slots";
 import { saveDemoSchedule } from "../../schedule/demoScheduleStore";
 import { applyGridEdits, gridEdits, type GridEdit } from "../../schedule/gridEdits";
 import type { Occupancy } from "../../schedule/plan";
@@ -67,18 +67,14 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   };
 
   const writeEdits = async (variant: ScheduleVariant, limit: string, edits: GridEdit[], self: string, painter: string,
-    foreign: Parameters<typeof applyScheduleEdit>[0]["foreign"] = [], confirmed = false) => {
+    foreign: Parameters<typeof applyScheduleEdit>[0]["foreign"] = []) => {
     const place = edits.filter((edit) => edit.after).map((edit) => ({
       day: edit.dayIdx + 1, half: edit.half, level: edit.level, tables: edit.after!.tables,
     }));
     const remove = edits.filter((edit) => !edit.after && (!edit.before?.memberId || edit.before.memberId === self)).map((edit) => ({
       day: edit.dayIdx + 1, half: edit.half, level: edit.level,
     }));
-    if (confirmed || (place.length && remove.length)) {
-      const result = await applyScheduleEdit({ memberId: painter, limit, variant, year, monthIndex, place, remove, foreign });
-      return result.error;
-    }
-    const result = await applyOwnSlots({ memberId: place.length ? painter : self, limit, variant, year, monthIndex, place, remove });
+    const result = await applyScheduleEdit({ memberId: place.length ? painter : self, limit, variant, year, monthIndex, place, remove, foreign });
     return result.error;
   };
 
@@ -96,9 +92,10 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     const self = selfIdRef.current;
     const painter = actingRef.current;
     if (!controller.snapshot.ready || !self || !painter) return;
-    showV2Toast(edits[0].after ? "ok" : "off", t(edits[0].after ? "schedule.toastPlaced" : "schedule.toastRemoved"));
     void controller.edit(key, edits, () => writeEdits(variant, limit, edits, self, painter)).then((error) => {
-      if (error && current.current === controller) showWriteError(error, variant, limit);
+      if (current.current !== controller) return;
+      if (error) showWriteError(error, variant, limit);
+      else showV2Toast(edits[0].after ? "ok" : "off", t(edits[0].after ? "schedule.toastPlaced" : "schedule.toastRemoved"));
     });
   };
 
@@ -134,7 +131,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     }
     overwritePending.current = true;
     setOverwriteBusy(true);
-    void controller.edit(key, edits, () => writeEdits(ask.variant, ask.limit, edits, self, painter, foreign, true), false).then((error) => {
+    void controller.edit(key, edits, () => writeEdits(ask.variant, ask.limit, edits, self, painter, foreign), false).then((error) => {
       if (!error && foreign.length) void notifyMarkRemoved(language);
       if (current.current !== controller) return;
       overwritePending.current = false;

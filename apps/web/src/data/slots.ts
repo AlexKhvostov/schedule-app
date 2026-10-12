@@ -360,55 +360,6 @@ export async function loadMultiMonthGrids(
   return { grids, loaded, errors };
 }
 
-function missingOwnRpc(message?: string) {
-  return Boolean(message && /apply_own_slots|Could not find the function/i.test(message));
-}
-
-async function insertSeat(input: {
-  memberId: string;
-  kindId: string;
-  year: number;
-  monthIndex: number;
-  day: number;
-  half: number;
-  level: number;
-  tables: number;
-}) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
-  const { error } = await db.from("occupancy").insert({
-    member_id: input.memberId,
-    kind_id: input.kindId,
-    slot_date: slotDate(input.year, input.monthIndex, input.day),
-    half: input.half,
-    level: input.level,
-    tables: clampTables(input.tables),
-  });
-  return { error: error?.message };
-}
-
-async function deleteSeat(input: {
-  memberId: string;
-  kindId: string;
-  year: number;
-  monthIndex: number;
-  day: number;
-  half: number;
-  level: number;
-}) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
-  const { error } = await db
-    .from("occupancy")
-    .delete()
-    .eq("member_id", input.memberId)
-    .eq("kind_id", input.kindId)
-    .eq("slot_date", slotDate(input.year, input.monthIndex, input.day))
-    .eq("half", input.half)
-    .eq("level", input.level);
-  return { error: error?.message };
-}
-
 export async function applyOwnSlots(input: {
   memberId: string;
   limit: string;
@@ -418,45 +369,8 @@ export async function applyOwnSlots(input: {
   place: OwnSlot[];
   remove: OwnSlot[];
 }) {
-  const db = getSupabase();
-  if (!db) return { error: "not-configured" as const };
-  const kindId = await kindIdOf(input.limit, input.variant);
-  if (!kindId) return { error: "unknown-kind" as const };
-  const { error } = await db.rpc("apply_own_slots", {
-    p_kind_id: kindId,
-    p_member_id: input.memberId,
-    p_place: asSlotJson(input.year, input.monthIndex, input.place),
-    p_remove: asSlotJson(input.year, input.monthIndex, input.remove),
-  });
-  if (!error) return {};
-  if (!missingOwnRpc(error.message)) return { error: error.message };
-  const jobs = [
-    ...input.place.map((slot) =>
-      insertSeat({
-        memberId: input.memberId,
-        kindId,
-        year: input.year,
-        monthIndex: input.monthIndex,
-        day: slot.day,
-        half: slot.half,
-        level: slot.level,
-        tables: slot.tables ?? 1,
-      }),
-    ),
-    ...input.remove.map((slot) =>
-      deleteSeat({
-        memberId: input.memberId,
-        kindId,
-        year: input.year,
-        monthIndex: input.monthIndex,
-        day: slot.day,
-        half: slot.half,
-        level: slot.level,
-      }),
-    ),
-  ];
-  const fail = (await Promise.all(jobs)).find((row) => row.error);
-  return { error: fail?.error };
+  // Keep the existing API, but never fall back to partial per-seat writes.
+  return applyScheduleEdit({ ...input, foreign: [] });
 }
 
 export async function placeSlot(input: {
@@ -518,7 +432,7 @@ export async function removeForeignSlots(input: {
   return { error: error?.message };
 }
 
-/** A confirmed mixed range is one transaction. Never fall back to separate writes. */
+/** Every gesture is one transaction. Never fall back to separate writes. */
 export async function applyScheduleEdit(input: {
   memberId: string;
   limit: string;
