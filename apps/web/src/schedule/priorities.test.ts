@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePriority, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
+import { calculatePriority, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityBreakdown, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
 const person = (id: string, patch: Partial<PriorityPerson> = {}): PriorityPerson => ({ memberId: id, nick: id, avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [], ...patch });
 describe("priority calculation", () => {
   it("uses six shifted months across year boundaries", () => {
@@ -28,6 +28,29 @@ describe("priority calculation", () => {
     expect(isPriorityPreliminary({ periodStart: "2026-08-01", today: "2026-08-08", lastMonthEntries: 19 })).toBe(true);
     expect(isPriorityPreliminary({ periodStart: "2026-08-01", today: "2026-08-08", lastMonthEntries: 20 })).toBe(false);
     expect(isPriorityPreliminary({ periodStart: "2026-11-01", today: "2026-10-12", lastMonthEntries: 40 })).toBe(true);
+  });
+  it("details each kind from monthly tournaments through both period weights to the combined cells", () => {
+    const result = calculatePriority(person("breakdown", { entries: [
+      { id: "n1", month: "2026-02-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 5 }, { limit: "100", tournaments: 7 }] },
+      { id: "n2", month: "2026-02-01", variant: "nitro", part: 2, values: [{ limit: "50", tournaments: 6 }] },
+      { id: "r1", month: "2026-02-01", variant: "regular", part: 1, values: [{ limit: "50", tournaments: 2 }] },
+      { id: "r2", month: "2026-07-01", variant: "regular", part: 1, values: [{ limit: "50", tournaments: 3 }, { limit: "100", tournaments: 4 }] },
+    ] }), "2026-08-01");
+    const [nitro, regular] = priorityBreakdown(result.months);
+    expect(nitro.periods[0].limits[0].monthly.map((m) => m.tournaments)).toEqual([11, 0, 0]);
+    expect(nitro.periods[0].limits.map((l) => [l.limit, l.tournaments, l.limitWeight, l.points])).toEqual([[50, 11, 1, 5.5], [100, 7, 2, 7]]);
+    expect(regular.periods[1].limits[0].monthly.map((m) => m.tournaments)).toEqual([0, 0, 3]);
+    expect(regular.periods.map((p) => p.periodWeight)).toEqual([0.5, 1]);
+    expect([nitro.total, regular.total]).toEqual([12.5, 12]);
+    expect(nitro.periods.flatMap((p, i) => p.limits.map((l, j) => l.points + regular.periods[i].limits[j].points))).toEqual(result.cells);
+    expect(nitro.total + regular.total).toBe(result.total);
+  });
+  it("keeps all months, limits and zero points in an empty kind breakdown", () => {
+    const row = calculatePriority(person("zero"), "2026-02-01");
+    const kinds = priorityBreakdown(row.months);
+    expect(kinds.map((k) => k.total)).toEqual([0, 0]);
+    expect(kinds[0].periods[0].limits[0].monthly.map((m) => m.month)).toEqual(["2025-08-01", "2025-09-01", "2025-10-01"]);
+    expect(kinds[1].periods[1].limits.map((l) => [l.tournaments, l.points])).toEqual([[0, 0], [0, 0]]);
   });
 });
 describe("priority places", () => {

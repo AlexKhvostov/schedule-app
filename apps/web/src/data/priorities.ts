@@ -62,6 +62,18 @@ export async function getPriorityRequest(id: string, demoCanManage: boolean) {
   const row = readDemo<DemoRequest[]>(DEMO_REQUESTS, []).find((r) => r.id === id);
   return { data: row?.detail ?? null, error: row ? null : "priority-request-not-found" };
 }
+// Reuse the server-protected detail endpoint; public summaries never contain authors.
+export async function loadPriorityRequestAuthors(ids: string[], demoCanManage: boolean) {
+  const data: Record<string, string> = {};
+  for (let start = 0; start < ids.length; start += 8) {
+    const batch = await Promise.all(ids.slice(start, start + 8).map(async (id) => ({ id, ...await getPriorityRequest(id, demoCanManage) })));
+    for (const row of batch) {
+      if (row.error || !row.data) return { data: null, error: row.error || "priority-request-not-found" };
+      data[row.id] = row.data.author;
+    }
+  }
+  return { data, error: null };
+}
 export async function closePriorityRequest(id: string, response: string, demoCanManage: boolean) {
   if (isLiveData()) return rpc<null>("close_priority_request", { p_id: id, p_response: response });
   if (!demoCanManage) return { data: null, error: "forbidden" };

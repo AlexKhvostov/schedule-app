@@ -26,6 +26,23 @@ export function priorityMonths(period: string) { return Array.from({ length: 6 }
 export function isPriorityPreliminary(source: Pick<PrioritySource, "today" | "periodStart" | "lastMonthEntries">) {
   return source.today < `${source.periodStart.slice(0, 7)}-08` || source.lastMonthEntries < 20;
 }
+export function priorityBreakdown(months: PriorityMonth[]) {
+  return (["nitro", "regular"] as const).map((kind) => {
+    const periods = [0, 3].map((start) => {
+      const periodMonths = months.slice(start, start + 3);
+      const periodWeight = start === 0 ? 0.5 : 1;
+      const limits = ([50, 100] as const).map((limit) => {
+        const key = `${kind}${limit}` as "nitro50" | "nitro100" | "regular50" | "regular100";
+        const monthly = periodMonths.map((m) => ({ month: m.month, tournaments: m[key] }));
+        const tournaments = monthly.reduce((sum, m) => sum + m.tournaments, 0);
+        const limitWeight = limit === 50 ? 1 : 2;
+        return { limit, monthly, tournaments, limitWeight, points: tournaments * limitWeight * periodWeight };
+      });
+      return { periodWeight, limits, total: limits.reduce((sum, limit) => sum + limit.points, 0) };
+    });
+    return { kind, periods, total: periods.reduce((sum, period) => sum + period.total, 0) };
+  });
+}
 export function calculatePriority(person: PriorityPerson, period: string): CalculatedPriority {
   const months: PriorityMonth[] = priorityMonths(period).map((month) => ({ month, nitro50: 0, regular50: 0, nitro100: 0, regular100: 0 }));
   for (const entry of person.entries) {
@@ -38,11 +55,7 @@ export function calculatePriority(person: PriorityPerson, period: string): Calcu
     }
   }
   const cells: CalculatedPriority["cells"] = [0, 0, 0, 0];
-  months.forEach((month, i) => {
-    const offset = i < 3 ? 0 : 2; const weight = i < 3 ? 0.5 : 1;
-    cells[offset] += (month.nitro50 + month.regular50) * weight;
-    cells[offset + 1] += (month.nitro100 + month.regular100) * 2 * weight;
-  });
+  for (const kind of priorityBreakdown(months)) kind.periods.forEach((period, i) => period.limits.forEach((limit, j) => { cells[i * 2 + j] += limit.points; }));
   return { ...person, months, cells, total: cells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
 }
 export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean): CalculatedPriority[] {

@@ -1311,16 +1311,26 @@ html[data-ui-theme="light"],
 .v2-prio-status { padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted-foreground); }
 .v2-prio-status.is-final { color: var(--title); border-color: color-mix(in srgb,var(--title) 35%,var(--border)); }
 .v2-prio-new { color: var(--title); font-size: 10px; }
-.v2-prio-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 9px 14px; padding: 9px; border-bottom: 1px solid var(--border); font-size: 11px; }
-.v2-prio-filters > label:not(.v2-prio-check) { display: grid; gap: 4px; color: var(--muted-foreground); }
-.v2-prio-filters select { min-height: 29px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--foreground); padding: 2px 7px; }
-.v2-prio-people-filters { display: flex; flex-wrap: wrap; gap: 7px 16px; width: 100%; }
+.v2-prio-report { display: flex; flex-wrap: wrap; align-items: start; gap: 9px 18px; padding: 10px 9px; border-bottom: 1px solid var(--border); font-size: 11px; }
+.v2-prio-report > label { display: grid; gap: 4px; color: var(--muted-foreground); }
+.v2-prio-report input,.v2-prio-report select { min-height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--foreground); padding: 2px 7px; }
+.v2-prio-report input { width: 105px; cursor: default; opacity: 1; background: var(--muted); }
+.v2-prio-report select { max-width: 100%; }
+.v2-prio-window { display: grid; gap: 4px; min-width: 0; flex: 1; color: var(--muted-foreground); }
+.v2-prio-window > div { display: flex; flex-wrap: wrap; gap: 5px 18px; min-height: 30px; align-items: center; color: var(--foreground); }
+.v2-prio-window b { color: var(--title); white-space: nowrap; }
+.v2-prio-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 9px; font-size: 11px; }
+.v2-prio-rule { width: 100%; font-size: 10px; color: var(--muted-foreground); }
 .v2-prio-check { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; cursor: pointer; }
 .v2-prio-live input[type=checkbox],.v2-prio-settings input { accent-color: var(--title); width: 15px; height: 15px; }
-.v2-prio-kind { display: flex; gap: 3px; }
-.v2-prio-kind button { min-height: 29px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 4px; }
-.v2-prio-kind button[aria-pressed=true] { color: var(--title); background: color-mix(in srgb,var(--title) 12%,var(--card)); }
+.v2-prio-tabs { display: flex; gap: 4px; padding: 8px 9px 0; border-bottom: 1px solid var(--border); background: var(--header); }
+.v2-prio-tabs button { min-height: 34px; padding: 6px 18px; margin-bottom: -1px; border: 1px solid transparent; border-radius: 6px 6px 0 0; color: var(--muted-foreground); font-size: 12px; font-weight: 650; }
+.v2-prio-tabs button:hover { color: var(--title); }
+.v2-prio-tabs button[aria-selected=true] { color: var(--title); border-color: var(--border); border-bottom-color: var(--card); background: var(--card); }
+.v2-prio-tabs button:focus-visible { outline: 2px solid var(--title); outline-offset: -3px; }
+.v2-prio-live [role=tabpanel]:focus-visible { outline: 2px solid var(--title); outline-offset: -2px; }
 .v2-prio-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 7px 9px; font-size: 10px; color: var(--muted-foreground); }
+.v2-prio-request-actions { display: flex; justify-content: flex-end; padding: 9px; border-top: 1px solid var(--border); }
 .v2-prio-live .v2-prio-table { font-size: 12px; }
 .v2-prio-live .v2-prio-table th,.v2-prio-live .v2-prio-table td { padding: 3px 5px; height: 31px; border-right: 1px solid var(--border); }
 .v2-prio-live .v2-prio-table thead th { position: static; font-size: 10px; }
@@ -1349,26 +1359,119 @@ html[data-ui-theme="light"],
 .v2-prio-compose textarea,.v2-prio-close textarea { width: 100%; min-height: 70px; resize: vertical; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 5px; padding: 6px; }
 .v2-prio-compose button,.v2-prio-close button { justify-self: start; }
 .v2-prio-notice,.v2-prio-error { padding: 6px 10px; font-size: 12px; overflow-wrap: anywhere; }
-.v2-prio-tooltip { position: fixed; z-index: 55; right: 16px; bottom: 16px; width: min(410px,calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); box-shadow: 0 4px 24px #0004; pointer-events: none; }
+.v2-prio-tooltip { position: fixed; z-index: 55; visibility: hidden; width: min(410px,calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); box-shadow: 0 4px 24px #0004; pointer-events: none; }
 .v2-prio-dialog { max-height: calc(100dvh - 32px); font-size: 12px; }
 .v2-prio-calculation { margin: 8px 0 14px; overflow-wrap: anywhere; }
-.v2-prio-calculation table { width: 100%; border-collapse: collapse; margin: 8px 0 3px; font-variant-numeric: tabular-nums; }
-.v2-prio-calculation th,.v2-prio-calculation td { padding: 5px 3px; text-align: right; border-bottom: 1px solid var(--border); }
-.v2-prio-calculation th:first-child { text-align: left; }
+.v2-prio-calculation > b { display: block; font-size: 14px; margin-bottom: 9px; }
+.v2-prio-calculation table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 8px 0 3px; font-variant-numeric: tabular-nums; }
+.v2-prio-calculation th,.v2-prio-calculation td { padding: 5px 6px; text-align: center; border: 1px solid color-mix(in srgb,var(--foreground) 22%,var(--border)); vertical-align: middle; }
+.v2-prio-calculation .is-label { text-align: left; }
+.v2-prio-calculation thead { background: var(--header); }
+.v2-prio-calculation thead th[scope=colgroup] { text-align: center; color: var(--title); }
+.v2-prio-calculation tbody tr:nth-child(even) { background: color-mix(in srgb,var(--foreground) 3%,var(--card)); }
+.v2-prio-breakdown .is-kind-end { border-right-width: 2px; }
+.v2-prio-kind-calculations { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.v2-prio-kind-calculation { min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--header); }
+.v2-prio-kind-calculation > h3 { margin: 0 0 10px; color: var(--title); font-size: 13px; font-weight: 700; }
+.v2-prio-calculation-period + .v2-prio-calculation-period { border-top: 2px solid var(--border); padding-top: 12px; margin-top: 14px; }
+.v2-prio-calculation-period h4 { display: flex; justify-content: space-between; gap: 5px; font-size: 11px; margin: 0; font-weight: 650; }
+.v2-prio-calculation-period h4 span { color: var(--muted-foreground); white-space: nowrap; }
+.v2-prio-kind-calculation .v2-prio-formulas { grid-template-columns: repeat(auto-fit,minmax(min(100%,145px),1fr)); gap: 6px; margin-top: 8px; }
+.v2-prio-kind-calculation tfoot { background: var(--muted); font-weight: 650; }
+.v2-prio-period-total,.v2-prio-kind-total,.v2-prio-combined-total { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 9px; font-variant-numeric: tabular-nums; }
+.v2-prio-period-total { font-size: 11px; }
+.v2-prio-kind-total { border-top: 1px solid var(--border); margin-top: 12px; font-weight: 650; }
+.v2-prio-kind-total b { color: var(--title); }
+.v2-prio-combined-total { margin-top: 10px; padding: 9px; border: 1px solid color-mix(in srgb,var(--title) 40%,var(--border)); border-radius: 5px; background: color-mix(in srgb,var(--title) 8%,var(--card)); font-weight: 650; }
+.v2-prio-combined-total b { color: var(--title); font-size: 15px; white-space: nowrap; }
 .v2-prio-calculation small { color: var(--muted-foreground); }
-.v2-prio-formulas p { margin: 6px 0; }
+.v2-prio-formulas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 12px; }
+.v2-prio-formula { border: 1px solid var(--border); border-radius: 6px; padding: 9px; background: var(--card); }
+.v2-prio-formula h3 { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px; margin: 0; font-size: 12px; font-weight: 650; }
+.v2-prio-formula h3 span { color: var(--muted-foreground); font-size: 11px; font-weight: 400; }
+.v2-prio-formula dl { margin: 7px 0 0; font-variant-numeric: tabular-nums; }
+.v2-prio-formula dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.v2-prio-formula dt { color: var(--muted-foreground); }
+.v2-prio-formula dd { margin: 0; font-weight: 600; white-space: nowrap; }
+.v2-prio-formula dl > .v2-prio-formula-result { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 7px; color: var(--title); }
+.v2-prio-formula-result dt { color: inherit; font-weight: 650; }
+.v2-prio-formula-result dd { font-size: 15px; }
+.v2-prio-tooltip { font-size: 11px; line-height: 1.3; padding: 10px; }
+.v2-prio-tooltip .v2-prio-formulas { grid-template-columns: 1fr; }
+.v2-prio-tooltip .v2-prio-kind-calculation { padding: 6px; }
+.v2-prio-tooltip .v2-prio-kind-calculation > h3 { margin-bottom: 6px; }
+.v2-prio-tooltip .v2-prio-formula { padding: 7px; }
+.v2-prio-tooltip .v2-prio-formula dl { margin-top: 5px; }
+.v2-prio-tooltip .v2-prio-formula dl > div { gap: 5px; }
+.v2-prio-tooltip .v2-prio-calculation th,.v2-prio-tooltip .v2-prio-calculation td { font-size: 11px; padding: 3px 2px; }
+.v2-prio-tooltip .v2-prio-calculation > b { margin-bottom: 6px; }
+.v2-prio-tooltip .v2-prio-combined-total { margin-top: 6px; padding: 6px; }
+.v2-prio-tooltip .v2-prio-calculation { margin: 0; }
+.v2-prio-source { margin-top: 12px; }
+.v2-prio-source summary { cursor: pointer; padding: 7px 0; font-weight: 600; }
+.app-dialog-panel.v2-prio-request-detail { max-width: 760px; }
+.v2-prio-detail-content { display: grid; gap: 14px; line-height: 1.5; }
+.v2-prio-detail-content h3 { margin: 0; font-size: 12px; font-weight: 650; }
+.v2-prio-submission { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--header); }
+.v2-prio-submission .v2-prio-request-meta { padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.v2-prio-saved-values { display: grid; gap: 7px; }
+.v2-prio-saved-values .v2-prio-snapshot-note { margin: 0; }
+.v2-prio-snapshot-scroll { overflow-x: auto; max-width: 100%; }
+.v2-prio-snapshot-table { width: 100%; min-width: 320px; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 11px; }
+.v2-prio-snapshot-table th,.v2-prio-snapshot-table td { border: 1px solid color-mix(in srgb,var(--foreground) 22%,var(--border)); text-align: center; padding: 5px 3px; vertical-align: middle; }
+.v2-prio-snapshot-table .is-label { text-align: left; }
+.v2-prio-snapshot-table small { display: block; font-size: 10px; color: var(--muted-foreground); }
+.v2-prio-snapshot-table .is-period-old { background: color-mix(in srgb,#c59e31 9%,var(--card)); }
+.v2-prio-snapshot-table .is-period-new { background: color-mix(in srgb,var(--title) 7%,var(--card)); }
+.v2-prio-snapshot-table .is-total { background: color-mix(in srgb,var(--title) 14%,var(--card)); font-weight: 700; border-left-width: 2px; color: var(--title); }
+.v2-prio-request-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 18px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--header); }
+.v2-prio-request-meta > div { min-width: 0; }
+.v2-prio-request-meta dt { font-size: 11px; color: var(--muted-foreground); }
+.v2-prio-request-meta dd { margin: 3px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.v2-prio-detail-comment .v2-prio-comment { margin: 6px 0 0; border-left: 3px solid var(--title); padding: 10px; overflow-wrap: anywhere; }
+.v2-prio-snapshot-note { margin: 0; font-size: 11px; color: var(--muted-foreground); }
+.v2-prio-review-rows { display: grid; gap: 8px; }
+.v2-prio-review-person { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.v2-prio-review-person > summary { display: grid; grid-template-columns: 12px minmax(0,1fr) auto; gap: 1px 8px; padding: 10px; background: var(--header); cursor: pointer; }
+.v2-prio-review-person > summary::before { content: "▸"; grid-column: 1; grid-row: 1 / 3; align-self: center; color: var(--title); }
+.v2-prio-review-person[open] > summary::before { content: "▾"; }
+.v2-prio-review-person > summary > span { grid-column: 2; grid-row: 1; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.v2-prio-review-person > summary > small { grid-column: 2; grid-row: 2; color: var(--muted-foreground); }
+.v2-prio-review-person > summary > b { grid-column: 3; grid-row: 1 / 3; align-self: center; text-align: right; color: var(--title); font-size: 15px; font-variant-numeric: tabular-nums; }
+.v2-prio-review-person > summary > b small { display: block; font-size: 10px; font-weight: 400; color: var(--muted-foreground); }
+.v2-prio-review-person > .v2-prio-calculation { margin: 0; padding: 10px; }
+.v2-prio-detail-content .v2-prio-close { padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.v2-prio-detail-reply { padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--header); }
+.v2-prio-detail-reply p { white-space: pre-wrap; margin: 6px 0 0; overflow-wrap: anywhere; }
 .v2-prio-settings { display: grid; gap: 9px; border-top: 1px solid var(--border); padding-top: 10px; }
 .v2-prio-settings label { display: flex; align-items: center; gap: 7px; min-height: 30px; }
-.v2-prio-request { padding: 10px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
-.v2-prio-request > small { display: block; margin-top: 5px; color: var(--muted-foreground); }
-.v2-prio-request > div { display: flex; gap: 7px; }
+.app-dialog-panel.v2-prio-request-list { max-width: 1100px; }
+.v2-prio-requests-scroll { max-width: 100%; overflow-x: auto; }
+.v2-prio-requests-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 11px; }
+.v2-prio-requests-table th,.v2-prio-requests-table td { border: 1px solid color-mix(in srgb,var(--foreground) 22%,var(--border)); padding: 7px 8px; text-align: left; vertical-align: middle; }
+.v2-prio-requests-table thead { background: var(--header); }
+.v2-prio-requests-table tbody tr:nth-child(even) { background: var(--header); }
+.v2-prio-requests-table .is-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-prio-requests-table .is-response { min-width: 150px; max-width: 240px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.v2-prio-request-buttons { display: flex; gap: 5px; white-space: nowrap; }
 .v2-prio-comment { white-space: pre-wrap; padding: 8px; background: var(--muted); border-radius: 4px; }
 @media(max-width:600px) {
+  .v2-prio-kind-calculations { grid-template-columns: 1fr; }
+  .v2-prio-submission { padding: 8px; }
+  .v2-prio-snapshot-table { font-size: 9px; }
+  .v2-prio-snapshot-table th,.v2-prio-snapshot-table td { padding: 4px 2px; }
+  .v2-prio-snapshot-table small { font-size: 9px; }
+  .v2-prio-formulas { grid-template-columns: 1fr; }
+  .v2-prio-calculation th,.v2-prio-calculation td { padding: 4px 2px; font-size: 11px; }
   .v2-prio-live { padding: 3px; }
   .v2-prio-live .v2-prio-head { font-size: 10px; padding: 6px; gap: 5px; }
   .v2-prio-live .v2-prio-head > button { margin-left: 0; }
-  .v2-prio-filters { display: grid; grid-template-columns: 1fr 1fr; padding: 7px; gap: 5px 10px; }
-  .v2-prio-people-filters { grid-column: 1 / -1; gap: 3px 12px; font-size: 10px; }
+  .v2-prio-report { display: grid; grid-template-columns: 105px minmax(0,1fr); padding: 7px; gap: 8px 10px; }
+  .v2-prio-report input { width: 100%; }
+  .v2-prio-window { grid-column: 1 / -1; }
+  .v2-prio-window > div { gap: 5px 12px; }
+  .v2-prio-filters { padding: 7px; gap: 3px 12px; font-size: 10px; }
+  .v2-prio-tabs { padding: 6px 7px 0; }
   .v2-prio-actions { padding: 6px; gap: 5px; align-items: start; }
   .v2-prio-actions > span { max-width: 58%; line-height: 1.5; }
   .v2-prio-live .v2-prio-table { min-width: 350px; }
