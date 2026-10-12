@@ -6,7 +6,7 @@ export type PriorityPerson = {
 };
 export type PrioritySource = { periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
 export type PriorityMonth = { month: string; nitro50: number; regular50: number; nitro100: number; regular100: number };
-export type CalculatedPriority = PriorityPerson & { months: PriorityMonth[]; cells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
+export type CalculatedPriority = PriorityPerson & { months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
 export type PriorityFilters = { redParty: boolean; team50: boolean; active: boolean };
 
 export function shiftPriorityMonth(month: string, offset: number) {
@@ -54,9 +54,13 @@ export function calculatePriority(person: PriorityPerson, period: string): Calcu
       month[key] += value.tournaments;
     }
   }
-  const cells: CalculatedPriority["cells"] = [0, 0, 0, 0];
-  for (const kind of priorityBreakdown(months)) kind.periods.forEach((period, i) => period.limits.forEach((limit, j) => { cells[i * 2 + j] += limit.points; }));
-  return { ...person, months, cells, total: cells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
+  const distanceCells: CalculatedPriority["distanceCells"] = [0, 0, 0, 0];
+  const pointCells: CalculatedPriority["pointCells"] = [0, 0, 0, 0];
+  for (const kind of priorityBreakdown(months)) kind.periods.forEach((period, i) => period.limits.forEach((limit, j) => {
+    distanceCells[i * 2 + j] += limit.tournaments;
+    pointCells[i * 2 + j] += limit.points;
+  }));
+  return { ...person, months, distanceCells, pointCells, total: pointCells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
 }
 export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean): CalculatedPriority[] {
   const rows = people.filter((person) => person.plays.includes(kind)).map((person) => {

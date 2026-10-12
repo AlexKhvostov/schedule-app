@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { currentPriorityPeriod, priorityMonths, type PriorityPerson } from "../src/schedule/priorities";
 
 async function enter(page: Page) {
   await page.goto("/");
@@ -46,6 +47,11 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
   const vera = page.locator('tr[data-member="demo-priority-2"]');
   await expect(vera.locator("td.is-rank")).toHaveText("3");
   const total = await vera.locator("td.is-total").textContent();
+  const values = (await vera.locator("td.is-num").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
+  expect(values).toEqual([5421, 549, 5484, 576, 9895.5]);
+  await expect(page.locator(".v2-prio-table th.is-total")).toContainText("Очки рейтинга");
+  await expect(page.locator(".v2-prio-table th.is-total small")).toHaveText("Дистанция × коэф.");
+  await expect(page.locator(".v2-prio-actions")).toContainText("Дистанции без коэффициентов");
   await expect(page.getByLabel("Покер-рум", { exact: true })).toBeDisabled();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(vera.locator("td.is-rank")).toHaveText("1");
@@ -62,7 +68,9 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
   await expect(tooltip).toContainText("50 €");
   await expect(tooltip).not.toContainText("100 €");
   await expect(tooltip.locator(".v2-prio-formula dl > div")).toHaveCount(8);
-  await expect(tooltip.locator(".v2-prio-combined-total b")).toHaveText(`= ${await vera.locator("td.is-num button").first().textContent()}`);
+  await expect(tooltip.locator(".v2-prio-cell-distance b")).toHaveText((await vera.locator("td.is-num button").first().textContent())!);
+  expect(Number((await tooltip.locator(".v2-prio-combined-total b").innerText()).replace(/[^\d,.-]/g, "").replace(",", "."))).toBe(2710.5);
+  await expect(tooltip.locator(".v2-prio-combined-total")).toContainText("Очки рейтинга");
   await expect.poll(async () => {
     const tip = await tooltip.boundingBox(), total = await tooltip.locator(".v2-prio-combined-total").boundingBox();
     return !!tip && !!total && total.y + total.height <= tip.y + tip.height;
@@ -75,6 +83,30 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
   await vera.locator("td.is-num button").first().click();
   await expect(page.getByRole("dialog", { name: "Подробный расчёт" })).toContainText("50 €");
   await expect(page.getByRole("dialog", { name: "Подробный расчёт" })).not.toContainText("100 €");
+});
+
+test("existing version-one request facts render raw distances and keep the original weighted total", async ({ page }) => {
+  await enter(page);
+  const periodStart = currentPriorityPeriod(), months = priorityMonths(periodStart);
+  const person: PriorityPerson = { memberId: "legacy-player", nick: "Сохранённый игрок", avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [
+    { id: "n", month: months[0], variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 11 }, { limit: "100", tournaments: 7 }] },
+    { id: "r-old", month: months[0], variant: "regular", part: 2, values: [{ limit: "50", tournaments: 2 }] },
+    { id: "r-new", month: months[5], variant: "regular", part: 1, values: [{ limit: "50", tournaments: 3 }, { limit: "100", tournaments: 4 }] },
+  ] };
+  const summary = { id: "legacy-request", periodStart, variant: "nitro", createdAt: `${periodStart.slice(0, 7)}-08T10:00:00Z`, closedAt: null, response: null, targets: [{ memberId: person.memberId, nick: person.nick }] };
+  const saved = JSON.stringify([{ ...summary, detail: { ...summary, author: "Старый автор", comment: "Сохранённая заявка", snapshot: { version: 1, periodStart, today: `${periodStart.slice(0, 7)}-08`, lastMonthEntries: 20, people: [person], rankingPeople: [person], vipEnabled: true } } }]);
+  await page.evaluate((value) => localStorage.setItem("v2-priority-requests-1", value), saved);
+  await page.reload();
+  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Заявка на проверку", exact: true });
+  await expect(dialog.locator(".v2-prio-saved-values")).toContainText("четыре колонки — чистые дистанции");
+  await expect(dialog.locator(".v2-prio-snapshot-table th.is-total")).toContainText("Очки рейтинга");
+  await expect(dialog.locator(".v2-prio-snapshot-table th.is-total small")).toHaveText("Дистанция × коэф.");
+  const values = (await dialog.locator(".v2-prio-snapshot-table tbody td").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
+  expect(values).toEqual([1, 13, 7, 3, 4, 24.5]);
+  await expect(dialog.locator(".v2-prio-combined-total b")).toHaveText("= 24,5");
+  expect(await page.evaluate(() => localStorage.getItem("v2-priority-requests-1"))).toBe(saved);
 });
 
 test("calculation tooltip stays beside its cell and inside the viewport", async ({ page }) => {

@@ -143,6 +143,10 @@
   "priorities": {
     "regularShort": "Regular",
     "distanceGames": "Tournaments",
+    "distanceTableHint": "Distances before weights",
+    "scoreFactor": "Points: ×{{n}}",
+    "pointsHint": "Distance × limit and period weights",
+    "pointsHintShort": "Distance × weights",
     "limitWeight": "Limit weight",
     "periodWeight": "Period weight",
     "points": "Points",
@@ -162,7 +166,7 @@
     "col": {
       "rank": "Place",
       "nick": "Player",
-      "total": "Total"
+      "total": "Rating points"
     },
     "month": "Month",
     "kindsLegend": "Both Nitro and Regular tournaments are included.",
@@ -216,7 +220,7 @@
     "requestStatus": "Status",
     "requestActions": "Actions",
     "noComment": "No comment",
-    "snapshotHint": "Rows at submission time. Points already include the limit and period weights.",
+    "snapshotHint": "At submission time: four columns show raw distances; the total is rating points with limit and period weights.",
     "adminResponse": "Administrator reply",
     "closeRequest": "Close request",
     "cancel": "Cancel",

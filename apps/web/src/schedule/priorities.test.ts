@@ -20,7 +20,8 @@ describe("priority calculation", () => {
       { id: "3", month: "2026-07-01", variant: "regular", part: 1, values: [{ limit: "50", tournaments: 3 }, { limit: "100", tournaments: 4 }] },
       { id: "4", month: "2026-08-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 999 }] },
     ] }), "2026-08-01");
-    expect(result.cells).toEqual([6.5, 7, 3, 8]); expect(result.total).toBe(24.5);
+    expect(result.distanceCells).toEqual([13, 7, 3, 4]);
+    expect(result.pointCells).toEqual([6.5, 7, 3, 8]); expect(result.total).toBe(24.5);
     expect(result.months[0]).toMatchObject({ nitro50: 11, regular50: 2, nitro100: 7 });
   });
   it("remains preliminary through day7 and below20 logical entries", () => {
@@ -42,7 +43,8 @@ describe("priority calculation", () => {
     expect(regular.periods[1].limits[0].monthly.map((m) => m.tournaments)).toEqual([0, 0, 3]);
     expect(regular.periods.map((p) => p.periodWeight)).toEqual([0.5, 1]);
     expect([nitro.total, regular.total]).toEqual([12.5, 12]);
-    expect(nitro.periods.flatMap((p, i) => p.limits.map((l, j) => l.points + regular.periods[i].limits[j].points))).toEqual(result.cells);
+    expect(nitro.periods.flatMap((p, i) => p.limits.map((l, j) => l.tournaments + regular.periods[i].limits[j].tournaments))).toEqual(result.distanceCells);
+    expect(nitro.periods.flatMap((p, i) => p.limits.map((l, j) => l.points + regular.periods[i].limits[j].points))).toEqual(result.pointCells);
     expect(nitro.total + regular.total).toBe(result.total);
   });
   it("keeps all months, limits and zero points in an empty kind breakdown", () => {
@@ -54,6 +56,13 @@ describe("priority calculation", () => {
   });
 });
 describe("priority places", () => {
+  it("orders by weighted points even when the raw tournament order is different", () => {
+    const ranked = rankPriorities([
+      person("more-games", { entries: [{ id: "old", month: "2026-02-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 100 }] }] }),
+      person("more-points", { entries: [{ id: "new", month: "2026-07-01", variant: "regular", part: 1, values: [{ limit: "100", tournaments: 40 }] }] }),
+    ], "2026-08-01", "nitro", false);
+    expect(ranked.map((r) => [r.memberId, r.total, r.distanceCells])).toEqual([["more-points", 80, [0, 0, 0, 40]], ["more-games", 50, [100, 0, 0, 0]]]);
+  });
   const score = (n: number): PriorityPerson["entries"] => [{ id: String(n), month: "2026-07-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: n }] }];
   const people = [person("a", { entries: score(100) }), person("b", { entries: score(90) }), person("vip", { vipNitro: 3, vipRegular: 1 }), person("c", { entries: score(80) }), person("out", { entries: score(999), excludedNitro: true })];
   it("reserves exact VIP seats and puts excluded people below everyone", () => {
