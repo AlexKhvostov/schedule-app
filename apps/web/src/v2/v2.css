@@ -1302,6 +1302,92 @@ html[data-ui-theme="light"],
   color: var(--title);
 }
 
+/* Live priorities: two weighted periods, dense readable rows, touch details. */
+.v2-prio-live { padding: 6px; }
+.v2-prio-live .v2-prio-card { max-width: 1100px; margin: 0 auto; }
+.v2-prio-live .v2-prio-head { gap: 6px 10px; padding: 7px 9px; font-size: 11px; }
+.v2-prio-live .v2-prio-head h1 { font-size: 12px; }
+.v2-prio-live .v2-prio-head > button { margin-left: auto; }
+.v2-prio-status { padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted-foreground); }
+.v2-prio-status.is-final { color: var(--title); border-color: color-mix(in srgb,var(--title) 35%,var(--border)); }
+.v2-prio-new { color: var(--title); font-size: 10px; }
+.v2-prio-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 9px 14px; padding: 9px; border-bottom: 1px solid var(--border); font-size: 11px; }
+.v2-prio-filters > label:not(.v2-prio-check) { display: grid; gap: 4px; color: var(--muted-foreground); }
+.v2-prio-filters select { min-height: 29px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--foreground); padding: 2px 7px; }
+.v2-prio-people-filters { display: flex; flex-wrap: wrap; gap: 7px 16px; width: 100%; }
+.v2-prio-check { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; cursor: pointer; }
+.v2-prio-live input[type=checkbox],.v2-prio-settings input { accent-color: var(--title); width: 15px; height: 15px; }
+.v2-prio-kind { display: flex; gap: 3px; }
+.v2-prio-kind button { min-height: 29px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 4px; }
+.v2-prio-kind button[aria-pressed=true] { color: var(--title); background: color-mix(in srgb,var(--title) 12%,var(--card)); }
+.v2-prio-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 7px 9px; font-size: 10px; color: var(--muted-foreground); }
+.v2-prio-live .v2-prio-table { font-size: 12px; }
+.v2-prio-live .v2-prio-table th,.v2-prio-live .v2-prio-table td { padding: 3px 5px; height: 31px; border-right: 1px solid var(--border); }
+.v2-prio-live .v2-prio-table thead th { position: static; font-size: 10px; }
+.v2-prio-live .v2-prio-table thead { position: sticky; top: 0; z-index: 2; }
+.v2-prio-live .v2-prio-table thead small { font-size: 10px; line-height: 1.3; }
+.v2-prio-live .v2-prio-table col.is-rank { width: 30px; }
+.v2-prio-live .v2-prio-table col.is-select { width: 25px; }
+.v2-prio-live .v2-prio-table col.is-nick { width: calc(32% - 30px); }
+.v2-prio-live .v2-prio-table.is-selecting col.is-nick { width: calc(32% - 55px); }
+.v2-prio-live .v2-prio-table col.is-num { width: 13%; }
+.v2-prio-live .v2-prio-table col.is-total { width: 16%; }
+.v2-prio-live .v2-prio-table .is-num { width: auto; font-size: 12px; }
+.v2-prio-live .v2-prio-table .is-period-old { background: color-mix(in srgb,#c59e31 9%,var(--card)); }
+.v2-prio-live .v2-prio-table .is-period-new { background: color-mix(in srgb,var(--title) 7%,var(--card)); }
+.v2-prio-live .v2-prio-table .is-total { width: auto; background: color-mix(in srgb,var(--title) 14%,var(--card)); border-left: 2px solid color-mix(in srgb,var(--title) 40%,var(--border)); font-size: 13px; }
+.v2-prio-live .v2-prio-table td.is-num button { width: 100%; min-height: 24px; text-align: right; cursor: help; font-weight: inherit; }
+.v2-prio-live .v2-prio-table button:focus-visible { outline: 2px solid var(--title); outline-offset: -1px; }
+.v2-prio-person { display: flex; gap: 6px; align-items: center; width: 100%; min-height: 25px; text-align: left; }
+.v2-prio-person > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-prio-person small { display: block; color: var(--title); font-size: 9px; line-height: 1.2; }
+.v2-prio-live .is-vip .is-rank { font-weight: 750; color: var(--title); }
+.v2-prio-live .is-excluded .is-nick { color: var(--muted-foreground); }
+.v2-prio-compose,.v2-prio-close { display: grid; gap: 7px; padding: 10px; border-block: 1px solid var(--border); font-size: 12px; }
+.v2-prio-compose p { margin: 0; color: var(--muted-foreground); }
+.v2-prio-compose label,.v2-prio-close label { display: grid; gap: 5px; }
+.v2-prio-compose textarea,.v2-prio-close textarea { width: 100%; min-height: 70px; resize: vertical; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 5px; padding: 6px; }
+.v2-prio-compose button,.v2-prio-close button { justify-self: start; }
+.v2-prio-notice,.v2-prio-error { padding: 6px 10px; font-size: 12px; overflow-wrap: anywhere; }
+.v2-prio-tooltip { position: fixed; z-index: 55; right: 16px; bottom: 16px; width: min(410px,calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); box-shadow: 0 4px 24px #0004; pointer-events: none; }
+.v2-prio-dialog { max-height: calc(100dvh - 32px); font-size: 12px; }
+.v2-prio-calculation { margin: 8px 0 14px; overflow-wrap: anywhere; }
+.v2-prio-calculation table { width: 100%; border-collapse: collapse; margin: 8px 0 3px; font-variant-numeric: tabular-nums; }
+.v2-prio-calculation th,.v2-prio-calculation td { padding: 5px 3px; text-align: right; border-bottom: 1px solid var(--border); }
+.v2-prio-calculation th:first-child { text-align: left; }
+.v2-prio-calculation small { color: var(--muted-foreground); }
+.v2-prio-formulas p { margin: 6px 0; }
+.v2-prio-settings { display: grid; gap: 9px; border-top: 1px solid var(--border); padding-top: 10px; }
+.v2-prio-settings label { display: flex; align-items: center; gap: 7px; min-height: 30px; }
+.v2-prio-request { padding: 10px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.v2-prio-request > small { display: block; margin-top: 5px; color: var(--muted-foreground); }
+.v2-prio-request > div { display: flex; gap: 7px; }
+.v2-prio-comment { white-space: pre-wrap; padding: 8px; background: var(--muted); border-radius: 4px; }
+@media(max-width:600px) {
+  .v2-prio-live { padding: 3px; }
+  .v2-prio-live .v2-prio-head { font-size: 10px; padding: 6px; gap: 5px; }
+  .v2-prio-live .v2-prio-head > button { margin-left: 0; }
+  .v2-prio-filters { display: grid; grid-template-columns: 1fr 1fr; padding: 7px; gap: 5px 10px; }
+  .v2-prio-people-filters { grid-column: 1 / -1; gap: 3px 12px; font-size: 10px; }
+  .v2-prio-actions { padding: 6px; gap: 5px; align-items: start; }
+  .v2-prio-actions > span { max-width: 58%; line-height: 1.5; }
+  .v2-prio-live .v2-prio-table { min-width: 350px; }
+  .v2-prio-live .v2-prio-table.is-selecting { min-width: 375px; }
+  .v2-prio-live .v2-prio-table col.is-nick { width: calc(35% - 23px); }
+  .v2-prio-live .v2-prio-table.is-selecting col.is-nick { width: calc(35% - 48px); }
+  .v2-prio-live .v2-prio-table col.is-rank { width: 23px; }
+  .v2-prio-live .v2-prio-table col.is-num { width: 12%; }
+  .v2-prio-live .v2-prio-table col.is-total { width: 17%; }
+  .v2-prio-live .v2-prio-table th,.v2-prio-live .v2-prio-table td { padding: 2px; }
+  .v2-prio-live .v2-prio-table .is-num { font-size: 9px; }
+  .v2-prio-live .v2-prio-table .is-total { font-size: 10px; }
+  .v2-prio-live .v2-prio-table thead th,.v2-prio-live .v2-prio-table thead small { font-size: 9px; }
+  .v2-prio-person { gap: 3px; font-size: 10px; }
+  .v2-prio-person .v2-ava { width: 16px; height: 16px; font-size: 8px; }
+  .v2-prio-person small { font-size: 8px; }
+  .v2-prio-calculation { font-size: 11px; }
+}
+
 .v2-root button {
   font: inherit;
 }

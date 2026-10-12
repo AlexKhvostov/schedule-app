@@ -1,4 +1,5 @@
 import { getSupabase } from "./client";
+import { notifyPriorityDistanceChanged } from "./priorityRefresh";
 
 export type DistanceVariant = "nitro" | "regular";
 
@@ -442,6 +443,7 @@ export async function saveHistoricalDistanceDump(input: {
     p_rows: input.rows,
   });
   if (error) return { error: error.message ?? error.code ?? "save", result: null };
+  notifyPriorityDistanceChanged();
   return { error: null, result: data as DistanceWriteResult & { nick_updated: number } };
 }
 
@@ -563,6 +565,7 @@ export async function saveDistanceDump(input: {
   });
   if (error) return { error: error.message ?? error.code ?? "save", result: null };
   const row = data as DistanceWriteResult | null;
+  notifyPriorityDistanceChanged();
   return {
     error: null,
     result: {
@@ -589,6 +592,7 @@ export async function clearDistanceRows(monthStart?: string) {
     p_month_start: monthStart ?? null,
   });
   if (error) return { error: error.message ?? error.code ?? "clear", deleted: 0 };
+  notifyPriorityDistanceChanged();
   return { error: null, deleted: Number((data as { deleted?: number } | null)?.deleted) || 0 };
 }
 

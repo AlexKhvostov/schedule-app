@@ -20,6 +20,11 @@ describe("shell navigation", () => {
     expect(resolveShellPage({ isRoot: false, permissions: ["profile", "schedule"], access: "pending" }, "#schedule")).toBe("cabinet");
   });
 
+  it("opens priorities for active schedule players without administrative permission", () => {
+    expect(resolveShellPage({ isRoot: false, permissions: ["profile", "schedule"], access: "active" }, "#priorities")).toBe("priorities");
+    expect(resolveShellPage({ isRoot: false, permissions: ["profile"], access: "active" }, "#priorities")).toBe("cabinet");
+  });
+
   it("falls back to an available administrative page or waiting screen", () => {
     expect(defaultShellPage({ isRoot: false, permissions: ["admin.people"], access: "active" })).toBe("admin-people");
     expect(defaultShellPage({ isRoot: false, permissions: [], access: "active" })).toBe("wait");

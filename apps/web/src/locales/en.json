@@ -1,5 +1,8 @@
 {
-  "brand": { "name": "schedule", "sandbox": "sandbox" },
+  "brand": {
+    "name": "schedule",
+    "sandbox": "sandbox"
+  },
   "login": {
     "brand": "Red Party",
     "kicker": "schedule",
@@ -13,9 +16,18 @@
     "environmentTitle": "Application environment",
     "environmentLead": "Choose an environment: safe local demo data or the current working database.",
     "environment": {
-      "demo": { "title": "Demo", "hint": "Fake local data" },
-      "working": { "title": "Working", "hint": "Current Supabase" },
-      "production": { "title": "Production", "hint": "Future launch" }
+      "demo": {
+        "title": "Demo",
+        "hint": "Fake local data"
+      },
+      "working": {
+        "title": "Working",
+        "hint": "Current Supabase"
+      },
+      "production": {
+        "title": "Production",
+        "hint": "Future launch"
+      }
     },
     "workingUnavailable": "The working database is not configured on this computer. Check the local Supabase keys.",
     "productionUnavailable": "The Production project has not been created yet",
@@ -132,10 +144,64 @@
     "count": "{{n}} players",
     "denied": "This section is closed for your role.",
     "col": {
-      "rank": "#",
-      "nick": "Nick",
+      "rank": "Place",
+      "nick": "Player",
       "total": "Total"
-    }
+    },
+    "month": "Month",
+    "kindsLegend": "N — Nitro, E — Regular. Both kinds contribute to the combined score.",
+    "sourceEntries": "Original entries by part",
+    "preliminary": "Preliminary",
+    "calculated": "Priorities calculated",
+    "scope": "50 € × 1 · 100 € × 2 · Nitro + Regular",
+    "requests": "Requests",
+    "new": "New",
+    "period": "Effective from",
+    "current": "Current period",
+    "room": "Poker room",
+    "kind": "Tournament kind",
+    "vipDisplay": "Apply VIP",
+    "filters": {
+      "redParty": "RedParty",
+      "team50": "Nitro 50+",
+      "active": "Active profile"
+    },
+    "finalRule": "Final from day 8 with 20 entries in the last month · currently {{n}}",
+    "cancelRequest": "Cancel request",
+    "submitRequest": "Submit request",
+    "requestInstruction": "Check the rows that need a review and explain your concern. Select up to 50 players. Only administrators can see your identity and comment.",
+    "comment": "Comment",
+    "selected": "Selected: {{n}}",
+    "sendRequest": "Send request",
+    "sent": "Request sent",
+    "loading": "Loading priorities…",
+    "loadError": "Could not load priorities: {{reason}}",
+    "retry": "Retry",
+    "selectPerson": "Review {{nick}}",
+    "excluded": "Outside ranking",
+    "inspectCell": "Calculation for {{nick}} · {{limit}} € · {{period}}",
+    "older": "older three months",
+    "newer": "recent three months",
+    "inspectTotal": "Full calculation for {{nick}}",
+    "empty": "No players match the filters",
+    "calculation": "Calculation details",
+    "vipConflict": "First remove the positive VIP for this kind in the player card.",
+    "vipConflictHint": "This setting is independent for each kind. Positive VIP and “Outside ranking” cannot both be enabled.",
+    "stale": "The data changed. Refresh the table, review the rows and submit again.",
+    "operationError": "Action failed: {{reason}}",
+    "noRequests": "No requests for this period yet",
+    "closed": "Closed",
+    "open": "Under review",
+    "openRequest": "Open request",
+    "deleteRequest": "Delete request",
+    "requestDetails": "Review request",
+    "author": "Author",
+    "noComment": "No comment",
+    "snapshotHint": "These are the values when the request was submitted. To correct them, open Distance control; current priorities update after saving.",
+    "adminResponse": "Administrator reply",
+    "closeRequest": "Close request",
+    "cancel": "Cancel",
+    "deleteConfirm": "Delete this request, its comment and its calculation snapshot?"
   },
   "guild": {
     "kicker": "root · discord",
@@ -515,7 +581,7 @@
     "clubLead": "Discord and the mark come in automatically. Read-only here.",
     "discordServerFallback": "Group Discord server",
     "discordAuto": "Guild nick and avatar sync on sign-in. Not editable.",
-    "discordIdHint": "Discord’s id, not our club id.",
+    "discordIdHint": "The account number Discord issues. We do not assign or change it.",
     "whoLead": "This is an info block for admins. Everyone will see only the name.",
     "whoPrivacy": "This is an info block for admins. Everyone will see only the name.",
     "notifyTitle": "Bot notifications",
@@ -627,7 +693,6 @@
     "discordUser": "Username",
     "discordUserHint": "Discord username, with the @.",
     "discordId": "Discord ID",
-    "discordIdHint": "The account number Discord issues. We do not assign or change it.",
     "discordJoined": "On the server since",
     "discordJoinedHint": "When this person joined the club Discord server. Discord sends this date.",
     "clubCode": "Club ID",
@@ -1032,7 +1097,12 @@
     "distanceBook": {
       "filtersTitle": "Filters",
       "summaryTitle": "Overview",
-      "groups": { "period": "Period and room", "distance": "Distance", "people": "People", "search": "Search and order" },
+      "groups": {
+        "period": "Period and room",
+        "distance": "Distance",
+        "people": "People",
+        "search": "Search and order"
+      },
       "activeProfiles": "Active with a profile",
       "rowSummary": "Summary",
       "summaryHint": "Member total for the selected period. Edit individual entries inside.",
@@ -1043,7 +1113,20 @@
       "filterMetadataError": "Could not load current roles and member statuses. Please try again later.",
       "lead": "Active club members and historical entries for the selected month. Role and profile filters are independent. Expand a member to add a part or edit an entry.",
       "download": "Download CSV",
-      "csv": { "month": "Month", "room": "Poker room", "distanceId": "Distance ID", "discordId": "Discord ID", "discordNick": "Discord nick", "gameNick": "Room nick", "variant": "Kind", "part": "Part", "comment": "Comment", "created": "Created", "updated": "Updated", "total": "Total tournaments" },
+      "csv": {
+        "month": "Month",
+        "room": "Poker room",
+        "distanceId": "Distance ID",
+        "discordId": "Discord ID",
+        "discordNick": "Discord nick",
+        "gameNick": "Room nick",
+        "variant": "Kind",
+        "part": "Part",
+        "comment": "Comment",
+        "created": "Created",
+        "updated": "Updated",
+        "total": "Total tournaments"
+      },
       "room": "Poker room",
       "month": "Month",
       "monthTotal": "Month total",
@@ -1051,11 +1134,25 @@
       "peopleStats": "{{records}} entries · {{without}} without distance",
       "search": "Discord nick, room nick, Discord ID or distance ID…",
       "sortLabel": "Sort",
-      "sort": { "total": "By distance", "discord": "By Discord nick", "game": "By room nick", "distanceId": "By distance ID", "updated": "By updated date" },
+      "sort": {
+        "total": "By distance",
+        "discord": "By Discord nick",
+        "game": "By room nick",
+        "distanceId": "By distance ID",
+        "updated": "By updated date"
+      },
       "idStatus": "ID status",
-      "idFilter": { "all": "All IDs", "set": "ID assigned", "missing": "Missing ID" },
+      "idFilter": {
+        "all": "All IDs",
+        "set": "ID assigned",
+        "missing": "Missing ID"
+      },
       "distanceStatus": "Distance status",
-      "presenceFilter": { "all": "All members", "with": "Has distance", "without": "No distance" },
+      "presenceFilter": {
+        "all": "All members",
+        "with": "Has distance",
+        "without": "No distance"
+      },
       "kind": "Kind",
       "colKind": "Kind",
       "kindAll": "All",
@@ -1075,7 +1172,12 @@
       "values": "Tournaments by limit",
       "modalTotal": "Total tournaments",
       "noRoomNick": "Room nick is not set",
-      "source": { "import": "File import", "historical": "Historical import", "manual": "Added manually", "legacy": "Migrated entry" },
+      "source": {
+        "import": "File import",
+        "historical": "Historical import",
+        "manual": "Added manually",
+        "legacy": "Migrated entry"
+      },
       "edit": "Edit entry",
       "save": "Save",
       "saveErr": "Could not save. Check the ID, part, and values.",

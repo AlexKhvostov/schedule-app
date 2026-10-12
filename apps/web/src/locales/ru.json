@@ -1,5 +1,8 @@
 {
-  "brand": { "name": "schedule", "sandbox": "песочница" },
+  "brand": {
+    "name": "schedule",
+    "sandbox": "песочница"
+  },
   "login": {
     "brand": "Red Party",
     "kicker": "расписание",
@@ -13,9 +16,18 @@
     "environmentTitle": "Среда приложения",
     "environmentLead": "Выберите среду: безопасное локальное демо или текущую рабочую базу.",
     "environment": {
-      "demo": { "title": "Демо", "hint": "Фейковые данные" },
-      "working": { "title": "Рабочая", "hint": "Текущий Supabase" },
-      "production": { "title": "Production", "hint": "Будущий запуск" }
+      "demo": {
+        "title": "Демо",
+        "hint": "Фейковые данные"
+      },
+      "working": {
+        "title": "Рабочая",
+        "hint": "Текущий Supabase"
+      },
+      "production": {
+        "title": "Production",
+        "hint": "Будущий запуск"
+      }
     },
     "workingUnavailable": "Рабочая база не настроена на этом компьютере. Проверьте локальные ключи Supabase.",
     "productionUnavailable": "Production-проект ещё не создан",
@@ -129,13 +141,67 @@
     }
   },
   "priorities": {
-    "count": "{{n}} игроков",
+    "count": "{{n}} участников",
     "denied": "Этот раздел закрыт для вашей роли.",
     "col": {
-      "rank": "#",
-      "nick": "Ник",
-      "total": "Итого"
-    }
+      "rank": "Место",
+      "nick": "Участник",
+      "total": "Итог"
+    },
+    "month": "Месяц",
+    "kindsLegend": "N — Nitro, E — Regular. Оба вида входят в общий расчёт.",
+    "sourceEntries": "Исходные записи по частям",
+    "preliminary": "Предварительный",
+    "calculated": "Приоритеты посчитаны",
+    "scope": "50 € × 1 · 100 € × 2 · Nitro + Regular",
+    "requests": "Заявки",
+    "new": "Новые",
+    "period": "Действует с",
+    "current": "Текущий период",
+    "room": "Покер-рум",
+    "kind": "Вид турниров",
+    "vipDisplay": "Учитывать VIP",
+    "filters": {
+      "redParty": "RedParty",
+      "team50": "Nitro 50+",
+      "active": "Активная карточка"
+    },
+    "finalRule": "Основной с 8-го числа при 20 записях последнего месяца · сейчас {{n}}",
+    "cancelRequest": "Отменить заявку",
+    "submitRequest": "Подать заявку",
+    "requestInstruction": "Поставьте галки возле строк, которые нужно проверить, и напишите, что вас смущает. Можно выбрать до 50 участников. Комментарий и автор доступны только администратору.",
+    "comment": "Комментарий",
+    "selected": "Выбрано: {{n}}",
+    "sendRequest": "Отправить заявку",
+    "sent": "Заявка отправлена",
+    "loading": "Загрузка приоритетов…",
+    "loadError": "Не удалось загрузить приоритеты: {{reason}}",
+    "retry": "Повторить",
+    "selectPerson": "Проверить {{nick}}",
+    "excluded": "Вне рейтинга",
+    "inspectCell": "Расчёт {{nick}} · {{limit}} € · {{period}}",
+    "older": "старшие три месяца",
+    "newer": "младшие три месяца",
+    "inspectTotal": "Полный расчёт {{nick}}",
+    "empty": "Нет участников с выбранными фильтрами",
+    "calculation": "Подробный расчёт",
+    "vipConflict": "Сначала уберите положительный VIP для этого вида в карточке участника.",
+    "vipConflictHint": "Галка действует отдельно для каждого вида. Положительный VIP и «Вне рейтинга» одновременно назначить нельзя.",
+    "stale": "Данные изменились. Обновите таблицу, проверьте строки и отправьте заявку повторно.",
+    "operationError": "Не удалось выполнить действие: {{reason}}",
+    "noRequests": "Заявок за этот период пока нет",
+    "closed": "Закрыта",
+    "open": "На рассмотрении",
+    "openRequest": "Открыть заявку",
+    "deleteRequest": "Удалить заявку",
+    "requestDetails": "Заявка на проверку",
+    "author": "Автор",
+    "noComment": "Без комментария",
+    "snapshotHint": "Ниже — значения на момент отправки заявки. Для исправления откройте «Контроль дистанций»; текущие приоритеты обновятся после сохранения.",
+    "adminResponse": "Ответ администратора",
+    "closeRequest": "Закрыть заявку",
+    "cancel": "Отмена",
+    "deleteConfirm": "Удалить заявку вместе с её комментарием и снимком расчёта?"
   },
   "guild": {
     "kicker": "root · discord",
@@ -225,7 +291,6 @@
     "cetPlace": "Испания",
     "mskLabel": "МСК",
     "you": "Вы",
-    "you": "Вы",
     "roleStudent": "ученик",
     "coverage50": "50 · 98%",
     "coverage100": "100 · 100%"
@@ -277,7 +342,7 @@
     "clubLead": "Discord и метка приходят сами. Здесь только смотрим.",
     "discordServerFallback": "Discord-сервер группы",
     "discordAuto": "Ник на сервере и аватар подтягиваются при входе. Править нельзя.",
-    "discordIdHint": "Id у Discord, не наш клубный id.",
+    "discordIdHint": "Номер аккаунта, который выдаёт Discord. Мы его не назначаем и не меняем.",
     "whoLead": "Это информативный блок для админов. Все увидят только имя.",
     "whoPrivacy": "Это информативный блок для админов. Все увидят только имя.",
     "notifyTitle": "Уведомления бота",
@@ -389,7 +454,6 @@
     "discordUser": "Username",
     "discordUserHint": "Технический username Discord, с собакой.",
     "discordId": "Discord ID",
-    "discordIdHint": "Номер аккаунта, который выдаёт Discord. Мы его не назначаем и не меняем.",
     "discordJoined": "На сервере с",
     "discordJoinedHint": "Когда человек зашёл на Discord-сервер клуба. Эту дату отдаёт сам Discord.",
     "clubCode": "ID в клубе",
@@ -1037,7 +1101,12 @@
     "distanceBook": {
       "filtersTitle": "Фильтры",
       "summaryTitle": "Сводка",
-      "groups": { "period": "Период и рум", "distance": "Дистанция", "people": "Участники", "search": "Поиск и порядок" },
+      "groups": {
+        "period": "Период и рум",
+        "distance": "Дистанция",
+        "people": "Участники",
+        "search": "Поиск и порядок"
+      },
       "activeProfiles": "Активные с анкетой",
       "rowSummary": "Итог",
       "summaryHint": "Сумма участника за выбранный период. Правьте отдельные записи внутри.",
@@ -1048,7 +1117,20 @@
       "filterMetadataError": "Не удалось получить актуальные роли и статусы участников. Повторите загрузку позже.",
       "lead": "Активные участники клуба и исторические записи за выбранный месяц. Фильтры роли и анкеты работают отдельно. Раскройте участника, чтобы добавить part или изменить запись.",
       "download": "Скачать CSV",
-      "csv": { "month": "Месяц", "room": "Покер-рум", "distanceId": "ID дистанции", "discordId": "Discord ID", "discordNick": "Ник Discord", "gameNick": "Ник на руме", "variant": "Вид", "part": "Part", "comment": "Комментарий", "created": "Создано", "updated": "Изменено", "total": "Всего турниров" },
+      "csv": {
+        "month": "Месяц",
+        "room": "Покер-рум",
+        "distanceId": "ID дистанции",
+        "discordId": "Discord ID",
+        "discordNick": "Ник Discord",
+        "gameNick": "Ник на руме",
+        "variant": "Вид",
+        "part": "Part",
+        "comment": "Комментарий",
+        "created": "Создано",
+        "updated": "Изменено",
+        "total": "Всего турниров"
+      },
       "room": "Покер-рум",
       "month": "Месяц",
       "monthTotal": "Месяц всего",
@@ -1056,11 +1138,25 @@
       "peopleStats": "записей {{records}} · без дистанции {{without}}",
       "search": "Ник Discord, игровой, Discord ID или ID дистанции…",
       "sortLabel": "Сортировка",
-      "sort": { "total": "По сумме", "discord": "По нику Discord", "game": "По игровому нику", "distanceId": "По ID дистанции", "updated": "По дате изменения" },
+      "sort": {
+        "total": "По сумме",
+        "discord": "По нику Discord",
+        "game": "По игровому нику",
+        "distanceId": "По ID дистанции",
+        "updated": "По дате изменения"
+      },
       "idStatus": "Статус ID",
-      "idFilter": { "all": "Все ID", "set": "ID задан", "missing": "Без ID" },
+      "idFilter": {
+        "all": "Все ID",
+        "set": "ID задан",
+        "missing": "Без ID"
+      },
       "distanceStatus": "Статус дистанции",
-      "presenceFilter": { "all": "Все участники", "with": "Есть дистанция", "without": "Нет дистанции" },
+      "presenceFilter": {
+        "all": "Все участники",
+        "with": "Есть дистанция",
+        "without": "Нет дистанции"
+      },
       "kind": "Вид",
       "colKind": "Вид",
       "kindAll": "Все",
@@ -1080,7 +1176,12 @@
       "values": "Турниры по лимитам",
       "modalTotal": "Итого турниров",
       "noRoomNick": "Игровой ник не задан",
-      "source": { "import": "Импорт файла", "historical": "Исторический импорт", "manual": "Добавлено вручную", "legacy": "Перенесённая запись" },
+      "source": {
+        "import": "Импорт файла",
+        "historical": "Исторический импорт",
+        "manual": "Добавлено вручную",
+        "legacy": "Перенесённая запись"
+      },
       "edit": "Править запись",
       "save": "Сохранить",
       "saveErr": "Не сохранилось. Проверьте ID, part и значения.",

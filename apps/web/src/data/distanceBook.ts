@@ -1,5 +1,6 @@
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
+import { notifyPriorityDistanceChanged } from "./priorityRefresh";
 import { formatHands, type DistanceVariant } from "./distanceDump";
 
 export type DistanceSort = "total" | "discord" | "game" | "distanceId" | "updated";
@@ -160,12 +161,13 @@ export async function createDistanceEntry(input: { memberId: string; roomSlug: s
     person.playerId = input.distanceExtId; person.slices.push({ id, key: id, variant: input.variant, part: input.part,
       comment: input.comment.trim() || null, source: "manual", createdAt: now, updatedAt: now, createdBy: "you", updatedBy: "you",
       byLimit, total: Object.values(input.values).reduce((sum, value) => sum + Math.max(0, value), 0) });
-    refreshDemoPerson(person); book.rowCount += 1; return { error: null };
+    refreshDemoPerson(person); book.rowCount += 1; notifyPriorityDistanceChanged(); return { error: null };
   }
   const db = getSupabase(); if (!db) return { error: "not-configured" as const };
   const { error } = await db.rpc("create_manual_distance_entry", { p_member_id: input.memberId, p_room_slug: input.roomSlug,
     p_month_start: input.monthStart, p_variant_id: input.variant, p_part: input.part, p_comment: input.comment,
     p_distance_ext_id: input.distanceExtId, p_values: Object.entries(input.values).map(([limit_id, tournaments]) => ({ limit_id, tournaments })) });
+  if (!error) notifyPriorityDistanceChanged();
   return { error: error?.message ?? error?.code ?? null };
 }
 export async function updateDistanceEntry(input: { entryId: string; comment: string; values: Record<string, number> }) {
@@ -174,13 +176,14 @@ export async function updateDistanceEntry(input: { entryId: string; comment: str
       const slice = person.slices.find((row) => row.id === input.entryId); if (!slice) continue;
       slice.comment = input.comment.trim() || null; slice.updatedAt = new Date().toISOString(); slice.updatedBy = "you";
       slice.byLimit = Object.fromEntries(Object.entries(input.values).filter(([, value]) => value > 0).map(([limit, hands]) => [limit, { id: `${slice.id}:${limit}`, hands }]));
-      slice.total = Object.values(input.values).reduce((sum, value) => sum + Math.max(0, value), 0); refreshDemoPerson(person); return { error: null };
+      slice.total = Object.values(input.values).reduce((sum, value) => sum + Math.max(0, value), 0); refreshDemoPerson(person); notifyPriorityDistanceChanged(); return { error: null };
     }
     return { error: "entry-not-found" };
   }
   const db = getSupabase(); if (!db) return { error: "not-configured" as const };
   const { error } = await db.rpc("update_manual_distance_entry", { p_entry_id: input.entryId, p_comment: input.comment,
     p_values: Object.entries(input.values).map(([limit_id, tournaments]) => ({ limit_id, tournaments })) });
+  if (!error) notifyPriorityDistanceChanged();
   return { error: error?.message ?? error?.code ?? null };
 }
 

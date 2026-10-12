@@ -26,6 +26,7 @@
 | Вход и доступ | [auth.md](auth.md) |
 | Discord и боты | [discord-now.md](discord-now.md) |
 | UX расписания | [schedule-ux.md](schedule-ux.md) |
+| Живые приоритеты и заявки | [priorities.md](priorities.md) |
 | Деплой, CI, backup и откат | [operations.md](operations.md) |
 | UI-кит | [ui-kits.md](ui-kits.md) |
 

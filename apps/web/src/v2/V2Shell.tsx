@@ -75,7 +75,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const can = (permission: string) => isRoot || menuPermissions.includes(permission);
   const canGrid = session.access === "active" && can("schedule");
   const canProfile = can("profile");
-  const canPriorities = session.access === "active" && can("priorities");
+  const canPriorities = session.access === "active" && (can("priorities") || can("schedule"));
   const canPeople = can("admin.people");
   const canScheduleAdmin = can("schedule.manage");
   const isAdmin = isRoot || canPeople || canScheduleAdmin;
@@ -429,7 +429,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
               <V2BlocksKit />
             </div>
           )}
-          {canPriorities && page === "priorities" && <V2Priorities />}
+          {canPriorities && page === "priorities" && <V2Priorities canManageDemo={canPeople || isRoot} author={nick} />}
           {isRoot && page === "guild" && <V2Guild />}
           {canPeople && page === "admin-distance" && (
             <div className="min-h-0 flex-1 overflow-auto">
