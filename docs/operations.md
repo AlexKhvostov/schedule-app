@@ -112,3 +112,6 @@ order by delivery_status;
 Миграцию `20260924235900_security_hardening.sql` нельзя откатывать возвратом прямой записи `authenticated` в `distances`; необходимые операции добавляются только узкими RPC.
 
 Приоритеты выпущены в preview/schedule-ui после полного [CI38239868788](https://github.com/AlexKhvostov/schedule-app/actions/runs/38239868788). Working smoke проверяет реальные агрегаты/права/снимок и откатывает тестовые записи; безопасный [SQL](../memory/tasks/2026-10-12-working-priorities-smoke.sql) не содержит реальных идентификаторов. Main не изменялся. Не публиковать реальные скриншоты/ID в git; UI-проверка использует постоянный OAuth-совместимый preview.
+
+
+12 октября2026 клиентские уточнения приоритетов опубликованы коммитомc45327d в preview/schedule-ui: полный [CI38261586255](https://github.com/AlexKhvostov/schedule-app/actions/runs/38261586255) и Vercel2nXb4JmMXVa2LuJ2fioinwAh9fxQ успешны. Миграции/Working и Main не менялись. Авторизованный UI-smoke последнего выпуска не повторён из-за входа Vercel в браузере проверки; это не подменяется статусом сборки. [Отчёт](../memory/tasks/2026-10-12-priorities-review-preview.md).
