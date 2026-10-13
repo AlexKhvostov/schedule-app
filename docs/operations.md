@@ -2,6 +2,14 @@
 
 ## Автоматический деплой
 
+### Подключение домена основной версии
+
+Инструкция сверена с официальными документами 13 октября2026. Настройки домена пока не изменены: имя домена и DNS-провайдер не заданы. В проекте Vercel (hobby-build / schedule-app) открыть Settings → Environments → Production → Branch Tracking и проверить main. В Settings → Domains добавить принадлежащий владельцу домен и подключить к Production. Каждый успешный выпуск production-ветки автоматически получает этот домен; preview/schedule-ui сохраняет свой постоянный адрес. [Ветка Production](https://vercel.com/kb/guide/can-i-use-a-non-default-branch-for-production), [домены и ветки](https://vercel.com/docs/domains/working-with-domains/assign-domain-to-a-git-branch).
+
+В панели DNS-провайдера добавить именно записи, показанные Vercel для этого проекта: обычно A для корневого домена и CNAME для поддомена. Точные значения не копировать из примеров другого проекта. При необходимости добавить www и перенаправить его на выбранный основной адрес. Дождаться подтверждения корректной конфигурации и HTTPS. Для простой привязки сайта достаточно записей A/CNAME; менять nameservers не требуется. [Добавление домена](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
+
+Для Discord-входа в используемом Supabase открыть Authentication → URL Configuration: Site URL — новый основной HTTPS-адрес, Redirect URLs — его точный /auth/callback. Сохранить имеющиеся callback тестовой ветки и локальной разработки. Приложение использует текущий origin для возврата. Подключение домена сайта не меняет адрес Supabase OAuth callback в настройках Discord. Проверить вход непосредственно с нового домена и возврат туда. [Разрешённые адреса](https://supabase.com/docs/guides/auth/redirect-urls).
+
 Последующее уточнение приоритетов12 октября2026 выпускается одинаковой версией в `preview/schedule-ui` и `main`: чистые дистанции, взвешенный итог и пояснение коэффициентов в таблице/подсказках/заявках. До push отдельно проверяется точный пакет без незавершённых MembersAdmin; после main-push сверяются полный CI и оба Vercel-окружения одного SHA. Серверные права/RPC/снимки/миграции не меняются, повторное применение миграций не требуется. [Отчёт выпуска](../memory/tasks/2026-10-12-priority-raw-release.md).
 
 Vercel подключён к GitHub. Каждый push в `main` автоматически запускает production-деплой `apps/web`; отдельного deploy-job в GitHub Actions нет. Pull request может создавать preview-деплой по настройкам Vercel.

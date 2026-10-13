@@ -52,6 +52,10 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
   await expect(page.locator(".v2-prio-table th.is-total")).toContainText("Очки рейтинга");
   await expect(page.locator(".v2-prio-table th.is-total small")).toHaveText("Дистанция × коэф.");
   await expect(page.locator(".v2-prio-actions")).toContainText("Дистанции без коэффициентов");
+  for (const value of await page.locator(".v2-prio-table tbody td.is-total").allTextContents()) expect(value).toMatch(/,\d$/);
+  await expect(page.locator('tr[data-member="RP-912"] td.is-total')).toHaveText("0,0");
+  await expect(page.locator('tr[data-member="RP-912"] td.is-num').first()).toHaveText("0");
+  await expect(page.locator('[data-metric="points"] dd')).toContainText(",");
   await expect(page.getByLabel("Покер-рум", { exact: true })).toBeDisabled();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(vera.locator("td.is-rank")).toHaveText("1");
@@ -106,6 +110,7 @@ test("existing version-one request facts render raw distances and keep the origi
   const values = (await dialog.locator(".v2-prio-snapshot-table tbody td").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
   expect(values).toEqual([1, 13, 7, 3, 4, 24.5]);
   await expect(dialog.locator(".v2-prio-combined-total b")).toHaveText("= 24,5");
+  for (const value of await dialog.locator(".v2-prio-formula-result dd, .v2-prio-period-total b, .v2-prio-kind-total b").allTextContents()) expect(value).toMatch(/,\d$/);
   expect(await page.evaluate(() => localStorage.getItem("v2-priority-requests-1"))).toBe(saved);
 });
 
@@ -373,6 +378,7 @@ test("priority table and touch calculation fit phones in both themes and languag
   await expect(page.getByLabel("Poker room", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Submit request", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Summary · Nitro" })).toBeVisible();
+  for (const value of await page.locator(".v2-prio-table tbody td.is-total").allTextContents()) expect(value).toMatch(/\.\d$/);
   await expect.poll(() => page.locator(".v2-prio-summary").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("priorities-mobile-en.png") });
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -401,11 +407,11 @@ test("editing a source distance updates the current priority but keeps the submi
   await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
   await expect(editor).toBeHidden();
   await page.goto("/#priorities");
-  await expect(page.locator('tr[data-member="RP-912"] td.is-total')).toHaveText("125");
+  await expect(page.locator('tr[data-member="RP-912"] td.is-total')).toHaveText("125,0");
   await page.getByRole("button", { name: /Заявки · 1/ }).click();
   await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
   const snapshot = page.getByRole("dialog", { name: "Заявка на проверку" });
-  await expect(snapshot.locator(".v2-prio-saved-values tbody tr td").last()).toHaveText("0");
+  await expect(snapshot.locator(".v2-prio-saved-values tbody tr td").last()).toHaveText("0,0");
   await expect(snapshot.locator(".v2-prio-review-person > summary")).toContainText("nina");
-  await expect(snapshot.locator(".v2-prio-review-person > summary > b")).toHaveText("0Очки");
+  await expect(snapshot.locator(".v2-prio-review-person > summary > b")).toHaveText("0,0Очки");
 });
