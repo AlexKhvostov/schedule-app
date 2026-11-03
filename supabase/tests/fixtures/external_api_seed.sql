@@ -38,4 +38,3 @@ insert into external_api_private.clients(name,key_hash,requests_per_minute) valu
 insert into external_api_private.clients(name,key_hash,scopes) values ('no-scope',repeat('c',64),'{}');
 insert into external_api_private.clients(name,key_hash,revoked_at) values ('revoked',repeat('d',64),now());
 insert into external_api_private.clients(name,key_hash,expires_at) values ('expired',repeat('e',64),now()-interval '1 second');
-
