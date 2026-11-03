@@ -5,22 +5,30 @@ import { addDays, SCHEDULE_TIMEZONE, timeResolver } from "./time.ts";
 export function scheduleResponse(query: ScheduleQuery, snapshot: ScheduleSnapshot) {
   if (snapshot.rows.length > 1000) throw new Error("invalid_snapshot");
   const resolveTime = timeResolver();
-  const toSlot = (row: ScheduleRow) => ({
-    id: row.id,
-    half: row.half,
-    ...resolveTime(row.date, row.half),
-    mark: row.mark,
-    tables: row.tables,
-    owner: row.owner,
-  });
+  const toSlot = (row: ScheduleRow) => {
+    const time = resolveTime(row.date, row.half);
+    return {
+      start: time.start_local.slice(11, 16),
+      end: row.half === 47 ? "24:00" : time.end_local.slice(11, 16),
+      ...(time.time_resolution === "exact" ? {} : { time_resolution: time.time_resolution }),
+      tables: row.tables,
+      mark: {
+        text: row.mark.text,
+        background: row.mark.background,
+        foreground: row.mark.foreground,
+      },
+      owner: {
+        discord_id: row.owner.discord_id,
+        name: row.owner.discord_guild_nick?.trim() || row.owner.discord_global_name?.trim() ||
+          row.owner.discord_username?.trim() || row.owner.display_name,
+      },
+    };
+  };
   type Line = {
     id: string;
-    name: string;
     number: number;
-    room: string;
     variant: string;
     limit: string;
-    currency: string;
     slots: ReturnType<typeof toSlot>[];
   };
   const days = Array.from({ length: query.days }, (_, n) => ({
@@ -46,12 +54,9 @@ export function scheduleResponse(query: ScheduleQuery, snapshot: ScheduleSnapsho
     if (!line) {
       line = {
         id,
-        name: `${row.variant === "nitro" ? "N" : "E"}${row.limit} · ${row.level + 1}`,
         number: row.level + 1,
-        room: row.room,
         variant: row.variant,
         limit: row.limit,
-        currency: "EUR",
         slots: [],
       };
       lines.set(id, line);

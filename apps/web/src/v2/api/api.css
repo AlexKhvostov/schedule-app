@@ -28,4 +28,7 @@
 .v2-api-instructions { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.65 inherit; font-family: inherit; line-height: 1.65; margin-bottom: 18px; }
 .v2-api-secret textarea { font-family: monospace; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); resize: none; }
 .v2-api-ack { display: flex; align-items: center; gap: 8px; margin: 20px 0; }
+.v2-api-examples h3 { font-size: 16px; font-weight: 650; margin-top: 24px; }
+.v2-api-examples h4 { font-size: 14px; font-weight: 650; margin: 20px 0 8px; }
+.v2-api-code { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 monospace; background: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0 18px; }
 @media (max-width: 600px) { .v2-api { padding: 16px; } .v2-api-head { align-items: flex-start; flex-direction: column; gap: 0; } .v2-api-client > header { align-items: flex-start; } .v2-api-modal { padding: 16px; } }

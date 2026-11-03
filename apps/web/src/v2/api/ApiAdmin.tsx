@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revokeApiClient, type ApiClient, type ApiCredential, type ApiClientDraft } from "../../data/externalApi";
 import { isLiveData } from "../../data/config";
+import { ApiExamples, apiExamplesText } from "./ApiExamples";
 import "./api.css";
 
 function ApiModal({ title, children, onClose, canClose = true }: { title: string; children: ReactNode; onClose: () => void; canClose?: boolean }) {
@@ -36,7 +37,10 @@ export function ApiAdmin() {
   const endpoint = externalApiEndpoint();
   const live = isLiveData();
   const formatDate = (date: string | null) => date ? new Date(date).toLocaleString(i18n.language, { timeZoneName: "short" }) : t("apiAdmin.unlimited");
-  const guide = selected ? t("apiAdmin.developerText", { name: selected.name, endpoint, rpm: selected.requests_per_minute, expiry: formatDate(selected.expires_at), interpolation: { escapeValue: false } }) : "";
+  const guideIntro = selected ? t("apiAdmin.developerText", { name: selected.name, endpoint, rpm: selected.requests_per_minute, expiry: formatDate(selected.expires_at), interpolation: { escapeValue: false } }) : "";
+  const examplesText = apiExamplesText(endpoint, t);
+  const guide = `${guideIntro}\n\n${examplesText}`;
+  const ownerGuide = `${t("apiAdmin.ownerText")}\n\n${examplesText}`;
 
   const refresh = async () => {
     setLoading(true); setError("");
@@ -97,8 +101,8 @@ export function ApiAdmin() {
           <label>{t("apiAdmin.rpm")}<input className="v2-ctrl" type="number" min={1} max={600} step={1} required value={rpm} onChange={(event) => setRpm(event.target.value)} /></label>
         </fieldset><p>{t("apiAdmin.scope")}</p><button className="v2-ctrl v2-primary-action" disabled={busy || !loaded || !name.trim()} type="submit">{busy ? "…" : t("apiAdmin.create")}</button>
       </form>}
-      {modal === "owner" && <div className="v2-api-instructions">{t("apiAdmin.ownerText")}</div>}
-      {modal === "guide" && <><pre className="v2-api-instructions">{guide}</pre><button className="v2-ctrl" onClick={() => void copy(guide)}>{t("apiAdmin.copy")}</button></>}
+      {modal === "owner" && <><div className="v2-api-instructions">{t("apiAdmin.ownerText")}</div><ApiExamples endpoint={endpoint} /><button className="v2-ctrl" onClick={() => void copy(ownerGuide)}>{t("apiAdmin.copy")}</button></>}
+      {modal === "guide" && <><div className="v2-api-instructions">{guideIntro}</div><ApiExamples endpoint={endpoint} /><button className="v2-ctrl" onClick={() => void copy(guide)}>{t("apiAdmin.copy")}</button></>}
       {modal === "secret" && <><p>{t("apiAdmin.once")}</p>{!live && <p className="v2-api-banner">{t("apiAdmin.demo")}</p>}<div className="v2-api-secret"><label htmlFor="api-created-key">{t("apiAdmin.secret")}</label><textarea id="api-created-key" readOnly autoComplete="off" spellCheck={false} rows={3} value={secret} /></div>
         <div className="v2-api-actions"><button className="v2-ctrl" onClick={() => void copy(secret)}>{t("apiAdmin.copyKey")}</button><button className="v2-ctrl" onClick={() => void copy(guide.replaceAll("<API_KEY>", secret))}>{t("apiAdmin.copyBundle")}</button></div>
         <label className="v2-api-ack"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} />{t("apiAdmin.saved")}</label><button className="v2-ctrl" disabled={!saved} onClick={close}>{t("apiAdmin.close")}</button></>}

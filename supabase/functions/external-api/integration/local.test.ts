@@ -36,8 +36,10 @@ Deno.test("real Edge HTTP: 1106 entries in 1000+106 pages from one replayable sn
   equal((await get(`cursor=${full.body.pagination.next_cursor}`)).body, next.body);
   const ids = [full, next].flatMap((result) =>
     result.body.days.flatMap(
-      (day: { lines: { slots: { id: string }[] }[] }) =>
-        day.lines.flatMap((line) => line.slots.map((slot) => slot.id)),
+      (day: { date: string; lines: { id: string; slots: { start: string }[] }[] }) =>
+        day.lines.flatMap((line) =>
+          line.slots.map((slot) => `${day.date}/${line.id}/${slot.start}`)
+        ),
     )
   );
   strictEqual(new Set(ids).size, 1106);
@@ -45,7 +47,8 @@ Deno.test("real Edge HTTP: 1106 entries in 1000+106 pages from one replayable sn
   strictEqual(full.body.timezone, "Europe/Madrid");
   const owner = full.body.days[0].lines[1].slots[0].owner;
   strictEqual(owner.discord_id, "123456789012345678");
-  strictEqual(owner.game_nick, "CurrentNick");
+  equal(Object.keys(owner).sort(), ["discord_id", "name"]);
+  ok(typeof owner.name === "string" && owner.name.length > 0);
   const three = await get("date=2098-11-01&days=3&limit=50&variant=nitro");
   strictEqual(three.status, 200);
   strictEqual(three.body.slots_count, 144);

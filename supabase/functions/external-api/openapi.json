@@ -3,7 +3,7 @@
   "info": {
     "title": "RedParty External API",
     "version": "1.1.0",
-    "description": "Local implementation, not deployed. Individual integration keys. Immutable 15-minute exports, 1000 marks per page."
+    "description": "Individual integration keys. Compact v1 schedule response. Immutable 15-minute exports, 1000 marks per page."
   },
   "servers": [
     {
@@ -84,6 +84,60 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Schedule"
+                },
+                "example": {
+                  "api_version": "1",
+                  "timezone": "Europe/Madrid",
+                  "date_from": "2030-01-15",
+                  "date_to": "2030-01-15",
+                  "days_count": 1,
+                  "slot_minutes": 30,
+                  "filters": {
+                    "limit": "50",
+                    "variant": "nitro"
+                  },
+                  "generated_at": "2030-01-15T10:00:00.000Z",
+                  "slots_count": 1,
+                  "pagination": {
+                    "snapshot_id": "11111111-1111-4111-8111-111111111111",
+                    "expires_at": "2030-01-15T10:15:00.000Z",
+                    "page_size": 1000,
+                    "page_number": 1,
+                    "total_pages": 1,
+                    "total_slots": 1,
+                    "cursor": "22222222-2222-4222-8222-222222222222",
+                    "has_more": false,
+                    "next_cursor": null
+                  },
+                  "days": [
+                    {
+                      "date": "2030-01-15",
+                      "lines": [
+                        {
+                          "id": "33333333-3333-4333-8333-333333333333:0",
+                          "number": 1,
+                          "variant": "nitro",
+                          "limit": "50",
+                          "slots": [
+                            {
+                              "start": "21:30",
+                              "end": "22:00",
+                              "tables": 2,
+                              "mark": {
+                                "text": "AB",
+                                "background": "#525252",
+                                "foreground": "#ffffff"
+                              },
+                              "owner": {
+                                "discord_id": "123456789012345678",
+                                "name": "Example Player"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -206,57 +260,20 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "member_id",
-          "display_name",
-          "profile_name",
           "discord_id",
-          "discord_username",
-          "discord_global_name",
-          "discord_guild_nick",
-          "game_nick"
+          "name"
         ],
         "properties": {
-          "member_id": {
-            "type": "string"
-          },
-          "display_name": {
-            "type": "string"
-          },
-          "profile_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "discord_id": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Discord user ID as a string; null when unavailable."
           },
-          "discord_username": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "discord_global_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "discord_guild_nick": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "game_nick": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "name": {
+            "type": "string",
+            "description": "Server nickname, falling back to Discord global name, username, then the saved display name."
           }
         }
       },
@@ -293,58 +310,31 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "id",
-          "half",
-          "start_local",
-          "end_local",
-          "start_at",
-          "end_at",
-          "time_resolution",
-          "mark",
+          "start",
+          "end",
           "tables",
+          "mark",
           "owner"
         ],
         "properties": {
-          "id": {
+          "start": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^(?:[01][0-9]|2[0-3]):(?:00|30)$",
+            "description": "Local start time on the enclosing day, in Europe/Madrid."
           },
-          "half": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 47
-          },
-          "start_local": {
-            "type": "string"
-          },
-          "end_local": {
-            "type": "string"
-          },
-          "start_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "end_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+          "end": {
+            "type": "string",
+            "pattern": "^(?:(?:[01][0-9]|2[0-3]):(?:00|30)|24:00)$",
+            "description": "Exclusive local end time; 24:00 is midnight at the start of the next day."
           },
           "time_resolution": {
             "type": "string",
             "enum": [
-              "exact",
               "ambiguous",
               "nonexistent",
               "transition"
-            ]
-          },
-          "mark": {
-            "$ref": "#/components/schemas/Mark"
+            ],
+            "description": "Only present for a DST overlap, gap or transition. Do not schedule an exact notification for this slot. Absent for normal slots."
           },
           "tables": {
             "type": [
@@ -353,6 +343,9 @@
             ],
             "minimum": 1,
             "maximum": 30
+          },
+          "mark": {
+            "$ref": "#/components/schemas/Mark"
           },
           "owner": {
             "$ref": "#/components/schemas/Owner"
@@ -364,28 +357,20 @@
         "additionalProperties": false,
         "required": [
           "id",
-          "name",
           "number",
-          "room",
           "variant",
           "limit",
-          "currency",
           "slots"
         ],
         "properties": {
           "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Opaque stable line ID. Merge pages by day.date + line.id + slot.start."
           },
           "number": {
             "type": "integer",
             "minimum": 1,
             "maximum": 6
-          },
-          "room": {
-            "const": "winamax"
           },
           "variant": {
             "enum": [
@@ -394,10 +379,8 @@
             ]
           },
           "limit": {
-            "type": "string"
-          },
-          "currency": {
-            "const": "EUR"
+            "type": "string",
+            "description": "Exact limit string, e.g. 50 or 0.50. v1 uses Winamax and EUR."
           },
           "slots": {
             "type": "array",

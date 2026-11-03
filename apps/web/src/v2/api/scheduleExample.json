@@ -1,0 +1,54 @@
+{
+  "api_version": "1",
+  "timezone": "Europe/Madrid",
+  "date_from": "2030-01-15",
+  "date_to": "2030-01-15",
+  "days_count": 1,
+  "slot_minutes": 30,
+  "filters": {
+    "limit": "50",
+    "variant": "nitro"
+  },
+  "generated_at": "2030-01-15T10:00:00.000Z",
+  "slots_count": 1,
+  "pagination": {
+    "snapshot_id": "11111111-1111-4111-8111-111111111111",
+    "expires_at": "2030-01-15T10:15:00.000Z",
+    "page_size": 1000,
+    "page_number": 1,
+    "total_pages": 1,
+    "total_slots": 1,
+    "cursor": "22222222-2222-4222-8222-222222222222",
+    "has_more": false,
+    "next_cursor": null
+  },
+  "days": [
+    {
+      "date": "2030-01-15",
+      "lines": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333:0",
+          "number": 1,
+          "variant": "nitro",
+          "limit": "50",
+          "slots": [
+            {
+              "start": "21:30",
+              "end": "22:00",
+              "tables": 2,
+              "mark": {
+                "text": "AB",
+                "background": "#525252",
+                "foreground": "#ffffff"
+              },
+              "owner": {
+                "discord_id": "123456789012345678",
+                "name": "Example Player"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
