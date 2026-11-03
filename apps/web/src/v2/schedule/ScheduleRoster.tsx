@@ -27,7 +27,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
     roster.length || historicalRoster.length ? (
       <table
         className="v2-people-table"
-        style={{ minWidth: 240 + auxiliaryLabels.length * 84 }}
+        style={{ minWidth: `calc(240px + ${auxiliaryLabels.length} * var(--roster-limit-width))` }}
       >
         <colgroup>
           <col className="v2-people-col-n" />

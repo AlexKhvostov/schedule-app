@@ -14085,6 +14085,7 @@ img.v2-people-ava {
 .v2-roster-help-tip > span { display: block; margin-top: 6px; color: var(--muted-foreground); }
 
 .v2-people-table {
+  --roster-limit-width: 54px;
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
@@ -14099,7 +14100,7 @@ img.v2-people-ava {
 }
 
 .v2-people-col-limit {
-  width: 84px;
+  width: var(--roster-limit-width);
 }
 
 .v2-people-col-dead {
@@ -14149,7 +14150,6 @@ img.v2-people-ava {
 }
 
 .v2-people-table th.v2-people-limit {
-  width: 84px;
   min-width: 0;
   padding-left: 6px;
   padding-right: 6px;
