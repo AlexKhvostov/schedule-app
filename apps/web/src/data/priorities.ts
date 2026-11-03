@@ -92,11 +92,10 @@ export async function deletePriorityRequest(id: string, demoCanManage: boolean) 
   writeDemo(DEMO_REQUESTS, rows.filter((r) => r.id !== id));
   return { data: null, error: null };
 }
-export async function setPriorityExclusion(person: PriorityPerson, variant: PriorityKind, excluded: boolean, demoCanManage: boolean) {
-  if (isLiveData()) return rpc<null>("set_priority_exclusion", { p_member_id: person.memberId, p_variant: variant, p_excluded: excluded });
-  if (!demoCanManage) return { data: null, error: "forbidden" };
-  if (excluded && (variant === "nitro" ? person.vipNitro : person.vipRegular) > 0) return { data: null, error: "priority-vip-exclusion-conflict" };
-  const rows = readDemo<Record<string, { nitro?: boolean; regular?: boolean }>>(DEMO_EXCLUSIONS, {});
-  rows[person.memberId] = { ...rows[person.memberId], [variant]: excluded }; writeDemo(DEMO_EXCLUSIONS, rows);
-  return { data: null, error: null };
+export function loadPriorityExclusions(memberId: string) {
+  return rpc<Record<PriorityKind, boolean>>("get_priority_exclusions", { p_member_id: memberId });
+}
+
+export function setPriorityExclusion(memberId: string, variant: PriorityKind, excluded: boolean) {
+  return rpc<null>("set_priority_exclusion", { p_member_id: memberId, p_variant: variant, p_excluded: excluded });
 }

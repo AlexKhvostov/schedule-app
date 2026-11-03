@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { PersonAvatar } from "./PersonAvatar";
 import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num, priorityPoints as points } from "./PriorityCalculation";
-import { closePriorityRequest, deletePriorityRequest, getPriorityRequest, listPriorityRequests, loadPriorityRequestAuthors, loadPriorities, setPriorityExclusion, submitPriorityRequest, type PriorityRequestDetail, type PriorityRequestSummary } from "../data/priorities";
-import { calculatePriority, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
+import { closePriorityRequest, deletePriorityRequest, getPriorityRequest, listPriorityRequests, loadPriorityRequestAuthors, loadPriorities, submitPriorityRequest, type PriorityRequestDetail, type PriorityRequestSummary } from "../data/priorities";
+import { currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityKind, type PrioritySource } from "../schedule/priorities";
 
 function PriorityTooltip({ row, cell, anchor }: { row: CalculatedPriority; cell: number; anchor: HTMLElement }) {
   const ref = useRef<HTMLElement>(null);
@@ -71,7 +71,6 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
   const [response, setResponse] = useState("");
   const [inspect, setInspect] = useState<{ row: CalculatedPriority; cell?: number } | null>(null);
   const [hover, setHover] = useState<{ row: CalculatedPriority; cell: number; anchor: HTMLElement } | null>(null);
-  const [settings, setSettings] = useState<PriorityPerson | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const generation = useRef(0); const detailGeneration = useRef(0); const viewEpoch = useRef(0);
@@ -81,13 +80,13 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
       const [board, list] = await Promise.all([loadPriorities(period, canManageDemo), listPriorityRequests(period)]);
       if (token !== generation.current) return;
       setLoading(false);
-      if (board.error || list.error || !board.data) { setError(board.error || list.error || "empty response"); setSource(null); setDetail(null); setSettings(null); return; }
+      if (board.error || list.error || !board.data) { setError(board.error || list.error || "empty response"); setSource(null); setDetail(null); return; }
       setSource(board.data); setRequests(list.data ?? []); setError("");
     } catch (e) { if (token === generation.current) { setError(String(e)); setSource(null); setLoading(false); } }
   }, [period, canManageDemo]);
   useEffect(() => {
     viewEpoch.current++; setBusy(false); setDetail(null); setRequestList(false); setDeleteId(null);
-    setLoading(true); setSource(null); setRequests([]); setSelected([]); setComposing(false); setHover(null); setSettings(null); setInspect(null);
+    setLoading(true); setSource(null); setRequests([]); setSelected([]); setComposing(false); setHover(null); setInspect(null);
     void refresh();
     const update = () => { setToday(priorityToday()); void refresh(); };
     const timer = window.setInterval(update, 30000);
@@ -97,7 +96,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
     return () => { generation.current++; detailGeneration.current++; clearInterval(timer); window.removeEventListener("focus", update); window.removeEventListener("priority-distance-changed", update); window.removeEventListener("storage", update); channel?.close(); };
   }, [refresh]);
   useEffect(() => {
-    const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) { setHover(null); setInspect(null); setSettings(null); setDeleteId(null); setDetail(null); setRequestList(false); detailGeneration.current++; } };
+    const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) { setHover(null); setInspect(null); setDeleteId(null); setDetail(null); setRequestList(false); detailGeneration.current++; } };
     window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close);
   }, [busy]);
   const current = source?.periodStart === period ? source : null;
@@ -174,7 +173,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
         <tbody>{visible.map((row) => <tr key={row.memberId} data-member={row.memberId} className={`${row.vip > 0 ? "is-vip" : ""}${row.excluded ? " is-excluded" : ""}`}>
           {composing && <td className="is-select"><input type="checkbox" aria-label={t("priorities.selectPerson", { nick: row.nick })} checked={selected.includes(row.memberId)} disabled={busy} onChange={(e) => toggleSelected(row.memberId, e.target.checked)} /></td>}
           <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : undefined}>{row.rank ?? "—"}</span></td>
-          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => canManage ? setSettings(row) : setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : ""}</small></span></button></td>
+          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : ""}</small></span></button></td>
           {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{num(value, i18n.language)}</button></td>)}
           <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{points(row.total, i18n.language)}</button></td>
         </tr>)}</tbody></table>{!visible.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
@@ -186,11 +185,8 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
       {notice && <p role="status" className="v2-prio-notice">{notice}</p>}
       </>}</div>)}
     </section>
-    {hover && !inspect && !settings && !detail && <PriorityTooltip {...hover} />}
+    {hover && !inspect && !detail && <PriorityTooltip {...hover} />}
     <Dialog open={!!inspect} title={t("priorities.calculation")} onClose={() => setInspect(null)} className="v2-prio-dialog">{inspect && <PriorityCalculation row={inspect.row} cell={inspect.cell} />}</Dialog>
-    <Dialog open={!!settings} title={settings?.nick ?? ""} onClose={() => { if (!busy) setSettings(null); }} className="v2-prio-dialog">
-      {settings && <><PriorityCalculation row={calculatePriority(settings, period)} /><div className="v2-prio-settings">{(["nitro", "regular"] as const).map((k) => <label key={k}><input type="checkbox" disabled={busy} checked={k === "nitro" ? settings.excludedNitro : settings.excludedRegular} onChange={(e) => { const excluded = e.target.checked; void run(() => setPriorityExclusion(settings, k, excluded, canManageDemo), () => setSettings({ ...settings, [k === "nitro" ? "excludedNitro" : "excludedRegular"]: excluded })); }} />{t("priorities.excluded")} · {k === "nitro" ? "Nitro" : "Regular"}</label>)}<p>{t("priorities.vipConflictHint")}</p></div>{notice && <p role="status">{notice}</p>}</>}
-    </Dialog>
     <Dialog open={requestList && !detail && !deleteId} title={t("priorities.requests")} onClose={() => { if (!busy) { setRequestList(false); detailGeneration.current++; } }} className="v2-prio-dialog v2-prio-request-list">
       {!requests.length ? <p>{t("priorities.noRequests")}</p> : <div className="v2-prio-requests-scroll"><table className="v2-prio-requests-table"><thead><tr>
         <th scope="col">{t("priorities.requestTargets")}</th>{canManage && <th scope="col">{t("priorities.author")}</th>}

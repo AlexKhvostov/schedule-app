@@ -13,6 +13,8 @@ import {
   type AdminPerson,
   type ClubAccess,
 } from "../data/people";
+import { loadPriorityExclusions, setPriorityExclusion } from "../data/priorities";
+import type { PriorityKind } from "../schedule/priorities";
 import type { NotifyChannel } from "../data/botSettings";
 import { loadMyPlays, saveMyPlays } from "../data/plays";
 import { CabinetLoginPanel, type LoginDraft } from "./CabinetLoginPanel";
@@ -146,6 +148,51 @@ function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy: bool
           {t("admin.save")}
         </button>
       </div>
+    </div>
+  );
+}
+
+function PriorityExclusions({ memberId, disabled }: { memberId: string; disabled: boolean }) {
+  const { t } = useTranslation();
+  const [flags, setFlags] = useState<Record<PriorityKind, boolean> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadPriorityExclusions(memberId).then((result) => {
+      if (!active) return;
+      setFlags(result.data);
+      if (!result.data) setError("admin.people.priorityExclusionsLoadError");
+    });
+    return () => { active = false; };
+  }, [memberId]);
+
+  const change = async (kind: PriorityKind, excluded: boolean) => {
+    setSaving(true);
+    setError(null);
+    const result = await setPriorityExclusion(memberId, kind, excluded);
+    if (result.error) {
+      setError(result.error === "priority-vip-exclusion-conflict"
+        ? "priorities.vipConflict"
+        : "admin.people.priorityExclusionsSaveError");
+    } else {
+      setFlags((current) => current && { ...current, [kind]: excluded });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="v2-prio-settings">
+      {(["nitro", "regular"] as const).map((kind) => (
+        <label key={kind}>
+          <input type="checkbox" checked={flags?.[kind] ?? false} disabled={!flags || saving || disabled}
+            onChange={(event) => void change(kind, event.target.checked)} />
+          {t("priorities.excluded")} · {kind === "nitro" ? "Nitro" : "Regular"}
+        </label>
+      ))}
+      <p>{t("admin.people.priorityExclusionsImmediate")}</p>
+      {error && <p role="alert">{t(error)}</p>}
     </div>
   );
 }
@@ -329,7 +376,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     });
     if (club.error) {
       setSaving(false);
-      if (club.error === "vip-dup") showV2Toast("err", t("admin.people.vipDup"));
+      if (club.error === "priority-vip-exclusion-conflict") showV2Toast("err", t("priorities.vipConflictHint"));
+      else if (club.error === "vip-dup") showV2Toast("err", t("admin.people.vipDup"));
       else fail();
       return;
     }
@@ -562,6 +610,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                           />
                         </Field>
                       </div>
+                      {person.memberId && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
                     </div>
                     <div className="v2-cab-facts">
                       <Fact label={t("admin.people.loggedIn")}>{person.loggedIn ? t("admin.people.yes") : t("admin.people.no")}</Fact>

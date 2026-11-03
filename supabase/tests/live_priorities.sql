@@ -58,6 +58,7 @@ begin
   begin perform get_priority_request(request_id); raise exception 'ordinary player read private request'; exception when sqlstate '42501' then null; end;
   begin perform close_priority_request(request_id,'bad'); raise exception 'ordinary player closed request'; exception when sqlstate '42501' then null; end;
   begin perform delete_priority_request(request_id); raise exception 'ordinary player deleted request'; exception when sqlstate '42501' then null; end;
+  begin perform get_priority_exclusions(target); raise exception 'ordinary player read exclusion settings'; exception when sqlstate '42501' then null; end;
   begin perform set_priority_exclusion(target,'nitro',true); raise exception 'ordinary player changed exclusion'; exception when sqlstate '42501' then null; end;
   execute 'reset role';
   delete from player_limits l where l.player_id in(select id from players where member_id=target) and l.variant_id='nitro';
@@ -74,7 +75,9 @@ begin
   select sum((v->>'tournaments')::integer) into old_total from jsonb_array_elements(source->'people') p,
     jsonb_array_elements(p->'entries') e,jsonb_array_elements(e->'values') v where p->>'memberId'=target::text and e->>'month'='2026-02-01';
   if old_total is distinct from 12 then raise exception 'distance change not reflected in current source'; end if;
+  if get_priority_exclusions(target) is distinct from jsonb_build_object('nitro',false,'regular',false) then raise exception 'missing exclusion defaults'; end if;
   perform set_priority_exclusion(target,'nitro',true);
+  if get_priority_exclusions(target) is distinct from jsonb_build_object('nitro',true,'regular',false) then raise exception 'saved exclusion missing from card'; end if;
   execute 'reset role';
   begin update members set vip_nitro=997 where id=target; raise exception 'positive VIP allowed for excluded player'; exception when sqlstate '23514' then null; end;
   update members set vip_regular=997 where id=target;

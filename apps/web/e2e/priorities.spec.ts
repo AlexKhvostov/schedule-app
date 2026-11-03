@@ -345,22 +345,21 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await expect(page.getByText("Заявок за этот период пока нет", { exact: true })).toBeVisible();
 });
 
-test("outside ranking is per kind and incompatible with a positive VIP", async ({ page }) => {
+test("ranking details show the calculation and the saved per-kind exclusion", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("v2-priority-exclusions-1", JSON.stringify({ "demo-priority-0": { nitro: true } }));
+  });
   await enter(page);
-  await page.locator('tr[data-member="demo-priority-0"] .v2-prio-person').click();
-  const settings = page.getByRole("dialog", { name: "Alina", exact: true });
-  await settings.getByLabel("Вне рейтинга · Nitro", { exact: true }).check();
-  await settings.getByRole("button", { name: "✕", exact: true }).click();
   await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("—");
   await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("1");
+  await page.locator('tr[data-member="demo-priority-0"] .v2-prio-person').click();
+  const calculation = page.getByRole("dialog");
+  await expect(calculation).toBeVisible();
+  await expect(calculation.getByRole("checkbox")).toHaveCount(0);
+  await calculation.getByRole("button", { name: "✕", exact: true }).click();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
-  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("1");
+  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("2");
   await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("0");
-  await page.locator('tr[data-member="demo-priority-2"] .v2-prio-person').click();
-  const vip = page.getByRole("dialog", { name: "Vera", exact: true });
-  await vip.getByLabel("Вне рейтинга · Regular", { exact: true }).click();
-  await expect(vip).toContainText("Сначала уберите положительный VIP");
-  await expect(vip.getByLabel("Вне рейтинга · Regular", { exact: true })).not.toBeChecked();
 });
 
 test("priority table and touch calculation fit phones in both themes and languages", async ({ page }, testInfo) => {
