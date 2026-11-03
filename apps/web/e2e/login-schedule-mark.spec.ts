@@ -754,15 +754,23 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
   const peopleTable = page.locator(".v2-people-table");
   await expect(peopleTable.locator("thead")).toContainText("N50");
-  await expect(peopleTable.locator("thead")).toContainText("E50");
+  await expect(peopleTable.locator("thead")).not.toContainText("E50");
   await expect(peopleTable.locator("thead")).toContainText("ч / м.ч.");
   await expect(peopleTable.locator("thead")).toContainText("Мёртвые");
   const currentRow = peopleTable.locator(".v2-people-row", { hasText: "you" });
-  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —", "м. —"]);
+  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —"]);
   await expect(currentRow.locator(".v2-people-dead-total")).toHaveText("—");
   await currentRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("N50");
+  await expect(page.locator(".v2-user-card")).not.toContainText("E50");
+  await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
+  await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
+  await expect(peopleTable.locator("thead")).toContainText("E50");
+  await expect(peopleTable.locator("thead")).not.toContainText("N50");
+  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —"]);
+  await currentRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("E50");
+  await expect(page.locator(".v2-user-card")).not.toContainText("N50");
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
 

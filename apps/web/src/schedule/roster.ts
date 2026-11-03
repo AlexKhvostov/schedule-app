@@ -2,6 +2,7 @@ import type { Mark } from "./marks";
 import { markKey, vipOf } from "./marks";
 import { isPastSlot, type CetStamp } from "./cet";
 import type { Occupancy } from "./plan";
+import { calculatePriority, type PrioritySource, type PriorityKind } from "./priorities";
 
 export type LimitHours = {
   slots: number;
@@ -11,6 +12,7 @@ export type LimitHours = {
 
 export type RosterRow = {
   n: number;
+  excluded?: boolean;
   mark: Mark;
   limit: string;
   byLimit: Record<string, LimitHours>;
@@ -23,6 +25,25 @@ export type RosterGroups = {
   active: RosterRow[];
   historical: RosterRow[];
 };
+
+/** Filling order is separate from the distance ranking and from legacy grid_priority. */
+export function orderRosterRows(rows: readonly RosterRow[], source: PrioritySource, kind: PriorityKind): RosterRow[] {
+  const people = new Map(source.people.map((person) => [person.memberId, person]));
+  const ranked = rows.map((row) => {
+    const person = row.mark.memberId ? people.get(row.mark.memberId) : undefined;
+    return {
+      row: { ...row, excluded: person ? (kind === "nitro" ? person.excludedNitro : person.excludedRegular) : false },
+      score: person ? calculatePriority(person, source.periodStart).total : 0,
+      vip: vipOf(row.mark, kind),
+    };
+  });
+  ranked.sort((a, b) => Number(a.row.excluded) - Number(b.row.excluded)
+    || (a.row.excluded ? 0 : rankKey(a.vip) - rankKey(b.vip))
+    || b.score - a.score
+    || a.row.mark.discord.localeCompare(b.row.mark.discord, "ru", { numeric: true, sensitivity: "base" })
+    || personKey(a.row.mark).localeCompare(personKey(b.row.mark)));
+  return ranked.map(({ row }, index) => ({ ...row, n: row.excluded ? 0 : index + 1 }));
+}
 
 export function groupRosterRows(
   activeRows: readonly RosterRow[],

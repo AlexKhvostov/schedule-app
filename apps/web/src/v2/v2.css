@@ -14012,6 +14012,16 @@ img.v2-people-ava {
   line-height: 1.35;
 }
 
+.v2-roster-controls { margin-bottom: 6px; }
+.v2-roster-controls .v2-prio-tabs { gap: 4px; padding: 0; border-bottom: 0; background: transparent; }
+.v2-roster-controls .v2-prio-tabs button { min-height: 24px; padding: 3px 10px; margin-bottom: 0; border: 1px solid color-mix(in srgb, var(--muted-foreground) 50%, var(--border)); border-radius: 4px; font-size: 10px; line-height: 16px; }
+.v2-roster-controls .v2-prio-tabs button[aria-selected=true] { border-color: var(--title); background: color-mix(in srgb, var(--title) 10%, var(--card)); }
+.v2-roster-help { display: inline-flex; }
+.v2-roster-info { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted-foreground); background: transparent; font: 600 12px/1 Georgia, serif; cursor: help; touch-action: manipulation; }
+.v2-roster-info:hover, .v2-roster-info:focus-visible { color: var(--title); border-color: var(--title); }
+.v2-roster-help-tip { position: fixed; z-index: 1000; width: min(300px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); box-shadow: 0 4px 16px rgb(0 0 0 / .25); font-size: 11px; line-height: 1.5; pointer-events: none; }
+.v2-roster-help-tip > span { display: block; margin-top: 6px; color: var(--muted-foreground); }
+
 .v2-people-table {
   width: 100%;
   table-layout: fixed;
@@ -14241,6 +14251,13 @@ img.v2-people-ava {
 
 .v2-people-nicks {
   min-width: 0;
+}
+
+.v2-people-who .v2-ava.is-sm {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  flex: 0 0 28px;
 }
 
 .v2-people-nicks b {

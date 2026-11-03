@@ -106,12 +106,12 @@ function markOf(row: DirectoryRow): Mark {
 
 async function loadDirectory(variant?: "nitro" | "regular", limits?: string[]) {
   const db = getSupabase();
-  if (!db) return [];
+  if (!db) return { data: null, error: "not-configured" };
   const { data, error } = await db.rpc("schedule_player_directory", {
     p_variant: variant ?? null,
     p_limit_ids: limits ?? null,
   });
-  return error ? [] : ((data ?? []) as DirectoryRow[]);
+  return { data: error ? null : ((data ?? []) as DirectoryRow[]), error: error?.message ?? null };
 }
 
 function demoPlayers(): SchedulePlayer[] {
@@ -138,7 +138,7 @@ function demoPlayers(): SchedulePlayer[] {
 
 export async function listSchedulePlayers(): Promise<SchedulePlayer[]> {
   if (!isLiveData()) return demoPlayers();
-  return (await loadDirectory()).map(playerOf);
+  return (await loadDirectory()).data?.map(playerOf) ?? [];
 }
 
 function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] {
@@ -168,7 +168,13 @@ function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] 
 }
 
 export async function listLimitMarks(variant: "nitro" | "regular", limits: string[]): Promise<Mark[]> {
-  if (!limits.length) return [];
-  if (!isLiveData()) return demoLimitMarks(variant, limits);
-  return (await loadDirectory(variant, limits)).map(markOf);
+  return (await loadLimitMarks(variant, limits)).data ?? [];
+}
+
+/** Keep failures distinct from an empty roster: a failed load must not invent an order. */
+export async function loadLimitMarks(variant: "nitro" | "regular", limits: string[]) {
+  if (!limits.length) return { data: [] as Mark[], error: null };
+  if (!isLiveData()) return { data: demoLimitMarks(variant, limits), error: null };
+  const result = await loadDirectory(variant, limits);
+  return { data: result.data?.map(markOf) ?? null, error: result.error };
 }

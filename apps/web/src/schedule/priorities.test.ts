@@ -65,17 +65,27 @@ describe("priority places", () => {
   });
   const score = (n: number): PriorityPerson["entries"] => [{ id: String(n), month: "2026-07-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: n }] }];
   const people = [person("a", { entries: score(100) }), person("b", { entries: score(90) }), person("vip", { vipNitro: 3, vipRegular: 1 }), person("c", { entries: score(80) }), person("out", { entries: score(999), excludedNitro: true })];
-  it("reserves exact VIP seats and puts excluded people below everyone", () => {
-    expect(rankPriorities(people, "2026-08-01", "nitro", true).map((r) => [r.memberId, r.rank])).toEqual([["a", 1], ["b", 2], ["vip", 3], ["c", 4], ["out", null]]);
-    expect(rankPriorities(people, "2026-08-01", "regular", true)[0].memberId).toBe("vip");
+  it("preserves exact VIP seats only for historical request snapshots", () => {
+    expect(rankPriorities(people, "2026-08-01", "nitro", true, "legacy-vip-seats").map((r) => [r.memberId, r.rank])).toEqual([["a", 1], ["b", 2], ["vip", 3], ["c", 4], ["out", null]]);
+    expect(rankPriorities(people, "2026-08-01", "regular", true, "legacy-vip-seats")[0].memberId).toBe("vip");
+  });
+  it("VIP visibility never changes distance ranks or scores", () => {
+    for (const kind of ["nitro", "regular"] as const) {
+      const on = rankPriorities(people, "2026-08-01", kind, true);
+      const off = rankPriorities(people, "2026-08-01", kind, false);
+      expect(on.map((p) => [p.memberId, p.rank, p.total])).toEqual(off.map((p) => [p.memberId, p.rank, p.total]));
+      expect(on.find((p) => p.memberId === "vip")?.vip).toBeGreaterThan(0);
+      expect(off.find((p) => p.memberId === "vip")?.vip).toBe(0);
+      expect(on[0].memberId).not.toBe("vip");
+    }
   });
   it("switches off manual VIP visually, with exclusions still effective", () => {
     expect(rankPriorities(people, "2026-08-01", "nitro", false).map((r) => r.memberId)).toEqual(["a", "b", "c", "vip", "out"]);
     expect(people[2].vipNitro).toBe(3);
   });
-  it("preserves places after filtering and permits a VIP beyond the visible count", () => {
+  it("preserves distance places after filtering regardless of VIP number", () => {
     const ranked = rankPriorities([person("hidden", { redParty: false, entries: score(10) }), person("visible", { vipNitro: 25 })], "2026-08-01", "nitro", true);
-    expect(filterPriorities(ranked, { redParty: true, team50: true, active: true }).map((r) => r.rank)).toEqual([25]);
+    expect(filterPriorities(ranked, { redParty: true, team50: true, active: true }).map((r) => r.rank)).toEqual([2]);
   });
   it("filters kinds using chosen games without changing the total and breaks ties stably", () => {
     const p = [person("b", { plays: ["nitro"], entries: score(2) }), person("a", { entries: score(2) })];

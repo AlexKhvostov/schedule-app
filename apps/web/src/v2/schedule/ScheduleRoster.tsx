@@ -64,11 +64,11 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
         </thead>
         <tbody>
           {[...roster, ...historicalRoster].map((row) => {
-            const historical = row.n === 0;
+            const historical = row.n === 0 && !row.excluded;
             const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
             const guild = showNick(row.mark.discord) || "—";
             const room = showNick(row.mark.room);
-            const vip = historical ? null : vipOf(row.mark, kind);
+            const vip = historical || row.excluded ? null : vipOf(row.mark, kind);
             return (
               <Fragment key={row.mark.memberId || markKey(row.mark)}>
                 {historical && row === historicalRoster[0] ? (
@@ -77,8 +77,10 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                   </tr>
                 ) : null}
                 <tr
+                  data-member={row.mark.memberId}
+                  data-excluded={row.excluded || undefined}
                   className={`v2-people-row${vip ? " is-vip" : ""}${historical ? " is-historical" : ""}`}
-                  title={historical ? t("schedule.playersHistoricalHint") : vip ? t("cabinet.vipLabel") : undefined}
+                  title={historical ? t("schedule.playersHistoricalHint") : row.excluded ? t("priorities.excluded") : vip ? t("cabinet.vipLabel") : undefined}
                   tabIndex={0}
                   onClick={() => {
                     onPeek(row);
@@ -91,7 +93,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                   }}
                 >
                   <td className={`v2-people-rank${vip ? " is-vip" : ""}`}>
-                    <b>{historical ? null : row.n}</b>
+                    <b>{row.n || null}</b>
                   </td>
                   <td>
                     <span className="v2-people-who">

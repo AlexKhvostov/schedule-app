@@ -42,10 +42,10 @@ async function expectCalculationColumns(table: ReturnType<Page["locator"]>) {
   }
 }
 
-test("combined priority scores, exact VIP seats and kind filters", async ({ page }, testInfo) => {
+test("distance ranking ignores VIP badges and keeps kind filters", async ({ page }, testInfo) => {
   await enter(page);
   const vera = page.locator('tr[data-member="demo-priority-2"]');
-  await expect(vera.locator("td.is-rank")).toHaveText("3");
+  await expect(vera.locator("td.is-rank")).toHaveText("4");
   const total = await vera.locator("td.is-total").textContent();
   const values = (await vera.locator("td.is-num").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
   expect(values).toEqual([5421, 549, 5484, 576, 9895.5]);
@@ -54,15 +54,15 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
   await expect(page.locator(".v2-prio-actions")).toContainText("Дистанции без коэффициентов");
   await expect(page.getByLabel("Покер-рум", { exact: true })).toBeDisabled();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
-  await expect(vera.locator("td.is-rank")).toHaveText("1");
+  await expect(vera.locator("td.is-rank")).toHaveText("4");
   await expect(vera.locator("td.is-total")).toHaveText(total!);
   await expect(page.locator('tr[data-member="demo-priority-16"]')).toBeVisible();
   await page.getByRole("tab", { name: "Nitro", exact: true }).click();
   await expect(page.locator('tr[data-member="demo-priority-16"]')).toHaveCount(0);
-  await page.getByLabel("Учитывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
   await expect(vera.locator("td.is-rank")).toHaveText("4");
-  await page.getByLabel("Учитывать VIP", { exact: true }).check();
-  await expect(vera.locator("td.is-rank")).toHaveText("3");
+  await page.getByLabel("Показывать VIP", { exact: true }).check();
+  await expect(vera.locator("td.is-rank")).toHaveText("4");
   await vera.locator("td.is-num button").first().hover();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toContainText("50 €");
@@ -88,7 +88,7 @@ test("combined priority scores, exact VIP seats and kind filters", async ({ page
 test("existing version-one request facts render raw distances and keep the original weighted total", async ({ page }) => {
   await enter(page);
   const periodStart = currentPriorityPeriod(), months = priorityMonths(periodStart);
-  const person: PriorityPerson = { memberId: "legacy-player", nick: "Сохранённый игрок", avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [
+  const person: PriorityPerson = { memberId: "legacy-player", nick: "Сохранённый игрок", avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 3, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [
     { id: "n", month: months[0], variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 11 }, { limit: "100", tournaments: 7 }] },
     { id: "r-old", month: months[0], variant: "regular", part: 2, values: [{ limit: "50", tournaments: 2 }] },
     { id: "r-new", month: months[5], variant: "regular", part: 1, values: [{ limit: "50", tournaments: 3 }, { limit: "100", tournaments: 4 }] },
@@ -104,7 +104,7 @@ test("existing version-one request facts render raw distances and keep the origi
   await expect(dialog.locator(".v2-prio-snapshot-table th.is-total")).toContainText("Очки рейтинга");
   await expect(dialog.locator(".v2-prio-snapshot-table th.is-total small")).toHaveText("Дистанция × коэф.");
   const values = (await dialog.locator(".v2-prio-snapshot-table tbody td").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
-  expect(values).toEqual([1, 13, 7, 3, 4, 24.5]);
+  expect(values).toEqual([3, 13, 7, 3, 4, 24.5]);
   await expect(dialog.locator(".v2-prio-combined-total b")).toHaveText("= 24,5");
   expect(await page.evaluate(() => localStorage.getItem("v2-priority-requests-1"))).toBe(saved);
 });
@@ -165,7 +165,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   const filters = await page.locator(".v2-prio-filters").boundingBox();
   const tabs = await page.getByRole("tablist", { name: "Вид турниров" }).boundingBox();
   expect(tabs!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
-  await page.getByLabel("Учитывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
   await page.getByLabel("Активная карточка", { exact: true }).uncheck();
   const nitro = page.getByRole("tab", { name: "Nitro", exact: true });
   const regular = page.getByRole("tab", { name: "Регулярные", exact: true });
@@ -176,7 +176,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   await expect(page.getByRole("tabpanel")).toHaveCount(1);
   await expect(page.getByRole("tabpanel", { name: "Регулярные" }).getByRole("button", { name: "Подать заявку" })).toBeVisible();
   await expect(page.locator(".v2-prio-table")).toHaveCount(1);
-  await expect(page.getByLabel("Учитывать VIP", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Показывать VIP", { exact: true })).not.toBeChecked();
   await expect(page.getByLabel("Активная карточка", { exact: true })).not.toBeChecked();
   await regular.press("Home");
   await expect(nitro).toBeFocused();
@@ -224,7 +224,7 @@ test("compact summary follows the visible kind, filters and VIP display", async 
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(page.getByRole("complementary", { name: "Сводка · Регулярные" })).toBeVisible();
   await checkSummary();
-  await page.getByLabel("Учитывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
   await checkSummary();
   await expect(page.locator('[data-metric="vip"] dd')).toHaveText("0");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -235,10 +235,15 @@ test("compact summary follows the visible kind, filters and VIP display", async 
 test("grouped request snapshots, public replies, private comments and admin deletion", async ({ page }, testInfo) => {
   await enter(page);
   const originalRows: Record<string, string[]> = {};
-  for (const id of ["demo-priority-0", "demo-priority-1"]) originalRows[id] = await page.locator(`tr[data-member="${id}"] td.is-num`).allTextContents();
+  const originalRanks: Record<string, string> = {};
+  for (const id of ["demo-priority-0", "demo-priority-1", "demo-priority-2"]) {
+    originalRows[id] = await page.locator(`tr[data-member="${id}"] td.is-num`).allTextContents();
+    originalRanks[id] = await page.locator(`tr[data-member="${id}"] td.is-rank`).innerText();
+  }
   await page.getByRole("button", { name: "Подать заявку", exact: true }).click();
   await page.getByLabel("Проверить Alina", { exact: true }).check();
   await page.getByLabel("Проверить Boris", { exact: true }).check();
+  await page.getByLabel("Проверить Vera", { exact: true }).check();
   await page.getByLabel("Комментарий", { exact: true }).fill("Секретная претензия: проверьте две строки.\n\nСверьте исходные дистанции по месяцам и коэффициенты расчёта.");
   await page.getByRole("button", { name: "Отправить заявку", exact: true }).click();
   await expect(page.getByText("Заявка отправлена", { exact: true })).toBeVisible();
@@ -252,15 +257,15 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
   const details = page.getByRole("dialog", { name: "Заявка на проверку", exact: true });
   await expect(details).toContainText("Секретная претензия");
-  await expect(details.locator(".v2-prio-calculation")).toHaveCount(2);
+  await expect(details.locator(".v2-prio-calculation")).toHaveCount(3);
   await expect(details.locator(".v2-prio-request-meta dt")).toHaveCount(4);
   const saved = details.locator(".v2-prio-saved-values");
   await expect(saved.getByRole("heading", { name: "Слепок значений", exact: true })).toBeVisible();
-  await expect(saved.locator("tbody tr")).toHaveCount(2);
+  await expect(saved.locator("tbody tr")).toHaveCount(3);
   await expect(saved.getByRole("button")).toHaveCount(0);
   for (const [id, scores] of Object.entries(originalRows)) {
     const row = saved.locator(`tr[data-member="${id}"]`);
-    expect(await row.locator("td").allTextContents()).toEqual([id === "demo-priority-0" ? "1" : "2", ...scores]);
+    expect(await row.locator("td").allTextContents()).toEqual([originalRanks[id], ...scores]);
   }
   const snapshotBox = await saved.boundingBox(), commentBox = await details.locator(".v2-prio-detail-comment").boundingBox(), reviewBox = await details.locator(".v2-prio-review-rows").boundingBox();
   expect(snapshotBox!.y + snapshotBox!.height).toBeLessThanOrEqual(commentBox!.y);
@@ -269,7 +274,8 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await expect(details.locator(".v2-prio-review-person").first().getByRole("columnheader", { name: "50 €", exact: true }).first()).toBeVisible();
   await expect(details.locator(".v2-prio-review-person").first().getByRole("columnheader", { name: "100 €", exact: true }).first()).toBeVisible();
   await details.locator(".v2-prio-review-person").nth(1).locator("summary").first().click();
-  await expect(details.locator(".v2-prio-review-person[open]")).toHaveCount(2);
+  await details.locator(".v2-prio-review-person").nth(2).locator("summary").first().click();
+  await expect(details.locator(".v2-prio-review-person[open]")).toHaveCount(3);
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await expectCalculationColumns(saved.locator("table"));
@@ -343,7 +349,7 @@ test("outside ranking is per kind and incompatible with a positive VIP", async (
   await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("—");
   await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("1");
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
-  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("2");
+  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("1");
   await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("0");
   await page.locator('tr[data-member="demo-priority-2"] .v2-prio-person').click();
   const vip = page.getByRole("dialog", { name: "Vera", exact: true });

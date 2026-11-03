@@ -11,6 +11,7 @@ type Props = {
   compact?: boolean;
   className?: string;
   footer?: ReactNode;
+  headerActions?: ReactNode;
   onMove: (x: number, y: number) => void;
   onFocus: () => void;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function V2Float({
   compact,
   className,
   footer,
+  headerActions,
   onMove,
   onFocus,
   onClose,
@@ -77,6 +79,7 @@ export function V2Float({
       >
         <i className="fa-solid fa-grip-vertical v2-modal-grip" aria-hidden />
         <h2>{title}</h2>
+        {headerActions}
         <button
           type="button"
           className="v2-modal-close"

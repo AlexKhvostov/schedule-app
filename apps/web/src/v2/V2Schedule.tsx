@@ -20,7 +20,8 @@ import { type HourLoadMap } from "../schedule/hourLoad";
 import { markKey, type Mark } from "../schedule/marks";
 import { loadMembers } from "../schedule/members";
 import { emptyMonth } from "../schedule/plan";
-import { groupRosterRows, rosterFromGrids, type RosterRow } from "../schedule/roster";
+import { groupRosterRows, orderRosterRows, rosterFromGrids, type RosterRow } from "../schedule/roster";
+import { currentPriorityPeriod, isPriorityPreliminary, type PriorityKind } from "../schedule/priorities";
 import { FillByHourChart } from "./FillByHourChart";
 import { OptField } from "./OptField";
 import { OverwriteConfirm } from "./OverwriteConfirm";
@@ -44,6 +45,8 @@ import { useScheduleMonth } from "./schedule/useScheduleMonth";
 import { useScheduleMutations } from "./schedule/useScheduleMutations";
 import { useSchedulePreferences } from "./schedule/useSchedulePreferences";
 import { useScheduleRules } from "./schedule/useScheduleRules";
+import { ScheduleRosterHelp } from "./schedule/ScheduleRosterHelp";
+import { useRosterSource } from "./schedule/useRosterSource";
 import { useScheduleToolbar } from "./schedule/useScheduleToolbar";
 import { decorateDemoRoster } from "./schedulePresentation";
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
@@ -81,6 +84,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showHours, setShowHours] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
+  const [chosenRosterKind, setChosenRosterKind] = useState<PriorityKind>(kind);
+  const rosterKind = kinds.includes(chosenRosterKind) ? chosenRosterKind : kinds[0];
+  const rosterTabs = useRef<Partial<Record<PriorityKind, HTMLButtonElement | null>>>({});
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
@@ -123,6 +129,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   );
   const auxiliaryLabels = useMemo(() => auxiliaryItems.map((item) => item.label), [auxiliaryItems]);
   const auxiliaryGrids = useMemo(() => gridsByVariantLabel(auxiliaryItems), [auxiliaryItems]);
+  const rosterItems = useMemo(() => auxiliaryItems.filter((item) => item.variant === rosterKind), [auxiliaryItems, rosterKind]);
+  const rosterLabels = useMemo(() => rosterItems.map((item) => item.label), [rosterItems]);
+  const rosterPeriod = currentPriorityPeriod(`${year}-${String(monthIndex + 1).padStart(2, "0")}-01`);
+  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, limits.filter((limit) => filterLimits[rosterKind].includes(limit)));
   const calendarItems = useMemo(
     () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
     [shownGridStore, fetchKey],
@@ -190,21 +200,20 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     };
   }, [kinds, limits, paintOn, showPeople, mayActAs]);
 
-  const eligiblePlayerIds = useMemo(
-    () => new Set((limitMarks ?? []).map((mark) => mark.memberId).filter((id): id is string => Boolean(id))),
-    [limitMarks],
-  );
   const rosterGroups = useMemo(() => {
-    if (!showPeople || limitMarks === null) return { active: [], historical: [] };
-    const items = auxiliaryItems.map((item) => ({ limit: item.label, grid: item.grid }));
-    const occupiedRows = rosterFromGrids(items, year, monthIndex, cetTick, undefined, kind);
-    const activeRows = rosterFromGrids(items, year, monthIndex, cetTick, limitMarks, kind);
+    if (!showPeople || !rosterSource.source) return { active: [], historical: [] };
+    const items = rosterItems.map((item) => ({ limit: item.label, grid: item.grid }));
+    const occupiedRows = rosterFromGrids(items, year, monthIndex, cetTick, undefined, rosterKind);
+    const activeRows = rosterFromGrids(items, year, monthIndex, cetTick, rosterSource.faces, rosterKind);
     const occupied = isLiveData() ? occupiedRows : decorateDemoRoster(occupiedRows, loadMembers());
     const active = isLiveData() ? activeRows : decorateDemoRoster(activeRows, loadMembers());
-    return groupRosterRows(active, occupied, eligiblePlayerIds);
-  }, [showPeople, auxiliaryItems, year, monthIndex, cetTick, limitMarks, kind, eligiblePlayerIds]);
+    const eligible = new Set(rosterSource.faces.map((mark) => mark.memberId).filter((id): id is string => Boolean(id)));
+    const groups = groupRosterRows(active, occupied, eligible);
+    return { ...groups, active: orderRosterRows(groups.active, rosterSource.source, rosterKind) };
+  }, [showPeople, rosterItems, year, monthIndex, cetTick, rosterSource.source, rosterSource.faces, rosterKind]);
   const roster = rosterGroups.active;
   const historicalRoster = rosterGroups.historical;
+  useEffect(() => { setPeek(null); }, [rosterKind, year, monthIndex]);
 
   const peopleIdsKey = useMemo(() => {
     if (!showPeople) return "";
@@ -251,6 +260,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const deadTimeByMember = useMemo(
     () => deadTimeIntervals ? deadTimeBreakdownsByMember(auxiliaryItems, deadTimeIntervals) : null,
     [auxiliaryItems, deadTimeIntervals],
+  );
+  const rosterDeadTime = useMemo(
+    () => deadTimeIntervals ? deadTimeBreakdownsByMember(rosterItems, deadTimeIntervals) : null,
+    [rosterItems, deadTimeIntervals],
   );
   const myDeadTime = useMemo(() => {
     if (!deadTimeByMember) return null;
@@ -540,24 +553,40 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {showPeople && (
           <V2Float
             title={t("schedule.playersTitle")}
+            headerActions={<ScheduleRosterHelp preliminary={Boolean(rosterSource.source && isPriorityPreliminary(rosterSource.source))} />}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(880, 310 + Math.max(1, auxiliaryLabels.length) * 88)}
+            width={Math.min(880, 310 + Math.max(1, rosterLabels.length) * 88)}
             compact
             z={zOf("people")}
             onMove={setPeoplePos}
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
           >
-            {<ScheduleRoster
+            {kinds.length > 1 && <div className="v2-roster-controls">
+              <div className="v2-prio-tabs" role="tablist" aria-label={t("schedule.rosterKinds")}>
+                {kinds.map((variant) => <button key={variant} ref={(node) => { rosterTabs.current[variant] = node; }} type="button" role="tab" id={`roster-tab-${variant}`} aria-controls="roster-panel" aria-selected={rosterKind === variant} tabIndex={rosterKind === variant ? 0 : -1}
+                  onClick={() => setChosenRosterKind(variant)} onKeyDown={(event) => {
+                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                    event.preventDefault();
+                    const next = event.key === "Home" ? kinds[0] : event.key === "End" ? kinds[kinds.length - 1] : kinds[(kinds.indexOf(variant) + 1) % kinds.length];
+                    setChosenRosterKind(next); rosterTabs.current[next]?.focus();
+                  }}>{t(`priorities.kinds.${variant}`)}</button>)}
+              </div>
+            </div>}
+            <div id="roster-panel" role={kinds.length > 1 ? "tabpanel" : undefined} aria-labelledby={kinds.length > 1 ? `roster-tab-${rosterKind}` : undefined}>
+            {rosterSource.loading && <p role="status">{t("priorities.loading")}</p>}
+            {rosterSource.error && <div role="alert"><p>{t("schedule.rosterLoadError")}</p><Button size="sm" onClick={rosterSource.retry}>{t("priorities.retry")}</Button></div>}
+            {rosterSource.source && <ScheduleRoster
               roster={roster}
               historicalRoster={historicalRoster}
-              auxiliaryLabels={auxiliaryLabels}
-              deadTimeByMember={deadTimeByMember}
-              kind={kind}
+              auxiliaryLabels={rosterLabels}
+              deadTimeByMember={rosterDeadTime}
+              kind={rosterKind}
               showTables={countTables && !hideTables}
               onPeek={(row) => { setPeek(row); setFront("user"); }}
             />}
+            </div>
           </V2Float>
         )}
         {peek ? (

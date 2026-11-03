@@ -105,7 +105,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
   const visible = useMemo(() => filterPriorities(ranked, filters), [ranked, filters]);
   const months = priorityMonths(period);
   const canManage = current?.canManage ?? false;
-  const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled).filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
+  const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled, "legacy-vip-seats").filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
   const requestIds = requests.map((r) => r.id).join(",");
   useEffect(() => {
     if (!requestList || !canManage || !requestIds) return;
@@ -151,7 +151,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
         <div className="v2-prio-window"><span>{t("priorities.calculationMonths")}</span><div>{[0, 3].map((i) => <span key={i}>({monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))}) <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b></span>)}</div></div>
       </div>
       <div className="v2-prio-controls"><div className="v2-prio-filters">
-        <label className="v2-prio-check"><input type="checkbox" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
+        <label className="v2-prio-check" title={t("priorities.vipDisplayHint")}><input type="checkbox" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
         {(["redParty", "team50", "active"] as const).map((key) => <label key={key} className="v2-prio-check"><input type="checkbox" checked={filters[key]} onChange={(e) => setFilters({ ...filters, [key]: e.target.checked })} />{t(`priorities.filters.${key}`)}</label>)}
         <span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span>
       </div>
@@ -181,7 +181,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
       <div className="v2-prio-request-actions"><Button size="sm" variant="outline" disabled={!current || busy} onClick={() => { setComposing(!composing); setSelected([]); setComment(""); setNotice(""); }}>{t(composing ? "priorities.cancelRequest" : "priorities.submitRequest")}</Button></div>
       {composing && <form className="v2-prio-compose" onSubmit={(e) => { e.preventDefault(); if (!current || !selected.length || busy) return;
         const people = current.people.filter((p) => selected.includes(p.memberId));
-        void run(() => submitPriorityRequest({ periodStart: period, variant: kind, people, comment, author, vipEnabled: vipOn, revision: current.revision }), () => { setComposing(false); setSelected([]); setComment(""); setNotice(t("priorities.sent")); });
+        void run(() => submitPriorityRequest({ periodStart: period, variant: kind, people, comment, author, vipEnabled: false, revision: current.revision }), () => { setComposing(false); setSelected([]); setComment(""); setNotice(t("priorities.sent")); });
       }}><p>{t("priorities.requestInstruction")}</p><label>{t("priorities.comment")}<textarea aria-label={t("priorities.comment")} maxLength={2000} value={comment} disabled={busy} onChange={(e) => setComment(e.target.value)} /></label><span>{t("priorities.selected", { n: selected.length })}</span><Button size="sm" type="submit" disabled={busy || !selected.length || selected.length > 50 || !current}>{t("priorities.sendRequest")}</Button></form>}
       {notice && <p role="status" className="v2-prio-notice">{notice}</p>}
       </>}</div>)}

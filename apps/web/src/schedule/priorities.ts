@@ -62,7 +62,7 @@ export function calculatePriority(person: PriorityPerson, period: string): Calcu
   }));
   return { ...person, months, distanceCells, pointCells, total: pointCells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
 }
-export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean): CalculatedPriority[] {
+export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean, order: "distance" | "legacy-vip-seats" = "distance"): CalculatedPriority[] {
   const rows = people.filter((person) => person.plays.includes(kind)).map((person) => {
     const row = calculatePriority(person, period);
     row.excluded = kind === "nitro" ? row.excludedNitro : row.excludedRegular;
@@ -70,6 +70,11 @@ export function rankPriorities(people: PriorityPerson[], period: string, kind: P
     return row;
   });
   const compare = (a: CalculatedPriority, b: CalculatedPriority) => b.total - a.total || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" }) || a.memberId.localeCompare(b.memberId);
+  if (order === "distance") {
+    const sorted = rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || compare(a, b));
+    sorted.forEach((row, index) => { row.rank = row.excluded ? null : index + 1; });
+    return sorted;
+  }
   const assigned = new Set(rows.filter((row) => !row.excluded && row.vip > 0).map((row) => row.vip));
   const ordinary = rows.filter((row) => !row.excluded && row.vip <= 0).sort(compare);
   let rank = 1;
