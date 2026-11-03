@@ -81,6 +81,20 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
   await expect(table.locator("thead")).toContainText("N50");
   await expect(page.locator(".v2-roster-controls")).toHaveCount(0);
   await expect(avatar).toBeVisible();
+  const resize = page.getByRole("button", { name: "Изменить ширину списка игроков" });
+  const widths = () => table.locator("thead th").evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect().width));
+  const initial = await widths();
+  const grip = (await resize.boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 130, grip.y + grip.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const narrowed = await widths();
+  expect(initial[1]).toBeGreaterThan(narrowed[1]);
+  expect(narrowed[1]).toBeCloseTo(36, 0);
+  expect(narrowed.filter((_, index) => index !== 1)).toEqual(initial.filter((_, index) => index !== 1));
+  await expect(avatar).toBeVisible();
+
   await page.setViewportSize({ width: 390, height: 844 });
   await info.click();
   await expect(page.getByRole("tooltip")).toBeVisible();

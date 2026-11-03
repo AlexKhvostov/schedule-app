@@ -496,6 +496,7 @@
     "level": "lv. {{n}}",
     "levelLocked": "Level 2 is night only · 22:00–06:00 CET",
     "players": "Players",
+    "playersResize": "Resize the player list",
     "playersTitle": "Players this month",
     "rosterKinds": "Filling order tournament kind",
     "rosterHelp": "How the player order works",

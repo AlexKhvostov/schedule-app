@@ -7888,6 +7888,17 @@ textarea.v2-ctrl.v2-cab-area {
   padding: 6px 8px 8px;
 }
 
+.v2-float-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: ew-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 55%, var(--muted-foreground) 56% 62%, transparent 63% 74%, var(--muted-foreground) 75% 81%, transparent 82%);
+}
+
 .v2-accent {
   color: var(--primary);
 }
@@ -14085,7 +14096,6 @@ img.v2-people-ava {
 .v2-roster-help-tip > span { display: block; margin-top: 6px; color: var(--muted-foreground); }
 
 .v2-people-table {
-  --roster-limit-width: 54px;
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;

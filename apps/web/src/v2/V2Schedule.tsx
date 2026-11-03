@@ -36,7 +36,7 @@ import {
   myHoursMatrix
 } from "./myShifts";
 import { loadPrefs, savePrefs } from "./prefs";
-import { ScheduleRoster } from "./schedule/ScheduleRoster";
+import { rosterTableWidth, ScheduleRoster } from "./schedule/ScheduleRoster";
 import { ScheduleToolbar } from "./schedule/ScheduleToolbar";
 import { ScheduleViewSettings } from "./schedule/ScheduleViewSettings";
 import { CALENDAR_VARIANTS } from "./schedule/constants";
@@ -84,6 +84,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showHours, setShowHours] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
+  const [rosterNameWidth, setRosterNameWidth] = useState(100);
+  const [manualRosterWidth, setManualRosterWidth] = useState<number | null>(null);
   const [chosenRosterKind, setChosenRosterKind] = useState<PriorityKind>(kind);
   const rosterKind = kinds.includes(chosenRosterKind) ? chosenRosterKind : kinds[0];
   const rosterTabs = useRef<Partial<Record<PriorityKind, HTMLButtonElement | null>>>({});
@@ -258,6 +260,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
   );
   const showDeadTime = Boolean(deadTimeIntervals?.length);
+  const rosterMinWidth = Math.max(170, rosterTableWidth(rosterLabels.length, showDeadTime) + 18);
+  const rosterWidth = Math.max(rosterMinWidth, manualRosterWidth ?? rosterTableWidth(rosterLabels.length, showDeadTime, rosterNameWidth) + 18);
   const deadTimeByMember = useMemo(
     () => deadTimeIntervals ? deadTimeBreakdownsByMember(auxiliaryItems, deadTimeIntervals) : null,
     [auxiliaryItems, deadTimeIntervals],
@@ -558,7 +562,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             headerActions={<ScheduleRosterHelp preliminary={Boolean(rosterSource.source && isPriorityPreliminary(rosterSource.source))} />}
             x={peoplePos.x}
             y={peoplePos.y}
-            width={Math.min(880, 310 + Math.max(1, rosterLabels.length) * 88)}
+            width={rosterWidth}
+            resizeLabel={t("schedule.playersResize")}
+            onResizeWidth={(width) => setManualRosterWidth(Math.max(rosterMinWidth, Math.min(width, window.innerWidth - 16)))}
             compact
             z={zOf("people")}
             onMove={setPeoplePos}
@@ -581,6 +587,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             {rosterSource.error && <div role="alert"><p>{t("schedule.rosterLoadError")}</p><Button size="sm" onClick={rosterSource.retry}>{t("priorities.retry")}</Button></div>}
             {rosterSource.source && <ScheduleRoster
               roster={roster}
+              onNameWidth={setRosterNameWidth}
               historicalRoster={historicalRoster}
               auxiliaryLabels={rosterLabels}
               deadTimeByMember={rosterDeadTime}

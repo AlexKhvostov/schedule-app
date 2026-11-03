@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { ScheduleVariant } from "../../data/slots";
 import type { DeadTimeBreakdown } from "../../schedule/deadTimeStats";
@@ -10,7 +10,15 @@ import { ScheduleSlot } from "../ScheduleSlot";
 import { rowInitials, showNick } from "../schedulePresentation";
 import { displayScheduleColumn } from "../variantSchedule";
 
+const ROSTER_LIMIT_WIDTH = 54;
+const ROSTER_MIN_NAME_WIDTH = 36;
+
+export function rosterTableWidth(limitCount: number, showDeadTime: boolean, nameWidth = ROSTER_MIN_NAME_WIDTH) {
+  return 24 + nameWidth + 44 + limitCount * ROSTER_LIMIT_WIDTH + (showDeadTime ? 62 : 0) + 26;
+}
+
 type Props = {
+  onNameWidth: (width: number) => void;
   roster: RosterRow[];
   historicalRoster: RosterRow[];
   auxiliaryLabels: string[];
@@ -21,13 +29,36 @@ type Props = {
   onPeek: (row: RosterRow) => void;
 };
 
-export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, deadTimeByMember, showDeadTime, kind, showTables, onPeek }: Props) {
+export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, deadTimeByMember, showDeadTime, kind, showTables, onPeek, onNameWidth }: Props) {
   const { t } = useTranslation();
+  const table = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      if (!active || !table.current) return;
+      const range = document.createRange();
+      let width = ROSTER_MIN_NAME_WIDTH;
+      for (const label of table.current.querySelectorAll("th:nth-child(2), .v2-people-nicks > *")) {
+        range.selectNodeContents(label);
+        const padding = label.tagName === "TH" ? 8 : 42;
+        width = Math.max(width, Math.ceil(range.getBoundingClientRect().width) + padding);
+      }
+      onNameWidth(width);
+    };
+    measure();
+    void document.fonts.ready.then(measure);
+    return () => { active = false; };
+  }, [roster, historicalRoster, t, onNameWidth]);
+
   return (
     roster.length || historicalRoster.length ? (
       <table
+        ref={table}
         className="v2-people-table"
-        style={{ minWidth: `calc(240px + ${auxiliaryLabels.length} * var(--roster-limit-width))` }}
+        style={{
+          "--roster-limit-width": `${ROSTER_LIMIT_WIDTH}px`,
+          minWidth: rosterTableWidth(auxiliaryLabels.length, showDeadTime),
+        } as CSSProperties}
       >
         <colgroup>
           <col className="v2-people-col-n" />
