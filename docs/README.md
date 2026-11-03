@@ -25,6 +25,8 @@
 | Таблицы, RPC и правила базы | [database.md](database.md) |
 | Вход и доступ | [auth.md](auth.md) |
 | Discord и боты | [discord-now.md](discord-now.md) |
+| Внешний API: ключи, расписание, снимки/страницы и локальный запуск | [external-api/README.md](../supabase/functions/external-api/README.md) |
+| Инструкция стороннему разработчику бота | [BOT-CONNECTION.md](../supabase/functions/external-api/BOT-CONNECTION.md) |
 | UX расписания | [schedule-ux.md](schedule-ux.md) |
 | Живые приоритеты и заявки | [priorities.md](priorities.md) |
 | Деплой, CI, backup и откат | [operations.md](operations.md) |

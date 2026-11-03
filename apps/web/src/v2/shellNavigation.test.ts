@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { defaultShellPage, resolveShellPage } from "./shellNavigation";
 
 describe("shell navigation", () => {
+  it("resolves API administration only for root", () => {
+    expect(resolveShellPage({ isRoot: true, access: "active" }, "#root-api")).toBe("root-api");
+    expect(resolveShellPage({ isRoot: false, permissions: ["admin.people"], access: "active" }, "#root-api")).toBe("admin-people");
+  });
   it("opens the schedule for an active player without a direct link", () => {
     expect(resolveShellPage({ isRoot: false, permissions: ["profile", "schedule"], access: "active" }, "")).toBe("schedule");
     expect(resolveShellPage({ isRoot: false, permissions: ["profile", "schedule"], access: "active" }, "#home")).toBe("schedule");

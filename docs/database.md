@@ -4,6 +4,12 @@
 
 Сверку живой схемы делали **22 сентября 2026**. Интерактивная схема с перетаскиванием таблиц — Canvas «Схема базы» рядом с чатом в Cursor. SQL: [`../supabase/migrations`](../supabase/migrations). Сид справочников: [`../supabase/seed.sql`](../supabase/seed.sql). Смысл сущностей: [модель данных](domain-model.md).
 
+## Внешний API — локальная миграция 3 ноября 2026
+
+[`20261103160348_external_api.sql`](../supabase/migrations/20261103160348_external_api.sql) создаёт закрытую схему `external_api_private`: `clients` хранит SHA-256 ключа, scopes, срок/отзыв и минутную квоту, `failed_auth` — один ограниченный счётчик неверных ключей. Обе таблицы с RLS, без доступа PUBLIC/anon/authenticated; схема не добавляется в Data API. Внутренняя RPC `public.external_api_schedule(text,text,integer,text,text,text)` — SECURITY INVOKER, EXECUTE только service_role. Источником расписания остаётся occupancy + имена/метка; права записи и Discord-вход сохранены.
+
+Следующая локальная миграция [`20261103165923_external_api_snapshot_pages.sql`](../supabase/migrations/20261103165923_external_api_snapshot_pages.sql) заменяет RPC без неоднозначных перегрузок и добавляет приватные `snapshots`/`snapshot_pages` (RLS, закрытые grants). Первый запрос читает1–31 день одним SQL-срезом и фиксирует все поля; выдача по1000 записей, продолжение по непрозрачному cursor только для того же ключа. Каждая страница повторно проверяет ключ/права/квоту. TTL15мин, cron5мин удаляет истёкшие данные каскадно; срок проверяется до выдачи. Ошибка410 одинакова для недоступного/истёкшего/чужого курсора. Лимиты250000 меток/128 MiB на снимок,30 живых снимков/256 MiB на ключ и4 MiB сырой страницы ограничивают хранение; неудачная сборка откатывает весь снимок. Обе миграции применены только к выделенным локальным Supabase, **не к Working**. [Контракт и запуск](../supabase/functions/external-api/README.md), [SQL-проверки](../supabase/tests/external_api.sql), [проверка неизменности/доступа/очистки снимка](../supabase/tests/external_api_pagination.sql).
+
 ## Где лежит то, что видно на экране
 
 | На экране | Таблица | Ключ |
@@ -273,3 +279,7 @@ erDiagram
 ## Что сознательно не кладём
 
 Платежный процессинг, скрейпер столов, лист 48×31, роли Discord как ключ от админки, простыня колонок «всё про человека», дистанции столбцами вправо, ник как идентификатор человека.
+
+### Управление внешними API-подключениями
+
+Миграция `20261103173923_external_api_root_admin.sql` добавляет к закрытым clients поля contact/notes и created_by/revoked_by (ссылки на members). `public.root_api_clients(action,id,input)` — SECURITY INVOKER wrapper; он вызывает закрытую `external_api_private.manage_clients` (SECURITY DEFINER, пустой search_path, явные auth.uid() и public.is_root()). Только authenticated получает EXECUTE; anon запрещён. Для wrapper authenticated имеет USAGE закрытой схемы, но никаких прав таблиц, authorize/export/prune. Сама схема по-прежнему не выставлена в Data API. Команды list/create/revoke возвращают только разрешённые метаданные, без key_hash. Создание всегда schedule:read, квота1–600, срок в будущем или null, повтор с тем же ID/хешем не дублирует запись; другой хеш для занятого ID отвергается. Отзыв идемпотентен. Контракты: `supabase/tests/external_api_root_admin.sql`, включая потерю root-права при ещё действующем JWT.

@@ -9,6 +9,7 @@ export type ShellPage =
   | "admin-distance"
   | "admin-schedule"
   | "admin-root"
+  | "root-api"
   | "root-distance"
   | "uikit"
   | "blocks"
@@ -42,6 +43,7 @@ export function resolveShellPage(context: NavigationContext, hash: string): Shel
   if (context.isRoot && hash === "#uikit") return "uikit";
   if (context.isRoot && hash === "#guild") return "guild";
   if (context.isRoot && hash === "#admin-root") return "admin-root";
+  if (context.isRoot && hash === "#root-api") return "root-api";
   if (context.isRoot && (hash === "#root-distance" || hash === "#root-import")) return "root-distance";
   if (can("admin.people") && hash === "#admin-distance") return "admin-distance";
   if (can("schedule.manage") && hash === "#admin-schedule") return "admin-schedule";

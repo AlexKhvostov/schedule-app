@@ -23,6 +23,7 @@ import "./v2.css";
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
 const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
 const V2Admin = lazy(() => import("./V2Admin").then((module) => ({ default: module.V2Admin })));
+const ApiAdmin = lazy(() => import("./api/ApiAdmin").then((module) => ({ default: module.ApiAdmin })));
 const V2Distances = lazy(() => import("./V2Distances").then((module) => ({ default: module.V2Distances })));
 const V2DistanceBook = lazy(() => import("./V2DistanceBook").then((module) => ({ default: module.V2DistanceBook })));
 const V2Cabinet = lazy(() => import("./V2Cabinet").then((module) => ({ default: module.V2Cabinet })));
@@ -118,6 +119,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
       "admin-distance": "admin-distance",
       "admin-schedule": "admin-schedule",
       "admin-root": "admin-root",
+      "root-api": "root-api",
     };
     const nextHash = hashes[key];
     if (nextHash) window.location.hash = nextHash;
@@ -139,13 +141,14 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const rootItems: StaffItem[] = isRoot
     ? [
         { key: "admin-root", label: t("nav.root"), icon: "fa-key", hint: t("nav.adminRootHint") },
+        { key: "root-api", label: t("nav.api"), icon: "fa-plug", hint: t("nav.apiHint") },
         { key: "root-distance", label: t("nav.rootImport"), icon: "fa-file-csv", hint: t("nav.rootImportHint") },
         { key: "uikit", label: t("nav.uikit"), icon: "fa-swatchbook" },
         { key: "blocks", label: t("nav.uikitBlocks"), icon: "fa-layer-group" },
         { key: "guild", label: t("nav.guild"), icon: "fa-brands fa-discord" },
       ]
     : [];
-  const staffOn = page.startsWith("admin") || page === "root-distance" || page === "uikit" || page === "blocks" || page === "guild";
+  const staffOn = page.startsWith("admin") || page.startsWith("root-") || page === "uikit" || page === "blocks" || page === "guild";
 
   useEffect(() => {
     const fallback = defaultShellPage(navigationContext);
@@ -155,6 +158,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
     if (page === "priorities" && !canPriorities) setPage(fallback);
     if ((page === "admin-people" || page === "admin-distance") && !canPeople) setPage(fallback);
     if (page === "admin-schedule" && !canScheduleAdmin) setPage(fallback);
+    if (page === "root-api" && !navigationContext.isRoot) setPage(fallback);
   }, [navigationContext, session.access, page, canProfile, canGrid, canPriorities, canPeople, canScheduleAdmin]);
 
   useEffect(() => {
@@ -431,6 +435,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           )}
           {canPriorities && page === "priorities" && <V2Priorities canManageDemo={canPeople || isRoot} author={nick} />}
           {isRoot && page === "guild" && <V2Guild />}
+          {isRoot && page === "root-api" && <div className="min-h-0 flex-1 overflow-auto"><ApiAdmin /></div>}
           {canPeople && page === "admin-distance" && (
             <div className="min-h-0 flex-1 overflow-auto">
               <V2DistanceBook />

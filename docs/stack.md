@@ -18,6 +18,7 @@
 | Выкладка сайта | **Vercel** | облако |
 | Скрейпер (позже) | **Render** (уже есть аккаунт) | отдельный сервис, не сайт |
 | Discord-бот (снимок, снятие метки, отправка Root) | **Supabase Edge Functions** | `discord-guild`, `notify-mark-removed`, `bot-send` |
+| Внешний API для машинных клиентов (локально) | **Supabase Edge Function**, Deno/TypeScript, встроенный fetch → закрытая RPC, Postgres-снимки/страницы и существующий pg_cron для очистки; без сторонних runtime-импортов | `supabase/functions/external-api`; контракт OpenAPI3.1, тестовый Deno2.9.6 |
 | Интерфейс RU / EN | **i18next** | `apps/web/src/locales` |
 
 Язык интерфейса в коде: **TypeScript**. Тексты UI — только в `locales/ru.json` и `locales/en.json`.
@@ -42,3 +43,5 @@
 | Discord API на каждый клик | Права только из нашей базы |
 
 Старые HTML-наброски лежат в `sandbox/legacy-html` как архив, на них не опираемся.
+
+Панель Root → API использует встроенный Web Crypto (`getRandomValues`, `subtle.digest`, `randomUUID`) для индивидуальных ключей и нативный HTML dialog для модальных окон/фокуса. Новых npm-зависимостей нет. Хеш передаётся через существующий Supabase RPC, raw key в базу не отправляется.

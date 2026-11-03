@@ -1,0 +1,31 @@
+.v2-api { padding: 24px; max-width: 1120px; margin: auto; color: var(--foreground); }
+.v2-api-head, .v2-api-client > header, .v2-api-modal > header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.v2-api h1 { font-size: 25px; font-weight: 700; }
+.v2-api h2, .v2-api-modal h2 { font-size: 17px; font-weight: 650; overflow-wrap: anywhere; }
+.v2-api-head p, .v2-api-endpoint p, .v2-api-client dt { color: var(--muted-foreground); font-size: 13px; }
+.v2-api-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+.v2-api .v2-ctrl, .v2-api-modal .v2-ctrl { padding: 8px 12px; height: auto; min-height: 36px; }
+.v2-api-endpoint, .v2-api-client { border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: var(--card); }
+.v2-api-endpoint { margin-top: 20px; display: grid; gap: 8px; }
+.v2-api code { overflow-wrap: anywhere; font-size: 13px; }
+.v2-api-clients { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.v2-api-client p { font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+.v2-api-notes { white-space: pre-wrap; color: var(--muted-foreground); }
+.v2-api-client dl { display: grid; gap: 8px; margin-top: 16px; font-size: 13px; }
+.v2-api-client dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.v2-api-status { font-size: 12px; border: 1px solid var(--border); padding: 4px 8px; border-radius: 20px; white-space: nowrap; }
+.v2-api-status.is-active { color: var(--primary); }
+.v2-api-danger, .v2-api [role=alert], .v2-api-modal [role=alert] { color: var(--destructive); }
+.v2-api-banner { border-left: 3px solid var(--primary); background: var(--muted); padding: 12px; font-size: 13px; margin-top: 16px; }
+.v2-api-empty { padding: 36px 12px; text-align: center; color: var(--muted-foreground); }
+.v2-api-modal { margin: auto; width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--foreground); padding: 22px; box-shadow: 0 20px 80px #0005; }
+.v2-api-modal::backdrop { background: #0008; }
+.v2-api-modal > header { margin-bottom: 20px; }
+.v2-api-modal p { margin: 12px 0; font-size: 14px; }
+.v2-api-form { display: grid; gap: 14px; min-width: 0; }
+.v2-api-form label, .v2-api-secret { display: grid; gap: 6px; font-size: 13px; }
+.v2-api-form input, .v2-api-form textarea, .v2-api-form select, .v2-api-secret textarea { width: 100%; min-width: 0; }
+.v2-api-instructions { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.65 inherit; font-family: inherit; line-height: 1.65; margin-bottom: 18px; }
+.v2-api-secret textarea { font-family: monospace; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); resize: none; }
+.v2-api-ack { display: flex; align-items: center; gap: 8px; margin: 20px 0; }
+@media (max-width: 600px) { .v2-api { padding: 16px; } .v2-api-head { align-items: flex-start; flex-direction: column; gap: 0; } .v2-api-client > header { align-items: flex-start; } .v2-api-modal { padding: 16px; } }

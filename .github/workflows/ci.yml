@@ -38,6 +38,22 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 14
 
+  external-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: supabase/functions/external-api
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - run: deno task check
+      - run: deno task lint
+      - run: deno task fmt:check
+      - run: deno task test
+
   database:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -65,7 +81,13 @@ jobs:
       - name: Check live priorities and request privacy
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/live_priorities.sql
       - name: Lint database
-        run: supabase db lint --local --level warning
+        run: supabase db lint --local --schema public,external_api_private --level warning
+      - name: Check external API keys, filters, completeness and quotas
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api.sql
+      - name: Check immutable API snapshot pagination
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_pagination.sql
+      - name: Check root API client administration
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_root_admin.sql
       - name: Stop local database
         if: ${{ always() }}
         run: supabase stop --no-backup

@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "check": "deno check index.ts tools/key.ts tests/*.test.ts integration/*.test.ts",
+    "test": "deno test tests/",
+    "lint": "deno lint",
+    "fmt:check": "deno fmt --check",
+    "key": "deno run tools/key.ts",
+    "test:integration": "deno test --allow-net=127.0.0.1,localhost --allow-env=EXTERNAL_API_TEST_URL,EXTERNAL_API_TEST_KEY,EXTERNAL_API_TEST_LIMITED_KEY integration/"
+  },
+  "compilerOptions": { "strict": true },
+  "fmt": { "lineWidth": 100 }
+}
