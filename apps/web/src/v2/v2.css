@@ -12011,6 +12011,48 @@ html[data-ui-theme="light"] .v2-opt-tip,
   width: 44px;
 }
 
+.v2-mem-table.v2-profiles-table { min-width: 760px; max-width: 900px; }
+.v2-profiles-table .v2-mem-col-person { width: 200px; }
+.v2-profiles-table .v2-mem-col-status { width: 132px; }
+.v2-profiles-table .v2-mem-col-roles { width: auto; }
+.v2-profiles-table .v2-mem-col-vip { width: 60px; }
+.v2-profiles-table .v2-mem-col-dist { width: 64px; }
+.v2-profiles-table .v2-mem-status-line, .v2-profiles-table .v2-mem-status-notes { flex-wrap: wrap; }
+.v2-profiles-table .v2-mem-status-notes:empty { display: none; }
+.v2-profiles-table .v2-role-pills { justify-content: flex-start; }
+.v2-profiles-table tbody tr[data-profile-id] { cursor: pointer; }
+.v2-profiles-table tbody tr[data-profile-id]:hover td,
+.v2-profiles-table tbody tr[data-profile-id]:focus-within td { background: color-mix(in srgb, var(--title) 6%, var(--card)); }
+.v2-profiles-table .v2-mem-mark.is-readonly { cursor: inherit; }
+.v2-profiles-table .v2-mem-mark.is-readonly:hover { background: transparent; }
+.v2-profiles-table .v2-mem-id { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; font-family: var(--font-mono), monospace; color: var(--muted-foreground); }
+.v2-profiles-table th.v2-mem-h-vip, .v2-profiles-table td.v2-mem-vip { text-align: center; }
+.v2-profiles-table .v2-mem-sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.v2-mem-sort i { font-size: 8px; opacity: 0.5; }
+.v2-profiles-table .v2-mem-h-vip .v2-mem-sort,
+.v2-profiles-table .v2-mem-h-mark .v2-mem-sort,
+.v2-profiles-table .v2-mem-h-dist .v2-mem-sort { justify-content: center; }
+.v2-profiles-table .v2-mem-h-vip .v2-mem-sort span { white-space: normal; line-height: 1.3; letter-spacing: 0.02em; }
+.v2-mem-sort.is-on, .v2-mem-sort:hover { color: var(--title); }
+.v2-mem-sort.is-on i { opacity: 1; }
+.v2-mem-sort:focus-visible { outline: 1px solid var(--title); outline-offset: 3px; border-radius: 2px; }
+.v2-mem-vip { font-variant-numeric: tabular-nums; font-family: var(--font-mono), monospace; }
+.v2-mem-vip.has-priority { color: var(--title); font-weight: 650; }
+.v2-mem-vip.is-empty { color: var(--muted-foreground); }
+
 .v2-mem-table thead {
   position: sticky;
   top: 0;
@@ -12368,10 +12410,20 @@ input.v2-ctrl.v2-mark-tag {
 
 .v2-profiles-section .v2-mem-filters {
   margin: 8px 16px 8px 42px;
+  max-width: 900px;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 0.8fr) minmax(150px, 0.95fr) auto;
 }
 
 .v2-profiles-section .v2-club-scroll {
   margin: 0 16px 10px 42px;
+  max-width: 900px;
+}
+
+@media (max-width: 900px) {
+  .v2-profiles-section .v2-mem-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 8px; }
+  .v2-profiles-section .v2-mem-filters .v2-field { min-width: 0; }
+  .v2-profiles-section .v2-mem-filter-extra { grid-column: auto; }
+  .v2-profiles-section .v2-club-scroll { margin: 0 8px 10px; }
 }
 
 .v2-mem-filter-extra {

@@ -1,14 +1,11 @@
-import { discordPrimary, hasRoot, peopleRank, personTitle, type AdminPerson, type ClubAccess } from "../data/people";
+import { discordPrimary, hasRoot, peopleRank, personTitle, type AdminPerson } from "../data/people";
 import type { MemberRoomNick } from "../data/plays";
-import { hueOfBg, type ClubMember } from "../schedule/members";
+import type { ClubMember } from "../schedule/members";
+import { asVip } from "../schedule/marks";
 
 export type StatusFilter = "all" | "active" | "blocked" | "left" | "root" | "bot";
-export type SortKey = "access" | "nick" | "joined" | "color";
-
-export type RowDraft = {
-  access: ClubAccess;
-  distanceId: string;
-};
+export type SortKey = "access" | "nick" | "mark" | "roles" | "distanceId" | "vipNitro" | "vipRegular";
+export type SortDirection = "asc" | "desc";
 
 export function discordLine(row: AdminPerson) {
   const extra =
@@ -16,22 +13,6 @@ export function discordLine(row: AdminPerson) {
       ? ` · ${row.globalName}`
       : "";
   return `@${row.username}${extra}`;
-}
-
-export function savedDraft(row: AdminPerson): RowDraft {
-  return {
-    access: row.access,
-    distanceId: row.distanceExtId ?? "",
-  };
-}
-
-export function sameDraft(a: RowDraft, b: RowDraft) {
-  return a.access === b.access && a.distanceId.trim() === b.distanceId.trim();
-}
-
-function markHue(row: AdminPerson) {
-  if (!row.markTag) return 1000;
-  return hueOfBg(row.markBg);
 }
 
 export function roomNickLines(memberId: string | null, map: Map<string, MemberRoomNick[]>) {
@@ -84,6 +65,7 @@ export function filterAndSortPeople(
   statusFilter: StatusFilter,
   sort: SortKey,
   roleIds: ReadonlySet<string>,
+  direction: SortDirection = "asc",
 ) {
   const q = query.trim().toLowerCase();
   const copy = people.filter((row) => {
@@ -111,11 +93,22 @@ export function filterAndSortPeople(
       .toLowerCase()
       .includes(q);
   });
+  const sign = direction === "asc" ? 1 : -1;
+  const compareText = (a: string, b: string) => a.localeCompare(b, "ru", { numeric: true, sensitivity: "base" });
+  // Missing values stay at the bottom even when the direction changes.
+  const compareOptionalText = (a: string, b: string) => Number(!a) - Number(!b) || sign * compareText(a, b);
   copy.sort((a, b) => {
-    if (sort === "joined") return (a.joinedAt ?? "").localeCompare(b.joinedAt ?? "");
-    if (sort === "nick") return discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-    if (sort === "color") return markHue(a) - markHue(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
-    return peopleRank(a) - peopleRank(b) || discordPrimary(a).localeCompare(discordPrimary(b), "ru");
+    const byNick = compareText(discordPrimary(a), discordPrimary(b));
+    if (sort === "vipNitro" || sort === "vipRegular") {
+      const av = asVip(a[sort]);
+      const bv = asVip(b[sort]);
+      return Number(!av) - Number(!bv) || sign * (av - bv) || byNick;
+    }
+    if (sort === "mark") return compareOptionalText(a.markTag?.trim() ?? "", b.markTag?.trim() ?? "") || byNick;
+    if (sort === "roles") return compareOptionalText(a.accessDiscordRoles.map((role) => role.name).join(" "), b.accessDiscordRoles.map((role) => role.name).join(" ")) || byNick;
+    if (sort === "distanceId") return compareOptionalText(a.distanceExtId?.trim() ?? "", b.distanceExtId?.trim() ?? "") || byNick;
+    if (sort === "nick") return sign * byNick;
+    return sign * (peopleRank(a) - peopleRank(b)) || byNick;
   });
   return copy;
 }

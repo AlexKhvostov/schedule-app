@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { PersonAvatar } from "./PersonAvatar";
-import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num } from "./PriorityCalculation";
+import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num, priorityPoints as points } from "./PriorityCalculation";
 import { closePriorityRequest, deletePriorityRequest, getPriorityRequest, listPriorityRequests, loadPriorityRequestAuthors, loadPriorities, setPriorityExclusion, submitPriorityRequest, type PriorityRequestDetail, type PriorityRequestSummary } from "../data/priorities";
 import { calculatePriority, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
 
@@ -156,7 +156,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
         <span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span>
       </div>
       <aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>
-        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? num(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
+        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? (key === "points" ? points : num)(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
       </aside></div>
       <div className="v2-prio-tabs" role="tablist" aria-label={t("priorities.kind")}>{(["nitro", "regular"] as const).map((k) => <button key={k} ref={(node) => { kindTabs.current[k] = node; }} id={`priority-tab-${k}`} type="button" role="tab" aria-selected={kind === k} aria-controls={`priority-panel-${k}`} tabIndex={kind === k ? 0 : -1} disabled={busy || composing} onClick={() => { setKind(k); setHover(null); }} onKeyDown={(e) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
@@ -176,7 +176,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
           <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : undefined}>{row.rank ?? "—"}</span></td>
           <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => canManage ? setSettings(row) : setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : ""}</small></span></button></td>
           {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{num(value, i18n.language)}</button></td>)}
-          <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{num(row.total, i18n.language)}</button></td>
+          <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{points(row.total, i18n.language)}</button></td>
         </tr>)}</tbody></table>{!visible.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
       <div className="v2-prio-request-actions"><Button size="sm" variant="outline" disabled={!current || busy} onClick={() => { setComposing(!composing); setSelected([]); setComment(""); setNotice(""); }}>{t(composing ? "priorities.cancelRequest" : "priorities.submitRequest")}</Button></div>
       {composing && <form className="v2-prio-compose" onSubmit={(e) => { e.preventDefault(); if (!current || !selected.length || busy) return;
@@ -219,7 +219,7 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
         <section className="v2-prio-review-rows"><h3>{t("priorities.reviewRows")} · {detail.snapshot.people.length}</h3>
           <p className="v2-prio-snapshot-note">{t("priorities.reviewHint")}</p>
           {detailRows.map((row, index) => <details key={row.memberId} className="v2-prio-review-person" open={index === 0}>
-            <summary><span>{row.nick}</span><small>{t("priorities.col.rank")}: {row.rank ?? t("priorities.excluded")}{row.vip > 0 ? ` · VIP ${row.vip}` : ""}</small><b>{num(row.total, i18n.language)}<small>{t("priorities.points")}</small></b></summary>
+            <summary><span>{row.nick}</span><small>{t("priorities.col.rank")}: {row.rank ?? t("priorities.excluded")}{row.vip > 0 ? ` · VIP ${row.vip}` : ""}</small><b>{points(row.total, i18n.language)}<small>{t("priorities.points")}</small></b></summary>
             <PriorityCalculation row={row} showHeading={false} />
           </details>)}
         </section>

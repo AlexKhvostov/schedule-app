@@ -17,7 +17,6 @@ import {
   loadClubRequests,
   restoreClubCard,
   reopenJoinRequest,
-  saveMemberDistanceId,
   saveMemberMark,
   type AdminPerson,
   type ClubAccess,
@@ -29,6 +28,7 @@ import { loadScheduleSettings, subscribeScheduleSettings } from "../data/schedul
 import { roomName } from "../schedule/rooms";
 import { bestInk, cssToHex, parseMarkHex } from "../schedule/markCatalog";
 import { lettersBlocked, type ClubMember } from "../schedule/members";
+import { asVip } from "../schedule/marks";
 import { AdminPersonCard } from "./AdminPersonCard";
 import { ScheduleSlot, ScheduleSlotStrip } from "./ScheduleSlot";
 import { PersonChip } from "./PersonAvatar";
@@ -36,7 +36,6 @@ import { catalogRoles, RolePick, RolePills } from "./RolePills";
 import { readSession } from "./session";
 import { loadTheme } from "./theme";
 import { showV2Toast } from "./V2Toast";
-import { V2SaveButton } from "./V2SaveButton";
 import { MembersRoleSettings } from "./members/MembersRoleSettings";
 import { MembersSystemSettings } from "./members/MembersSystemSettings";
 import { DiscordSnapshotModal } from "./members/DiscordSnapshotModal";
@@ -46,10 +45,8 @@ import {
   filterAndSortPeople,
   peopleCounts,
   roomNickLines,
-  sameDraft,
-  savedDraft,
   visibleProfiles,
-  type RowDraft,
+  type SortDirection,
   type SortKey,
   type StatusFilter,
 } from "./membersAdminModel";
@@ -339,13 +336,13 @@ export function MembersAdmin() {
   const [list, setList] = useState<AdminPerson[]>([]);
   const [asks, setAsks] = useState<ClubRequest[]>([]);
   const [roomNicks, setRoomNicks] = useState<Map<string, MemberRoomNick[]>>(new Map());
-  const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
   const [busyLoad, setBusyLoad] = useState(true);
   const [busyGuild, setBusyGuild] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [nickQ, setNickQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("access");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showBots, setShowBots] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [markFor, setMarkFor] = useState<string | null>(null);
@@ -471,55 +468,6 @@ export function MembersAdmin() {
     setBulkBusy(false);
   };
 
-  const shownOf = (row: AdminPerson) => drafts[row.discordId] ?? savedDraft(row);
-
-  const patchRow = (row: AdminPerson, part: Partial<RowDraft>) => {
-    const next = { ...shownOf(row), ...part };
-    setDrafts((prev) => {
-      const copy = { ...prev };
-      if (sameDraft(next, savedDraft(row))) delete copy[row.discordId];
-      else copy[row.discordId] = next;
-      return copy;
-    });
-  };
-
-  const saveRow = async (row: AdminPerson) => {
-    const draft = shownOf(row);
-    const saved = savedDraft(row);
-    if (sameDraft(draft, saved)) return;
-    if (hasRoot(row) && draft.access === "closed") return;
-    if (row.memberId === selfMemberId && draft.access === "closed") return;
-    setBusyId(row.discordId);
-    const memberId = row.memberId;
-    if (draft.distanceId.trim() !== (row.distanceExtId ?? "").trim()) {
-      const distance = await saveMemberDistanceId(memberId, draft.distanceId, row.discordId);
-      if (distance.error === "duplicate") {
-        showV2Toast("err", t("admin.people.distanceIdDup"));
-        setBusyId("");
-        return;
-      }
-      if (distance.error === "bad-shape") {
-        showV2Toast("err", t("admin.people.distanceIdBad"));
-        setBusyId("");
-        return;
-      }
-      if (distance.error) {
-        showV2Toast("err", t("admin.people.saveErr"));
-        setBusyId("");
-        await reload();
-        return;
-      }
-    }
-    setDrafts((prev) => {
-      const copy = { ...prev };
-      delete copy[row.discordId];
-      return copy;
-    });
-    await reload();
-    setBusyId("");
-    showV2Toast("ok", t("admin.saved"));
-  };
-
   const people = useMemo(() => visibleProfiles(list, statusFilter, showBots), [list, showBots, statusFilter]);
   const counts = useMemo(() => peopleCounts(list), [list]);
   const rolePicked = useMemo(() => new Set(roleFilter), [roleFilter]);
@@ -534,8 +482,25 @@ export function MembersAdmin() {
   };
 
   const rows = useMemo(
-    () => filterAndSortPeople(people, nickQ, statusFilter, sort, rolePicked),
-    [people, nickQ, statusFilter, sort, rolePicked],
+    () => filterAndSortPeople(people, nickQ, statusFilter, sort, rolePicked, sortDirection),
+    [people, nickQ, statusFilter, sort, rolePicked, sortDirection],
+  );
+
+  const sortHeader = (key: SortKey, label: string, className?: string, hint?: string) => (
+    <th className={className} title={hint} aria-sort={sort === key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        className={`v2-mem-sort${sort === key ? " is-on" : ""}`}
+        title={t("admin.people.sortColumnHint")}
+        onClick={() => {
+          setSortDirection(sort === key && sortDirection === "asc" ? "desc" : "asc");
+          setSort(key);
+        }}
+      >
+        <span>{label}</span>
+        <i className={`fa-solid ${sort === key ? (sortDirection === "asc" ? "fa-arrow-up" : "fa-arrow-down") : "fa-sort"}`} aria-hidden />
+      </button>
+    </th>
   );
 
   const editing = list.find((row) => (row.memberId ?? row.discordId) === markFor) ?? null;
@@ -622,15 +587,6 @@ export function MembersAdmin() {
                 emptyLabel={t("admin.people.filterRolesAll")}
               />
             </div>
-            <CompactField label={t("admin.people.sortLabel")}>
-              <NativeSelect className="w-full" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
-                {(["access", "nick", "color", "joined"] as SortKey[]).map((key) => (
-                  <option key={key} value={key}>
-                    {t(`admin.people.sort.${key}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </CompactField>
             <div className="v2-mem-filter-extra">
               <label className="v2-mem-check">
                 <input type="checkbox" checked={showBots} onChange={(event) => setShowBots(event.target.checked)} />
@@ -639,35 +595,31 @@ export function MembersAdmin() {
             </div>
           </div>
           <div className="v2-club-scroll">
-            <table className="v2-mem-table v2-club-table">
+            <table className="v2-mem-table v2-club-table v2-profiles-table">
               <colgroup>
                 <col className="v2-mem-col-person" />
                 <col className="v2-mem-col-mark" />
                 <col className="v2-mem-col-status" />
                 <col className="v2-mem-col-roles" />
+                <col className="v2-mem-col-vip" />
+                <col className="v2-mem-col-vip" />
                 <col className="v2-mem-col-dist" />
-                <col className="v2-mem-col-save" />
               </colgroup>
               <thead>
                 <tr>
-                  <th>{t("admin.people.colPerson")}</th>
-                  <th className="v2-mem-h-mark">{t("admin.people.colMark")}</th>
-                  <th>{t("admin.people.colAccess")}</th>
-                  <th title={t("admin.people.colRolesHint")}>{t("admin.people.colRoles")}</th>
-                  <th className="v2-mem-h-dist" title={t("admin.people.distanceIdHint")}>
-                    {t("admin.people.colDist")}
-                  </th>
-                  <th className="v2-mem-h-save" />
+                  {sortHeader("nick", t("admin.people.colPerson"))}
+                  {sortHeader("mark", t("admin.people.colMark"), "v2-mem-h-mark")}
+                  {sortHeader("access", t("admin.people.colAccess"))}
+                  {sortHeader("roles", t("admin.people.colRoles"), undefined, t("admin.people.colRolesHint"))}
+                  {sortHeader("vipNitro", t("admin.people.colVipNitro"), "v2-mem-h-vip", t("admin.people.vipColumnHint"))}
+                  {sortHeader("vipRegular", t("admin.people.colVipRegular"), "v2-mem-h-vip", t("admin.people.vipColumnHint"))}
+                  {sortHeader("distanceId", t("admin.people.colDist"), "v2-mem-h-dist", t("admin.people.distanceIdHint"))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const draft = shownOf(row);
-                  const dirty = !sameDraft(draft, savedDraft(row));
-                  const closedLocked = hasRoot(row) || row.memberId === selfMemberId;
-                  const rowLocked = row.bot || !row.memberId;
                   return (
-                    <tr key={row.discordId} className={row.accessStatus !== "active" || row.bot || (row.memberId && !row.onGuild) ? "is-dim" : undefined}>
+                    <tr key={row.discordId} data-profile-id={row.discordId} title={t("admin.people.openProfileHint")} onClick={() => setProfileFor(row.discordId)} className={row.accessStatus !== "active" || row.bot || (row.memberId && !row.onGuild) ? "is-dim" : undefined}>
                       <td>
                         <PersonTip row={row} rooms={roomNickLines(row.memberId, roomNicks)}>
                           <PersonChip
@@ -679,21 +631,9 @@ export function MembersAdmin() {
                         </PersonTip>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className={`v2-mem-mark${row.markTag ? "" : " is-empty"}`}
-                          title={t("admin.people.markEdit")}
-                          aria-label={t("admin.people.markEdit")}
-                          onClick={() => {
-                            if (!row.memberId) {
-                              showV2Toast("err", t("admin.people.noCard"));
-                              return;
-                            }
-                            setMarkFor(row.memberId);
-                          }}
-                        >
+                        <span className="v2-mem-mark is-readonly">
                           <ScheduleSlot letters={row.markTag ?? ""} bg={row.markBg} fg={row.markFg} tables={row.tables ?? 12} showTables={countTables} />
-                        </button>
+                        </span>
                       </td>
                       <td>
                         {row.bot ? (
@@ -704,16 +644,6 @@ export function MembersAdmin() {
                               <b className={`v2-profile-state is-${row.accessStatus ?? "blocked"}`}>
                                 {row.accessStatus === "active" ? t("admin.people.profileActive") : t("admin.people.profileBlocked")}
                               </b>
-                              {!closedLocked ? (
-                                <button
-                                  type="button"
-                                  className="v2-ctrl v2-status-action"
-                                  disabled={busyId === row.discordId || (row.accessStatus !== "active" && !row.onGuild)}
-                                  onClick={() => void setAccess(row, row.accessStatus === "active" ? "closed" : "member")}
-                                >
-                                  {row.accessStatus === "active" ? t("admin.people.blockProfile") : t("admin.people.restoreCard")}
-                                </button>
-                              ) : null}
                             </span>
                             <span className="v2-mem-status-notes">
                               {hasRoot(row) ? <i className="v2-club-root">{t("admin.root.roleRoot")}</i> : null}
@@ -722,49 +652,26 @@ export function MembersAdmin() {
                             </span>
                           </span>
                         ) : (
-                          <button
-                            type="button"
-                            className="v2-ctrl v2-mem-create"
-                            disabled={busyId === row.discordId}
-                            onClick={() => void makeCard(row.discordId)}
-                          >
-                            {t("admin.people.createCard")}
-                          </button>
+                          <span className="v2-muted">{t("admin.people.noCard")}</span>
                         )}
                       </td>
                       <td>
                         <RolePills roles={row.accessDiscordRoles} max={99} />
                       </td>
+                      {(["vipNitro", "vipRegular"] as const).map((key) => (
+                        <td key={key} className={`v2-mem-vip${asVip(row[key]) ? " has-priority" : " is-empty"}`}>
+                          {asVip(row[key]) || "—"}
+                        </td>
+                      ))}
                       <td>
-                        <Input
-                          className="v2-mem-dist"
-                          value={draft.distanceId}
-                          inputMode="numeric"
-                          maxLength={12}
-                          placeholder="—"
-                          disabled={rowLocked || busyId === row.discordId}
-                          title={t("admin.people.distanceIdHint")}
-                          aria-label={t("admin.people.distanceId")}
-                          onChange={(event) =>
-                            patchRow(row, { distanceId: event.target.value.replace(/\D/g, "").slice(0, 12) })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <V2SaveButton
-                          icon
-                          dirty={dirty}
-                          disabled={busyId === row.discordId}
-                          label={t("admin.save")}
-                          onClick={() => void saveRow(row)}
-                        />
+                        <span className="v2-mem-id" title={row.distanceExtId || undefined}>{row.distanceExtId || "—"}</span>
                       </td>
                     </tr>
                   );
                 })}
                 {!rows.length && !busyLoad && (
                   <tr>
-                    <td colSpan={6} className="v2-muted py-4 text-center text-[12px]">
+                    <td colSpan={7} className="v2-muted py-4 text-center text-[12px]">
                       {list.length ? t("admin.people.empty") : t("admin.people.noSnapshot")}
                     </td>
                   </tr>
