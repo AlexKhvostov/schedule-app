@@ -738,13 +738,12 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   const total = hours.getByRole("row", { name: /^Итого / });
   await expect(nitro).toBeVisible();
   await expect(regularHours).toBeVisible();
-  await expect(hours.getByRole("columnheader")).toHaveText(["Лимит", "Часов", "Мёртвых", "Осталось"]);
+  await expect(hours.getByRole("columnheader")).toHaveText(["Лимит", "Часов", "Осталось"]);
   await expect(hours).not.toContainText("Меток");
   const valueAt = async (row: typeof nitro) => Number(await row.getByRole("cell").nth(0).textContent());
   const [nitroValue, regularValue, totalValue] = await Promise.all([valueAt(nitro), valueAt(regularHours), valueAt(total)]);
   expect(totalValue).toBeLessThan(nitroValue + regularValue);
-  await expect(nitro.getByRole("cell").nth(1)).toHaveText("0.0");
-  await expect(total.getByRole("cell").nth(1)).toHaveText("0.0");
+  await expect(hours.locator(".is-dead")).toHaveCount(0);
   await page.getByRole("button", { name: "Часы", exact: true }).click();
 
   await page.getByRole("button", { name: "Аналитика", exact: true }).click();
@@ -755,11 +754,11 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   const peopleTable = page.locator(".v2-people-table");
   await expect(peopleTable.locator("thead")).toContainText("N50");
   await expect(peopleTable.locator("thead")).not.toContainText("E50");
-  await expect(peopleTable.locator("thead")).toContainText("ч / м.ч.");
-  await expect(peopleTable.locator("thead")).toContainText("Мёртвые");
+  await expect(peopleTable.locator("thead")).not.toContainText("ч / м.ч.");
+  await expect(peopleTable.locator("thead")).not.toContainText("Мёртвые");
   const currentRow = peopleTable.locator(".v2-people-row", { hasText: "you" });
-  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —"]);
-  await expect(currentRow.locator(".v2-people-dead-total")).toHaveText("—");
+  await expect(currentRow.locator(".v2-people-num small")).toHaveCount(0);
+  await expect(currentRow.locator(".v2-people-dead-total")).toHaveCount(0);
   await currentRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("N50");
   await expect(page.locator(".v2-user-card")).not.toContainText("E50");
@@ -767,7 +766,7 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(peopleTable.locator("thead")).toContainText("E50");
   await expect(peopleTable.locator("thead")).not.toContainText("N50");
-  await expect(currentRow.locator(".v2-people-num small")).toHaveText(["м. —"]);
+  await expect(currentRow.locator(".v2-people-num small")).toHaveCount(0);
   await currentRow.click();
   await expect(page.locator(".v2-user-card")).toContainText("E50");
   await expect(page.locator(".v2-user-card")).not.toContainText("N50");
@@ -1166,4 +1165,40 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await expect(middle).not.toHaveClass(/is-on/);
   await expect(end).toHaveClass(/is-on/);
   await expectFullTag(start, ":scope > .v2-opt-face > b");
+});
+
+
+test("dead-time statistics appear only while intervals exist and update in both open panels", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "Часы", exact: true }).click();
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  const hours = page.locator(".v2-hours-summary");
+  const people = page.locator(".v2-people-table");
+  await expect(hours.locator("tbody tr").first()).toBeVisible();
+  await expect(people.locator(".v2-people-nicks").first()).toBeVisible();
+  const ordinaryHours = await hours.locator("tbody tr td:first-of-type").allTextContents();
+  const names = await people.locator(".v2-people-nicks").allTextContents();
+
+  for (const enabled of [false, true, false]) {
+    await page.evaluate((enabled) => {
+      localStorage.setItem("redparty.demo.dead-time.v1", JSON.stringify(enabled
+        ? [{ id: "test", variant: "nitro", limit: "50", startHalf: 0, endHalf: 48 }] : []));
+      window.dispatchEvent(new Event("redparty:demo-dead-time"));
+    }, enabled);
+    await expect(hours.locator("thead .is-dead")).toHaveCount(enabled ? 1 : 0);
+    await expect(people.locator("thead .v2-people-dead-total")).toHaveCount(enabled ? 1 : 0);
+    await expect(people.locator("col.v2-people-col-dead")).toHaveCount(enabled ? 1 : 0);
+    await expect(people.locator("thead .v2-people-limit small").first()).toHaveText(enabled ? "ч / м.ч." : "ч");
+    if (enabled) {
+      await expect(people.locator(".v2-people-num small").first()).toBeVisible();
+      await expect(hours.locator("tfoot .is-dead")).toBeVisible();
+    } else {
+      await expect(people.locator(".v2-people-num small, .v2-people-dead-total")).toHaveCount(0);
+      await expect(hours.locator(".is-dead")).toHaveCount(0);
+    }
+    await expect(hours.locator("tbody tr td:first-of-type")).toHaveText(ordinaryHours);
+    await expect(people.locator(".v2-people-nicks")).toHaveText(names);
+  }
 });

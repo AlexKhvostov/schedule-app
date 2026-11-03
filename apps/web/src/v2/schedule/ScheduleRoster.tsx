@@ -15,12 +15,13 @@ type Props = {
   historicalRoster: RosterRow[];
   auxiliaryLabels: string[];
   deadTimeByMember: Record<string, DeadTimeBreakdown> | null;
+  showDeadTime: boolean;
   kind: ScheduleVariant;
   showTables: boolean;
   onPeek: (row: RosterRow) => void;
 };
 
-export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, deadTimeByMember, kind, showTables, onPeek }: Props) {
+export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, deadTimeByMember, showDeadTime, kind, showTables, onPeek }: Props) {
   const { t } = useTranslation();
   return (
     roster.length || historicalRoster.length ? (
@@ -35,7 +36,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
           {auxiliaryLabels.map((limit) => (
             <col key={limit} className="v2-people-col-limit" />
           ))}
-          <col className="v2-people-col-dead" />
+          {showDeadTime && <col className="v2-people-col-dead" />}
           <col className="v2-people-col-tick" />
         </colgroup>
         <thead>
@@ -50,13 +51,13 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                 title={t("schedule.colHoursHint", { limit: displayScheduleColumn(limit) })}
               >
                 <span>{displayScheduleColumn(limit)}</span>
-                <small>{t("schedule.colHoursDeadUnits")}</small>
+                <small>{t(showDeadTime ? "schedule.colHoursDeadUnits" : "schedule.colHoursUnit")}</small>
               </th>
             ))}
-            <th className="v2-people-dead-total" title={t("schedule.deadTotalHint")}>
+            {showDeadTime && <th className="v2-people-dead-total" title={t("schedule.deadTotalHint")}>
               <span>{t("schedule.deadTotal")}</span>
               <small>{t("schedule.colHoursUnit")}</small>
-            </th>
+            </th>}
             <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
               <i className="fa-solid fa-check" aria-hidden />
             </th>
@@ -73,7 +74,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
               <Fragment key={row.mark.memberId || markKey(row.mark)}>
                 {historical && row === historicalRoster[0] ? (
                   <tr className="v2-people-historical-head">
-                    <td colSpan={5 + auxiliaryLabels.length}>{t("schedule.playersHistorical")}</td>
+                    <td colSpan={4 + Number(showDeadTime) + auxiliaryLabels.length}>{t("schedule.playersHistorical")}</td>
                   </tr>
                 ) : null}
                 <tr
@@ -131,16 +132,16 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                         title={t("schedule.colHoursHint", { limit: label })}
                       >
                         <b>{formatHours(stat.hours)}</b>
-                        <small>{t("schedule.deadHoursShort")} {deadTimeByMember && deadHours ? formatHours(deadHours) : "—"}</small>
+                        {showDeadTime && <small>{t("schedule.deadHoursShort")} {deadTimeByMember && deadHours ? formatHours(deadHours) : "—"}</small>}
                       </td>
                     );
                   })}
-                  <td
+                  {showDeadTime && <td
                     className={`v2-people-num v2-people-dead-total${memberDeadTime?.total ? " is-on" : ""}`}
                     title={t("schedule.deadTotalHint")}
                   >
                     {deadTimeByMember && memberDeadTime?.total ? formatHours(memberDeadTime.total) : "—"}
-                  </td>
+                  </td>}
                   <td className="v2-people-tick-cell">
                     <button
                       type="button"

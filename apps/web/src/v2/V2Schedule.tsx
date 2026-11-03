@@ -257,6 +257,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     () => (showHours ? myHoursMatrix(hoursGrids, me, dockLimits, { year, monthIndex, cet: cetTick }) : null),
     [showHours, hoursGrids, me, dockLimits, year, monthIndex, cetTick],
   );
+  const showDeadTime = Boolean(deadTimeIntervals?.length);
   const deadTimeByMember = useMemo(
     () => deadTimeIntervals ? deadTimeBreakdownsByMember(auxiliaryItems, deadTimeIntervals) : null,
     [auxiliaryItems, deadTimeIntervals],
@@ -520,6 +521,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           <HoursPanel
             matrix={hoursMatrix}
             deadTime={myDeadTime}
+            showDeadTime={showDeadTime}
             year={year}
             monthIndex={monthIndex}
             x={hoursPos.x}
@@ -582,6 +584,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               historicalRoster={historicalRoster}
               auxiliaryLabels={rosterLabels}
               deadTimeByMember={rosterDeadTime}
+              showDeadTime={showDeadTime}
               kind={rosterKind}
               showTables={countTables && !hideTables}
               onPeek={(row) => { setPeek(row); setFront("user"); }}
