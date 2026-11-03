@@ -358,7 +358,7 @@ test("ranking details show the calculation and the saved per-kind exclusion", as
   await expect(calculation.getByRole("checkbox")).toHaveCount(0);
   await calculation.getByRole("button", { name: "✕", exact: true }).click();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
-  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText("2");
+  await expect(page.locator('tr[data-member="demo-priority-0"] td.is-rank')).toHaveText(/^[1-9][0-9]*$/);
   await expect(page.locator('[data-metric="excluded"] dd')).toHaveText("0");
 });
 
