@@ -14,6 +14,7 @@ export function OptNlChip({
   ghost?: boolean;
 }) {
   if (ghost) return <div className="v2-opt-nl is-ghost" aria-hidden />;
+  const [limitLabel, laneNumber] = label.split("·");
   const chipTone = variant === "nitro"
     ? `color-mix(in srgb, var(--primary) 68%, ${tone ?? "var(--muted-foreground)"})`
     : variant === "regular"
@@ -24,8 +25,9 @@ export function OptNlChip({
       {lab ? (
         label
       ) : (
-        <span className="v2-limit-chip" style={chipTone ? { color: chipTone } : undefined}>
-          {label}
+        <span className="v2-limit-chip" aria-label={label} style={chipTone ? { color: chipTone } : undefined}>
+          <span className="v2-opt-limit-label" aria-hidden>{limitLabel}</span>
+          {laneNumber && <span className="v2-opt-lane-number" aria-hidden>{laneNumber}</span>}
         </span>
       )}
     </div>
