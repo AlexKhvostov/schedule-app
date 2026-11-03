@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Dialog } from "@/components/ui/dialog";
+import { V2Float } from "./V2Float";
+import { centerPos, useWindowPos } from "./windowPos";
 import { isLiveData } from "../data/config";
 import { loadOnlineMembers, pingMemberPresence, type OnlineMember } from "../data/online";
 import { PersonAvatar } from "./PersonAvatar";
 
 const REFRESH_MS = 30_000;
+const PANEL_WIDTH = 352;
 
 export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; nick: string; avatarUrl: string | null }) {
   const { t, i18n } = useTranslation();
   const live = isLiveData();
   const [open, setOpen] = useState(false);
+  const [pos, move] = useWindowPos("online", () => centerPos(PANEL_WIDTH, 230));
   const [members, setMembers] = useState<OnlineMember[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -88,6 +91,10 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
   return (
     <>
       <button type="button" className={`v2-nav-link${open ? " is-on" : ""}`} aria-label={t("online.title")} aria-haspopup="dialog" aria-expanded={open} onClick={() => {
+        if (open) {
+          setOpen(false);
+          return;
+        }
         setFailed(false);
         setMembers(null);
         setOpen(true);
@@ -95,7 +102,18 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
         <i className="fa-solid fa-users" aria-hidden />
         <span>{t("online.title")}</span>
       </button>
-      <Dialog open={open} title={t("online.title")} onClose={() => setOpen(false)} className="v2-online-dialog">
+      {open && <V2Float
+        role="dialog"
+        title={t("online.title")}
+        x={pos.x}
+        y={pos.y}
+        width={PANEL_WIDTH}
+        z={57}
+        compact
+        onMove={move}
+        onClose={() => setOpen(false)}
+        className="v2-online-dialog"
+      >
         {failed ? <p role="alert">{t("online.loadError")}</p>
           : !rows ? <p role="status">{t("priorities.loading")}</p>
           : ([true, false] as const).map((online) => {
@@ -124,7 +142,7 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
               })}</ul> : <p>{t("online.empty")}</p>}
             </section>;
           })}
-      </Dialog>
+      </V2Float>}
     </>
   );
 }

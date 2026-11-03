@@ -43,3 +43,6 @@ API README/BOT-CONNECTION/OpenAPI, docs/current-state, decisions, operations, co
 ## Рабочая копия и выпуск
 
 Ветка codex/api-compact-v1, база origin/main976ca1b. Каталог C:/Users/alexe/.codex/worktrees/api-compact-v1/schedule-app. Общая исходная dirty-копия не перезаписывалась. Git push и облачный deploy не выполнялись. Для выпуска нужен сайт с новыми инструкциями и обновление external-api; схема и ключи прежние.
+
+
+4 ноября2026 следующий этап разрешён пользователем: [общий выпуск](2026-11-04-combined-release.md). Сервер компактного API установлен, сайт выпускается с изменениями других чатов. Актуальный статус публикации — в отчёте выпуска.

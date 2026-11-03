@@ -15,7 +15,8 @@ type Props = {
   footer?: ReactNode;
   headerActions?: ReactNode;
   onMove: (x: number, y: number) => void;
-  onFocus: () => void;
+  onFocus?: () => void;
+  role?: "dialog";
   onClose: () => void;
   children: ReactNode;
 };
@@ -34,6 +35,7 @@ export function V2Float({
   headerActions,
   onMove,
   onFocus,
+  role,
   onClose,
   children,
 }: Props) {
@@ -73,6 +75,8 @@ export function V2Float({
     <div
       className={`v2-float${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
       style={{ left: box.x, top: box.y, width: box.width, zIndex: z }}
+      role={role}
+      aria-label={role ? title : undefined}
       onPointerDown={onFocus}
     >
       <header

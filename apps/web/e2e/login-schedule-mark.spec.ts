@@ -406,6 +406,9 @@ test("schedule time hint works in view mode and drag shows the full range", asyn
 
 test("mobile schedule starts safe and only edits at a readable zoom", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.setItem("v2-capacity", JSON.stringify({ "50": { hours: Array(24).fill(2) } }));
+  });
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
@@ -417,6 +420,11 @@ test("mobile schedule starts safe and only edits at a readable zoom", async ({ p
   await expect(page.locator('.v2-opt-hour[data-h="0"] .v2-opt-hour-short')).toHaveText("0");
   await expect(page.locator('.v2-opt-hour[data-h="0"] .v2-opt-hour-full')).toBeHidden();
   await expect(page.locator('.v2-opt-hour[data-h="0"] small')).toBeHidden();
+  await expect(page.locator(".v2-opt")).toHaveClass(/is-overview/);
+  const laneNumber = page.locator(".v2-opt-lane-number").first();
+  await expect(laneNumber).toBeAttached();
+  await expect(laneNumber).toBeHidden();
+  await expect(page.locator(".v2-opt-limit-label").first()).toBeVisible();
   const foreign = page.locator('[data-slot].is-on:not([data-mark="YO"])').first();
   await foreign.dispatchEvent("pointerdown", { pointerId: 17, pointerType: "touch", button: 0, clientX: 120, clientY: 220 });
   await foreign.dispatchEvent("pointerup", { pointerId: 17, pointerType: "touch", button: 0, clientX: 120, clientY: 220 });
@@ -440,6 +448,7 @@ test("mobile schedule starts safe and only edits at a readable zoom", async ({ p
   await expect(fitZoom).toHaveText(initialFitLabel ?? "");
   for (let i = 0; i < 8; i += 1) await zoomIn.click();
   await expect(edit).toBeEnabled();
+  await expect(laneNumber).toBeVisible();
   await edit.click();
   await expect(dock.getByRole("button", { name: "Готово" })).toHaveAttribute("aria-pressed", "true");
   await expect(zoomIn).toBeDisabled();
@@ -1224,7 +1233,7 @@ test("dead-time statistics appear only while intervals exist and update in both 
   }
 });
 
-test("active members can open and close the Online panel from the right side of the header", async ({ page }) => {
+test("active members can move the Online panel and keep using the schedule", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
@@ -1234,6 +1243,17 @@ test("active members can open and close the Online panel from the right side of 
   await online.click();
   await expect(dialog).toContainText("На сайте · 1");
   await expect(dialog).toContainText("Только что");
-  await dialog.getByRole("button", { name: "✕" }).click();
+  const heading = dialog.getByRole("heading", { name: "Онлайн" });
+  const before = (await dialog.boundingBox())!;
+  const header = (await heading.boundingBox())!;
+  await page.mouse.move(header.x + 10, header.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(header.x + 90, header.y + 45, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await dialog.boundingBox())!.x).toBeGreaterThan(before.x);
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Игроки месяца" })).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "close" }).click();
   await expect(dialog).toHaveCount(0);
 });
