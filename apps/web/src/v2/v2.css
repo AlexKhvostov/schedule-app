@@ -5410,14 +5410,15 @@ i.v2-staff-ico {
 
 .v2-bar-mark-edit {
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   flex: none;
   place-items: center;
   padding: 0;
-  border: 0;
+  margin-left: 3px;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: transparent;
+  background: var(--card);
   color: var(--muted-foreground);
   font-size: 11px;
   cursor: pointer;
@@ -5430,7 +5431,14 @@ i.v2-staff-ico {
 
 .v2-bar-mark-edit.is-on {
   color: var(--now, #e11d2e);
-  background: color-mix(in srgb, var(--now, #e11d2e) 18%, transparent);
+  border-color: var(--now, #e11d2e);
+  background: color-mix(in srgb, var(--now, #e11d2e) 24%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--now, #e11d2e) 20%, transparent);
+}
+
+.v2-bar-mark-edit:focus-visible {
+  outline: 2px solid var(--title);
+  outline-offset: 2px;
 }
 
 .v2-bar-mark-busy {
@@ -5475,8 +5483,9 @@ i.v2-staff-ico {
   left: 9px;
 }
 
-.v2-bar-mark.is-edit:not(.is-proxy) {
-  border-color: color-mix(in srgb, var(--now, #e11d2e) 42%, var(--border));
+.v2-bar-mark.is-edit {
+  border-color: color-mix(in srgb, var(--now, #e11d2e) 60%, var(--border));
+  background: color-mix(in srgb, var(--now, #e11d2e) 10%, var(--card));
 }
 
 button.v2-bar-mark-hit {

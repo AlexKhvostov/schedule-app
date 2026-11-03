@@ -37,7 +37,25 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  const brush = page.locator(".v2-bar-mark");
+  const edit = page.getByTitle("Редактирование");
+  const highlight = page.getByRole("button", { name: "Другие лимиты", exact: true });
+  await expect(highlight).toBeVisible();
+  const highlightBox = await highlight.boundingBox();
+  const editBox = await edit.boundingBox();
+  expect(editBox!.x).toBeGreaterThanOrEqual(highlightBox!.x + highlightBox!.width);
+  const inactiveBackground = await brush.evaluate((node) => getComputedStyle(node).backgroundColor);
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "true");
+  await expect(edit).toHaveAttribute("aria-pressed", "false");
+  await expect(brush).not.toHaveClass(/is-edit/);
   await page.getByTitle("Редактирование").click();
+  await expect(edit).toHaveAttribute("aria-pressed", "true");
+  await expect(brush).toHaveClass(/is-edit/);
+  expect(await brush.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(inactiveBackground);
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "false");
+  await expect(edit).toHaveAttribute("aria-pressed", "true");
   const candidate = page.locator('[data-slot]:not(.is-past):not(.is-lock):not(.is-on)').first();
   await expect(candidate).toBeVisible();
   const lane = await candidate.getAttribute("data-lane");
@@ -50,6 +68,9 @@ test("login → schedule → place and remove own mark", async ({ page }) => {
 
   await editableCell.click();
   await expect(editableCell).not.toHaveClass(/is-on/);
+  await edit.press("Enter");
+  await expect(edit).toHaveAttribute("aria-pressed", "false");
+  await expect(brush).not.toHaveClass(/is-edit/);
 });
 
 test("cancelled schedule drag keeps cells empty and the next drag still works", async ({ page }) => {

@@ -151,17 +151,6 @@ export function BarMark({
       ) : (
         <span className="v2-bar-mark-hit">{slot}</span>
       )}
-      {showEdit ? (
-        <button
-          type="button"
-          className={`v2-bar-mark-edit${editOn ? " is-on" : ""}`}
-          title={t("schedule.editMode")}
-          aria-pressed={editOn}
-          onClick={onToggleEdit}
-        >
-          <i className="fa-solid fa-pencil" />
-        </button>
-      ) : null}
       {showBusyToggle ? (
         <button
           type="button"
@@ -190,6 +179,17 @@ export function BarMark({
             </button>
           ) : null}
         </span>
+      ) : null}
+      {showEdit ? (
+        <button
+          type="button"
+          className={`v2-bar-mark-edit${editOn ? " is-on" : ""}`}
+          title={t("schedule.editMode")}
+          aria-pressed={editOn}
+          onClick={onToggleEdit}
+        >
+          <i className="fa-solid fa-pencil" />
+        </button>
       ) : null}
       {menuOpen && menuBox
         ? createPortal(
