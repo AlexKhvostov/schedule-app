@@ -99,10 +99,8 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                     <span className="v2-people-who">
                       <PersonAvatar src={row.mark.avatarUrl} label={rowInitials(guild, row.mark.t)} size="sm" />
                       <span className="v2-people-nicks">
-                        <b>
-                          {guild}
-                          {room ? <i> ({room})</i> : null}
-                        </b>
+                        <b title={guild}>{guild}</b>
+                        {room ? <span title={room}>{room}</span> : null}
                       </span>
                     </span>
                   </td>

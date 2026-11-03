@@ -23,7 +23,8 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
   await expect.poll(ids).toEqual(["RP-221", "RP-308", "RP-104", "RP-415"]);
   await expect(active.locator(".v2-people-rank")).toHaveText(["1", "2", "3", "4"]);
   await expect(active.first()).toHaveClass(/is-vip/);
-  await expect(active.nth(2).locator(".v2-people-nicks")).toHaveText("polar (PolarWin)");
+  await expect(active.nth(2).locator(".v2-people-nicks > b")).toHaveText("polar");
+  await expect(active.nth(2).locator(".v2-people-nicks > span")).toHaveText("PolarWin");
   await expect(table.locator("thead")).toContainText("N50");
   await expect(table.locator("thead")).not.toContainText("E50");
 

@@ -14323,9 +14323,14 @@ img.v2-people-ava {
   white-space: nowrap;
 }
 
-.v2-people-nicks i {
-  font-style: normal;
-  font-weight: 500;
+.v2-people-nicks > span {
+  display: block;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted-foreground);
 }
 
