@@ -93,8 +93,9 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                     }
                   }}
                 >
-                  <td className={`v2-people-rank${vip ? " is-vip" : ""}`}>
+                  <td className="v2-people-rank">
                     <b>{row.n || null}</b>
+                    {vip ? <small className="v2-people-vip-number" title={t("cabinet.vipLabel")}>{vip}</small> : null}
                   </td>
                   <td>
                     <span className="v2-people-who">

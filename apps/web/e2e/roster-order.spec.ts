@@ -21,8 +21,25 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
   const active = table.locator(".v2-people-row:not(.is-historical)");
   const ids = () => active.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-member")));
   await expect.poll(ids).toEqual(["RP-221", "RP-308", "RP-104", "RP-415"]);
-  await expect(active.locator(".v2-people-rank")).toHaveText(["1", "2", "3", "4"]);
+  await expect(active.locator(".v2-people-rank > b")).toHaveText(["1", "2", "3", "4"]);
   await expect(active.first()).toHaveClass(/is-vip/);
+  const vip = active.locator(".v2-people-vip-number").nth(1);
+  await expect(vip).toHaveText("3");
+  const layout = await vip.evaluate((node) => {
+    const rank = node.previousElementSibling!;
+    const row = node.closest("tr")!;
+    const before = row.getBoundingClientRect().height;
+    const rankStyle = getComputedStyle(rank);
+    const vipStyle = getComputedStyle(node);
+    const stacked = node.getBoundingClientRect().top >= rank.getBoundingClientRect().bottom;
+    const smaller = parseFloat(vipStyle.fontSize) < parseFloat(rankStyle.fontSize);
+    const style = (node as HTMLElement).style;
+    style.display = "none";
+    const after = row.getBoundingClientRect().height;
+    style.removeProperty("display");
+    return { stacked, smaller, sameHeight: before === after };
+  });
+  expect(layout).toEqual({ stacked: true, smaller: true, sameHeight: true });
   await expect(active.nth(2).locator(".v2-people-nicks > b")).toHaveText("polar");
   await expect(active.nth(2).locator(".v2-people-nicks > span")).toHaveText("PolarWin");
   await expect(table.locator("thead")).toContainText("N50");
@@ -44,7 +61,7 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
     window.dispatchEvent(new Event("priority-distance-changed"));
   });
   await expect.poll(ids).toEqual(["RP-221", "RP-308", "RP-415", "RP-104"]);
-  await expect(active.locator(".v2-people-rank")).toHaveText(["1", "2", "3", ""]);
+  await expect(active.locator(".v2-people-rank > b")).toHaveText(["1", "2", "3", ""]);
   await expect(active.last()).toHaveAttribute("title", "Вне рейтинга");
   await page.screenshot({ path: testInfo.outputPath("roster-nitro.png") });
 
@@ -53,7 +70,7 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
   await expect(regular).toBeFocused();
   await expect(regular).toHaveAttribute("aria-selected", "true");
   await expect.poll(ids).toEqual(["RP-308", "RP-221", "RP-104", "RP-415"]);
-  await expect(active.locator(".v2-people-rank")).toHaveText(["1", "2", "3", "4"]);
+  await expect(active.locator(".v2-people-rank > b")).toHaveText(["1", "2", "3", "4"]);
   await expect(table.locator("thead")).toContainText("E50");
   await expect(table.locator("thead")).not.toContainText("N50");
   await expect(avatar).toBeVisible();
