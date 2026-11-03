@@ -12,6 +12,7 @@ import { loadPrefs } from "./prefs";
 import { setAppLanguage } from "../i18n";
 import { V2Wait } from "./V2Wait";
 import { writeSession, type Session } from "./session";
+import { OnlineMenu } from "./OnlineMenu";
 import { PersonAvatar } from "./PersonAvatar";
 import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/compact-menu";
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
@@ -250,6 +251,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
           <V2HeaderClock />
           <div className="v2-top-end">
+            {session.access === "active" && <OnlineMenu key={session.memberId ?? session.nick} memberId={session.memberId} nick={nick} avatarUrl={avatarUrl} />}
             {isAdmin ? (
               <div className="v2-staff" ref={adminRef}>
                 <button

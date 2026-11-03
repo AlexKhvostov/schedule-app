@@ -154,3 +154,5 @@ order by delivery_status;
 Откат сайта — обычный revert выпуска в main; таблицы API и данные расписания не удалять. При необходимости остановить конкретного клиента — revoke в Root → API; cron очистит истёкшие снимки. [Отчёт полного выпуска](../memory/tasks/2026-11-03-main-api-schedule-release.md).
 
 Миграция [чтения участия в рейтинге](../supabase/migrations/20261103191708_admin_priority_exclusions.sql) нужна для отображения галок в анкете. Она применяется в Working перед публикацией клиента.
+
+Для выпуска окна «Онлайн» сначала применить [миграцию присутствия](../supabase/migrations/20261103200602_member_online.sql), затем опубликовать клиент. SQL-контракт проверяется в supabase/tests/member_online.sql.

@@ -1223,3 +1223,17 @@ test("dead-time statistics appear only while intervals exist and update in both 
     await expect(people.locator(".v2-people-nicks")).toHaveText(names);
   }
 });
+
+test("active members can open and close the Online panel from the right side of the header", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  const online = page.locator(".v2-top-end").getByRole("button", { name: "Онлайн" });
+  const dialog = page.getByRole("dialog", { name: "Онлайн" });
+  await expect(dialog).toHaveCount(0);
+  await online.click();
+  await expect(dialog).toContainText("На сайте · 1");
+  await expect(dialog).toContainText("Только что");
+  await dialog.getByRole("button", { name: "✕" }).click();
+  await expect(dialog).toHaveCount(0);
+});

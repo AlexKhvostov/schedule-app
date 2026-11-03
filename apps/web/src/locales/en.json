@@ -1,4 +1,15 @@
 {
+  "online": {
+    "title": "Online",
+    "present": "On site",
+    "recent": "Recently seen",
+    "justNow": "Just now",
+    "activity": "Activity · {{time}}",
+    "editedSchedule": "Edited {{schedule}} · {{time}}",
+    "edited": "Edited the schedule · {{time}}",
+    "empty": "Nobody is online",
+    "loadError": "Could not load the list. Retrying automatically."
+  },
   "brand": {
     "name": "schedule",
     "sandbox": "sandbox"

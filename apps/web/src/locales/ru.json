@@ -1,4 +1,15 @@
 {
+  "online": {
+    "title": "Онлайн",
+    "present": "На сайте",
+    "recent": "Недавно были",
+    "justNow": "Только что",
+    "activity": "Активность · {{time}}",
+    "editedSchedule": "Редактирование {{schedule}} · {{time}}",
+    "edited": "Редактирование расписания · {{time}}",
+    "empty": "Сейчас никого нет",
+    "loadError": "Не удалось загрузить список. Повторим автоматически."
+  },
   "brand": {
     "name": "schedule",
     "sandbox": "песочница"
