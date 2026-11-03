@@ -18,7 +18,7 @@
 | Выкладка сайта | **Vercel** | облако |
 | Скрейпер (позже) | **Render** (уже есть аккаунт) | отдельный сервис, не сайт |
 | Discord-бот (снимок, снятие метки, отправка Root) | **Supabase Edge Functions** | `discord-guild`, `notify-mark-removed`, `bot-send` |
-| Внешний API для машинных клиентов (локально) | **Supabase Edge Function**, Deno/TypeScript, встроенный fetch → закрытая RPC, Postgres-снимки/страницы и существующий pg_cron для очистки; без сторонних runtime-импортов | `supabase/functions/external-api`; контракт OpenAPI3.1, тестовый Deno2.9.6 |
+| Внешний API для машинных клиентов | **Supabase Edge Function**, Deno/TypeScript, встроенный fetch → закрытая RPC, Postgres-снимки/страницы и существующий pg_cron для очистки; без сторонних runtime-импортов | `supabase/functions/external-api`; контракт OpenAPI3.1, тестовый Deno2.9.6 |
 | Интерфейс RU / EN | **i18next** | `apps/web/src/locales` |
 
 Язык интерфейса в коде: **TypeScript**. Тексты UI — только в `locales/ru.json` и `locales/en.json`.
