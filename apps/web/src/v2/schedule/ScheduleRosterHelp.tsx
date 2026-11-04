@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-export function ScheduleRosterHelp({ preliminary }: { preliminary: boolean }) {
+export function ScheduleRosterHelp({ preliminary, group }: { preliminary: boolean; group?: string }) {
   const { t } = useTranslation();
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -16,14 +16,14 @@ export function ScheduleRosterHelp({ preliminary }: { preliminary: boolean }) {
       left: Math.max(8, Math.min(anchor.right - box.width, window.innerWidth - box.width - 8)),
       top: Math.max(8, Math.min(anchor.bottom + 6, window.innerHeight - box.height - 8)),
     });
-  }, [open, preliminary]);
+  }, [open, preliminary, group]);
   return <span className="v2-roster-help" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
     <button ref={button} type="button" className="v2-roster-info" aria-label={t("schedule.rosterHelp")} aria-expanded={open} aria-describedby={open ? id : undefined}
       onClick={() => setOpen(true)} onBlur={() => setOpen(false)}
       onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}
     >i</button>
     {open && createPortal(<span ref={tip} id={id} role="tooltip" className="v2-roster-help-tip" style={position}>
-      {t("schedule.rosterOrderHint")}
+      {t(group === "none" ? "priorities.noSelectedGroup" : group === "250" ? "priorities.noDistance250" : "schedule.rosterOrderHint")}
       {preliminary && <span>{t("schedule.rosterPreliminary")}</span>}
     </span>, document.body)}
   </span>;

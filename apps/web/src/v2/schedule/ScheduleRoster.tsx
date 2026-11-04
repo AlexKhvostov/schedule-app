@@ -101,7 +101,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
             const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
             const guild = showNick(row.mark.discord) || "—";
             const room = showNick(row.mark.room);
-            const vip = historical || row.excluded ? null : vipOf(row.mark, kind);
+            const vip = historical || row.excluded ? null : row.core ?? vipOf(row.mark, kind);
             return (
               <Fragment key={row.mark.memberId || markKey(row.mark)}>
                 {historical && row === historicalRoster[0] ? (
@@ -127,7 +127,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                 >
                   <td className="v2-people-rank">
                     <b>{row.n || null}</b>
-                    {vip ? <small className="v2-people-vip-number" title={t("cabinet.vipLabel")}>{vip}</small> : null}
+                    {vip ? <small className="v2-people-vip-number" title={t("priorities.coreBadge", { n: vip })}>{vip}</small> : null}
                   </td>
                   <td>
                     <span className="v2-people-who">

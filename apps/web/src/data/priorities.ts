@@ -1,10 +1,12 @@
+import { loadRoleAccess, rolesWithGrantedAccess } from "./roleAccess";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
+import { loadMembers, limitsOfKind } from "../schedule/members";
 import { demoDistanceBook } from "./distanceBook";
-import { priorityMonths, priorityToday, shiftPriorityMonth, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
+import { calculatePriority, priorityMonths, priorityToday, type PriorityGroup, shiftPriorityMonth, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
 
-export type PriorityRequestSummary = { id: string; periodStart: string; variant: PriorityKind; createdAt: string; closedAt: string | null; response: string | null; targets: { memberId: string; nick: string }[] };
-export type PriorityRequestDetail = { id: string; variant: PriorityKind; author: string; comment: string; createdAt: string; closedAt: string | null; response: string | null; snapshot: Pick<PrioritySource, "periodStart" | "today" | "lastMonthEntries" | "people"> & { version: number; rankingPeople: PriorityPerson[]; vipEnabled: boolean } };
+export type PriorityRequestSummary = { id: string; periodStart: string; variant: PriorityKind; group?: PriorityGroup; createdAt: string; closedAt: string | null; response: string | null; targets: { memberId: string; nick: string }[] };
+export type PriorityRequestDetail = { id: string; variant: PriorityKind; author: string; comment: string; createdAt: string; closedAt: string | null; response: string | null; snapshot: Pick<PrioritySource, "periodStart" | "today" | "lastMonthEntries" | "people"> & { version: number; group?: PriorityGroup; calculatedAt?: string; rankingPeople: PriorityPerson[]; vipEnabled: boolean } };
 type DemoRequest = PriorityRequestSummary & { detail: PriorityRequestDetail };
 const DEMO_REQUESTS = "v2-priority-requests-1";
 const DEMO_EXCLUSIONS = "v2-priority-exclusions-1";
@@ -20,6 +22,7 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<{ da
 export function demoPrioritySource(periodStart: string, canManage: boolean): PrioritySource {
   const months = priorityMonths(periodStart);
   const exclusions = readDemo<Record<string, { nitro?: boolean; regular?: boolean }>>(DEMO_EXCLUSIONS, {});
+  const members = loadMembers();
   const firstBook = demoDistanceBook(months[0]);
   const people: PriorityPerson[] = firstBook.people.filter((p) => p.memberId).map((p) => ({
     memberId: p.memberId!, nick: p.nick, avatarUrl: p.avatarUrl, redParty: p.redParty, team50: true, hasActiveProfile: p.hasActiveProfile,
@@ -36,27 +39,56 @@ export function demoPrioritySource(periodStart: string, canManage: boolean): Pri
       values: [{ limit: "50", tournaments: (i === 3 ? 19 : 20 - i) * 100 + m * 7 }, { limit: "100", tournaments: (i === 3 ? 19 : 20 - i) * 10 + m * 3 }] })),
   });
   for (const p of people) p.discordRoles = [
+    { id: "demo-decorative", name: "Demo decoration", color: null },
     ...(p.redParty ? [{ id: "1208022351652986891", name: "RedParty", color: null }] : []),
     ...(p.team50 ? [{ id: "1208022278088949770", name: "Nitro 50+", color: null }] : []),
   ];
-  for (const p of people) { p.excludedNitro = exclusions[p.memberId]?.nitro ?? false; p.excludedRegular = exclusions[p.memberId]?.regular ?? false; }
+  for (const p of people) { const m = members.find((m) => m.id === p.memberId); if (m) { p.vipNitro = m.vipNitro ?? 0; p.vipRegular = m.vipRegular ?? 0; } p.excludedNitro = exclusions[p.memberId]?.nitro ?? false; p.excludedRegular = exclusions[p.memberId]?.regular ?? false; }
   return { periodStart, today: priorityToday(), canManage, people, revision: JSON.stringify(people), lastMonthEntries: people.flatMap((p) => p.entries).filter((e) => e.month === shiftPriorityMonth(periodStart, -1) && e.values.some((v) => ["50", "100"].includes(v.limit) && v.tournaments > 0)).length };
 }
-export async function loadPriorities(periodStart: string, demoCanManage: boolean) {
-  return !isLiveData() ? { data: demoPrioritySource(periodStart, demoCanManage), error: null } : rpc<PrioritySource>("load_priorities", { p_period_start: periodStart });
+const demoCache = new Map<string, { fingerprint: string; source: PrioritySource }>();
+export function demoPrioritySlice(periodStart: string, canManage: boolean, kind: PriorityKind, group: PriorityGroup, force = false): PrioritySource {
+  const raw = demoPrioritySource(periodStart, canManage);
+  const key = `${periodStart}|${kind}|${group}`;
+  const fingerprint = raw.revision;
+  const saved = demoCache.get(key);
+  if (!force && saved?.fingerprint === fingerprint) return { ...saved.source, canManage, today: priorityToday() };
+  const people = raw.people.map((person) => {
+    const member = loadMembers().find((m) => m.id === person.memberId);
+    const plays = member ? (["nitro", "regular"] as const).filter((k) => (member.plays ?? []).some((play) => play.roomId === "winamax" && limitsOfKind(play, k).some((limit) => group === "250" ? limit === "250" : ["50", "100"].includes(limit)))) : person.plays;
+    const p = { ...person, plays, coreNitro250: person.memberId === "demo-priority-2" ? 2 : 0, coreRegular250: person.memberId === "demo-priority-1" ? 1 : 0,
+      entries: person.entries.filter((e) => group === "50-100" && e.variant === kind) };
+    const result = calculatePriority(p, periodStart, kind, group);
+    return { ...p, calculation: { periodStart, kind, group, months: result.months, distanceCells: result.distanceCells, pointCells: result.pointCells, total: result.total } };
+  });
+  const source: PrioritySource = { ...raw, kind, group, people, calculatedAt: new Date().toISOString(), revision: JSON.stringify(people),
+    lastMonthEntries: people.flatMap((p) => p.entries).filter((e) => e.month === shiftPriorityMonth(periodStart, -1) && e.values.some((v) => ["50", "100"].includes(v.limit))).length };
+  demoCache.set(key, { fingerprint, source }); return source;
+}
+export async function loadPriorities(periodStart: string, demoCanManage: boolean, kind: PriorityKind = "nitro", group: PriorityGroup = "50-100", refresh = false) {
+  if (!isLiveData()) return refresh && !demoCanManage ? { data: null, error: "forbidden" } : { data: demoPrioritySlice(periodStart, demoCanManage, kind, group, refresh), error: null };
+  return rpc<PrioritySource>("load_priority_slice", { p_period_start: periodStart, p_variant: kind, p_group: group, p_refresh: refresh });
+}
+export async function loadPriorityFilterRoles() {
+  if (!isLiveData()) return { data: [
+    { id: "1208022351652986891", name: "RedParty", color: null },
+    { id: "1208022278088949770", name: "Nitro 50+", color: null },
+  ], error: null };
+  const result = await loadRoleAccess();
+  return { data: rolesWithGrantedAccess(result.roles).map(({ id, name, color }) => ({ id, name, color })), error: result.error };
 }
 export async function listPriorityRequests(periodStart: string) {
   if (isLiveData()) return rpc<PriorityRequestSummary[]>("list_priority_requests", { p_period_start: periodStart });
   const rows = readDemo<DemoRequest[]>(DEMO_REQUESTS, []).filter((r) => r.periodStart === periodStart);
-  return { data: rows.map((row) => ({ id: row.id, periodStart: row.periodStart, variant: row.variant, createdAt: row.createdAt, closedAt: row.closedAt, response: row.response, targets: row.targets })), error: null };
+  return { data: rows.map((row) => ({ id: row.id, periodStart: row.periodStart, variant: row.variant, group: row.group, createdAt: row.createdAt, closedAt: row.closedAt, response: row.response, targets: row.targets })), error: null };
 }
-export async function submitPriorityRequest(input: { periodStart: string; variant: PriorityKind; people: PriorityPerson[]; comment: string; author: string; vipEnabled: boolean; revision: string }) {
-  if (isLiveData()) return rpc<string>("submit_priority_request", { p_period_start: input.periodStart, p_variant: input.variant, p_expected: input.people, p_comment: input.comment, p_vip_enabled: input.vipEnabled, p_revision: input.revision });
-  const source = demoPrioritySource(input.periodStart, false);
+export async function submitPriorityRequest(input: { periodStart: string; variant: PriorityKind; group: PriorityGroup; people: PriorityPerson[]; comment: string; author: string; vipEnabled: boolean; revision: string }) {
+  if (isLiveData()) return rpc<string>("submit_priority_slice_request", { p_period_start: input.periodStart, p_variant: input.variant, p_group: input.group, p_expected: input.people, p_comment: input.comment, p_vip_enabled: input.vipEnabled, p_revision: input.revision });
+  const source = demoPrioritySlice(input.periodStart, false, input.variant, input.group);
   if (input.revision !== source.revision || input.people.some((p) => JSON.stringify(source.people.find((row) => row.memberId === p.memberId)) !== JSON.stringify(p))) return { data: null, error: "priority-stale" };
   const id = crypto.randomUUID(); const createdAt = new Date().toISOString();
-  const row: DemoRequest = { id, periodStart: input.periodStart, variant: input.variant, targets: input.people.map((p) => ({ memberId: p.memberId, nick: p.nick })), createdAt, closedAt: null, response: null,
-    detail: { id, variant: input.variant, author: input.author, comment: input.comment, createdAt, closedAt: null, response: null, snapshot: { periodStart: source.periodStart, today: source.today, lastMonthEntries: source.lastMonthEntries, version: 2, people: structuredClone(input.people), rankingPeople: structuredClone(source.people), vipEnabled: input.vipEnabled } } };
+  const row: DemoRequest = { id, periodStart: input.periodStart, variant: input.variant, group: input.group, targets: input.people.map((p) => ({ memberId: p.memberId, nick: p.nick })), createdAt, closedAt: null, response: null,
+    detail: { id, variant: input.variant, author: input.author, comment: input.comment, createdAt, closedAt: null, response: null, snapshot: { periodStart: source.periodStart, today: source.today, lastMonthEntries: source.lastMonthEntries, version: 3, group: input.group, calculatedAt: source.calculatedAt, people: structuredClone(input.people), rankingPeople: structuredClone(source.people), vipEnabled: input.vipEnabled } } };
   writeDemo(DEMO_REQUESTS, [row, ...readDemo<DemoRequest[]>(DEMO_REQUESTS, [])]);
   return { data: id, error: null };
 }

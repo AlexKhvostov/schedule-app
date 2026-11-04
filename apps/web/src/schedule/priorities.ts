@@ -1,14 +1,18 @@
 export type PriorityKind = "nitro" | "regular";
+export type PriorityGroup = "50-100" | "250";
+export const priorityGroups: PriorityGroup[] = ["50-100", "250"];
+export function groupsForLimits(limits: readonly string[]): PriorityGroup[] { return priorityGroups.filter((g) => g === "250" ? limits.includes("250") : limits.some((l) => l === "50" || l === "100")); }
 export type PriorityEntry = { id: string; month: string; variant: PriorityKind; part: number; values: { limit: string; tournaments: number }[] };
 export type PriorityPerson = {
   memberId: string; nick: string; avatarUrl: string | null; redParty: boolean; team50: boolean; hasActiveProfile: boolean;
   discordRoles?: { id: string; name: string; color: string | null }[];
-  plays: PriorityKind[]; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
+  plays: PriorityKind[]; coreNitro250?: number; coreRegular250?: number; calculation?: SavedPriorityCalculation; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
 };
-export type PrioritySource = { periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
+export type SavedPriorityCalculation = { periodStart: string; kind: PriorityKind; group: PriorityGroup; months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number };
+export type PrioritySource = { kind?: PriorityKind; group?: PriorityGroup; calculatedAt?: string; periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
 export type PriorityMonth = { month: string; nitro50: number; regular50: number; nitro100: number; regular100: number };
-export type CalculatedPriority = PriorityPerson & { months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
-export type PriorityFilters = { roleIds: string[]; active: boolean; scheduleActive: boolean };
+export type CalculatedPriority = PriorityPerson & { calculationKind?: PriorityKind; group?: PriorityGroup; months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
+export type PriorityFilters = { kind?: PriorityKind; group?: PriorityGroup; roleIds: string[]; active: boolean; scheduleActive: boolean };
 
 export function shiftPriorityMonth(month: string, offset: number) {
   const date = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + offset, 1));
@@ -44,9 +48,18 @@ export function priorityBreakdown(months: PriorityMonth[]) {
     return { kind, periods, total: periods.reduce((sum, period) => sum + period.total, 0) };
   });
 }
-export function calculatePriority(person: PriorityPerson, period: string): CalculatedPriority {
+export function coreOf(person: PriorityPerson, kind: PriorityKind, group: PriorityGroup = "50-100") {
+  return group === "250" ? (kind === "nitro" ? person.coreNitro250 ?? 0 : person.coreRegular250 ?? 0) : (kind === "nitro" ? person.vipNitro : person.vipRegular);
+}
+// Omitted kind preserves the calculation in historical v1/v2 request snapshots.
+export function calculatePriority(person: PriorityPerson, period: string, kind?: PriorityKind, group: PriorityGroup = "50-100"): CalculatedPriority {
+  const saved = person.calculation;
+  if (kind && saved?.periodStart === period && saved.kind === kind && saved.group === group) {
+    return { ...person, ...saved, calculationKind: kind, rank: null, excluded: false, vip: 0 };
+  }
   const months: PriorityMonth[] = priorityMonths(period).map((month) => ({ month, nitro50: 0, regular50: 0, nitro100: 0, regular100: 0 }));
   for (const entry of person.entries) {
+    if (group === "250" || (kind && entry.variant !== kind)) continue;
     const month = months.find((row) => row.month === entry.month);
     if (!month || !["nitro", "regular"].includes(entry.variant)) continue;
     for (const value of entry.values) {
@@ -61,18 +74,18 @@ export function calculatePriority(person: PriorityPerson, period: string): Calcu
     distanceCells[i * 2 + j] += limit.tournaments;
     pointCells[i * 2 + j] += limit.points;
   }));
-  return { ...person, months, distanceCells, pointCells, total: pointCells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
+  return { ...person, calculationKind: kind, group, entries: kind ? person.entries.filter((e) => group !== "250" && e.variant === kind) : person.entries, months, distanceCells, pointCells, total: pointCells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
 }
-export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean, order: "distance" | "legacy-vip-seats" = "distance"): CalculatedPriority[] {
+export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean, order: "distance" | "legacy-vip-seats" | "slice" = "distance", group: PriorityGroup = "50-100"): CalculatedPriority[] {
   const rows = people.filter((person) => order !== "legacy-vip-seats" || person.plays.includes(kind)).map((person) => {
-    const row = calculatePriority(person, period);
+    const row = calculatePriority(person, period, order === "slice" ? kind : undefined, group);
     row.excluded = kind === "nitro" ? row.excludedNitro : row.excludedRegular;
-    row.vip = vipEnabled ? (kind === "nitro" ? row.vipNitro : row.vipRegular) : 0;
+    row.vip = vipEnabled ? coreOf(row, kind, group) : 0;
     return row;
   });
   const compare = (a: CalculatedPriority, b: CalculatedPriority) => b.total - a.total || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" }) || a.memberId.localeCompare(b.memberId);
-  if (order === "distance") {
-    const sorted = rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || compare(a, b));
+  if (order !== "legacy-vip-seats") {
+    const sorted = rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || (group === "250" ? (coreOf(a, kind, group) || Infinity) - (coreOf(b, kind, group) || Infinity) : 0) || compare(a, b));
     sorted.forEach((row, index) => { row.rank = row.excluded ? null : index + 1; });
     return sorted;
   }

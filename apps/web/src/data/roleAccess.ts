@@ -16,8 +16,8 @@ export type PermissionRow = { code: string; title: string };
 
 export async function loadRoleAccess() {
   const db = getSupabase();
-  if (!db) return { roles: [] as RoleAccessRow[], permissions: [] as PermissionRow[] };
-  const [{ data: roles }, { data: permissions }, { data: grants }, { data: limits }] = await Promise.all([
+  if (!db) return { roles: [] as RoleAccessRow[], permissions: [] as PermissionRow[], error: "not-configured" };
+  const [{ data: roles, error: rolesError }, { data: permissions, error: permissionsError }, { data: grants, error: grantsError }, { data: limits, error: limitsError }] = await Promise.all([
     db.from("discord_guild_roles").select("role_id,name,color,position,display_order,admin_visible,present").order("display_order", { ascending: false }),
     db.from("app_permissions").select("code,title").order("sort"),
     db.from("discord_role_permissions").select("role_id,permission_code"),
@@ -49,6 +49,7 @@ export async function loadRoleAccess() {
       limits: limitMap.get(role.role_id) ?? [],
     })),
     permissions: (permissions ?? []) as PermissionRow[],
+    error: rolesError?.message ?? permissionsError?.message ?? grantsError?.message ?? limitsError?.message ?? null,
   };
 }
 
@@ -89,4 +90,9 @@ export async function setRoleLimit(roleId: string, variant: "nitro" | "regular",
         .eq("limit_id", limit);
   const { error } = await query;
   return { error: error?.message ?? null };
+}
+
+/** Only current Discord roles with an application permission or schedule-limit grant. */
+export function rolesWithGrantedAccess<T extends Pick<RoleAccessRow, "present" | "permissions" | "limits">>(roles: T[]): T[] {
+  return roles.filter((role) => role.present && (role.permissions.length > 0 || role.limits.length > 0));
 }

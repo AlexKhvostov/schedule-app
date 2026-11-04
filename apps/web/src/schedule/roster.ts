@@ -2,7 +2,7 @@ import type { Mark } from "./marks";
 import { markKey, vipOf } from "./marks";
 import { isPastSlot, type CetStamp } from "./cet";
 import type { Occupancy } from "./plan";
-import { calculatePriority, type PrioritySource, type PriorityKind } from "./priorities";
+import { calculatePriority, coreOf, type PrioritySource, type PriorityKind } from "./priorities";
 
 export type LimitHours = {
   slots: number;
@@ -13,6 +13,7 @@ export type LimitHours = {
 export type RosterRow = {
   n: number;
   excluded?: boolean;
+  core?: number;
   mark: Mark;
   limit: string;
   byLimit: Record<string, LimitHours>;
@@ -27,14 +28,15 @@ export type RosterGroups = {
 };
 
 /** Filling order is separate from the distance ranking and from legacy grid_priority. */
-export function orderRosterRows(rows: readonly RosterRow[], source: PrioritySource, kind: PriorityKind): RosterRow[] {
+export function orderRosterRows(rows: readonly RosterRow[], source: PrioritySource, kind: PriorityKind, enabled = true): RosterRow[] {
+  if (!enabled) return rows.map((row) => ({ ...row, n: 0, core: 0, excluded: false })).sort((a,b) => a.mark.discord.localeCompare(b.mark.discord, "ru", { numeric: true, sensitivity: "base" }) || personKey(a.mark).localeCompare(personKey(b.mark)));
   const people = new Map(source.people.map((person) => [person.memberId, person]));
   const ranked = rows.map((row) => {
     const person = row.mark.memberId ? people.get(row.mark.memberId) : undefined;
     return {
-      row: { ...row, excluded: person ? (kind === "nitro" ? person.excludedNitro : person.excludedRegular) : false },
-      score: person ? calculatePriority(person, source.periodStart).total : 0,
-      vip: vipOf(row.mark, kind),
+      row: { ...row, core: person ? coreOf(person, kind, source.group) : source.group === "250" ? 0 : vipOf(row.mark, kind) ?? 0, excluded: person ? (kind === "nitro" ? person.excludedNitro : person.excludedRegular) : false },
+      score: person ? calculatePriority(person, source.periodStart, source.kind, source.group).total : 0,
+      vip: person && source.group ? coreOf(person, kind, source.group) : source.group === "250" ? 0 : vipOf(row.mark, kind),
     };
   });
   ranked.sort((a, b) => Number(a.row.excluded) - Number(b.row.excluded)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePriority, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityBreakdown, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
+import { calculatePriority, coreOf, groupsForLimits, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityBreakdown, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
 const person = (id: string, patch: Partial<PriorityPerson> = {}): PriorityPerson => ({ memberId: id, nick: id, avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [], ...patch });
 describe("priority calculation", () => {
   it("uses six shifted months across year boundaries", () => {
@@ -119,5 +119,40 @@ describe("explicit priority filters", () => {
     expect(filterPriorities(rows, { ...all, active: true }, "nitro")).toHaveLength(3);
     expect(filterPriorities(rows, { ...all, roleIds: ["rp"], scheduleActive: true }, "regular")).toEqual([]);
     expect(filterPriorities(rows, { ...all, scheduleActive: true }, "nitro")[0].rank).toBe(rows.find((p) => p.memberId === "nitro")?.rank);
+  });
+});
+
+
+describe("independent priority slices", () => {
+  const p = person("mixed", { vipNitro: 3, vipRegular: 4, coreNitro250: 1, coreRegular250: 2, entries: [
+    { id: "n", month: "2026-02-01", variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 11 }, { limit: "100", tournaments: 7 }, { limit: "250", tournaments: 900 }] },
+    { id: "r", month: "2026-07-01", variant: "regular", part: 1, values: [{ limit: "100", tournaments: 9 }, { limit: "500", tournaments: 900 }] },
+  ] });
+  it("uses only the selected variant and exact 50/100, preserving legacy snapshots", () => {
+    expect(calculatePriority(p, "2026-08-01", "nitro").total).toBe(12.5);
+    expect(calculatePriority(p, "2026-08-01", "regular").total).toBe(18);
+    expect(calculatePriority(p, "2026-08-01").total).toBe(30.5);
+    expect(calculatePriority(p, "2026-08-01", "nitro").entries.map((e) => e.id)).toEqual(["n"]);
+    expect(calculatePriority(p, "2026-08-01", "nitro", "250").total).toBe(0);
+    expect(calculatePriority(p, "2026-08-01", "nitro", "250").entries).toEqual([]);
+  });
+  it("keeps all four Core values independent and 250 ordering independent of badge visibility", () => {
+    expect([coreOf(p,"nitro"),coreOf(p,"regular"),coreOf(p,"nitro","250"),coreOf(p,"regular","250")]).toEqual([3,4,1,2]);
+    const people = [person("alpha"), p, person("beta", { coreNitro250: 2, vipNitro: 1 })];
+    for (const show of [true,false]) expect(rankPriorities(people,"2026-08-01","nitro",show,"slice","250").map((r) => r.memberId)).toEqual(["mixed","beta","alpha"]);
+    expect(rankPriorities(people,"2026-08-01","regular",true,"slice","250").map((r) => r.memberId)).toEqual(["mixed","alpha","beta"]);
+  });
+  it("reuses saved calculations only for the exact period, kind and group", () => {
+    const cached = { ...p, calculation: { periodStart: "2026-08-01", kind: "nitro" as const, group: "50-100" as const, months: [], distanceCells: [1,2,3,4] as [number,number,number,number], pointCells: [0.5,2,3,8] as [number,number,number,number], total: 13.5 } };
+    expect(calculatePriority(cached,"2026-08-01","nitro").total).toBe(13.5);
+    expect(calculatePriority(cached,"2026-08-01","regular").total).toBe(18);
+    expect(calculatePriority(cached,"2026-08-01","nitro","250").total).toBe(0);
+    expect(calculatePriority(cached,"2026-11-01","nitro").total).toBe(0);
+  });
+  it("derives available groups strictly from schedule filters", () => {
+    expect(groupsForLimits(["50"])).toEqual(["50-100"]);
+    expect(groupsForLimits(["100","250"])).toEqual(["50-100","250"]);
+    expect(groupsForLimits(["250"])).toEqual(["250"]);
+    expect(groupsForLimits(["25","500"])).toEqual([]);
   });
 });

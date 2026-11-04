@@ -215,6 +215,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const [savedChannel, setSavedChannel] = useState<NotifyChannel>(person.notifyChannel ?? "discord");
 
   const [vipNitro, setVipNitro] = useState(vipText(person.vipNitro));
+  const [coreNitro250, setCoreNitro250] = useState(vipText(person.coreNitro250));
+  const [coreRegular250, setCoreRegular250] = useState(vipText(person.coreRegular250));
   const [vipRegular, setVipRegular] = useState(vipText(person.vipRegular));
   const [community, setCommunity] = useState<"school" | "club">(person.communityStatus === "school" ? "school" : "club");
   const [guarantorId, setGuarantorId] = useState(person.guarantorId ?? "");
@@ -241,6 +243,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     setSavedChannel(person.notifyChannel ?? "discord");
     setVipNitro(vipText(person.vipNitro));
     setVipRegular(vipText(person.vipRegular));
+    setCoreNitro250(vipText(person.coreNitro250)); setCoreRegular250(vipText(person.coreRegular250));
     setCommunity(person.communityStatus === "school" ? "school" : "club");
     setGuarantorId(person.guarantorId ?? "");
     setDistanceId(person.distanceExtId ?? "");
@@ -295,7 +298,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const profileDirty = !sameJson(profileDraft, profileSaved);
   const clubDirty =
     vipNitro !== vipText(person.vipNitro) ||
-    vipRegular !== vipText(person.vipRegular) ||
+    vipRegular !== vipText(person.vipRegular) || coreNitro250 !== vipText(person.coreNitro250) || coreRegular250 !== vipText(person.coreRegular250) ||
     community !== (person.communityStatus === "school" ? "school" : "club") ||
     guarantorId !== (person.guarantorId ?? "") ||
     distanceId.trim() !== (person.distanceExtId ?? "").trim();
@@ -371,6 +374,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     const club = await saveMemberClub(person.memberId, {
       vipNitro: Number(vipNitro) || 0,
       vipRegular: Number(vipRegular) || 0,
+      coreNitro250: Number(coreNitro250) || 0, coreRegular250: Number(coreRegular250) || 0,
       communityStatus: community,
       guarantorId: guarantorId || null,
     });
@@ -548,7 +552,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                         : "—"}
                     </Fact>
                   </div>
-                  <PermanentPriority nitro={person.vipNitro} regular={person.vipRegular} />
+                  <PermanentPriority nitro={person.vipNitro} regular={person.vipRegular} nitro250={person.coreNitro250} regular250={person.coreRegular250} />
                 </div>
                 {canEdit ? (
                   <StaffOnly>
@@ -591,7 +595,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       <span>{t("cabinet.vipLabel")}</span>
                       <p className="v2-cab-hint">{t("admin.people.vipHint")}</p>
                       <div className="v2-prio-edit-grid">
-                        <Field label="Nitro">
+                        <Field label="50–100 · Nitro">
                           <input
                             className="v2-ctrl w-full px-3"
                             inputMode="numeric"
@@ -600,7 +604,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                             onChange={(event) => setVipNitro(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
                           />
                         </Field>
-                        <Field label="Regular">
+                        <Field label="50–100 · Regular">
                           <input
                             className="v2-ctrl w-full px-3"
                             inputMode="numeric"
@@ -609,6 +613,10 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                             onChange={(event) => setVipRegular(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
                           />
                         </Field>
+                      </div>
+                      <div className="v2-prio-edit-grid">
+                        <Field label="250 · Nitro"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreNitro250} onChange={(e) => setCoreNitro250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
+                        <Field label="250 · Regular"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
                       </div>
                       {person.memberId && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
                     </div>
@@ -633,6 +641,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       onCancel={() => {
                         setVipNitro(vipText(person.vipNitro));
                         setVipRegular(vipText(person.vipRegular));
+                        setCoreNitro250(vipText(person.coreNitro250)); setCoreRegular250(vipText(person.coreRegular250));
                         setCommunity(person.communityStatus === "school" ? "school" : "club");
                         setGuarantorId(person.guarantorId ?? "");
                         setDistanceId(person.distanceExtId ?? "");

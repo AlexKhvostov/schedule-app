@@ -11,6 +11,8 @@ export function parsePriorityFilters(raw: string | null): PriorityFilters {
     if (!value || typeof value !== "object" || Array.isArray(value)) return defaults;
     const saved = value as Record<string, unknown>;
     return {
+      ...(saved.kind === "nitro" || saved.kind === "regular" ? { kind: saved.kind } : {}),
+      ...(saved.group === "50-100" || saved.group === "250" ? { group: saved.group } : {}),
       roleIds: Array.isArray(saved.roleIds)
         ? [...new Set(saved.roleIds.filter((id): id is string => typeof id === "string").map((id) => id.trim()).filter(Boolean))]
         : [],

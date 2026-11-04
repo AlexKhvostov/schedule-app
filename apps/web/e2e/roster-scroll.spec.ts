@@ -47,7 +47,7 @@ for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
     await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
-    await expect(panel.locator(".v2-roster-controls")).toHaveCount(0);
+    await expect(panel.getByRole("tab", { name: "Регулярные", exact: true })).toBeDisabled();
     await scroll.evaluate(node => { node.scrollTop = 180; });
     await expect.poll(() => panel.locator("thead th").first().evaluate(cell => Math.abs(cell.getBoundingClientRect().top - cell.closest(".v2-float-body")!.getBoundingClientRect().top))).toBeLessThan(0.6);
   });

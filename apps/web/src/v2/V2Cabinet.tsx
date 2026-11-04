@@ -491,7 +491,7 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
               </Fact>
               {live ? null : <Fact label={t("cabinet.poolShare")}>{`${mine?.poolShare ?? 80}%`}</Fact>}
             </div>
-            <PermanentPriority nitro={vipNitro} regular={vipRegular} hideEmpty />
+            <PermanentPriority nitro={vipNitro} regular={vipRegular} nitro250={card?.coreNitro250} regular250={card?.coreRegular250} hideEmpty />
           </div>
         </div>
         <div className="v2-cab-overview-roles">

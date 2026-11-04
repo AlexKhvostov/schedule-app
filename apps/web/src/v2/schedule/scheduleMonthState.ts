@@ -1,8 +1,11 @@
-import type { MonthGridStore, MultiMonthGridsResult, ScheduleVariant } from "../../data/slots";
+import type { MonthGridStore, MonthLoadProgress, MultiMonthGridsResult, ScheduleVariant } from "../../data/slots";
 import { applyGridEdits, type GridEdit } from "../../schedule/gridEdits";
+import { mergeScheduleSnapshot } from "../../schedule/mergeScheduleSnapshot";
+import type { ScheduleSnapshot, SnapshotRequest } from "../../data/scheduleSnapshot";
+import type { Mark } from "../../schedule/marks";
 
 type PendingEdit = { key: string; edits: GridEdit[]; optimistic: boolean };
-export type MonthSnapshot = { grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean };
+export type MonthSnapshot = { grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean; progress?: MonthLoadProgress };
 
 /** One instance per month. Old requests can only settle their own instance. */
 export class ScheduleMonthState {
@@ -12,6 +15,9 @@ export class ScheduleMonthState {
   private generation = 0;
   private tail: Promise<unknown> = Promise.resolve();
   private listeners = new Set<() => void>();
+  private editListeners = new Set<(key: string, edits: GridEdit[]) => void>();
+  directory: Record<string, Mark> = {};
+  kinds: ScheduleSnapshot["kinds"] = [];
   snapshot: MonthSnapshot;
 
   constructor(initial: MonthGridStore, private variants: readonly ScheduleVariant[]) {
@@ -20,6 +26,27 @@ export class ScheduleMonthState {
   }
 
   get pendingCount() { return this.pending.length; }
+
+  subscribeEdits(listener: (key: string, edits: GridEdit[]) => void) {
+    this.editListeners.add(listener);
+    return () => { this.editListeners.delete(listener); };
+  }
+
+  acceptSnapshot(generation: number, data: ScheduleSnapshot, request: SnapshotRequest) {
+    if (generation !== this.generation || this.pendingCount) return false;
+    this.base = mergeScheduleSnapshot(this.base, data, request);
+    this.directory = request.targets === null && !request.directoryOnly ? data.members : { ...this.directory, ...data.members };
+    this.kinds = data.kinds;
+    this.snapshot = { ...this.snapshot, ready: true, loading: false, error: false };
+    this.emit();
+    return true;
+  }
+
+  failLoad(generation: number) {
+    if (generation !== this.generation) return;
+    this.snapshot = { ...this.snapshot, loading: false, error: true };
+    this.emit();
+  }
 
   subscribe(listener: () => void) {
     this.listeners.add(listener);
@@ -46,9 +73,16 @@ export class ScheduleMonthState {
   }
 
   startLoad() {
-    this.snapshot = { ...this.snapshot, loading: true, error: false };
+    ++this.generation;
+    this.snapshot = { ...this.snapshot, loading: true, error: false, progress: undefined };
     this.emit();
-    return ++this.generation;
+    return this.generation;
+  }
+
+  reportProgress(generation: number, progress: MonthLoadProgress) {
+    if (generation !== this.generation || !this.snapshot.loading || this.pendingCount) return;
+    this.snapshot = { ...this.snapshot, progress };
+    this.emit();
   }
 
   acceptLoad(generation: number, result: MultiMonthGridsResult) {
@@ -70,6 +104,7 @@ export class ScheduleMonthState {
     this.pending.push(operation);
     ++this.generation; // A read started before this gesture cannot undo it.
     this.emit();
+    this.editListeners.forEach((listener) => listener(key, edits));
     const task = this.tail.then(async () => {
       let error: string | undefined;
       try { error = await write(); }

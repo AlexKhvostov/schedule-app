@@ -13,6 +13,25 @@ function deferred() {
 }
 
 describe("month snapshot and pending writes", () => {
+  it("resets progress on retry and ignores stale or settled requests", () => {
+    const month = state();
+    const first = month.startLoad();
+    month.reportProgress(first, { completedPages: 2, totalPages: 6 });
+    expect(month.snapshot.progress?.completedPages).toBe(2);
+    expect(month.snapshot.ready).toBe(false);
+    const retry = month.startLoad();
+    expect(month.snapshot.progress).toBeUndefined();
+    month.reportProgress(first, { completedPages: 6, totalPages: 6 });
+    expect(month.snapshot.progress).toBeUndefined();
+    month.reportProgress(retry, { completedPages: 1, totalPages: 6 });
+    month.acceptLoad(retry, { grids: blank(), loaded: ["nitro", "regular"], errors: {} });
+    month.reportProgress(retry, { completedPages: 5, totalPages: 6 });
+    expect(month.snapshot.progress?.completedPages).toBe(1);
+    expect(month.snapshot.ready).toBe(true);
+    month.startLoad();
+    expect(month.snapshot.ready).toBe(true); // Background refresh does not cover a ready month.
+  });
+
   it("keeps a failed new month blank and uneditable, then retries", () => {
     const october = state();
     october.replaceLocal({ ...blank(), "nitro:50": patchSeat(blank()["nitro:50"], 20, 2, 0, face) });
