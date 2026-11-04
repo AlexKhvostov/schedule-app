@@ -14170,7 +14170,9 @@ img.v2-people-ava {
   line-height: 1.35;
 }
 
-.v2-roster-controls { margin-bottom: 6px; }
+/* No scrollable strip above the sticky roster header. Other floats keep their padding. */
+.v2-roster-float.is-compact .v2-float-body { padding-top: 0; }
+.v2-roster-controls { padding-top: 6px; margin-bottom: 6px; }
 .v2-roster-controls .v2-prio-tabs { gap: 4px; padding: 0; border-bottom: 0; background: transparent; }
 .v2-roster-controls .v2-prio-tabs button { min-height: 24px; padding: 3px 10px; margin-bottom: 0; border: 1px solid color-mix(in srgb, var(--muted-foreground) 50%, var(--border)); border-radius: 4px; font-size: 10px; line-height: 16px; }
 .v2-roster-controls .v2-prio-tabs button[aria-selected=true] { border-color: var(--title); background: color-mix(in srgb, var(--title) 10%, var(--card)); }
@@ -14184,6 +14186,12 @@ img.v2-people-ava {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
+}
+
+/* Contain the shared mark's layers beneath this table's sticky header. */
+.v2-people-table tbody {
+  position: relative;
+  z-index: 0;
 }
 
 .v2-people-col-n {

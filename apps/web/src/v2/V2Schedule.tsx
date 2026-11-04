@@ -564,6 +564,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {showPeople && (
           <V2Float
             title={t("schedule.playersTitle")}
+            className="v2-roster-float"
             headerActions={<ScheduleRosterHelp preliminary={Boolean(rosterSource.source && isPriorityPreliminary(rosterSource.source))} />}
             x={peoplePos.x}
             y={peoplePos.y}
