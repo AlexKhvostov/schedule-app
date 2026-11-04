@@ -318,9 +318,9 @@ erDiagram
 Миграция `20261104065408_priority_explicit_filters.sql` расширяет `priority_source`: все members, LEFT JOIN Winamax, без обязательных member/admin/лимитов; `discordRoles` содержит только id/name/color текущих ролей, при `present=false` пуст. Источник Discord-снимка приоритетнее identity; название/цвет берутся из каталога с fallback. `plays` остаётся фактом игровых настроек для явного фильтра. `submit_priority_request` принимает видимые карточки без выбранного вида, сохраняет v2; revision и точное равенство строк, права RPC/таблиц и приватность не меняются. Старые v1 не обновляются. Контракты проверяют отсутствие комнаты/лимитов/игровой роли/активности, уход из Discord, fallback и заявку на игрока в отпуске. Миграция применена к Working4 ноября2026. Проверено170 карточек вместо5; дистанции и настройки сохранены, права не расширены.
 
 
-### Локальная матрица приоритетов и кэш
+### Матрица приоритетов и кэш
 
-Миграция `20261104145020_priority_matrix_cache.sql` пока только локальная. `members.core_nitro_250/core_regular_250` (0..999, отдельные частичные unique indexes для положительных значений) дополняют существующие `vip_nitro/regular` группы50–100. `admin_people_snapshot` и карточка отдают все четыре поля. UPDATE четырёх значений атомарен; серверный guard запрещает не-staff менять Core и конфликт с исключением.
+Миграция `20261104145020_priority_matrix_cache.sql` применена к Working4 ноября2026. `members.core_nitro_250/core_regular_250` (0..999, отдельные частичные unique indexes для положительных значений) дополняют существующие `vip_nitro/regular` группы50–100. `admin_people_snapshot` и карточка отдают все четыре поля. UPDATE четырёх значений атомарен; серверный guard запрещает не-staff менять Core и конфликт с исключением.
 
 `priority_rating_cache` имеет PK(period_start,variant_id,limit_group), dirty,payload. RLS включён, прямые права public/anon/authenticated отозваны. Внутренний `priority_slice_source` закрыт. `load_priority_slice(date,text,text,boolean)` проверяет право priorities/schedule; force требует is_staff. Сохранённый JSON содержит исходные записи выбранного вида и готовые months/distanceCells/pointCells/total; дата и права вызывающего подставляются при чтении. Сериализация пересборки через FOR UPDATE; запись дистанции, ожидающая блокировку, затем снова помечает результат dirty.
 
