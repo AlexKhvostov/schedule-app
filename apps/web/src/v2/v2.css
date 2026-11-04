@@ -9639,6 +9639,7 @@ textarea.v2-ctrl.v2-cab-area {
   flex-direction: column;
   align-items: flex-start;
   width: max-content;
+  padding-inline: 6px;
 }
 
 .v2-opt-sheet .v2-days {
