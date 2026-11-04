@@ -38,6 +38,7 @@ import {
 import { loadPrefs, savePrefs } from "./prefs";
 import { rosterTableWidth, ScheduleRoster } from "./schedule/ScheduleRoster";
 import { ScheduleToolbar } from "./schedule/ScheduleToolbar";
+import { ScheduleLoading } from "./schedule/ScheduleLoading";
 import { ScheduleViewSettings } from "./schedule/ScheduleViewSettings";
 import { CALENDAR_VARIANTS } from "./schedule/constants";
 import { useScheduleBrush } from "./schedule/useScheduleBrush";
@@ -439,52 +440,47 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         tools={tools}
       />
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden" aria-busy={gridLoading}>
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <OptField
-            year={year}
-            monthIndex={monthIndex}
-            me={me}
-            self={selfMark}
-            showTables={countTables && !hideTables}
-            countTables={countTables}
-            mergeAdjacentSlots={mergeAdjacentSlots}
-            dimPast={dimPast}
-            hidePastDays={hidePastDays}
-            displayRange={displayRange}
-            workHours={workHours}
-            showTip={showTip}
-            canEdit={paintOn && !gridLoading}
-            quietEdit={!editGlow || !editPulse}
-            focus={focus}
-            kinds={kinds}
-            limits={limits}
-            pairRows={pairRows}
-            capacity={capacity}
-            grids={shownGridStore}
-            players={players}
-            hourLoad={hideSlotHighlight ? undefined : hourLoad}
-            onGridChange={onGridChange}
-            canRemoveForeign={canRemoveForeign}
-            onOverwriteAsk={setOverwriteAsk}
-            onForeignKept={() => showV2Toast("off", t("schedule.toastForeignKept"))}
-            skin={skin}
-            busy={busyMap}
-            cellWidth={touchLayout ? mobileCellWidth : 20}
-            zoomEnabled={touchLayout && !mobileEditOn}
-            onCellWidthChange={touchLayout ? setMobileCellWidth : undefined}
-            onFitWidthChange={updateMobileFitWidth}
-            footerTools={mobileScheduleTools}
-          />
+          <div className="v2-sched-field" inert={gridLoading} aria-busy={gridLoading} style={gridLoading ? { visibility: "hidden" } : undefined}>
+            <OptField
+              year={year}
+              monthIndex={monthIndex}
+              me={me}
+              self={selfMark}
+              showTables={countTables && !hideTables}
+              countTables={countTables}
+              mergeAdjacentSlots={mergeAdjacentSlots}
+              dimPast={dimPast}
+              hidePastDays={hidePastDays}
+              displayRange={displayRange}
+              workHours={workHours}
+              showTip={showTip}
+              canEdit={paintOn && !gridLoading}
+              quietEdit={!editGlow || !editPulse}
+              focus={focus}
+              kinds={kinds}
+              limits={limits}
+              pairRows={pairRows}
+              capacity={capacity}
+              grids={shownGridStore}
+              players={players}
+              hourLoad={hideSlotHighlight ? undefined : hourLoad}
+              onGridChange={onGridChange}
+              canRemoveForeign={canRemoveForeign}
+              onOverwriteAsk={setOverwriteAsk}
+              onForeignKept={() => showV2Toast("off", t("schedule.toastForeignKept"))}
+              skin={skin}
+              busy={busyMap}
+              cellWidth={touchLayout ? mobileCellWidth : 20}
+              zoomEnabled={touchLayout && !mobileEditOn}
+              onCellWidthChange={touchLayout ? setMobileCellWidth : undefined}
+              onFitWidthChange={updateMobileFitWidth}
+              footerTools={mobileScheduleTools}
+            />
+          </div>
           {gridLoading ? (
-            <div className="v2-sched-load">
-              <div className="v2-sched-load-card" role={month.gridLoadError ? "alert" : "status"}>
-                {!month.gridLoadError ? <span className="v2-sched-spin" aria-hidden /> : null}
-                <b>{t(month.gridLoadError ? "schedule.loadErrorTitle" : "schedule.loading")}</b>
-                <p>{t(month.gridLoadError ? "schedule.loadErrorHint" : "schedule.loadingHint")}</p>
-                {month.gridLoadError ? <Button onClick={() => void month.retryLoad()}>{t("schedule.retryLoad")}</Button> : null}
-              </div>
-            </div>
+            <ScheduleLoading error={month.gridLoadError} progress={month.gridLoadProgress} onRetry={() => void month.retryLoad()} t={t} />
           ) : null}
         </div>
         {showMine && (

@@ -40,6 +40,16 @@ function StartHarness() {
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); harness.load.mockReset(); harness.change = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("schedule realtime reconciliation", () => {
+  it("connects page progress to the current month controller", async () => {
+    const month = StartHarness();
+    const report = harness.load.mock.calls[0][5];
+    report({ completedPages: 2, totalPages: 4 });
+    expect(month.controller.snapshot.progress).toEqual({ completedPages: 2, totalPages: 4 });
+    expect(month.controller.snapshot.ready).toBe(false);
+    await Promise.resolve();
+    expect(month.controller.snapshot.ready).toBe(true);
+  });
+
   it("reloads an own-member event from another session", async () => {
     vi.useFakeTimers();
     StartHarness();

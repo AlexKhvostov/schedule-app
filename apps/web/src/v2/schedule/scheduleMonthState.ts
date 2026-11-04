@@ -1,8 +1,8 @@
-import type { MonthGridStore, MultiMonthGridsResult, ScheduleVariant } from "../../data/slots";
+import type { MonthGridStore, MonthLoadProgress, MultiMonthGridsResult, ScheduleVariant } from "../../data/slots";
 import { applyGridEdits, type GridEdit } from "../../schedule/gridEdits";
 
 type PendingEdit = { key: string; edits: GridEdit[]; optimistic: boolean };
-export type MonthSnapshot = { grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean };
+export type MonthSnapshot = { grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean; progress?: MonthLoadProgress };
 
 /** One instance per month. Old requests can only settle their own instance. */
 export class ScheduleMonthState {
@@ -46,9 +46,16 @@ export class ScheduleMonthState {
   }
 
   startLoad() {
-    this.snapshot = { ...this.snapshot, loading: true, error: false };
+    ++this.generation;
+    this.snapshot = { ...this.snapshot, loading: true, error: false, progress: undefined };
     this.emit();
-    return ++this.generation;
+    return this.generation;
+  }
+
+  reportProgress(generation: number, progress: MonthLoadProgress) {
+    if (generation !== this.generation || !this.snapshot.loading || this.pendingCount) return;
+    this.snapshot = { ...this.snapshot, progress };
+    this.emit();
   }
 
   acceptLoad(generation: number, result: MultiMonthGridsResult) {

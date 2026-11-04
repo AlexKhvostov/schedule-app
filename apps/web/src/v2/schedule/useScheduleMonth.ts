@@ -39,7 +39,9 @@ export function useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef
   const pullGrids = useCallback(async () => {
     if (current.current !== controller || controller.pendingCount) return;
     const generation = controller.startLoad();
-    const next = await loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], [...LIMIT_OPTIONS]);
+    const next = await loadMultiMonthGrids(year, monthIndex, [...CALENDAR_VARIANTS], [...LIMIT_OPTIONS], undefined, (progress) => {
+      if (current.current === controller) controller.reportProgress(generation, progress);
+    });
     if (current.current !== controller) return;
     if (controller.acceptLoad(generation, next) && Object.keys(next.errors).length) {
       showV2Toast("err", t("schedule.toastLoadError"));
@@ -115,6 +117,7 @@ export function useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef
     requestedLimits, fetchKey, loadStamp,
     gridLoading: isLiveData() && !snapshot.ready,
     gridLoadError: snapshot.error && !snapshot.ready,
+    gridLoadProgress: snapshot.progress,
     retryLoad: pullGrids,
   };
 }

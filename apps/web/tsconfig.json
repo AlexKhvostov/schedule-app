@@ -34,7 +34,8 @@
     ".next-e2e/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-local-3000/types/**/*.ts"
+    ".next-local-3000/types/**/*.ts",
+    ".next-e2e-live/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

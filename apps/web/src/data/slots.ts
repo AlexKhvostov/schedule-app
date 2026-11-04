@@ -20,6 +20,7 @@ export type MonthGridsResult = {
 };
 
 export type ScheduleVariant = "nitro" | "regular";
+export type MonthLoadProgress = { completedPages: number; totalPages: number | null };
 export type MonthGridStore = Record<string, Occupancy>;
 export type MultiMonthGridsResult = {
   grids: MonthGridStore;
@@ -300,23 +301,54 @@ export async function loadMonthGrids(
   monthIndex: number,
   variant: ScheduleVariant,
   limits: string[],
+  onProgress?: (progress: MonthLoadProgress) => void,
 ): Promise<MonthGridsResult | null> {
   const db = getSupabase();
   if (!db) return null;
   const grids = Object.fromEntries(limits.map((limit) => [limit, emptyMonth(year, monthIndex)]));
   if (!limits.length) return { grids };
-  const { data, error } = await db.rpc("load_month_schedule", {
-    p_year: year,
-    p_month: monthIndex + 1,
-    p_variant: variant,
-    p_limit_ids: limits,
-  });
-  if (!error) {
-    paintScheduleRows(grids, (data ?? []) as MonthScheduleRow[]);
-    return { grids };
+  const rows: MonthScheduleRow[] = [];
+  let completedPages = 0;
+  let pageSize = OCCUPANCY_PAGE;
+  for (;;) {
+    // Table-returning RPCs are capped by the Data API just like table selects.
+    // Unique seat coordinates keep page boundaries deterministic.
+    const { data, error, count } = await db.rpc("load_month_schedule", {
+      p_year: year,
+      p_month: monthIndex + 1,
+      p_variant: variant,
+      p_limit_ids: limits,
+    }, { count: "exact" })
+      .order("limit_id", { ascending: true })
+      .order("slot_date", { ascending: true })
+      .order("half", { ascending: true })
+      .order("level", { ascending: true })
+      .range(rows.length, rows.length + OCCUPANCY_PAGE - 1);
+    if (error) {
+      if (!rows.length && missingMonthRpc(error.message)) {
+        return loadMonthGridsLegacy(year, monthIndex, variant, limits, grids);
+      }
+      return { grids, error: error.message };
+    }
+    const page = (data ?? []) as MonthScheduleRow[];
+    rows.push(...page);
+    if (!page.length && count != null && rows.length < count) {
+      return { grids, error: "schedule-conflict" };
+    }
+    if (!completedPages && page.length) pageSize = page.length;
+    ++completedPages;
+    const done = !page.length || (count != null && rows.length >= count);
+    onProgress?.({
+      completedPages,
+      totalPages: done ? completedPages : count == null ? null : completedPages + Math.ceil((count - rows.length) / pageSize),
+    });
+    // Use the actual returned length: the server may have a lower page cap.
+    // Without a count, an empty page is the only reliable end marker.
+    if (done) {
+      paintScheduleRows(grids, rows);
+      return { grids };
+    }
   }
-  if (!missingMonthRpc(error.message)) return { grids, error: error.message };
-  return loadMonthGridsLegacy(year, monthIndex, variant, limits, grids);
 }
 
 export async function loadMultiMonthGrids(
@@ -325,14 +357,25 @@ export async function loadMultiMonthGrids(
   variants: ScheduleVariant[],
   limits: string[],
   loader: typeof loadMonthGrids = loadMonthGrids,
+  onProgress?: (progress: MonthLoadProgress) => void,
 ): Promise<MultiMonthGridsResult> {
   const selected = [...new Set(variants)].filter((variant): variant is ScheduleVariant =>
     variant === "nitro" || variant === "regular",
   );
+  const progress = new Map(selected.map((variant) => [variant, { completedPages: 0, totalPages: null } as MonthLoadProgress]));
+  const report = (variant: ScheduleVariant, next: MonthLoadProgress) => {
+    progress.set(variant, next);
+    const values = [...progress.values()];
+    onProgress?.({
+      completedPages: values.reduce((sum, value) => sum + value.completedPages, 0),
+      totalPages: values.every((value) => value.totalPages !== null)
+        ? values.reduce((sum, value) => sum + (value.totalPages ?? 0), 0) : null,
+    });
+  };
   const results = await Promise.all(
     selected.map(async (variant) => {
       try {
-        return { variant, result: await loader(year, monthIndex, variant, limits) };
+        return { variant, result: await loader(year, monthIndex, variant, limits, (next) => report(variant, next)) };
       } catch (error) {
         return { variant, error: error instanceof Error ? error.message : String(error) };
       }
