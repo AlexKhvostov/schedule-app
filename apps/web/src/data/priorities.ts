@@ -30,11 +30,15 @@ export function demoPrioritySource(periodStart: string, canManage: boolean): Pri
   }));
   for (let i = 0; i < 20; i++) people.push({
     memberId: `demo-priority-${i}`, nick: ["Alina", "Boris", "Vera", "Daniil"][i] ?? `Player ${i + 1}`,
-    avatarUrl: null, redParty: i !== 19, team50: i !== 18, hasActiveProfile: i !== 17, plays: i === 16 ? ["regular"] : ["nitro", "regular"],
+    avatarUrl: null, redParty: i !== 19, team50: i !== 18, hasActiveProfile: i !== 17, plays: i === 15 ? [] : i === 16 ? ["regular"] : ["nitro", "regular"],
     vipNitro: i === 2 ? 3 : 0, vipRegular: i === 2 ? 1 : 0, excludedNitro: false, excludedRegular: false,
     entries: months.map((month, m) => ({ id: `demo-${i}-${month}`, month, variant: m % 2 ? "regular" : "nitro", part: 1,
       values: [{ limit: "50", tournaments: (i === 3 ? 19 : 20 - i) * 100 + m * 7 }, { limit: "100", tournaments: (i === 3 ? 19 : 20 - i) * 10 + m * 3 }] })),
   });
+  for (const p of people) p.discordRoles = [
+    ...(p.redParty ? [{ id: "1208022351652986891", name: "RedParty", color: null }] : []),
+    ...(p.team50 ? [{ id: "1208022278088949770", name: "Nitro 50+", color: null }] : []),
+  ];
   for (const p of people) { p.excludedNitro = exclusions[p.memberId]?.nitro ?? false; p.excludedRegular = exclusions[p.memberId]?.regular ?? false; }
   return { periodStart, today: priorityToday(), canManage, people, revision: JSON.stringify(people), lastMonthEntries: people.flatMap((p) => p.entries).filter((e) => e.month === shiftPriorityMonth(periodStart, -1) && e.values.some((v) => ["50", "100"].includes(v.limit) && v.tournaments > 0)).length };
 }
@@ -52,7 +56,7 @@ export async function submitPriorityRequest(input: { periodStart: string; varian
   if (input.revision !== source.revision || input.people.some((p) => JSON.stringify(source.people.find((row) => row.memberId === p.memberId)) !== JSON.stringify(p))) return { data: null, error: "priority-stale" };
   const id = crypto.randomUUID(); const createdAt = new Date().toISOString();
   const row: DemoRequest = { id, periodStart: input.periodStart, variant: input.variant, targets: input.people.map((p) => ({ memberId: p.memberId, nick: p.nick })), createdAt, closedAt: null, response: null,
-    detail: { id, variant: input.variant, author: input.author, comment: input.comment, createdAt, closedAt: null, response: null, snapshot: { periodStart: source.periodStart, today: source.today, lastMonthEntries: source.lastMonthEntries, version: 1, people: structuredClone(input.people), rankingPeople: structuredClone(source.people), vipEnabled: input.vipEnabled } } };
+    detail: { id, variant: input.variant, author: input.author, comment: input.comment, createdAt, closedAt: null, response: null, snapshot: { periodStart: source.periodStart, today: source.today, lastMonthEntries: source.lastMonthEntries, version: 2, people: structuredClone(input.people), rankingPeople: structuredClone(source.people), vipEnabled: input.vipEnabled } } };
   writeDemo(DEMO_REQUESTS, [row, ...readDemo<DemoRequest[]>(DEMO_REQUESTS, [])]);
   return { data: id, error: null };
 }

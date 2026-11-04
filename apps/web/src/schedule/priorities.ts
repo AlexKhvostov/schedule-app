@@ -2,12 +2,13 @@ export type PriorityKind = "nitro" | "regular";
 export type PriorityEntry = { id: string; month: string; variant: PriorityKind; part: number; values: { limit: string; tournaments: number }[] };
 export type PriorityPerson = {
   memberId: string; nick: string; avatarUrl: string | null; redParty: boolean; team50: boolean; hasActiveProfile: boolean;
+  discordRoles?: { id: string; name: string; color: string | null }[];
   plays: PriorityKind[]; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
 };
 export type PrioritySource = { periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
 export type PriorityMonth = { month: string; nitro50: number; regular50: number; nitro100: number; regular100: number };
 export type CalculatedPriority = PriorityPerson & { months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
-export type PriorityFilters = { redParty: boolean; team50: boolean; active: boolean };
+export type PriorityFilters = { roleIds: string[]; active: boolean; scheduleActive: boolean };
 
 export function shiftPriorityMonth(month: string, offset: number) {
   const date = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + offset, 1));
@@ -63,7 +64,7 @@ export function calculatePriority(person: PriorityPerson, period: string): Calcu
   return { ...person, months, distanceCells, pointCells, total: pointCells.reduce((a, b) => a + b, 0), rank: null, excluded: false, vip: 0 };
 }
 export function rankPriorities(people: PriorityPerson[], period: string, kind: PriorityKind, vipEnabled: boolean, order: "distance" | "legacy-vip-seats" = "distance"): CalculatedPriority[] {
-  const rows = people.filter((person) => person.plays.includes(kind)).map((person) => {
+  const rows = people.filter((person) => order !== "legacy-vip-seats" || person.plays.includes(kind)).map((person) => {
     const row = calculatePriority(person, period);
     row.excluded = kind === "nitro" ? row.excludedNitro : row.excludedRegular;
     row.vip = vipEnabled ? (kind === "nitro" ? row.vipNitro : row.vipRegular) : 0;
@@ -82,6 +83,9 @@ export function rankPriorities(people: PriorityPerson[], period: string, kind: P
   for (const row of rows) if (!row.excluded && row.vip > 0) row.rank = row.vip;
   return rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || (a.excluded ? compare(a, b) : (a.rank ?? 0) - (b.rank ?? 0)));
 }
-export function filterPriorities(rows: CalculatedPriority[], filters: PriorityFilters) {
-  return rows.filter((row) => (!filters.redParty || row.redParty) && (!filters.team50 || row.team50) && (!filters.active || row.hasActiveProfile));
+export function filterPriorities(rows: CalculatedPriority[], filters: PriorityFilters, kind: PriorityKind) {
+  const roles = new Set(filters.roleIds);
+  return rows.filter((row) => (!roles.size || row.discordRoles?.some((role) => roles.has(role.id)))
+    && (!filters.active || row.hasActiveProfile)
+    && (!filters.scheduleActive || row.plays.includes(kind)));
 }

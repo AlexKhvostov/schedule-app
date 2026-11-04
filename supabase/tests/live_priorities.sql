@@ -4,6 +4,7 @@ do $$
 declare
   admin_auth uuid := gen_random_uuid(); player_auth uuid := gen_random_uuid();
   admin_id uuid; player_id uuid; target uuid; room uuid; rp text; source jsonb; expected jsonb;
+  no_room uuid; vacation uuid; staff_only uuid; vacation_request uuid;
   request_id uuid; detail jsonb; summary jsonb; entry uuid; old_total integer;
 begin
   if has_table_privilege('authenticated','public.priority_requests','SELECT')
@@ -22,7 +23,7 @@ begin
   insert into member_roles(member_id,role_id) values(admin_id,'root'),(player_id,'member'),(target,'member');
   insert into profiles(member_id) values(player_id),(target) on conflict do nothing;
   select required_discord_role_id into rp from club_settings where id;
-  insert into discord_guild_roles(role_id,name) values('1208022278088949770','Priority test 50+') on conflict do nothing;
+  insert into discord_guild_roles(role_id,name) values('1208022278088949770','Priority test 50+') on conflict(role_id) do update set name=excluded.name;
   insert into discord_role_permissions(role_id,permission_code) values('1208022278088949770','schedule') on conflict do nothing;
   insert into identities(member_id,provider,provider_uid,guild_present,discord_roles) values
     (player_id,'discord','990000000000000101',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770'))),
@@ -30,7 +31,20 @@ begin
   insert into discord_members(discord_id,username,present,roles) values
     ('990000000000000101','PriorityPlayer',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770'))),
     ('990000000000000102','PriorityTarget',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770')));
+  insert into members(public_code,access_status) values('RP-PRIONOROOM','blocked') returning id into no_room;
+  insert into members(public_code,access_status) values('RP-PRIOVACATION','active') returning id into vacation;
+  insert into members(public_code,access_status) values('RP-PRIOSTAFF','active') returning id into staff_only;
+  insert into member_roles(member_id,role_id) values(staff_only,'staff');
+  insert into identities(member_id,provider,provider_uid,guild_present,discord_roles) values
+    (vacation,'discord','990000000000000103',true,jsonb_build_array(jsonb_build_object('id','1208022278088949770','name','Fallback role'))),
+    (staff_only,'discord','990000000000000104',true,jsonb_build_array(jsonb_build_object('id','1208022278088949770')));
+  -- A newer Discord snapshot overrides a stale identity, including departure from the server.
+  insert into discord_members(discord_id,username,present,roles) values
+    ('990000000000000104','PriorityDeparted',false,jsonb_build_array(jsonb_build_object('id','1208022278088949770')));
   select id into room from rooms where slug='winamax';
+  insert into players(member_id,room_id) values(vacation,room) on conflict do nothing;
+  delete from player_limits l where l.player_id in (select p.id from players p where p.member_id=vacation);
+
   insert into players(member_id,room_id) values(player_id,room),(target,room) on conflict do nothing;
   insert into player_limits(player_id,variant_id,limit_id)
     select id,'nitro','50' from players where member_id in(player_id,target) and room_id=room on conflict do nothing;
@@ -49,6 +63,14 @@ begin
   execute 'set local role authenticated';
   source:=load_priorities('2026-08-01');
   if (source->>'canManage')::boolean then raise exception 'ordinary player marked admin'; end if;
+  if not exists(select 1 from jsonb_array_elements(source->'people') p where p->>'memberId'=no_room::text and p->'plays'='[]'::jsonb and not (p->>'hasActiveProfile')::boolean)
+    or not exists(select 1 from jsonb_array_elements(source->'people') p where p->>'memberId'=staff_only::text and p->'discordRoles'='[]'::jsonb)
+    or not exists(select 1 from jsonb_array_elements(source->'people') p where p->>'memberId'=vacation::text and p->'plays'='[]'::jsonb and p->'discordRoles' @> '[{"id":"1208022278088949770","name":"Priority test 50+"}]'::jsonb) then
+    raise exception 'base roster still requires game limits, room, club role, active profile or Discord presence';
+  end if;
+  select jsonb_build_array(p) into expected from jsonb_array_elements(source->'people') p where p->>'memberId'=vacation::text;
+  vacation_request:=submit_priority_request('2026-08-01','nitro',expected,'vacation request',true,source->>'revision');
+
   if (source->>'lastMonthEntries')::integer<20 then raise exception 'logical parts were not counted'; end if;
   select jsonb_build_array(x) into expected from jsonb_array_elements(source->'people') x where x->>'memberId'=target::text;
   if expected is null or jsonb_array_length(expected->0->'entries')<>21 or not (expected->0->>'team50')::boolean then raise exception 'historical entries/role missing'; end if;
@@ -66,6 +88,10 @@ begin
   update distance_values set tournaments=12 where entry_id=entry and limit_id='50';
   perform set_config('request.jwt.claim.sub',admin_auth::text,true);
   execute 'set local role authenticated';
+  detail:=get_priority_request(vacation_request);
+  if detail->'snapshot'->>'version'<>'2' or detail->'snapshot'->'people'->0->>'memberId'<>vacation::text then
+    raise exception 'new snapshot dropped player without selected games';
+  end if;
   detail:=get_priority_request(request_id);
   if detail->>'comment'<>'private concern' or (detail->'snapshot'->'people') is distinct from expected then raise exception 'request snapshot changed with distance'; end if;
   begin perform submit_priority_request('2026-08-01','nitro',expected,'stale',true,source->>'revision'); raise exception 'stale request accepted'; exception when sqlstate '40001' then null; end;

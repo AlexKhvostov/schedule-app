@@ -84,12 +84,40 @@ describe("priority places", () => {
     expect(people[2].vipNitro).toBe(3);
   });
   it("preserves distance places after filtering regardless of VIP number", () => {
-    const ranked = rankPriorities([person("hidden", { redParty: false, entries: score(10) }), person("visible", { vipNitro: 25 })], "2026-08-01", "nitro", true);
-    expect(filterPriorities(ranked, { redParty: true, team50: true, active: true }).map((r) => r.rank)).toEqual([2]);
+    const ranked = rankPriorities([person("hidden", { redParty: false, discordRoles: [], entries: score(10) }), person("visible", { vipNitro: 25, discordRoles: [{ id: "rp", name: "RedParty", color: null }] })], "2026-08-01", "nitro", true);
+    expect(filterPriorities(ranked, { roleIds: ["rp"], active: false, scheduleActive: false }, "nitro").map((r) => r.rank)).toEqual([2]);
   });
-  it("filters kinds using chosen games without changing the total and breaks ties stably", () => {
+  it("includes players without selected games and preserves old snapshot membership", () => {
     const p = [person("b", { plays: ["nitro"], entries: score(2) }), person("a", { entries: score(2) })];
     expect(rankPriorities(p, "2026-08-01", "nitro", true).map((r) => r.memberId)).toEqual(["a", "b"]);
-    expect(rankPriorities(p, "2026-08-01", "regular", true).map((r) => [r.memberId, r.total])).toEqual([["a", 2]]);
+    expect(rankPriorities(p, "2026-08-01", "regular", true).map((r) => [r.memberId, r.total])).toEqual([["a", 2], ["b", 2]]);
+    expect(rankPriorities(p, "2026-08-01", "regular", true, "legacy-vip-seats").map((r) => r.memberId)).toEqual(["a"]);
+  });
+});
+
+
+describe("explicit priority filters", () => {
+  const role = (id: string) => ({ id, name: id, color: null });
+  const rows = rankPriorities([
+    person("vacation", { plays: [], discordRoles: [role("rp")], hasActiveProfile: false }),
+    person("nitro", { plays: ["nitro"], discordRoles: [role("nitro"), role("rp")] }),
+    person("regular", { plays: ["regular"], discordRoles: [role("regular")] }),
+    person("no-roles", { plays: [], discordRoles: [] }),
+  ], "2026-08-01", "nitro", true);
+  const all = { roleIds: [], active: false, scheduleActive: false };
+  it("empty filters include every player, including inactive profiles, no roles and no limits", () => {
+    expect(filterPriorities(rows, all, "nitro")).toEqual(rows);
+    expect(filterPriorities(rows, all, "regular")).toEqual(rows);
+  });
+  it("matches any selected Discord role, including a player on vacation", () => {
+    expect(filterPriorities(rows, { ...all, roleIds: ["rp", "regular"] }, "nitro").map((p) => p.memberId)).toEqual(["nitro", "regular", "vacation"]);
+    expect(filterPriorities(rows, { ...all, roleIds: ["unknown"] }, "nitro")).toEqual([]);
+  });
+  it("checks current kind limits only when enabled, separately from profile and role filters", () => {
+    expect(filterPriorities(rows, { ...all, scheduleActive: true }, "nitro").map((p) => p.memberId)).toEqual(["nitro"]);
+    expect(filterPriorities(rows, { ...all, scheduleActive: true }, "regular").map((p) => p.memberId)).toEqual(["regular"]);
+    expect(filterPriorities(rows, { ...all, active: true }, "nitro")).toHaveLength(3);
+    expect(filterPriorities(rows, { ...all, roleIds: ["rp"], scheduleActive: true }, "regular")).toEqual([]);
+    expect(filterPriorities(rows, { ...all, scheduleActive: true }, "nitro")[0].rank).toBe(rows.find((p) => p.memberId === "nitro")?.rank);
   });
 });

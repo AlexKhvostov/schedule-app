@@ -62,7 +62,10 @@ test("distance ranking ignores VIP badges and keeps kind filters", async ({ page
   await expect(vera.locator("td.is-total")).toHaveText(total!);
   await expect(page.locator('tr[data-member="demo-priority-16"]')).toBeVisible();
   await page.getByRole("tab", { name: "Nitro", exact: true }).click();
+  await expect(page.locator('tr[data-member="demo-priority-16"]')).toBeVisible();
+  await page.getByLabel("Активны в расписании", { exact: true }).check();
   await expect(page.locator('tr[data-member="demo-priority-16"]')).toHaveCount(0);
+  await page.getByLabel("Активны в расписании", { exact: true }).uncheck();
   await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
   await expect(vera.locator("td.is-rank")).toHaveText("4");
   await page.getByLabel("Показывать VIP", { exact: true }).check();
@@ -171,7 +174,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   const tabs = await page.getByRole("tablist", { name: "Вид турниров" }).boundingBox();
   expect(tabs!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
   await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
-  await page.getByLabel("Активная карточка", { exact: true }).uncheck();
+  await page.getByLabel("Активная карточка", { exact: true }).check();
   const nitro = page.getByRole("tab", { name: "Nitro", exact: true });
   const regular = page.getByRole("tab", { name: "Регулярные", exact: true });
   await nitro.press("ArrowRight");
@@ -179,17 +182,17 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   await expect(regular).toHaveAttribute("aria-selected", "true");
   await expect(nitro).toHaveAttribute("aria-selected", "false");
   await expect(page.getByRole("tabpanel")).toHaveCount(1);
-  await expect(page.getByRole("tabpanel", { name: "Регулярные" }).getByRole("button", { name: "Подать заявку" })).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Регулярные" }).getByRole("button", { name: "Сообщить о неточности" })).toBeVisible();
   await expect(page.locator(".v2-prio-table")).toHaveCount(1);
   await expect(page.getByLabel("Показывать VIP", { exact: true })).not.toBeChecked();
-  await expect(page.getByLabel("Активная карточка", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Активная карточка", { exact: true })).toBeChecked();
   await regular.press("Home");
   await expect(nitro).toBeFocused();
   await expect(nitro).toHaveAttribute("aria-selected", "true");
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const table = await page.locator(".v2-prio-scroll").boundingBox();
-    const button = page.getByRole("button", { name: "Подать заявку", exact: true });
+    const button = page.getByRole("button", { name: "Сообщить о неточности", exact: true });
     const action = await button.boundingBox();
     expect(action!.y).toBeGreaterThanOrEqual(table!.y + table!.height);
     await button.click();
@@ -224,7 +227,7 @@ test("compact summary follows the visible kind, filters and VIP display", async 
   expect(summary!.x).toBeGreaterThanOrEqual(filters!.x + filters!.width);
   expect(controls!.height).toBeLessThanOrEqual(filters!.height + 1);
   await page.screenshot({ path: testInfo.outputPath("priority-summary-desktop.png") });
-  await page.getByLabel("Активная карточка", { exact: true }).uncheck();
+  await page.getByLabel("Активная карточка", { exact: true }).check();
   await checkSummary();
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(page.getByRole("complementary", { name: "Сводка · Регулярные" })).toBeVisible();
@@ -245,7 +248,7 @@ test("grouped request snapshots, public replies, private comments and admin dele
     originalRows[id] = await page.locator(`tr[data-member="${id}"] td.is-num`).allTextContents();
     originalRanks[id] = await page.locator(`tr[data-member="${id}"] td.is-rank`).innerText();
   }
-  await page.getByRole("button", { name: "Подать заявку", exact: true }).click();
+  await page.getByRole("button", { name: "Сообщить о неточности", exact: true }).click();
   await page.getByLabel("Проверить Alina", { exact: true }).check();
   await page.getByLabel("Проверить Boris", { exact: true }).check();
   await page.getByLabel("Проверить Vera", { exact: true }).check();
@@ -381,7 +384,7 @@ test("priority table and touch calculation fit phones in both themes and languag
   await dialog.getByRole("button", { name: "✕", exact: true }).click();
   await page.evaluate(() => localStorage.setItem("lang", "en")); await page.reload();
   await expect(page.getByLabel("Poker room", { exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Submit request", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Report an inaccuracy", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Summary · Nitro" })).toBeVisible();
   for (const value of await page.locator(".v2-prio-table tbody td.is-total").allTextContents()) expect(value).toMatch(/\.\d$/);
   await expect.poll(() => page.locator(".v2-prio-summary").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
@@ -396,7 +399,7 @@ test("editing a source distance updates the current priority but keeps the submi
   const periodLabel = await page.locator(".v2-prio-table th.is-period").last().textContent();
   const match = periodLabel!.match(/–(\d{2})\.(\d{2})/)!;
   const lastMonth = `20${match[2]}-${match[1]}`;
-  await page.getByRole("button", { name: "Подать заявку", exact: true }).click();
+  await page.getByRole("button", { name: "Сообщить о неточности", exact: true }).click();
   await page.getByLabel("Проверить nina", { exact: true }).check();
   await page.getByLabel("Комментарий", { exact: true }).fill("Проверка исходного нуля");
   await page.getByRole("button", { name: "Отправить заявку", exact: true }).click();
@@ -419,4 +422,54 @@ test("editing a source distance updates the current priority but keeps the submi
   await expect(snapshot.locator(".v2-prio-saved-values tbody tr td").last()).toHaveText("0,0");
   await expect(snapshot.locator(".v2-prio-review-person > summary")).toContainText("nina");
   await expect(snapshot.locator(".v2-prio-review-person > summary > b")).toHaveText("0,0Очки");
+});
+
+
+test("optional limits and any-role filters retain vacation players and request snapshots", async ({ page }, testInfo) => {
+  await enter(page);
+  const vacation = page.locator('tr[data-member="demo-priority-15"]');
+  const regularOnly = page.locator('tr[data-member="demo-priority-16"]');
+  const inactive = page.locator('tr[data-member="demo-priority-17"]');
+  await expect(page.getByLabel("Активны в расписании", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Активная карточка", { exact: true })).not.toBeChecked();
+  await expect(vacation).toBeVisible();
+  await expect(inactive).toBeVisible();
+  const rank = await vacation.locator("td.is-rank").innerText();
+  const score = await vacation.locator("td.is-total").innerText();
+  const count = await page.locator(".v2-prio-table tbody tr").count();
+  await page.getByRole("button", { name: "Все роли Discord", exact: true }).click();
+  await page.getByRole("option", { name: /^RedParty/ }).click();
+  await expect(page.locator('tr[data-member="demo-priority-19"]')).toHaveCount(0);
+  await page.getByRole("option", { name: /^Nitro 50/ }).click();
+  await expect(page.locator(".v2-prio-table tbody tr")).toHaveCount(count);
+  await page.getByRole("option", { name: /^RedParty/ }).click();
+  await expect(page.locator('tr[data-member="demo-priority-18"]')).toHaveCount(0);
+  await page.getByRole("option", { name: /^Nitro 50/ }).click();
+  await page.getByRole("heading", { name: "Приоритеты", exact: true }).click();
+  await expect(page.locator(".v2-prio-table tbody tr")).toHaveCount(count);
+  await page.getByLabel("Активны в расписании", { exact: true }).check();
+  await expect(vacation).toHaveCount(0);
+  await expect(regularOnly).toHaveCount(0);
+  await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
+  await expect(regularOnly).toBeVisible();
+  await expect(vacation).toHaveCount(0);
+  await page.getByLabel("Активны в расписании", { exact: true }).uncheck();
+  await expect(vacation).toBeVisible();
+  await expect(vacation.locator("td.is-rank")).toHaveText(rank);
+  await expect(vacation.locator("td.is-total")).toHaveText(score);
+  await page.getByLabel("Активная карточка", { exact: true }).check();
+  await expect(inactive).toHaveCount(0);
+  await page.getByLabel("Активная карточка", { exact: true }).uncheck();
+  await expect(inactive).toBeVisible();
+  await page.getByRole("button", { name: "Сообщить о неточности", exact: true }).click();
+  await page.getByLabel("Проверить Player 16", { exact: true }).check();
+  await page.getByRole("button", { name: "Отправить заявку", exact: true }).click();
+  await expect(page.getByText("Заявка отправлена", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
+  const saved = page.locator('.v2-prio-snapshot-table tr[data-member="demo-priority-15"]');
+  await expect(saved.locator("td").first()).toHaveText(rank);
+  await expect(saved.locator("td").last()).toHaveText(score);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("v2-priority-requests-1")!)[0].detail.snapshot.version)).toBe(2);
+  await page.screenshot({ path: testInfo.outputPath("vacation-request.png") });
 });
