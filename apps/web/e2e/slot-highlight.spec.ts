@@ -16,7 +16,7 @@ for (const theme of ["dark", "light"]) {
     }, theme);
     await page.goto("/#schedule");
     await login(page, "RP-221");
-    const washes = page.locator(".v2-hour-wash");
+    const washes = page.locator("[data-slot][data-load-tone]");
     await expect(washes.first()).toBeVisible();
     const clubColors = await page.evaluate(() => localStorage.getItem("redparty.demo.hour-load.v2"));
     const cells = await page.locator("[data-slot]").count();

@@ -178,7 +178,11 @@ function placeFrame(
     pair.dataset.variant = hit.variant;
     frame.style.setProperty("--opt-frame-limit-tone", limitTone(hit.limit));
     pair.style.color = "var(--opt-frame-limit-tone)";
-    pair.textContent = pairLabel;
+    const prefix = document.createElement("span");
+    prefix.className = "v2-pair-kind";
+    prefix.dataset.variant = hit.variant;
+    prefix.textContent = pairLabel[0];
+    pair.append(prefix, document.createTextNode(pairLabel.slice(1)));
     const time = document.createElement("span");
     time.className = "v2-opt-frame-time";
     time.textContent = label.slice(pairLabel.length);

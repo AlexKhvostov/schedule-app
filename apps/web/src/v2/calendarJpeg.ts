@@ -69,6 +69,20 @@ function mineTone(limit: string) {
   return cssVar(`--limit-${limit}`, limitTonePaint(limit, theme));
 }
 
+function drawPairLabel(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, variant: ScheduleVariant) {
+  const centered = ctx.textAlign === "center";
+  if (centered) x -= ctx.measureText(label).width / 2;
+  const align = ctx.textAlign;
+  ctx.textAlign = "left";
+  ctx.strokeText(label, x, y);
+  const ink = ctx.fillStyle;
+  ctx.fillStyle = cssVar(variant === "nitro" ? "--schedule-nitro" : "--schedule-regular", variant === "nitro" ? "#68b5ff" : "#f3ce62");
+  ctx.fillText(label[0], x, y);
+  ctx.fillStyle = ink;
+  if (label.length > 1) ctx.fillText(label.slice(1), x + ctx.measureText(label[0]).width, y);
+  ctx.textAlign = align;
+}
+
 function variantInk(variant: ScheduleVariant) {
   return variant === "nitro" ? "#071014" : "#ffffff";
 }
@@ -262,8 +276,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const runLabel = len >= 6 ? run.label : run.label.slice(0, 1);
-        ctx.strokeText(runLabel, x + w / 2, cy + CHIP_H / 2);
-        ctx.fillText(runLabel, x + w / 2, cy + CHIP_H / 2);
+        drawPairLabel(ctx, runLabel, x + w / 2, cy + CHIP_H / 2, run.variant);
         ctx.restore();
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
@@ -295,8 +308,7 @@ export async function downloadCalendarJpeg(opts: Opts) {
     ctx.lineJoin = "round";
     ctx.font = variantFont(column.variant, 11);
     const label = column.label;
-    ctx.strokeText(label, legendX + 14, footY);
-    ctx.fillText(label, legendX + 14, footY);
+    drawPairLabel(ctx, label, legendX + 14, footY, column.variant);
     legendX += ctx.measureText(label).width + 28;
   }
 

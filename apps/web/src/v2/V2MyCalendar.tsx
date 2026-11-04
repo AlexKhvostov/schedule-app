@@ -1,3 +1,4 @@
+import { PairLabel } from "./PairLabel";
 import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -154,7 +155,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
         ) : null}
       </div>
       <div className="mt-2 text-[12px]" style={{ color: mineTone(hover.limit) }}>
-        {hover.label}
+        <PairLabel label={hover.label} />
       </div>
     </div>
   ) : null;
@@ -287,7 +288,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                           </span>
                         )}
                         <span className="v2-chip-face">
-                          {len >= 4 ? run.label : run.label.slice(0, 1)}
+                          <PairLabel label={len >= 4 ? run.label : run.label.slice(0, 1)} />
                         </span>
                       </button>
                     );
@@ -304,7 +305,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
             {usedColumns.map((column) => (
               <span key={column.key} className={`v2-mine-legend is-${column.variant}`}>
                 <i style={{ background: mineTone(column.limit) }} />
-                {column.label}
+                <PairLabel label={column.label} />
               </span>
             ))}
           </div>

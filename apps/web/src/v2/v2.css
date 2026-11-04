@@ -10766,18 +10766,6 @@ textarea.v2-ctrl.v2-cab-area {
   opacity: 0.9;
 }
 
-/* Static spans are scoped to one kind/limit/level, above empty cells and below marks. */
-.v2-hour-wash {
-  position: relative;
-  z-index: 2;
-  min-width: 0;
-  margin-block: -3px;
-  border-radius: 3px;
-  filter: blur(2px);
-  pointer-events: none;
-}
-.v2-opt-cell.is-on { z-index: 3; }
-.v2-opt-block.is-day-past .v2-hour-wash { opacity: 0.4; }
 
 .v2-opt-limit,
 .v2-opt-gutter-limit {
@@ -11778,9 +11766,33 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   height: auto;
 }
 
+/* Palette tint is independent of load. Only actual future empty/open cells use it. */
+.v2-opt .v2-opt-cell[data-future="true"]:not(.is-on):not(.is-lock) {
+  background: color-mix(in srgb, var(--slot-limit-tone) var(--slot-tint-strength, 8%), var(--slot-future-bg, var(--slot)));
+}
+
+/* Outset shadows leave each cell's interior untouched; no overlay nodes or animation. */
+.v2-opt .v2-opt-cell[data-load-tone] {
+  --slot-load-shadow: 0 0 0 1px color-mix(in srgb, var(--load-glow-color) 65%, transparent), 0 0 5px 1px var(--load-glow-color);
+  --load-glow-color: var(--load-base-color, var(--slot-load-tone));
+  box-shadow: var(--slot-load-shadow);
+}
+.v2-opt .v2-opt-cell[data-load-tone]:not(.is-on):not(.is-past):not(.is-lock) {
+  box-shadow: var(--slot-load-shadow), inset 0 0 0 1px var(--opt-day-stroke);
+}
+.v2-opt .v2-opt-cell[data-load-tone].is-on,
+.v2-opt .v2-opt-cell[data-load-tone].is-past:not(.is-on):not(.is-lock) { box-shadow: var(--slot-load-shadow); }
+html[data-ui-theme="light"] .v2-opt .v2-opt-cell[data-load-tone] {
+  --load-base-color: color-mix(in srgb, var(--slot-load-tone) 85%, #000 15%);
+}
+.v2-opt .v2-opt-cell[data-load-tone].is-past {
+  --load-glow-color: color-mix(in srgb, var(--load-base-color, var(--slot-load-tone)) 40%, transparent);
+}
+
 .v2-opt.is-kit .v2-opt-cell.is-busy:not(.is-on):not(.is-lock):not(.is-past),
 .v2-opt.is-kit .v2-opt-cell.is-busy.is-on {
   box-shadow:
+    var(--slot-load-shadow, 0 0 transparent),
     inset 0 0 0 1.5px var(--busy-mark, var(--foreground)),
     0 0 5px color-mix(in srgb, var(--busy-mark, var(--foreground)) 45%, transparent);
 }
@@ -16456,3 +16468,20 @@ button.v2-home-action:hover { transform: translateY(-2px); border-color: color-m
 }
 .v2-online-dot.is-active { background: var(--success); }
 .v2-online-dot.is-idle { background: var(--warning); }
+
+/* Stable tournament identity; digits continue to inherit the limit palette. */
+html, .v2-palette-sample.is-dark { --schedule-nitro: #68b5ff; --schedule-regular: #f3ce62; }
+html[data-ui-theme="light"], .v2-palette-sample.is-light { --schedule-nitro: #245da6; --schedule-regular: #896600; }
+.v2-pair-kind[data-variant="nitro"] { color: var(--schedule-nitro); }
+.v2-pair-kind[data-variant="regular"] { color: var(--schedule-regular); }
+.v2-opt-tip-kind[data-variant="nitro"] { color: var(--schedule-nitro); }
+.v2-opt-tip-kind[data-variant="regular"] { color: var(--schedule-regular); }
+.v2-palette-tint { border: 0; margin: 0 0 14px; padding: 0; max-width: 680px; }
+.v2-palette-tint legend { font-weight: 650; margin-bottom: 8px; }
+.v2-palette-tint label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.v2-palette-strength input { flex: 1; min-width: 60px; max-width: 220px; accent-color: var(--primary); }
+.v2-palette-strength output { min-width: 3ch; font-variant-numeric: tabular-nums; }
+.v2-palette-sample { flex-wrap: wrap; }
+.v2-palette-slots { display: flex; gap: 4px; flex-basis: 100%; padding-top: 2px; }
+.v2-palette-slots i { display: block; width: 24px; height: 20px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(244 245 247 / .22); background: color-mix(in srgb, var(--preview-limit) var(--preview-strength), #0e1118); }
+.v2-palette-sample.is-light .v2-palette-slots i { box-shadow: inset 0 0 0 1px rgb(17 22 32 / .22); background: color-mix(in srgb, var(--preview-limit) var(--preview-strength), #edf1f7); }

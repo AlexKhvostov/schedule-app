@@ -1,5 +1,11 @@
 # База schedule-app
 
+## Фон будущих слотов (локально, 4 ноября 2026)
+
+[Миграция](../supabase/migrations/20261104153303_slot_tint.sql) добавляет `schedule_settings.slot_tint`: ровно `{enabled: boolean, strength: integer 0..30}`, NOT NULL, по умолчанию `{enabled:true,strength:8}`, строгий CHECK. Новый RPC `save_schedule_appearance(p_palette,p_expected_palette,p_tint,p_expected_tint)` проверяет личность и `schedule.manage`, блокирует строку и сравнивает обе исходные версии перед единым UPDATE. Конфликт — `40001 / palette-conflict`, невалидный JSON — `22023`; прямой UPDATE и анонимный EXECUTE закрыты, search_path пустой. Чтение/RLS/аудит/Realtime прежние.
+
+Старый `save_schedule_limit_palette` совместим и сохраняет только цвета, не затрагивая фон. [Контракт палитры](../supabase/tests/limit_palette.sql) расширен проверками общего сохранения, границ, некорректных типов, конфликтов обоих полей и прав. Миграция проверена на изолированной локальной базе; в Working ещё не установлена.
+
 ## Нагрузка по часам (опубликовано, 4 ноября 2026)
 
 [Миграция](../supabase/migrations/20261104101829_schedule_hour_load.sql) добавляет `schedule_settings.hour_load` — JSON-объект с ключами `nitro:50`, `regular:50` и другими существующими номиналами. Значение — ровно 24 часа CET; каждый час содержит `null` либо ID одного из десяти оттенков. CSS-строки не принимаются. Отсутствующая пара равна пустой строке. CHECK использует `valid_hour_load` и `valid_hour_load_row`.
@@ -12,7 +18,7 @@
 
 [Миграция](../supabase/migrations/20261104095535_club_limit_palette.sql) добавляет `schedule_settings.limit_palette`: обязательный JSON из шести номиналов (5/25/50/100/250/500), каждый содержит ровно `light` и `dark` в формате `#RRGGBB`. CHECK и RPC используют строгую `valid_schedule_limit_palette`. Начальные покерные цвета согласованы с клиентом; доступность лимитов не меняется.
 
-Существующая RLS разрешает чтение авторизованным пользователям. Прямого UPDATE нового поля нет; запись только через `save_schedule_limit_palette(p_palette, p_expected)` с проверкой `auth.uid()` и `schedule.manage`, закрытым `search_path` и без анонимного EXECUTE. Функция блокирует строку, сравнивает предыдущую палитру и при несовпадении возвращает `40001 / palette-conflict`. Невалидный JSON возвращает `22023`. HEX нормализуется к нижнему регистру. Существующий trigger обновляет автора и время; остальные настройки не меняются.
+Существующая RLS разрешает чтение авторизованным пользователям. Прямого UPDATE нового поля нет; запись через `save_schedule_limit_palette(p_palette, p_expected)` либо новый общий RPC оформления (описан выше) с проверкой `auth.uid()` и `schedule.manage`, закрытым `search_path` и без анонимного EXECUTE. Функция блокирует строку, сравнивает предыдущую палитру и при несовпадении возвращает `40001 / palette-conflict`. Невалидный JSON возвращает `22023`. HEX нормализуется к нижнему регистру. Существующий trigger обновляет автора и время; остальные настройки не меняются.
 
 Realtime использует уже опубликованную `schedule_settings`. [SQL-контракт](../supabase/tests/limit_palette.sql) проверяет доступ, формат, атомарность и конфликты в транзакции с откатом; включён в CI. 4 ноября2026 миграции палитры и нагрузки применены к Working; облачные SQL-проверки с rollback прошли. [Выпуск](../memory/tasks/2026-11-04-schedule-release.md).
 

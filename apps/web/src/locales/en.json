@@ -17,9 +17,14 @@
     "scope": "Only the selected pair is saved. Colors apply to all its levels and club members. Save other pairs separately; their drafts remain when switching. Old local settings can be imported into the selected pair and saved."
   },
   "limitPalette": {
+    "slotBackground": "Future slot background",
+    "tintEnabled": "Tint empty future slots",
+    "tintStrength": "Tint intensity",
+    "tintHint": "One setting for all limits. Uses the palette colors; marks, past and locked slots stay unchanged. The preview below updates before saving.",
+    "tintPreview": "Slot background {{limit}} · {{theme}}",
     "title": "Limit colors",
     "kicker": "Club palette",
-    "lead": "Shared colors for every player. Nitro uses upright text; Regular uses italics.",
+    "lead": "Shared colors and slot tint for every player. N is blue, E is yellow; Regular uses italics.",
     "limit": "Limit",
     "light": "Light theme",
     "dark": "Dark theme",
@@ -27,14 +32,14 @@
     "loading": "Loading palette…",
     "loadError": "Unable to load the club palette. Editing is unavailable for now.",
     "retry": "Retry",
-    "saveError": "Unable to save colors. Your draft is still on screen; please try again.",
-    "conflict": "Another administrator changed the palette. Load the saved colors before saving.",
-    "save": "Save colors",
+    "saveError": "Unable to save colors and tint. Your draft is still on screen; please try again.",
+    "conflict": "Another administrator changed colors or slot tint. Load the saved settings before saving.",
+    "save": "Save colors and tint",
     "saving": "Saving…",
     "reset": "Restore poker colors",
-    "discard": "Load saved colors",
+    "discard": "Load saved settings",
     "contrast": "Low contrast on the preview background: {{items}}. Choose more readable colors.",
-    "scope": "Only you see this preview. Saving updates colors for the whole club, calendar and JPEG. A reset also needs to be saved."
+    "scope": "Only you see this preview. Saving updates colors and slot tint for the whole club; label colors also update in the calendar and JPEG. Resetting colors also needs to be saved."
   },
   "online": {
     "title": "Online",

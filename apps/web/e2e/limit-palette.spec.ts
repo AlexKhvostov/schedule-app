@@ -23,9 +23,9 @@ test("club colors save, persist across players and reset; Regular stays italic",
   await expect(page.locator(".v2-admin-page > section").last()).toHaveClass(/v2-limit-palette/);
   expect(await rootColor(page)).toBe("#5ba8ff");
   await editor.getByLabel("Цвет 50 · Тёмная тема", { exact: true }).fill("#66ccff");
-  await expect(editor.getByRole("button", { name: "Сохранить цвета", exact: true })).toBeEnabled();
+  await expect(editor.getByRole("button", { name: "Сохранить цвета и фон", exact: true })).toBeEnabled();
   expect(await rootColor(page)).toBe("#5ba8ff");
-  await editor.getByRole("button", { name: "Сохранить цвета", exact: true }).click();
+  await editor.getByRole("button", { name: "Сохранить цвета и фон", exact: true }).click();
   await expect.poll(() => rootColor(page)).toBe("#66ccff");
   await page.reload();
   await openEditor(page);
@@ -41,7 +41,7 @@ test("club colors save, persist across players and reset; Regular stays italic",
   await expect(player.locator('.v2-opt-nl[data-variant=regular] .v2-opt-limit-label').first()).toHaveCSS("font-style", "italic");
   await editor.getByRole("button", { name: "Вернуть покерные цвета" }).click();
   expect(await rootColor(page)).toBe("#66ccff");
-  await editor.getByRole("button", { name: "Сохранить цвета", exact: true }).click();
+  await editor.getByRole("button", { name: "Сохранить цвета и фон", exact: true }).click();
   await expect.poll(() => rootColor(player)).toBe("#5ba8ff");
   await editor.screenshot({ path: path.resolve("../../memory/tasks/2026-11-04-palette-dark.png") });
 });
@@ -54,10 +54,10 @@ test("concurrent admin draft survives updates and conflict cannot overwrite save
   const second = await openEditor(other);
   await first.getByLabel("Цвет 50 · Тёмная тема", { exact: true }).fill("#88bbff");
   await second.getByLabel("Цвет 50 · Тёмная тема", { exact: true }).fill("#99aaff");
-  await first.getByRole("button", { name: "Сохранить цвета", exact: true }).click();
+  await first.getByRole("button", { name: "Сохранить цвета и фон", exact: true }).click();
   await expect(second.getByRole("alert")).toContainText("Другой администратор");
   await expect(second.getByLabel("Цвет 50 · Тёмная тема", { exact: true })).toHaveValue("#99aaff");
-  await expect(second.getByRole("button", { name: "Сохранить цвета", exact: true })).toBeDisabled();
+  await expect(second.getByRole("button", { name: "Сохранить цвета и фон", exact: true })).toBeDisabled();
   await second.getByRole("button", { name: "Загрузить сохранённые" }).click();
   await expect(second.getByLabel("Цвет 50 · Тёмная тема", { exact: true })).toHaveValue("#88bbff");
 });
@@ -68,7 +68,7 @@ test("palette fits mobile in English and warns about unreadable colors", async (
   await enter(page);
   const editor = await openEditor(page);
   await editor.getByLabel("Цвет 50 · Светлая тема", { exact: true }).fill("#ffffff");
-  await expect(editor.getByRole("status")).toContainText("плохо читаются");
+  await expect(editor.getByRole("status").filter({ hasText: "плохо читаются" })).toContainText("плохо читаются");
   await editor.getByRole("button", { name: "Вернуть покерные цвета" }).click();
   await page.getByRole("button", { name: "you", exact: true }).click();
   await page.getByRole("button", { name: "EN", exact: true }).click();
@@ -84,7 +84,7 @@ test(`calendar and JPEG use the saved palette in the ${theme} theme`, async ({ p
   await enter(page);
   const editor = await openEditor(page);
   await editor.getByLabel(`Цвет 50 · ${theme === "dark" ? "Тёмная" : "Светлая"} тема`, { exact: true }).fill("#66ccff");
-  await editor.getByRole("button", { name: "Сохранить цвета", exact: true }).click();
+  await editor.getByRole("button", { name: "Сохранить цвета и фон", exact: true }).click();
   await expect.poll(() => rootColor(page)).toBe("#66ccff");
   await page.goto("/#schedule");
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();

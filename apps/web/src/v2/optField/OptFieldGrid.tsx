@@ -18,7 +18,7 @@ import {
 import { OptLevelLane, OptNlChip } from "../OptLevelLane";
 import { MarkFace } from "../ScheduleSlot";
 import type { SchedulePairRow } from "../variantSchedule";
-import { hourLoadKey, hourLoadSegments, loadToneColor, type HourLoadMap } from "../../schedule/hourLoad";
+import { hourLoadKey, loadToneColor, type HourLoadMap, type LoadTone } from "../../schedule/hourLoad";
 
 function levelsOf(
   capacity: CapacityMap,
@@ -170,6 +170,8 @@ const OptCell = memo(function OptCell({
   showTables,
   past,
   locked,
+  future,
+  loadTone,
   muted,
   hit,
   nowPct,
@@ -197,6 +199,8 @@ const OptCell = memo(function OptCell({
   showTables: boolean;
   past: boolean;
   locked: boolean;
+  future: boolean;
+  loadTone?: LoadTone;
   muted?: boolean;
   hit?: boolean;
   nowPct?: number;
@@ -223,6 +227,8 @@ const OptCell = memo(function OptCell({
       data-level={level}
       data-variant={variant}
       data-limit={limit}
+      data-future={future || undefined}
+      data-load-tone={loadTone}
       data-lane={lane}
       data-mark={mark}
       data-busy={busyPairs?.length ? busyPairs.map((pair) => monthGridKey(pair.variant, pair.limit)).join(",") : undefined}
@@ -236,6 +242,7 @@ const OptCell = memo(function OptCell({
         {
           "--mark": bg,
           "--mark-ink": fg,
+          "--slot-load-tone": loadTone ? loadToneColor(loadTone) : undefined,
           "--opt-now-pct": nowPct != null ? `${nowPct}%` : undefined,
           gridColumn,
           gridRow: 1,
@@ -436,6 +443,8 @@ export const OptBody = memo(function OptBody({
                                   showTables={showTables}
                                   past={past}
                                   locked={locked}
+                                  future={!gone}
+                                  loadTone={locked ? undefined : hourLoad?.[hourLoadKey(group.variant, rowInfo.limit)]?.[Math.floor(half / 2)] ?? undefined}
                                   nowPct={nowPct}
                                   busyPairs={hidden}
                                   busyHalf={Boolean(hidden?.length)}
@@ -449,13 +458,6 @@ export const OptBody = memo(function OptBody({
                                 />
                               );
                             })}
-                          {!ghost && hourLoadSegments(hourLoad?.[hourLoadKey(group.variant, rowInfo.limit)], visibleHalves,
-                            (half) => levelAllowed(half, level, limitHours)).map((span) => (
-                            <i key={span.startHalf} className="v2-hour-wash" aria-hidden
-                              data-tone={span.tone} data-start-half={span.startHalf} data-end-half={span.endHalf}
-                              style={{ gridColumn: `${workGridColumn(visibleHalves, span.startHalf)} / span ${span.endHalf - span.startHalf}`,
-                                gridRow: 1, backgroundColor: loadToneColor(span.tone) }} />
-                          ))}
                           {segments.map((segment) => {
                             const segmentPast = dimPast && isPastSlot(year, monthIndex, day.d, segment.endHalf - 1, cet);
                             const progress = sameMonth && today && cet.half >= segment.startHalf && cet.half < segment.endHalf

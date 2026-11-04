@@ -31,6 +31,36 @@ describe("shared palette persistence", () => {
     mock.single.mockRejectedValue(new Error("offline"));
     expect((await loadClubLimitPalette()).error).toBe("network-error");
   });
+  it("saves palette and tint atomically in Demo and rejects a stale tint", async () => {
+    mock.demo = true;
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) });
+    vi.stubGlobal("window", new EventTarget());
+    const before = await loadClubLimitPalette();
+    const next = normalizeLimitPalette(before.palette);
+    next["50"].dark = "#abcdef";
+    const tint = { enabled: false, strength: 22 };
+    expect(await saveClubLimitPalette(next, before.palette, tint, before.tint)).toEqual({});
+    expect(store.size).toBe(1);
+    expect(await loadClubLimitPalette()).toEqual({ palette: next, tint });
+    expect((await saveClubLimitPalette(before.palette, next, before.tint, before.tint)).error).toBe("palette-conflict");
+    expect(await loadClubLimitPalette()).toEqual({ palette: next, tint });
+    expect((await saveClubLimitPalette(next, next, { enabled: true, strength: 40 }, tint)).error).toBe("invalid-slot-tint");
+  });
+  it("uses one guarded RPC for both settings and surfaces missing migration errors", async () => {
+    vi.stubGlobal("window", new EventTarget());
+    mock.rpc.mockResolvedValue({ error: null });
+    const tint = { enabled: false, strength: 15 };
+    const expected = { enabled: true, strength: 8 };
+    expect(await saveClubLimitPalette(DEFAULT_LIMIT_PALETTE, DEFAULT_LIMIT_PALETTE, tint, expected)).toEqual({});
+    expect(mock.rpc).toHaveBeenCalledWith("save_schedule_appearance", {
+      p_palette: DEFAULT_LIMIT_PALETTE, p_expected_palette: DEFAULT_LIMIT_PALETTE, p_tint: tint, p_expected_tint: expected,
+    });
+    mock.single.mockResolvedValue({ data: { limit_palette: DEFAULT_LIMIT_PALETTE, slot_tint: tint }, error: null });
+    expect((await loadClubLimitPalette()).tint).toEqual(tint);
+    mock.single.mockResolvedValue({ data: { limit_palette: DEFAULT_LIMIT_PALETTE }, error: null });
+    expect((await loadClubLimitPalette()).error).toBe("invalid-palette");
+  });
   it("saves only via the guarded RPC and preserves failures", async () => {
     mock.rpc.mockResolvedValue({ error: { message: "palette-conflict" } });
     expect((await saveClubLimitPalette(DEFAULT_LIMIT_PALETTE, DEFAULT_LIMIT_PALETTE)).error).toBe("palette-conflict");

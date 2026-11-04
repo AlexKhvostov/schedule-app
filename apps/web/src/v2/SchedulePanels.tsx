@@ -1,3 +1,4 @@
+import { PairLabel } from "./PairLabel";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -433,7 +434,7 @@ export function HoursPanel({
             <tbody>
               {cols.map((limit) => (
                 <tr key={limit}>
-                  <th>{displayScheduleColumn(limit)}</th>
+                  <th><PairLabel label={displayScheduleColumn(limit)} /></th>
                   <td className={matrix.totals[limit] ? "is-on" : ""}>{formatHours(matrix.totals[limit] || 0)}</td>
                   {showDeadTime && <td className={`is-dead${deadTime?.byPair[limit] ? " is-on" : ""}`}>
                     {deadTime ? formatHours(deadTime.byPair[limit] || 0) : "—"}
