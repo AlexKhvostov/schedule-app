@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/ui/button";
@@ -53,6 +53,8 @@ import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
 import { gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
 import { centerPos, useWindowPos } from "./windowPos";
 
+const ScheduleMemberProfile = lazy(() => import("./ScheduleMemberProfile").then(module => ({ default: module.ScheduleMemberProfile })));
+
 type Props = {
   cursor: Date;
   onCursorChange: (value: Date) => void;
@@ -62,10 +64,11 @@ type Props = {
   memberId?: string;
   highlightPreferencesKey?: string | null;
   canActAs?: boolean;
+  canManagePeople?: boolean;
   onKindChange?: (kind: "nitro" | "regular") => void;
 };
 
-export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme", memberId, highlightPreferencesKey, canActAs = false, onKindChange }: Props) {
+export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme", memberId, highlightPreferencesKey, canActAs = false, canManagePeople = false, onKindChange }: Props) {
   const { t, i18n } = useTranslation();
   const isKit = skin === "theme";
   const year = cursor.getFullYear();
@@ -90,6 +93,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [chosenRosterKind, setChosenRosterKind] = useState<PriorityKind>(kind);
   const rosterKind = kinds.includes(chosenRosterKind) ? chosenRosterKind : kinds[0];
   const rosterTabs = useRef<Partial<Record<PriorityKind, HTMLButtonElement | null>>>({});
+  const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
   const [publicNames, setPublicNames] = useState<Map<string, string>>(() => new Map());
@@ -603,6 +607,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {peek ? (
           <V2UserCard
             row={peek}
+            canManageProfile={canManagePeople}
+            onOpenProfile={canManagePeople ? setProfileMemberId : undefined}
             givenName={peek.mark.memberId ? publicNames.get(peek.mark.memberId) : undefined}
             monthLabel={monthTitle(year, monthIndex, i18n.language)}
             x={userPos.x}
@@ -614,6 +620,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             showTables={countTables && !hideTables}
           />
         ) : null}
+        {canManagePeople && profileMemberId && <Suspense fallback={null}>
+          <ScheduleMemberProfile key={profileMemberId} memberId={profileMemberId} countTables={countTables}
+            onClose={() => setProfileMemberId(null)} onSaved={() => {
+              void loadPublicNames([profileMemberId]).then(names => setPublicNames(current => new Map([...current, ...names])));
+            }} />
+        </Suspense>}
         <Dialog
           open={Boolean(missingPlayPair)}
           title={t("schedule.playLimitRequiredTitle")}

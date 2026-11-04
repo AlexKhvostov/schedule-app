@@ -16485,3 +16485,10 @@ html[data-ui-theme="light"], .v2-palette-sample.is-light { --schedule-nitro: #24
 .v2-palette-slots { display: flex; gap: 4px; flex-basis: 100%; padding-top: 2px; }
 .v2-palette-slots i { display: block; width: 24px; height: 20px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(244 245 247 / .22); background: color-mix(in srgb, var(--preview-limit) var(--preview-strength), #0e1118); }
 .v2-palette-sample.is-light .v2-palette-slots i { box-shadow: inset 0 0 0 1px rgb(17 22 32 / .22); background: color-mix(in srgb, var(--preview-limit) var(--preview-strength), #edf1f7); }
+
+.v2-user-profile-action { position: relative; display: inline-flex; margin-top: 8px; max-width: 100%; }
+.v2-user-profile-action > button { padding: 5px 10px; }
+.v2-user-profile-action > button:disabled { pointer-events: none; opacity: .5; }
+.v2-user-profile-hint { display: none; position: absolute; z-index: 1; top: calc(100% + 5px); left: 0; width: max-content; max-width: 260px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--popover); color: var(--popover-foreground); font-size: 11px; box-shadow: 0 3px 10px #0003; pointer-events: none; }
+.v2-user-profile-action:hover .v2-user-profile-hint,
+.v2-user-profile-action:focus .v2-user-profile-hint { display: block; }

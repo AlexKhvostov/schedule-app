@@ -378,6 +378,10 @@
     "coverage100": "100 · 100%"
   },
   "schedule": {
+    "openProfile": "Open profile",
+    "profileAdminsOnly": "Available to administrators only",
+    "profileLoading": "Loading profile…",
+    "profileUnavailable": "Unable to open this player’s profile. Please try again.",
     "edit": "Edit",
     "editDone": "Done",
     "mobileTools": "Schedule tools",

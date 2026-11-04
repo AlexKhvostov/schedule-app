@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { formatHours, type RosterRow } from "../schedule/roster";
 import { PersonAvatar } from "./PersonAvatar";
@@ -17,6 +18,8 @@ type Props = {
   onFocus: () => void;
   onClose: () => void;
   showTables?: boolean;
+  canManageProfile?: boolean;
+  onOpenProfile?: (memberId: string) => void;
 };
 
 function isClubCode(value?: string | null) {
@@ -37,8 +40,11 @@ function initials(nick: string, mark: string) {
   return (parts[0] || "?").slice(0, 2).toUpperCase();
 }
 
-export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocus, onClose, showTables = false }: Props) {
+export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocus, onClose, showTables = false, canManageProfile = false, onOpenProfile }: Props) {
   const { t } = useTranslation();
+  const hintId = useId();
+  const profileAvailable = canManageProfile && !!row.mark.memberId && !!onOpenProfile;
+  const profileHint = t(canManageProfile ? "schedule.profileUnavailable" : "schedule.profileAdminsOnly");
   const guild = showNick(row.mark.discord) || "—";
   const room = showNick(row.mark.room);
   const user = showNick(row.mark.username);
@@ -57,6 +63,13 @@ export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocu
           <span className="v2-mark-chip">
             <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
           </span>
+        </div>
+        <div className="v2-user-profile-action" tabIndex={profileAvailable ? undefined : 0} aria-describedby={profileAvailable ? undefined : hintId}>
+          <button type="button" className="v2-ctrl" disabled={!profileAvailable}
+            onClick={() => { if (profileAvailable && row.mark.memberId) onOpenProfile?.(row.mark.memberId); }}>
+            {t("schedule.openProfile")}
+          </button>
+          {!profileAvailable && <span className="v2-user-profile-hint" role="tooltip" id={hintId}>{profileHint}</span>}
         </div>
         <p className="v2-user-card-lead">{t("schedule.userCardHint")}</p>
         <div className="v2-club-facts">
