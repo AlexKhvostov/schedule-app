@@ -2,7 +2,7 @@ import {
   slotRangeSpan
 } from "../optFieldModel";
 import { type SlotHit } from "./types";
-import { formatVariantLimit } from "../../schedule/capacity";
+import { formatVariantLimit, limitTone } from "../../schedule/capacity";
 
 type NavMem = {
   block: Element | null;
@@ -175,7 +175,16 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
   frame.style.height = "auto";
   frame.style.bottom = "auto";
   if (frame.textContent !== label) {
-    frame.textContent = label;
+    const pairLabel = formatVariantLimit(hit.variant, hit.limit);
+    const pair = document.createElement("span");
+    pair.className = "v2-opt-frame-limit";
+    pair.dataset.variant = hit.variant;
+    pair.style.color = limitTone(hit.limit);
+    pair.textContent = pairLabel;
+    const time = document.createElement("span");
+    time.className = "v2-opt-frame-time";
+    time.textContent = label.slice(pairLabel.length);
+    frame.replaceChildren(pair, time);
   }
   mem.col = col;
   frame.hidden = false;

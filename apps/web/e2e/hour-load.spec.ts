@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import { DEFAULT_LIMIT_PALETTE } from "../src/schedule/limitPalette";
 
 async function enter(page: Page, player = false) {
   await page.goto("/#admin-schedule");
@@ -65,8 +66,9 @@ test("concurrent drafts reject stale same-pair writes without blocking another p
 
 for (const theme of ["dark", "light"]) {
   test(`load wash follows exact pairs and cropped hours; separators and hover label in ${theme}`, async ({ page }) => {
-    await page.addInitScript((theme) => {
+    await page.addInitScript(({theme, palette}) => {
       localStorage.setItem("v2-ui-theme", theme);
+      localStorage.setItem("redparty.demo.limit-palette.v1", JSON.stringify({...palette,"50":{dark:"#66ccff",light:"#126b44"}}));
       localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits:["50","100"], kinds:["nitro","regular"], dimPast:false, workHours:[0,1,3,4,8] }));
       const row = (tone:string) => Array.from({length:24},(_,hour) => hour === 3 || hour === 8 ? tone : null);
       localStorage.setItem("redparty.demo.hour-load.v2", JSON.stringify({ "nitro:50":row("peach"), "regular:50":row("sky") }));
@@ -74,7 +76,7 @@ for (const theme of ["dark", "light"]) {
         "50": {hours:Array(24).fill(2),days:{},weekdays:{},equalize:false,weekOn:false,monthOn:false},
         "100": {hours:Array(24).fill(1),days:{},weekdays:{},equalize:false,weekOn:false,monthOn:false},
       }));
-    }, theme);
+    }, { theme, palette: DEFAULT_LIMIT_PALETTE });
     await enter(page);
     await page.goto("/#schedule");
     const day = page.locator(".v2-opt-block").first();
@@ -91,6 +93,13 @@ for (const theme of ["dark", "light"]) {
     const cell = n50.locator('[data-slot][data-half="6"]').first();
     await cell.hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N50: 03:00 – 03:30");
+    const frameLimit = page.locator(".v2-opt-frame-limit");
+    const frameTime = page.locator(".v2-opt-frame-time");
+    await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
+    await expect(frameLimit).toHaveCSS("font-style", "normal");
+    await expect(frameTime).toHaveCSS("font-style", "normal");
+    await expect(frameTime).toHaveCSS("font-weight", "400");
+    expect(await frameTime.evaluate(el => getComputedStyle(el).color)).toBe(await page.locator(".v2-opt-frame").evaluate(el => getComputedStyle(el).color));
     const [washBox, cellBox] = await Promise.all([wash.boundingBox(),cell.boundingBox()]);
     expect(Math.abs(washBox!.x-cellBox!.x)).toBeLessThan(1);
     expect(washBox!.y).toBeLessThan(cellBox!.y);
@@ -103,9 +112,13 @@ for (const theme of ["dark", "light"]) {
     // Same hour, different limit/type: the frame must invalidate its cached text.
     await n100.locator('[data-slot][data-half="6"]').first().hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N100: 03:00 – 03:30");
+    await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(216, 222, 233)" : "rgb(52, 59, 70)");
     await e50.locator('[data-slot][data-half="6"]').first().hover();
     await expect(page.locator(".v2-opt-frame")).toBeVisible();
     await expect(page.locator(".v2-opt-frame")).toHaveText("E50: 03:00 – 03:30");
+    await expect(frameLimit).toHaveCSS("font-style", "italic");
+    await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
+    await expect(frameTime).toHaveCSS("font-style", "normal");
     await page.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-hour-load-grid-${theme}.png`), clip: { x:0, y:80, width:500, height:550 } });
   });
 }

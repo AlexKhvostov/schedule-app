@@ -10832,6 +10832,10 @@ textarea.v2-ctrl.v2-cab-area {
   display: none;
 }
 
+.v2-opt-frame-limit { font-style: normal; }
+.v2-opt-frame-limit[data-variant="regular"] { font-style: italic; }
+.v2-opt-frame-time { font-style: normal; font-weight: 400; }
+
 .v2-opt-cell {
   --opt-letter: 10px;
   --opt-tables: 7px;
