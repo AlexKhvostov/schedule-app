@@ -5,7 +5,8 @@ import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
 import { loadMembers, memberOfSession } from "../schedule/members";
 import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
 import { defaultHourLoad, loadHourLoad, saveHourLoad, type HourLoadMap } from "../schedule/hourLoad";
-import { isLiveData } from "../data/config";
+import { isLiveData, supabaseUrl } from "../data/config";
+import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
 import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
 import { loadPrefs } from "./prefs";
@@ -68,6 +69,7 @@ type StaffItem = { key: ShellPage; label: string; icon: string; hint?: string };
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
   const { t, i18n } = useTranslation();
   const nick = session.nick;
+  const priorityPreferencesKey = priorityFiltersStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo");
   const permissions = session.permissions ?? [];
   const isRoot = session.role === "root";
   const menuPermissions = useMemo(
@@ -435,7 +437,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
               <V2BlocksKit />
             </div>
           )}
-          {canPriorities && page === "priorities" && <V2Priorities canManageDemo={canPeople || isRoot} author={nick} />}
+          {canPriorities && page === "priorities" && <V2Priorities key={priorityPreferencesKey ?? nick} preferencesKey={priorityPreferencesKey} canManageDemo={canPeople || isRoot} author={nick} />}
           {isRoot && page === "guild" && <V2Guild />}
           {isRoot && page === "root-api" && <div className="min-h-0 flex-1 overflow-auto"><ApiAdmin /></div>}
           {canPeople && page === "admin-distance" && (

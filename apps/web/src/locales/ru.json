@@ -198,6 +198,7 @@
     "filters": {
       "roles": "Роли Discord — любая из выбранных",
       "allRoles": "Все роли Discord",
+      "unavailableRole": "Роль недоступна · {{id}}",
       "scheduleActive": "Активны в расписании",
       "scheduleActiveHint": "Выбраны игровые лимиты Winamax для текущей вкладки Nitro/Регулярные. Наличие меток в календаре не проверяется.",
       "active": "Активная карточка"

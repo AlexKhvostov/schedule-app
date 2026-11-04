@@ -198,6 +198,7 @@
     "filters": {
       "roles": "Discord roles — any selected",
       "allRoles": "All Discord roles",
+      "unavailableRole": "Unavailable role · {{id}}",
       "scheduleActive": "Active in schedule",
       "scheduleActiveHint": "Winamax limits are selected for the current Nitro/Regular tab. Calendar entries are not required.",
       "active": "Active profile"

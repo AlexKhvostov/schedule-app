@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { loadPriorityFilters, savePriorityFilters } from "./priorityFilterPrefs";
 import { catalogRoles, RolePick } from "./RolePills";
 import { PersonAvatar } from "./PersonAvatar";
 import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num, priorityPoints as points } from "./PriorityCalculation";
@@ -48,7 +49,7 @@ function PriorityTooltip({ row, cell, anchor }: { row: CalculatedPriority; cell:
   return <aside ref={ref} role="tooltip" className="v2-prio-tooltip"><PriorityCalculation row={row} cell={cell} /></aside>;
 }
 
-export function V2Priorities({ canManageDemo = false, author = "you" }: { canManageDemo?: boolean; author?: string }) {
+export function V2Priorities({ canManageDemo = false, author = "you", preferencesKey = null }: { canManageDemo?: boolean; author?: string; preferencesKey?: string | null }) {
   const { t, i18n } = useTranslation();
   const [today, setToday] = useState(priorityToday);
   const [chosenPeriod, setChosenPeriod] = useState("");
@@ -56,7 +57,8 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
   const [kind, setKind] = useState<PriorityKind>("nitro");
   const kindTabs = useRef<Record<PriorityKind, HTMLButtonElement | null>>({ nitro: null, regular: null });
   const monthFormat = new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric", timeZone: "UTC" });
-  const [filters, setFilters] = useState<PriorityFilters>({ roleIds: [], active: false, scheduleActive: false });
+  const [filters, setFilters] = useState<PriorityFilters>(() => loadPriorityFilters(preferencesKey));
+  const changeFilters = (next: PriorityFilters) => { setFilters(next); savePriorityFilters(preferencesKey, next); };
   const [vipOn, setVipOn] = useState(true);
   const [source, setSource] = useState<PrioritySource | null>(null);
   const [requests, setRequests] = useState<PriorityRequestSummary[]>([]);
@@ -103,7 +105,14 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
   const current = source?.periodStart === period ? source : null;
   const ranked = useMemo(() => current ? rankPriorities(current.people, period, kind, vipOn) : [], [current, period, kind, vipOn]);
   const visible = useMemo(() => filterPriorities(ranked, filters, kind), [ranked, filters, kind]);
-  const roleOptions = useMemo(() => catalogRoles(current?.people ?? []), [current]);
+  const roleOptions = useMemo(() => {
+    const options = catalogRoles(current?.people ?? []);
+    // Keep a saved role removable even if no current player has it anymore.
+    for (const id of filters.roleIds) if (!options.some((option) => option.role.id === id)) {
+      options.push({ role: { id, name: t("priorities.filters.unavailableRole", { id }), color: null }, n: 0 });
+    }
+    return options;
+  }, [current, filters.roleIds, t]);
   const months = priorityMonths(period);
   const canManage = current?.canManage ?? false;
   const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled, detail.snapshot.version >= 2 ? "distance" : "legacy-vip-seats").filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
@@ -153,8 +162,8 @@ export function V2Priorities({ canManageDemo = false, author = "you" }: { canMan
       </div>
       <div className="v2-prio-controls"><div className="v2-prio-filters">
         <label className="v2-prio-check" title={t("priorities.vipDisplayHint")}><input type="checkbox" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
-        <RolePick roles={roleOptions} picked={new Set(filters.roleIds)} label={t("priorities.filters.roles")} emptyLabel={t("priorities.filters.allRoles")} onToggle={(id) => setFilters((prev) => ({ ...prev, roleIds: prev.roleIds.includes(id) ? prev.roleIds.filter((role) => role !== id) : [...prev.roleIds, id] }))} />
-        {(["scheduleActive", "active"] as const).map((key) => <label key={key} className="v2-prio-check" title={key === "scheduleActive" ? t("priorities.filters.scheduleActiveHint") : undefined}><input type="checkbox" checked={filters[key]} onChange={(e) => setFilters({ ...filters, [key]: e.target.checked })} />{t(`priorities.filters.${key}`)}</label>)}
+        <RolePick roles={roleOptions} picked={new Set(filters.roleIds)} label={t("priorities.filters.roles")} emptyLabel={t("priorities.filters.allRoles")} onToggle={(id) => changeFilters({ ...filters, roleIds: filters.roleIds.includes(id) ? filters.roleIds.filter((role) => role !== id) : [...filters.roleIds, id] })} />
+        {(["scheduleActive", "active"] as const).map((key) => <label key={key} className="v2-prio-check" title={key === "scheduleActive" ? t("priorities.filters.scheduleActiveHint") : undefined}><input type="checkbox" checked={filters[key]} onChange={(e) => changeFilters({ ...filters, [key]: e.target.checked })} />{t(`priorities.filters.${key}`)}</label>)}
         <span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span>
       </div>
       <aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>

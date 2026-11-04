@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { priorityFiltersStorageKey } from "../src/v2/priorityFilterPrefs";
 import { currentPriorityPeriod, priorityMonths, type PriorityPerson } from "../src/schedule/priorities";
 
 async function enter(page: Page) {
@@ -472,4 +473,69 @@ test("optional limits and any-role filters retain vacation players and request s
   await expect(saved.locator("td").last()).toHaveText(score);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("v2-priority-requests-1")!)[0].detail.snapshot.version)).toBe(2);
   await page.screenshot({ path: testInfo.outputPath("vacation-request.png") });
+});
+
+
+test("priority filters survive navigation, reload and sign-in without leaking to another account", async ({ page }) => {
+  await enter(page);
+  const original = await page.evaluate(() => JSON.parse(sessionStorage.getItem("v2-session")!));
+  await page.getByRole("button", { name: "Все роли Discord", exact: true }).click();
+  await page.getByRole("option", { name: /^RedParty/ }).click();
+  await page.getByRole("heading", { name: "Приоритеты", exact: true }).click();
+  await page.getByLabel("Активны в расписании", { exact: true }).check();
+  await page.getByLabel("Активная карточка", { exact: true }).check();
+  const count = await page.locator('.v2-prio-summary [data-metric="players"] dd').innerText();
+  const assertSaved = async () => {
+    await expect(page.getByRole("button", { name: "RedParty", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Активны в расписании", { exact: true })).toBeChecked();
+    await expect(page.getByLabel("Активная карточка", { exact: true })).toBeChecked();
+    await expect(page.locator('.v2-prio-summary [data-metric="players"] dd')).toHaveText(count);
+  };
+  await page.goto("/#schedule");
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.goto("/#priorities");
+  await assertSaved();
+  await page.reload();
+  await assertSaved();
+  const switchUser = async (id: string) => {
+    const nick = await page.evaluate(() => JSON.parse(sessionStorage.getItem("v2-session")!).nick);
+    await page.getByRole("banner").getByRole("button", { name: nick, exact: true }).click();
+    await page.getByRole("button", { name: "Кабинет", exact: true }).click();
+    await page.getByRole("button", { name: "Аккаунт", exact: true }).click();
+    await page.getByRole("button", { name: "Выйти", exact: true }).click();
+    await page.getByRole("tab", { name: /Демо/ }).click();
+    await page.locator(".v2-dev-login select").selectOption(id);
+    await page.getByRole("button", { name: "Войти для проверки", exact: true }).click();
+    await page.getByRole("navigation", { name: "Меню", exact: true }).getByRole("button", { name: "Приоритеты", exact: true }).click();
+  };
+  await switchUser("RP-104");
+  await expect(page.getByRole("button", { name: "Все роли Discord", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Активны в расписании", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Активная карточка", { exact: true })).not.toBeChecked();
+  await page.getByLabel("Активная карточка", { exact: true }).check();
+  await switchUser(original.memberId);
+  await assertSaved();
+  await page.getByLabel("Активны в расписании", { exact: true }).uncheck();
+  await page.getByLabel("Активная карточка", { exact: true }).uncheck();
+  await page.getByRole("button", { name: "RedParty", exact: true }).click();
+  await page.getByRole("option", { name: /^RedParty/ }).click();
+  await page.getByRole("heading", { name: "Приоритеты", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Все роли Discord", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Активны в расписании", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Активная карточка", { exact: true })).not.toBeChecked();
+});
+
+test("a saved role no longer present in the roster can still be deselected", async ({ page }) => {
+  await enter(page);
+  const memberId = await page.evaluate(() => JSON.parse(sessionStorage.getItem("v2-session")!).memberId);
+  const key = priorityFiltersStorageKey(memberId, "demo")!;
+  await page.evaluate((storageKey) => localStorage.setItem(storageKey, JSON.stringify({ roleIds: ["removed-role"], active: false, scheduleActive: false })), key);
+  await page.reload();
+  await page.getByRole("button", { name: "Роль недоступна · removed-role", exact: true }).click();
+  await page.getByRole("option", { name: /Роль недоступна · removed-role/ }).click();
+  await page.getByRole("heading", { name: "Приоритеты", exact: true }).click();
+  await expect(page.locator(".v2-prio-table tbody tr[data-member]")).not.toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Все роли Discord", exact: true })).toBeVisible();
 });
