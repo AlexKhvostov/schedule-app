@@ -141,7 +141,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const rosterGroupsAvailable = groupsForLimits(rosterLimits);
   const hasRosterPriority = rosterGroupsAvailable.length > 0;
   const rosterGroup = rosterGroupsAvailable.includes(chosenRosterGroup) ? chosenRosterGroup : rosterGroupsAvailable[0] ?? "50-100";
-  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, rosterLimits, rosterGroup);
+  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, rosterLimits, rosterGroup, memberId);
   const calendarItems = useMemo(
     () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
     [shownGridStore, fetchKey],

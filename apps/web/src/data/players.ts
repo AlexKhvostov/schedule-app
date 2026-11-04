@@ -21,7 +21,7 @@ export type SchedulePlayer = {
   profileName?: string;
 };
 
-type DirectoryRow = {
+export type DirectoryRow = {
   member_id: string;
   public_code: string;
   mark_tag: string | null;
@@ -90,7 +90,7 @@ function playerOf(row: DirectoryRow): SchedulePlayer {
   };
 }
 
-function markOf(row: DirectoryRow): Mark {
+export function markOf(row: DirectoryRow): Mark {
   const player = playerOf(row);
   return {
     ...markFromPlayer(player),

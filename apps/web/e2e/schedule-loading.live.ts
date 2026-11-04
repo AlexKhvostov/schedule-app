@@ -96,3 +96,71 @@ test("a failed compact read keeps the month hidden until retry succeeds", async 
   await expect(page.locator(".v2-sched-load")).toHaveCount(0);
   await expect(page.locator("[data-slot].is-on")).toHaveCount(2800);
 });
+
+test("monthly roster uses one conditional compact read, coalesces events and pauses while hidden", async ({ page }) => {
+  const { gates } = await fixture(page);
+  const requests: Record<string, unknown>[] = [];
+  let revision = "p1", directoryRevision = "d1", fail = false;
+  const forbiddenLoads: string[] = [];
+  page.on("request", (request) => { if (request.url().endsWith("/rpc/load_priority_slice")) forbiddenLoads.push(request.url()); });
+  await page.route("**/rpc/load_month_roster", async (route) => {
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (fail) return route.fulfill({ status: 503, json: { message: "roster offline" } });
+    await route.fulfill({ json: {
+      periodStart: body.p_period_start, kind: body.p_variant, group: body.p_group,
+      today: "2026-11-04", lastMonthEntries: 20, revision, directoryRevision,
+      people: body.p_priority_revision === revision ? null : [
+        { memberId: "a", core: revision === "p1" ? 3 : 0, score: 5, excluded: false },
+        { memberId: "b", core: 0, score: 100, excluded: false },
+        { memberId: "c", core: revision === "p1" ? 0 : 1, score: 10, excluded: false },
+      ],
+      directory: body.p_directory_revision === directoryRevision ? null : ["a", "b", "c"].map((id) => ({
+        member_id: id, public_code: id, discord_guild_nick: id === "b" && directoryRevision === "d2" ? "Beta updated" : id,
+        mark_tag: id.toUpperCase(), mark_bg: "#468ec6", mark_fg: "#fff", tables: 1,
+      })),
+    } });
+  });
+  gates.forEach((gate) => gate.release());
+  await page.goto("/");
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  const roster = page.locator(".v2-people-table");
+  const ids = () => roster.locator(".v2-people-row:not(.is-historical)").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-member")));
+  await expect.poll(ids).toEqual(["a", "b", "c"]);
+  expect(requests).toHaveLength(1);
+  const burst = () => page.evaluate(() => {
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("priority-distance-changed"));
+    window.dispatchEvent(new StorageEvent("storage"));
+  });
+  await burst();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1]).toMatchObject({ p_priority_revision: "p1", p_directory_revision: "d1" });
+  await expect.poll(ids).toEqual(["a", "b", "c"]);
+  revision = "p2"; directoryRevision = "d2";
+  await burst(); await expect.poll(ids).toEqual(["c", "b", "a"]);
+  await expect(roster).toContainText("Beta updated");
+  expect(requests).toHaveLength(3);
+  await page.clock.install();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.fastForward(31000); expect(requests).toHaveLength(3);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.fastForward(150); await expect.poll(() => requests.length).toBe(4);
+  fail = true; await burst(); await page.clock.fastForward(150);
+  await expect(page.locator("#roster-panel [role=alert]")).toBeVisible();
+  await expect(roster).toHaveCount(0);
+  fail = false;
+  await page.locator("#roster-panel [role=alert] button").click(); await page.clock.fastForward(150);
+  await expect.poll(ids).toEqual(["c", "b", "a"]);
+  expect(forbiddenLoads).toEqual([]);
+  const closedAt = requests.length;
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  await expect(roster).toHaveCount(0);
+  await page.clock.fastForward(31000); expect(requests).toHaveLength(closedAt);
+});

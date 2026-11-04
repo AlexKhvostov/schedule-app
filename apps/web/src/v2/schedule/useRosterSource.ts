@@ -1,48 +1,50 @@
-import { useEffect, useState } from "react";
-import { loadPriorities } from "../../data/priorities";
-import { loadLimitMarks } from "../../data/players";
+import { useEffect, useMemo, useState } from "react";
+import { createRosterLoader, rosterQueryKey } from "../../data/roster";
+import { createRosterRefresh } from "../../data/rosterRefresh";
 import type { Mark } from "../../schedule/marks";
-import type { PriorityKind, PriorityGroup, PrioritySource } from "../../schedule/priorities";
+import type { PriorityKind, PriorityGroup } from "../../schedule/priorities";
+import type { RosterPrioritySource } from "../../schedule/rosterPriorities";
 
-type State = { key: string; source: PrioritySource | null; faces: Mark[]; error: string };
+type State = { key: string; source: RosterPrioritySource | null; faces: Mark[]; error: string };
 
-export function useRosterSource(enabled: boolean, period: string, kind: PriorityKind, limits: string[], group: PriorityGroup) {
-  const limitsKey = limits.join(",");
-  const key = `${period}|${kind}|${group}|${limitsKey}`;
+export function useRosterSource(enabled: boolean, period: string, kind: PriorityKind, limits: string[], group: PriorityGroup, account = "demo") {
+  const limitsKey = [...new Set(limits)].sort().join(",");
+  const key = `${account}|${rosterQueryKey({ period, kind, group, limits })}`;
+  // Recreate both in-flight requests and saved revisions when the account changes.
+  const loader = useMemo(() => ({ account, reader: createRosterLoader() }), [account]);
   const [state, setState] = useState<State | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    let generation = 0;
     setState(null);
     const update = async () => {
-      const token = ++generation;
       try {
-        const [board, directory] = await Promise.all([
-          loadPriorities(period, false, kind, group), loadLimitMarks(kind, limitsKey ? limitsKey.split(",") : []),
-        ]);
-        if (!alive || token !== generation) return;
-        const error = board.error || directory.error || (!board.data || !directory.data ? "empty response" : "");
-        setState({ key, source: error ? null : board.data, faces: error ? [] : directory.data!, error });
+        const result = await loader.reader.load({ period, kind, group, limits: limitsKey ? limitsKey.split(",") : [] });
+        if (alive) setState({ key, ...result, error: "" });
       } catch (error) {
-        if (alive && token === generation) setState({ key, source: null, faces: [], error: String(error) });
+        if (alive) setState({ key, source: null, faces: [], error: String(error) });
       }
     };
-    void update();
-    const timer = window.setInterval(update, 30000);
-    window.addEventListener("focus", update);
-    window.addEventListener("priority-distance-changed", update);
-    window.addEventListener("storage", update);
+    const refresh = createRosterRefresh(update, () => !document.hidden);
+    const check = () => refresh.request();
+    const changed = () => refresh.request(true);
+    refresh.request();
+    const timer = window.setInterval(check, 30000);
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("priority-distance-changed", changed);
+    window.addEventListener("storage", changed);
     const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("priority-refresh");
-    if (channel) channel.onmessage = update;
+    if (channel) channel.onmessage = changed;
     return () => {
-      alive = false; clearInterval(timer); channel?.close();
-      window.removeEventListener("focus", update);
-      window.removeEventListener("priority-distance-changed", update);
-      window.removeEventListener("storage", update);
+      alive = false; refresh.dispose(); clearInterval(timer); channel?.close();
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("priority-distance-changed", changed);
+      window.removeEventListener("storage", changed);
     };
-  }, [enabled, key, period, kind, group, limitsKey, retry]);
+  }, [enabled, key, period, kind, group, limitsKey, retry, loader]);
   const current = enabled && state?.key === key ? state : null;
   return { source: current?.source ?? null, faces: current?.faces ?? [], error: current?.error ?? "", loading: enabled && !current, retry: () => setRetry((n) => n + 1) };
 }

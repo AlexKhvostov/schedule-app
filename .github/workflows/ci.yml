@@ -88,6 +88,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/live_priorities.sql
       - name: Check saved priority matrix
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/priority_matrix.sql
+      - name: Check compact monthly roster and conditional reads
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/month_roster.sql
       - name: Check member presence access and activity summary
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_online.sql
       - name: Lint database
