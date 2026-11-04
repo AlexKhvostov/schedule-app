@@ -18,6 +18,7 @@ import {
 import { OptLevelLane, OptNlChip } from "../OptLevelLane";
 import { MarkFace } from "../ScheduleSlot";
 import type { SchedulePairRow } from "../variantSchedule";
+import { hourLoadKey, hourLoadSegments, loadToneColor, type HourLoadMap } from "../../schedule/hourLoad";
 
 function levelsOf(
   capacity: CapacityMap,
@@ -270,6 +271,7 @@ export const OptBody = memo(function OptBody({
   kinds,
   limits,
   pairRows,
+  hourLoad,
   capacity,
   grids,
   days,
@@ -290,6 +292,7 @@ export const OptBody = memo(function OptBody({
   skin?: "classic" | "theme";
   limits: string[];
   pairRows?: SchedulePairRow[];
+  hourLoad?: HourLoadMap;
   capacity: CapacityMap;
   grids: MonthGridStore;
   days: { d: number; wd: string; weekend: boolean }[];
@@ -348,9 +351,8 @@ export const OptBody = memo(function OptBody({
                       const disabled = rowInfo.disabled ? (
                         <span className="v2-limit-disabled" title={t("schedule.limitDisabled")}>{t("schedule.limitDisabled")}</span>
                       ) : null;
-                      if (skin !== "theme") return chips;
                       return (
-                        <div key={rowInfo.key} className="v2-opt-gutter-limit">
+                        <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}>
                           {chips}
                           {disabled}
                         </div>
@@ -447,6 +449,13 @@ export const OptBody = memo(function OptBody({
                                 />
                               );
                             })}
+                          {!ghost && hourLoadSegments(hourLoad?.[hourLoadKey(group.variant, rowInfo.limit)], visibleHalves,
+                            (half) => levelAllowed(half, level, limitHours)).map((span) => (
+                            <i key={span.startHalf} className="v2-hour-wash" aria-hidden
+                              data-tone={span.tone} data-start-half={span.startHalf} data-end-half={span.endHalf}
+                              style={{ gridColumn: `${workGridColumn(visibleHalves, span.startHalf)} / span ${span.endHalf - span.startHalf}`,
+                                gridRow: 1, backgroundColor: loadToneColor(span.tone) }} />
+                          ))}
                           {segments.map((segment) => {
                             const segmentPast = dimPast && isPastSlot(year, monthIndex, day.d, segment.endHalf - 1, cet);
                             const progress = sameMonth && today && cet.half >= segment.startHalf && cet.half < segment.endHalf
@@ -466,9 +475,8 @@ export const OptBody = memo(function OptBody({
                         </OptLevelLane>
                       );
                     });
-                    if (skin !== "theme") return lanes;
                     return (
-                      <div key={rowInfo.key} className="v2-opt-limit">
+                      <div key={rowInfo.key} className="v2-opt-limit" data-pair={rowInfo.key}>
                         {lanes}
                       </div>
                     );

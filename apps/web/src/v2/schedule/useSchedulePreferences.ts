@@ -1,8 +1,14 @@
 import { useRef, useState } from "react";
 import { loadPrefs, resetSchedulePrefs } from "../prefs";
+import { loadSlotHighlightDisabled, saveSlotHighlightDisabled } from "../slotHighlightPrefs";
 
-export function useSchedulePreferences(onKindChange?: (kind: "nitro" | "regular") => void) {
+export function useSchedulePreferences(onKindChange?: (kind: "nitro" | "regular") => void, highlightPreferencesKey: string | null = null) {
   const [boot] = useState(loadPrefs);
+  const [hideSlotHighlight, setHideSlotHighlight] = useState(() => loadSlotHighlightDisabled(highlightPreferencesKey));
+  const changeSlotHighlight = (disabled: boolean) => {
+    setHideSlotHighlight(disabled);
+    saveSlotHighlightDisabled(highlightPreferencesKey, disabled);
+  };
 
   const [hideTables, setHideTables] = useState(boot.hideTables);
 
@@ -33,6 +39,7 @@ export function useSchedulePreferences(onKindChange?: (kind: "nitro" | "regular"
   kindsRef.current = kinds;
   const resetPreferences = () => {
     const next = resetSchedulePrefs();
+    changeSlotHighlight(false);
     setLimits(next.limits);
     setKinds(next.kinds);
     setKind(next.kinds[0]);
@@ -47,5 +54,5 @@ export function useSchedulePreferences(onKindChange?: (kind: "nitro" | "regular"
     setShowTip(next.showTip);
     onKindChange?.(next.kinds[0]);
   };
-  return { hideTables, setHideTables, dimPast, setDimPast, hidePastDays, setHidePastDays, displayRange, setDisplayRange, workHours, setWorkHours, showTip, setShowTip, editPulse, setEditPulse, busyHint, setBusyHint, showExtraTz, setShowExtraTz, limits, setLimits, kinds, setKinds, kind, setKind, kindsRef, resetPreferences };
+  return { hideSlotHighlight, changeSlotHighlight, hideTables, setHideTables, dimPast, setDimPast, hidePastDays, setHidePastDays, displayRange, setDisplayRange, workHours, setWorkHours, showTip, setShowTip, editPulse, setEditPulse, busyHint, setBusyHint, showExtraTz, setShowExtraTz, limits, setLimits, kinds, setKinds, kind, setKind, kindsRef, resetPreferences };
 }

@@ -14,7 +14,7 @@
 | Историческая UI-лаборатория | **React** + **Vite** | `sandbox/ui`, новые функции туда не добавляем |
 | Стили и контролы кабинета | **Tailwind CSS** + **shadcn/ui** | `apps/web` |
 | Сетка слотов на месяц | **Свои React-компоненты** на Tailwind | ни один кит не умеет 48×31 клеток |
-| База, Discord-вход, живые слоты | **Supabase** (Postgres, Auth, Realtime), регион EU | облако |
+| База, Discord-вход, живые слоты | **Supabase** (Postgres, Auth, Realtime), регион EU; сетка использует private Broadcast из DB-триггеров и компактную JSON-RPC, без серверного кэша | облако |
 | Выкладка сайта | **Vercel** | облако |
 | Скрейпер (позже) | **Render** (уже есть аккаунт) | отдельный сервис, не сайт |
 | Discord-бот (снимок, снятие метки, отправка Root) | **Supabase Edge Functions** | `discord-guild`, `notify-mark-removed`, `bot-send` |

@@ -4,6 +4,8 @@ import { DAY_HOURS } from "../schedule/workHours";
 import { V2Float } from "./V2Float";
 
 type Props = {
+  hideSlotHighlight: boolean;
+  onHideSlotHighlight: (value: boolean) => void;
   dimPast: boolean;
   hidePastDays: boolean;
   displayRange: DisplayRange;
@@ -33,6 +35,8 @@ type Props = {
 };
 
 export function V2Settings({
+  hideSlotHighlight,
+  onHideSlotHighlight,
   dimPast,
   hidePastDays,
   displayRange,
@@ -63,6 +67,14 @@ export function V2Settings({
   const { t } = useTranslation();
 
   const rows = [
+    {
+      key: "slotHighlight",
+      on: hideSlotHighlight,
+      toggle: () => onHideSlotHighlight(!hideSlotHighlight),
+      icon: "fa-eye-slash",
+      title: t("schedule.hideSlotHighlight"),
+      hint: t("schedule.hideSlotHighlightHint"),
+    },
     {
       key: "past",
       on: dimPast,
@@ -169,7 +181,7 @@ export function V2Settings({
           </div>
         </section>
         {rows.map((row) => (
-          <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} onClick={row.toggle}>
+          <button key={row.key} type="button" className={`v2-settings-row${row.on ? " is-on" : ""}`} title={row.hint} aria-pressed={row.on} onClick={row.toggle}>
             <span className="v2-settings-ico">
               <i className={`fa-solid ${row.icon}`} />
             </span>

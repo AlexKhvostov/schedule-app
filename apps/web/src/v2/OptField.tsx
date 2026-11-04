@@ -2,7 +2,6 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSPr
 import { useTranslation } from "react-i18next";
 import { isPastDay, readCet, type CetStamp } from "../schedule/cet";
 import { visibleMonthDays } from "../schedule/displayRange";
-import { loadGradient } from "../schedule/hourLoad";
 import { daysInMonth } from "../schedule/plan";
 import { loadSlotLook, lookToVars, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { DEFAULT_WORK_HOURS, workGapBefore, workHalfSlots, workHourSegments } from "../schedule/workHours";
@@ -155,7 +154,6 @@ export const OptField = memo(function OptField({
     };
   }, [year, monthIndex, days.length, limits, capacity, hidePastDays]);
 
-  const loadWash = loadGradient(hourLoad?.[limits[0] ?? "50"]);
   const q = markQuery(focus);
 
   return (
@@ -165,7 +163,6 @@ export const OptField = memo(function OptField({
       data-opt-find={q || undefined}
       style={
         {
-          ["--opt-load" as string]: loadWash,
           ["--busy-mark" as string]: me.bg || undefined,
           ["--opt-cell-w" as string]: `${cellWidth}px`,
           ["--opt-cell-h" as string]: `${cellWidth}px`,
@@ -243,6 +240,7 @@ export const OptField = memo(function OptField({
                 kinds={kinds}
                 limits={limits}
                 pairRows={pairRows}
+                hourLoad={hourLoad}
                 capacity={capacity}
                 grids={grids}
                 days={days}

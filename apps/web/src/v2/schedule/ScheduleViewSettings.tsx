@@ -21,10 +21,12 @@ type Props = {
 };
 
 export function ScheduleViewSettings({ preferences, year, monthIndex, cetTick, countTables, window, onResetDemo }: Props) {
-  const { hideTables, setHideTables, dimPast, setDimPast, hidePastDays, setHidePastDays, displayRange, setDisplayRange, workHours, setWorkHours, showTip, setShowTip, editPulse, setEditPulse, showExtraTz, setShowExtraTz, resetPreferences } = preferences;
+  const { hideSlotHighlight, changeSlotHighlight, hideTables, setHideTables, dimPast, setDimPast, hidePastDays, setHidePastDays, displayRange, setDisplayRange, workHours, setWorkHours, showTip, setShowTip, editPulse, setEditPulse, showExtraTz, setShowExtraTz, resetPreferences } = preferences;
   const { settingsPos, z, setSettingsPos, onFocus, onClose } = window;
   return (
     <V2Settings
+      hideSlotHighlight={hideSlotHighlight}
+      onHideSlotHighlight={changeSlotHighlight}
       dimPast={dimPast}
       hidePastDays={hidePastDays}
       displayRange={displayRange}

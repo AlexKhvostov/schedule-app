@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
 import { loadMembers, memberOfSession } from "../schedule/members";
 import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
-import { defaultHourLoad, loadHourLoad, saveHourLoad, type HourLoadMap } from "../schedule/hourLoad";
+import { ClubHourLoadProvider, useClubHourLoad } from "./ClubHourLoad";
 import { isLiveData, supabaseUrl } from "../data/config";
 import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
+import { slotHighlightStorageKey } from "./slotHighlightPrefs";
 import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
 import { loadPrefs } from "./prefs";
@@ -21,6 +22,7 @@ import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slot
 import { usePlayerClock } from "./usePlayerClock";
 import { defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
 import "./v2.css";
+import { ClubLimitPaletteProvider } from "./ClubLimitPalette";
 
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
 const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
@@ -67,6 +69,12 @@ function V2HeaderClock() {
 type StaffItem = { key: ShellPage; label: string; icon: string; hint?: string };
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
+  return <ClubLimitPaletteProvider key={session.memberId ?? session.role}><ClubHourLoadProvider>
+    <V2ShellContent session={session} cursor={cursor} onCursorChange={onCursorChange} onSession={onSession} onLogout={onLogout} />
+  </ClubHourLoadProvider></ClubLimitPaletteProvider>;
+}
+
+function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
   const { t, i18n } = useTranslation();
   const nick = session.nick;
   const priorityPreferencesKey = priorityFiltersStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo");
@@ -95,7 +103,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminCapacity, setAdminCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
-  const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
+  const { map: hourLoad } = useClubHourLoad();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
   const avatarUrl = session.avatarUrl || demoAvatar || null;
@@ -418,6 +426,7 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
               capacity={capacity}
               hourLoad={hourLoad}
               memberId={session.memberId}
+              highlightPreferencesKey={slotHighlightStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo")}
               canActAs={isAdmin}
               onKindChange={(kind) => {
                 if (!isLiveData()) return;
@@ -457,7 +466,6 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                 section={page === "admin-root" ? "root" : page === "admin-schedule" ? "schedule" : "people"}
                 variant={adminVariant}
                 capacity={adminCapacity}
-                hourLoad={hourLoad}
                 onVariantChange={(next) => {
                   setAdminVariant(next);
                   if (isLiveData()) {
@@ -471,10 +479,6 @@ export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }
                   saveCapacity(next);
                   if (adminVariant === loadPrefs().kinds[0]) setCapacity(next);
                   if (isLiveData()) void saveCapacityLive(adminVariant, next);
-                }}
-                onHourLoadChange={(next) => {
-                  setHourLoad(next);
-                  saveHourLoad(next);
                 }}
               />
             </div>

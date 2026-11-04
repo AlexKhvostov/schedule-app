@@ -21,7 +21,7 @@ create function public.priority_slice_source(p_period_start date, p_variant text
 language plpgsql security definer set search_path = '' as $$
 declare
   v_cache public.priority_rating_cache%rowtype; v_source jsonb; v_person jsonb; v_old jsonb;
-  v_people jsonb := '[]'; v_entries jsonb; v_months jsonb; v_cells jsonb; v_points jsonb;
+  v_people jsonb := '[]'::jsonb; v_entries jsonb; v_months jsonb; v_cells jsonb; v_points jsonb;
   v_calc jsonb; v_core public.members%rowtype; v_count integer;
 begin
   if p_variant is null or p_variant not in ('nitro','regular') or p_group is null or p_group not in ('50-100','250') then

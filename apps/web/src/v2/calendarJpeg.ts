@@ -65,8 +65,8 @@ function variantFont(variant: ScheduleVariant, size: number) {
 }
 
 function mineTone(limit: string) {
-  if (limit === "25") return "#4ADE80";
-  return limitTonePaint(limit);
+  const theme = document.documentElement.dataset.uiTheme === "light" ? "light" : "dark";
+  return cssVar(`--limit-${limit}`, limitTonePaint(limit, theme));
 }
 
 function variantInk(variant: ScheduleVariant) {

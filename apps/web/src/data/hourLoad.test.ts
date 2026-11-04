@@ -1,0 +1,34 @@
+import { afterEach, expect, it, vi } from "vitest";
+import { loadClubHourLoad, saveClubHourLoad } from "./hourLoad";
+import { emptyLoadRow } from "../schedule/hourLoad";
+const mock = vi.hoisted(() => ({ demo: false, single: vi.fn(), rpc: vi.fn() }));
+vi.mock("./config", () => ({ isDevSandboxEnabled: () => mock.demo }));
+vi.mock("./client", () => ({ getSupabase: () => ({
+  from: () => ({ select: () => ({ eq: () => ({ single: mock.single }) }) }), rpc: mock.rpc,
+}) }));
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); mock.demo = false; });
+it("saves independent Demo pairs, rejects stale writes, and reports storage failures", async () => {
+  mock.demo = true;
+  const store = new Map<string,string>();
+  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("localStorage", { getItem: (k:string) => store.get(k) ?? null, setItem: (k:string,v:string) => store.set(k,v) });
+  const empty = emptyLoadRow();
+  const row = emptyLoadRow(); row[3] = "peach";
+  expect(await saveClubHourLoad("nitro:50", row, empty)).toEqual({});
+  expect(await saveClubHourLoad("regular:50", empty, empty)).toEqual({});
+  expect((await loadClubHourLoad()).map["nitro:50"][3]).toBe("peach");
+  expect((await loadClubHourLoad()).map["regular:50"][3]).toBeNull();
+  expect((await saveClubHourLoad("nitro:50", empty, empty)).error).toBe("hour-load-conflict");
+  store.set("redparty.demo.hour-load.v2", "{");
+  expect((await loadClubHourLoad()).error).toBeTruthy();
+});
+it("keeps server failures explicit and only writes through the guarded RPC", async () => {
+  mock.single.mockResolvedValue({ error: { message: "missing-column" } });
+  expect((await loadClubHourLoad()).error).toBe("missing-column");
+  mock.single.mockRejectedValue(new Error("offline"));
+  expect((await loadClubHourLoad()).error).toBeTruthy();
+  mock.rpc.mockResolvedValue({ error: { message: "hour-load-conflict" } });
+  const row = emptyLoadRow();
+  expect((await saveClubHourLoad("nitro:50", row, row)).error).toBe("hour-load-conflict");
+  expect(mock.rpc).toHaveBeenCalledWith("save_schedule_hour_load", { p_key: "nitro:50", p_row: row, p_expected: row });
+});

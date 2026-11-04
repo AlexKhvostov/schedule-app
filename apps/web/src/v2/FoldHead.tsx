@@ -21,7 +21,7 @@ export function FoldHead({
         <h2>{title}</h2>
         {open && lead ? <p className="v2-fold-lead">{lead}</p> : null}
       </div>
-      <button type="button" className="v2-ctrl v2-fold-btn" onClick={onToggle}>
+      <button type="button" className="v2-ctrl v2-fold-btn" aria-expanded={open} onClick={onToggle}>
         {open ? t("admin.fold.close") : t("admin.fold.open")}
       </button>
     </div>

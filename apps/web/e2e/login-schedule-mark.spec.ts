@@ -364,7 +364,8 @@ test("schedule time hint works in view mode and drag shows the full range", asyn
   await candidate.hover();
   const frame = page.locator(".v2-opt-frame");
   await expect(frame).toBeVisible();
-  await expect(frame).toHaveText(`${format(half)} – ${format(half + 1)}`);
+  const pairLabel = `${await candidate.getAttribute("data-variant") === "regular" ? "E" : "N"}${await candidate.getAttribute("data-limit")}`;
+  await expect(frame).toHaveText(`${pairLabel}: ${format(half)} – ${format(half + 1)}`);
   const [cellBox, frameBox] = await Promise.all([candidate.boundingBox(), frame.boundingBox()]);
   expect(cellBox && frameBox).toBeTruthy();
   await expect(candidate).toHaveClass(/is-hover/);
@@ -555,6 +556,7 @@ test("schedule-limit editor keeps tournament types independent and stays admin-o
   await page.getByRole("button", { name: "Войти для проверки" }).click();
 
   await expect(page.getByRole("heading", { name: "Лимиты в расписании" })).toBeVisible();
+  await page.locator(".v2-admin-card", { has: page.getByRole("heading", { name: "Лимиты в расписании", exact: true }) }).getByRole("button", { name: "Развернуть", exact: true }).click();
   const nitro25 = page.getByRole("button", { name: "Nitro 25 €", exact: true });
   const regular25 = page.getByRole("button", { name: "Regular 25 €", exact: true });
   await expect(nitro25).toHaveAttribute("aria-pressed", "true");
@@ -581,6 +583,8 @@ test("dead-time editor persists CRUD, blocks overlap and stays admin-only", asyn
   await page.getByRole("button", { name: "Войти для проверки" }).click();
 
   await expect(page.getByRole("heading", { name: "Мёртвое время" })).toBeVisible();
+  const deadPanel = page.locator(".v2-admin-card", { has: page.getByRole("heading", { name: "Мёртвое время", exact: true }) });
+  await deadPanel.getByRole("button", { name: "Развернуть", exact: true }).click();
   const editor = page.locator(".v2-dead-time-editor");
   const rows = editor.locator(".v2-dead-time-row");
   const save = editor.getByRole("button", { name: "Сохранить", exact: true });
@@ -600,6 +604,7 @@ test("dead-time editor persists CRUD, blocks overlap and stays admin-only", asyn
   await expect(editor.getByRole("button", { name: "Сохранено", exact: true })).toBeVisible();
 
   await page.reload();
+  await deadPanel.getByRole("button", { name: "Развернуть", exact: true }).click();
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1).locator("select").nth(1)).toHaveValue("6");
   await rows.nth(0).locator("select").nth(1).selectOption("1");
@@ -610,6 +615,7 @@ test("dead-time editor persists CRUD, blocks overlap and stays admin-only", asyn
   await expect(rows).toHaveCount(1);
   await save.click();
   await page.reload();
+  await deadPanel.getByRole("button", { name: "Развернуть", exact: true }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.nth(0).locator("select").nth(1)).toHaveValue("1");
 
@@ -645,7 +651,10 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
     nitroChip.evaluate((node) => getComputedStyle(node).color),
     regularChip.evaluate((node) => getComputedStyle(node).color),
   ]);
-  expect(nitroColor).not.toBe(regularColor);
+  // The club palette is shared by denomination; typography distinguishes kinds.
+  expect(nitroColor).toBe(regularColor);
+  await expect(nitroChip.locator(".v2-opt-limit-label")).toHaveCSS("font-style", "normal");
+  await expect(regularChip.locator(".v2-opt-limit-label")).toHaveCSS("font-style", "italic");
 
   await page.getByTitle("Редактирование").click();
   const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();
@@ -1102,7 +1111,7 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   const formatHalf = (value: number) => `${String(Math.floor(value / 2)).padStart(2, "0")}:${value % 2 ? "30" : "00"}`;
   const mergedTime = `${formatHalf(run!.half)} – ${formatHalf(run!.half + 3)}`;
   await middle.hover();
-  await expect(page.locator(".v2-opt-frame")).toHaveText(mergedTime);
+  await expect(page.locator(".v2-opt-frame")).toHaveText(`${run!.variant === "regular" ? "E" : "N"}${run!.limit}: ${mergedTime}`);
   await page.evaluate(() => {
     localStorage.setItem("v2-ui-theme", "light");
     document.documentElement.dataset.uiTheme = "light";
