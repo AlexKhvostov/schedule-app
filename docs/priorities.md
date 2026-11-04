@@ -91,4 +91,4 @@
 Отключаемые фильтры и новая подпись кнопки реализованы в отдельной ветке `codex/priority-explicit-filters`. По прямому поручению Алексея миграция `20261104065408_priority_explicit_filters.sql` применена к Working; клиент опубликован в main коммитом `4ef5c2e`; CI и Vercel успешны, авторизованная проверка сайта пройдена. [Статус выпуска](../memory/tasks/2026-11-04-priority-filters-release.md). Проверки: [отчёт](../memory/tasks/2026-11-04-priority-explicit-filters.md).
 
 
-Сохранение фильтров подготовлено локально 4 ноября 2026 в `codex/priority-filter-prefs`; на сайте пока нет. Миграция не требуется. [Отчёт](../memory/tasks/2026-11-04-priority-filter-prefs.md).
+Сохранение фильтров проверено 4 ноября 2026 в `codex/priority-filter-prefs`; по прямому поручению Алексея выпускается в main. Миграция не требуется. [Отчёт](../memory/tasks/2026-11-04-priority-filter-prefs.md).
