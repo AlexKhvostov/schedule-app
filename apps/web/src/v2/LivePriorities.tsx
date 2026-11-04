@@ -184,8 +184,8 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
           <tr>{[0, 1, 2, 3].map((i) => <th key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}`}>{i % 2 ? "100" : "50"} €<small>{t("priorities.scoreFactor", { n: i % 2 ? 2 : 1 })}</small></th>)}</tr></thead>
         <tbody>{visible.map((row) => <tr key={row.memberId} data-member={row.memberId} className={`${row.vip > 0 ? "is-vip" : ""}${row.excluded ? " is-excluded" : ""}`}>
           {composing && <td className="is-select"><input type="checkbox" aria-label={t("priorities.selectPerson", { nick: row.nick })} checked={selected.includes(row.memberId)} disabled={busy} onChange={(e) => toggleSelected(row.memberId, e.target.checked)} /></td>}
-          <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : undefined}>{row.rank ?? "—"}</span></td>
-          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? `VIP ${row.vip}` : ""}</small></span></button></td>
+          <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : undefined}>{row.rank ?? "—"}</span></td>
+          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : ""}</small></span></button></td>
           {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{num(value, i18n.language)}</button></td>)}
           <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{points(row.total, i18n.language)}</button></td>
         </tr>)}</tbody></table>{!visible.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
@@ -227,7 +227,7 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
         <section className="v2-prio-review-rows"><h3>{t("priorities.reviewRows")} · {detail.snapshot.people.length}</h3>
           <p className="v2-prio-snapshot-note">{t("priorities.reviewHint")}</p>
           {detailRows.map((row, index) => <details key={row.memberId} className="v2-prio-review-person" open={index === 0}>
-            <summary><span>{row.nick}</span><small>{t("priorities.col.rank")}: {row.rank ?? t("priorities.excluded")}{row.vip > 0 ? ` · VIP ${row.vip}` : ""}</small><b>{points(row.total, i18n.language)}<small>{t("priorities.points")}</small></b></summary>
+            <summary><span>{row.nick}</span><small>{t("priorities.col.rank")}: {row.rank ?? t("priorities.excluded")}{row.vip > 0 ? ` · ${t("priorities.coreBadge", { n: row.vip })}` : ""}</small><b>{points(row.total, i18n.language)}<small>{t("priorities.points")}</small></b></summary>
             <PriorityCalculation row={row} showHeading={false} />
           </details>)}
         </section>

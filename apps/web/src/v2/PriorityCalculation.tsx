@@ -18,7 +18,7 @@ export function PrioritySnapshotRows({ rows }: { rows: CalculatedPriority[] }) {
       {[0, 3].map((i) => <th key={i} colSpan={2} scope="colgroup" className={i === 0 ? "is-period-old" : "is-period-new"}>{priorityMonthLabel(months[i].month)}–{priorityMonthLabel(months[i + 2].month)}<small>{t("priorities.scoreFactor", { n: num(i === 0 ? 0.5 : 1) })}</small></th>)}
       <th rowSpan={2} scope="col" className="is-total" title={t("priorities.pointsHint")}>{t("priorities.col.total")}<small>{t("priorities.pointsHintShort")}</small></th></tr>
       <tr>{[0, 1, 2, 3].map((i) => <th key={i} scope="col" className={i < 2 ? "is-period-old" : "is-period-new"}>{i % 2 ? 100 : 50} €<small>{t("priorities.scoreFactor", { n: i % 2 ? 2 : 1 })}</small></th>)}</tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.memberId} data-member={row.memberId}><td>{row.rank ?? "—"}</td><th scope="row" className="is-label">{row.nick}{(row.excluded || row.vip > 0) && <small>{row.excluded ? t("priorities.excluded") : `VIP ${row.vip}`}</small>}</th>
+    <tbody>{rows.map((row) => <tr key={row.memberId} data-member={row.memberId}><td>{row.rank ?? "—"}</td><th scope="row" className="is-label">{row.nick}{(row.excluded || row.vip > 0) && <small>{row.excluded ? t("priorities.excluded") : t("priorities.coreBadge", { n: row.vip })}</small>}</th>
       {row.distanceCells.map((value, i) => <td key={i} className={i < 2 ? "is-period-old" : "is-period-new"}>{num(value)}</td>)}<td className="is-total">{points(row.total)}</td></tr>)}</tbody>
   </table></div>;
 }

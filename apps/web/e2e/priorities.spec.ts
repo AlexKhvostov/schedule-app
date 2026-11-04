@@ -43,10 +43,11 @@ async function expectCalculationColumns(table: ReturnType<Page["locator"]>) {
   }
 }
 
-test("distance ranking ignores VIP badges and keeps kind filters", async ({ page }, testInfo) => {
+test("distance ranking ignores Core badges and keeps kind filters", async ({ page }, testInfo) => {
   await enter(page);
   const vera = page.locator('tr[data-member="demo-priority-2"]');
   await expect(vera.locator("td.is-rank")).toHaveText("4");
+  await expect(vera.locator("td.is-nick small")).toHaveText("Core 3");
   const total = await vera.locator("td.is-total").textContent();
   const values = (await vera.locator("td.is-num").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
   expect(values).toEqual([5421, 549, 5484, 576, 9895.5]);
@@ -67,9 +68,9 @@ test("distance ranking ignores VIP badges and keeps kind filters", async ({ page
   await page.getByLabel("Активны в расписании", { exact: true }).check();
   await expect(page.locator('tr[data-member="demo-priority-16"]')).toHaveCount(0);
   await page.getByLabel("Активны в расписании", { exact: true }).uncheck();
-  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать Core", { exact: true }).uncheck();
   await expect(vera.locator("td.is-rank")).toHaveText("4");
-  await page.getByLabel("Показывать VIP", { exact: true }).check();
+  await page.getByLabel("Показывать Core", { exact: true }).check();
   await expect(vera.locator("td.is-rank")).toHaveText("4");
   await vera.locator("td.is-num button").first().hover();
   const tooltip = page.getByRole("tooltip");
@@ -110,6 +111,7 @@ test("existing version-one request facts render raw distances and keep the origi
   const dialog = page.getByRole("dialog", { name: "Заявка на проверку", exact: true });
   await expect(dialog.locator(".v2-prio-saved-values")).toContainText("четыре колонки — чистые дистанции");
   await expect(dialog.locator(".v2-prio-snapshot-table th.is-total")).toContainText("Очки рейтинга");
+  await expect(dialog.locator(".v2-prio-snapshot-table tbody th small")).toHaveText("Core 3");
   await expect(dialog.locator(".v2-prio-snapshot-table th.is-total small")).toHaveText("Дистанция × коэф.");
   const values = (await dialog.locator(".v2-prio-snapshot-table tbody td").allTextContents()).map((value) => Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")));
   expect(values).toEqual([3, 13, 7, 3, 4, 24.5]);
@@ -174,7 +176,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   const filters = await page.locator(".v2-prio-filters").boundingBox();
   const tabs = await page.getByRole("tablist", { name: "Вид турниров" }).boundingBox();
   expect(tabs!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
-  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать Core", { exact: true }).uncheck();
   await page.getByLabel("Активная карточка", { exact: true }).check();
   const nitro = page.getByRole("tab", { name: "Nitro", exact: true });
   const regular = page.getByRole("tab", { name: "Регулярные", exact: true });
@@ -185,7 +187,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   await expect(page.getByRole("tabpanel")).toHaveCount(1);
   await expect(page.getByRole("tabpanel", { name: "Регулярные" }).getByRole("button", { name: "Сообщить о неточности" })).toBeVisible();
   await expect(page.locator(".v2-prio-table")).toHaveCount(1);
-  await expect(page.getByLabel("Показывать VIP", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("Показывать Core", { exact: true })).not.toBeChecked();
   await expect(page.getByLabel("Активная карточка", { exact: true })).toBeChecked();
   await regular.press("Home");
   await expect(nitro).toBeFocused();
@@ -208,7 +210,7 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   }
 });
 
-test("compact summary follows the visible kind, filters and VIP display", async ({ page }, testInfo) => {
+test("compact summary follows the visible kind, filters and Core display", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await enter(page);
   const number = (value: string) => Number(value.replace(/[^\d,.-]/g, "").replace(",", "."));
@@ -218,7 +220,7 @@ test("compact summary follows the visible kind, filters and VIP display", async 
     const summary = page.locator(".v2-prio-summary");
     await expect(summary.locator('[data-metric="players"] dd')).toHaveText(String(await rows.count()));
     expect(number(await summary.locator('[data-metric="points"] dd').innerText())).toBe(points);
-    await expect(summary.locator('[data-metric="vip"] dd')).toHaveText(String(await rows.filter({ has: page.locator(".is-nick small", { hasText: /VIP/ }) }).count()));
+    await expect(summary.locator('[data-metric="vip"] dd')).toHaveText(String(await rows.filter({ has: page.locator(".is-nick small", { hasText: /Core/ }) }).count()));
     await expect(summary.locator('[data-metric="excluded"] dd')).toHaveText(String(await page.locator(".v2-prio-table tbody tr.is-excluded").count()));
   };
   await checkSummary();
@@ -233,7 +235,7 @@ test("compact summary follows the visible kind, filters and VIP display", async 
   await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
   await expect(page.getByRole("complementary", { name: "Сводка · Регулярные" })).toBeVisible();
   await checkSummary();
-  await page.getByLabel("Показывать VIP", { exact: true }).uncheck();
+  await page.getByLabel("Показывать Core", { exact: true }).uncheck();
   await checkSummary();
   await expect(page.locator('[data-metric="vip"] dd')).toHaveText("0");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -385,6 +387,8 @@ test("priority table and touch calculation fit phones in both themes and languag
   await dialog.getByRole("button", { name: "✕", exact: true }).click();
   await page.evaluate(() => localStorage.setItem("lang", "en")); await page.reload();
   await expect(page.getByLabel("Poker room", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Show Core", { exact: true })).toBeChecked();
+  await expect(page.locator('tr[data-member="demo-priority-2"] td.is-nick small')).toHaveText("Core 3");
   await expect(page.getByRole("button", { name: "Report an inaccuracy", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Summary · Nitro" })).toBeVisible();
   for (const value of await page.locator(".v2-prio-table tbody td.is-total").allTextContents()) expect(value).toMatch(/\.\d$/);

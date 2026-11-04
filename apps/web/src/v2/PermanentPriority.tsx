@@ -22,13 +22,13 @@ export function PermanentPriority({ nitro, regular, hideEmpty }: Props) {
         {hideEmpty && !nitroOn ? null : (
           <div>
             <em>Nitro</em>
-            <b className={nitroOn ? undefined : "is-empty"}>{nitroOn ? nitro : "—"}</b>
+            <b className={nitroOn ? undefined : "is-empty"}>{nitroOn ? t("priorities.coreBadge", { n: nitro }) : "—"}</b>
           </div>
         )}
         {hideEmpty && !regularOn ? null : (
           <div>
             <em>Regular</em>
-            <b className={regularOn ? undefined : "is-empty"}>{regularOn ? regular : "—"}</b>
+            <b className={regularOn ? undefined : "is-empty"}>{regularOn ? t("priorities.coreBadge", { n: regular }) : "—"}</b>
           </div>
         )}
       </div>

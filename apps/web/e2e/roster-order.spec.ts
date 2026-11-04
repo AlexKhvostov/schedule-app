@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { SEED_MEMBERS } from "../src/schedule/members";
 
-test("monthly roster separates kind-specific VIP queues, distance order and excluded players", async ({ page }, testInfo) => {
+test("monthly roster separates kind-specific Core queues, distance order and excluded players", async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date("2026-11-03T08:00:00Z"));
   const members = SEED_MEMBERS.filter((m) => ["RP-104", "RP-221", "RP-308", "RP-415"].includes(m.id)).map((m) => ({
     ...m, vipNitro: m.id === "RP-221" ? 1 : m.id === "RP-308" ? 3 : 0,
@@ -49,7 +49,7 @@ test("monthly roster separates kind-specific VIP queues, distance order and excl
   await expect(avatar).toHaveAttribute("src", "https://cdn.discordapp.com/embed/avatars/2.png");
   await expect.poll(() => avatar.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   const info = page.getByRole("button", { name: "Как устроен порядок игроков" });
-  await expect(page.getByText(/Порядок заполнения: сначала VIP/)).toHaveCount(0);
+  await expect(page.getByText(/Порядок заполнения: сначала Core/)).toHaveCount(0);
   await info.hover();
   await expect(page.getByRole("tooltip")).toContainText("Игроки вне рейтинга идут в конце без номера");
   await info.press("Escape");
