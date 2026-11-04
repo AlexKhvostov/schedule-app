@@ -32,22 +32,21 @@ export function PriorityCalculation({ row, cell, showHeading = true }: { row: Ca
   const kinds = priorityBreakdown(row.months).filter((k) => !row.calculationKind || k.kind === row.calculationKind);
   const kindNames = kinds.map((k) => t(`priorities.kinds.${k.kind}`)).join(" + ");
   const sourceKinds = kinds.map((k) => k.kind);
-  const selectedLimit = cell === undefined ? null : cell % 2 ? 100 : 50;
-  const total = cell === undefined ? row.total : row.pointCells[cell];
+  const periodCell = cell === undefined ? undefined : cell < 2 ? 0 : 2;
+  const total = periodCell === undefined ? row.total : row.pointCells[periodCell] + row.pointCells[periodCell + 1];
   return <div className="v2-prio-calculation">
-    {showHeading && <b>{row.nick} · {selectedLimit === null ? `${t("priorities.col.total")}: ${points(total)}` : `${selectedLimit} €`}</b>}
-    {cell !== undefined && <div className="v2-prio-cell-distance"><span>{t("priorities.distanceGames")} · {kindNames}</span><b>{num(row.distanceCells[cell])}</b></div>}
+    {showHeading && <b>{row.nick} · {periodCell === undefined ? `${t("priorities.col.total")}: ${points(total)}` : "50–100 €"}</b>}
     <div className="v2-prio-kind-calculations">{kinds.map((kind) => {
       const periods = kind.periods.filter((_, i) => cell === undefined || i === (cell < 2 ? 0 : 1));
-      const kindTotal = periods.reduce((sum, period) => sum + period.limits.filter((limit) => selectedLimit === null || limit.limit === selectedLimit).reduce((n, limit) => n + limit.points, 0), 0);
+      const kindTotal = periods.reduce((sum, period) => sum + period.limits.reduce((n, limit) => n + limit.points, 0), 0);
       return <section key={kind.kind} className="v2-prio-kind-calculation" data-kind={kind.kind}>
         <h3>{t(`priorities.kinds.${kind.kind}`)}</h3>
         {periods.map((period, index) => {
-          const limits = period.limits.filter((limit) => selectedLimit === null || limit.limit === selectedLimit);
+          const limits = period.limits;
           const months = limits[0].monthly;
           return <section key={index} className="v2-prio-calculation-period">
             <h4>{priorityMonthLabel(months[0].month)}–{priorityMonthLabel(months[2].month)} <span>× {num(period.periodWeight)}</span></h4>
-            <table className="v2-prio-months"><colgroup><col style={{ width: selectedLimit === null ? "36%" : "50%" }} />{limits.map((limit) => <col key={limit.limit} />)}</colgroup><thead><tr><th scope="col" className="is-label">{t("priorities.month")}</th>{limits.map((limit) => <th key={limit.limit} scope="col">{limit.limit} €</th>)}</tr></thead>
+            <table className="v2-prio-months"><colgroup><col style={{ width: "36%" }} />{limits.map((limit) => <col key={limit.limit} />)}</colgroup><thead><tr><th scope="col" className="is-label">{t("priorities.month")}</th>{limits.map((limit) => <th key={limit.limit} scope="col">{limit.limit} €</th>)}</tr></thead>
               <tbody>{months.map((month, i) => <tr key={month.month}><th scope="row" className="is-label">{priorityMonthLabel(month.month)}</th>{limits.map((limit) => <td key={limit.limit}>{num(limit.monthly[i].tournaments)}</td>)}</tr>)}</tbody>
               <tfoot><tr><th scope="row" className="is-label">{t("priorities.totalGames")}</th>{limits.map((limit) => <td key={limit.limit}>{num(limit.tournaments)}</td>)}</tr></tfoot></table>
             <div className="v2-prio-formulas">{limits.map((limit) => <section key={limit.limit} className="v2-prio-formula">

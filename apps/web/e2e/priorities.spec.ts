@@ -75,10 +75,12 @@ test("distance ranking ignores Core badges and keeps kind filters", async ({ pag
   await vera.locator("td.is-num button").first().hover();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toContainText("50 €");
-  await expect(tooltip).not.toContainText("100 €");
-  await expect(tooltip.locator(".v2-prio-formula dl > div")).toHaveCount(4);
-  await expect(tooltip.locator(".v2-prio-cell-distance b")).toHaveText((await vera.locator("td.is-num button").first().textContent())!);
-  expect(Number((await tooltip.locator(".v2-prio-combined-total b").innerText()).replace(/[^\d,.-]/g, "").replace(",", "."))).toBe(1807);
+  await expect(tooltip).toContainText("100 €");
+  await expect(tooltip.locator(".v2-prio-formula dl > div")).toHaveCount(8);
+  await expect(tooltip.locator(".v2-prio-months tfoot td")).toHaveText(["3 614", "366"]);
+  await expect(tooltip.locator(".v2-prio-months tbody tr")).toHaveCount(3);
+  await expect(tooltip.locator('.v2-prio-kind-calculation[data-kind="regular"]')).toHaveCount(0);
+  expect(Number((await tooltip.locator(".v2-prio-combined-total b").innerText()).replace(/[^\d,.-]/g, "").replace(",", "."))).toBe(2173);
   await expect(tooltip.locator(".v2-prio-combined-total")).toContainText("Очки рейтинга");
   await expect.poll(async () => {
     const tip = await tooltip.boundingBox(), total = await tooltip.locator(".v2-prio-combined-total").boundingBox();
@@ -88,10 +90,10 @@ test("distance ranking ignores Core badges and keeps kind filters", async ({ pag
   await page.screenshot({ path: testInfo.outputPath("aligned-tooltip.png") });
   await vera.locator("td.is-num button").nth(1).hover();
   await expect(tooltip).toContainText("100 €");
-  await expect(tooltip).not.toContainText("50 €");
+  await expect(tooltip).toContainText("50 €");
   await vera.locator("td.is-num button").first().click();
   await expect(page.getByRole("dialog", { name: "Подробный расчёт" })).toContainText("50 €");
-  await expect(page.getByRole("dialog", { name: "Подробный расчёт" })).not.toContainText("100 €");
+  await expect(page.getByRole("dialog", { name: "Подробный расчёт" })).toContainText("100 €");
 });
 
 test("existing version-one request facts render raw distances and keep the original weighted total", async ({ page }) => {
@@ -152,7 +154,7 @@ test("compact desktop windows keep the complete calculation tooltip readable", a
   }
 });
 
-test("report row and shared filters stay above mutually exclusive tournament tabs", async ({ page }, testInfo) => {
+test("report row stays above side-by-side selectors and filters", async ({ page }, testInfo) => {
   await enter(page);
   await expect(page.getByLabel("Покер-рум", { exact: true })).toHaveValue("Winamax");
   await expect(page.locator(".v2-prio-report select")).toHaveCount(1);
@@ -175,7 +177,10 @@ test("report row and shared filters stay above mutually exclusive tournament tab
   await expect(page.locator(".v2-prio-table tbody tr")).not.toHaveCount(0);
   const filters = await page.locator(".v2-prio-filters").boundingBox();
   const tabs = await page.getByRole("tablist", { name: "Вид турниров" }).boundingBox();
-  expect(tabs!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
+  expect(filters!.x).toBeGreaterThanOrEqual(tabs!.x + tabs!.width);
+  expect(tabs!.y).toBeLessThan(filters!.y + filters!.height);
+  await expect(page.getByRole("region", { name: "Фильтры игроков", exact: true }).getByRole("checkbox")).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Отображение", exact: true }).getByRole("checkbox", { name: "Показывать Core", exact: true })).toBeVisible();
   await page.getByLabel("Показывать Core", { exact: true }).uncheck();
   await page.getByLabel("Активная карточка", { exact: true }).check();
   const nitro = page.getByRole("tab", { name: "Nitro", exact: true });
@@ -227,8 +232,9 @@ test("compact summary follows the visible kind, filters and Core display", async
   const filters = await page.locator(".v2-prio-filters").boundingBox();
   const summary = await page.locator(".v2-prio-summary").boundingBox();
   const controls = await page.locator(".v2-prio-controls").boundingBox();
-  expect(summary!.x).toBeGreaterThanOrEqual(filters!.x + filters!.width);
-  expect(controls!.height).toBeLessThanOrEqual(filters!.height + 1);
+  expect(summary!.y).toBeGreaterThanOrEqual(controls!.y + controls!.height);
+  expect(summary!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
+  expect(controls!.height).toBeLessThanOrEqual(105);
   await page.screenshot({ path: testInfo.outputPath("priority-summary-desktop.png") });
   await page.getByLabel("Активная карточка", { exact: true }).check();
   await checkSummary();
@@ -440,6 +446,7 @@ test("optional limits and any-role filters retain vacation players and request s
   const score = await vacation.locator("td.is-total").innerText();
   const count = await page.locator(".v2-prio-table tbody tr").count();
   await page.getByRole("button", { name: "Все роли Discord", exact: true }).click();
+  await expect(page.getByRole("option", { name: /Demo decoration/ })).toHaveCount(0);
   await page.getByRole("option", { name: /^RedParty/ }).click();
   await expect(page.locator('tr[data-member="demo-priority-19"]')).toHaveCount(0);
   await page.getByRole("option", { name: /^Nitro 50/ }).click();

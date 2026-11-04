@@ -1,3 +1,4 @@
+import { loadRoleAccess, rolesWithGrantedAccess } from "./roleAccess";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { loadMembers, limitsOfKind } from "../schedule/members";
@@ -38,6 +39,7 @@ export function demoPrioritySource(periodStart: string, canManage: boolean): Pri
       values: [{ limit: "50", tournaments: (i === 3 ? 19 : 20 - i) * 100 + m * 7 }, { limit: "100", tournaments: (i === 3 ? 19 : 20 - i) * 10 + m * 3 }] })),
   });
   for (const p of people) p.discordRoles = [
+    { id: "demo-decorative", name: "Demo decoration", color: null },
     ...(p.redParty ? [{ id: "1208022351652986891", name: "RedParty", color: null }] : []),
     ...(p.team50 ? [{ id: "1208022278088949770", name: "Nitro 50+", color: null }] : []),
   ];
@@ -66,6 +68,14 @@ export function demoPrioritySlice(periodStart: string, canManage: boolean, kind:
 export async function loadPriorities(periodStart: string, demoCanManage: boolean, kind: PriorityKind = "nitro", group: PriorityGroup = "50-100", refresh = false) {
   if (!isLiveData()) return refresh && !demoCanManage ? { data: null, error: "forbidden" } : { data: demoPrioritySlice(periodStart, demoCanManage, kind, group, refresh), error: null };
   return rpc<PrioritySource>("load_priority_slice", { p_period_start: periodStart, p_variant: kind, p_group: group, p_refresh: refresh });
+}
+export async function loadPriorityFilterRoles() {
+  if (!isLiveData()) return { data: [
+    { id: "1208022351652986891", name: "RedParty", color: null },
+    { id: "1208022278088949770", name: "Nitro 50+", color: null },
+  ], error: null };
+  const result = await loadRoleAccess();
+  return { data: rolesWithGrantedAccess(result.roles).map(({ id, name, color }) => ({ id, name, color })), error: result.error };
 }
 export async function listPriorityRequests(periodStart: string) {
   if (isLiveData()) return rpc<PriorityRequestSummary[]>("list_priority_requests", { p_period_start: periodStart });

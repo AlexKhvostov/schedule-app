@@ -576,7 +576,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
           >
-            {<div className="v2-roster-controls">
+            <div className="v2-roster-controls">
+              <div className="v2-prio-switch"><span className="v2-prio-switch-label">{t("priorities.kind")}</span>
               <div className="v2-prio-tabs" role="tablist" aria-label={t("schedule.rosterKinds")}>
                 {(["nitro", "regular"] as const).map((variant) => <button key={variant} ref={(node) => { rosterTabs.current[variant] = node; }} type="button" role="tab" disabled={!kinds.includes(variant)} id={`roster-tab-${variant}`} aria-controls="roster-panel" aria-selected={rosterKind === variant} tabIndex={rosterKind === variant ? 0 : -1}
                   onClick={() => setChosenRosterKind(variant)} onKeyDown={(event) => {
@@ -586,8 +587,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                     setChosenRosterKind(next); rosterTabs.current[next]?.focus();
                   }}>{t(`priorities.kinds.${variant}`)}</button>)}
               </div>
+              </div>
+              <div className="v2-prio-switch"><span className="v2-prio-switch-label">{t("priorities.limitGroup")}</span>
               <div className="v2-prio-tabs" role="group" aria-label={t("priorities.limitGroup")}>{(["50-100", "250"] as const).map((g) => <button type="button" key={g} aria-pressed={hasRosterPriority && rosterGroup === g} disabled={!rosterGroupsAvailable.includes(g)} onClick={() => setChosenRosterGroup(g)}>{g === "50-100" ? "50–100" : "250"} €</button>)}</div>
-            </div>}
+              </div>
+            </div>
             <div id="roster-panel" role={kinds.length > 1 ? "tabpanel" : undefined} aria-labelledby={kinds.length > 1 ? `roster-tab-${rosterKind}` : undefined}>
             {!hasRosterPriority && <p>{t("priorities.noSelectedGroup")}</p>}
             {rosterSource.loading && <p role="status">{t("priorities.loading")}</p>}

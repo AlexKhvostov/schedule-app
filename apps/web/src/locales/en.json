@@ -154,6 +154,9 @@
     }
   },
   "priorities": {
+    "groups": {"rating": "Ranking", "filters": "Player filters", "display": "Display"},
+    "periodHint": "Three months of €50 and €100 volume. Points: (€50 × 1 + €100 × 2) × {{weight}}. Hover over a player’s volume to see both stakes.",
+
     "noSelectedGroup": "No 50, 100 or 250 € limits are selected. No priority is selected; players are listed by name.",
     "limitGroup": "Limit group",
     "sliceScope": "Winamax · {{kind}} · {{group}} €",
@@ -207,7 +210,8 @@
     "vipDisplay": "Show Core",
     "vipDisplayHint": "Show Core numbers for the selected kind and group. This checkbox does not change the order.",
     "filters": {
-      "roles": "Discord roles — any selected",
+      "roles": "Discord roles with access — any selected role",
+      "roleLabel": "Discord roles",
       "allRoles": "All Discord roles",
       "unavailableRole": "Unavailable role · {{id}}",
       "scheduleActive": "Active in schedule",
