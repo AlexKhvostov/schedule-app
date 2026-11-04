@@ -10817,7 +10817,7 @@ textarea.v2-ctrl.v2-cab-area {
   padding: 4px 7px 5px;
   border: 1px solid color-mix(in srgb, var(--ring) 42%, var(--border));
   border-radius: 6px;
-  background: color-mix(in srgb, var(--popover) 92%, var(--ring));
+  background: color-mix(in srgb, var(--opt-frame-limit-tone, var(--ring)) 12%, var(--popover));
   color: var(--popover-foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 9px;
@@ -11643,7 +11643,7 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 .v2-opt.is-kit .v2-opt-frame {
   color: var(--popover-foreground);
   text-shadow: none;
-  background: color-mix(in srgb, var(--popover) 92%, var(--ring));
+  background: color-mix(in srgb, var(--opt-frame-limit-tone, var(--ring)) 12%, var(--popover));
   border-color: color-mix(in srgb, var(--ring) 42%, var(--border));
 }
 

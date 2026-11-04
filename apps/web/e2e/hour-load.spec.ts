@@ -93,6 +93,7 @@ for (const theme of ["dark", "light"]) {
     const cell = n50.locator('[data-slot][data-half="6"]').first();
     await cell.hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N50: 03:00 – 03:30");
+    const frame = page.locator(".v2-opt-frame");
     const frameLimit = page.locator(".v2-opt-frame-limit");
     const frameTime = page.locator(".v2-opt-frame-time");
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
@@ -100,6 +101,7 @@ for (const theme of ["dark", "light"]) {
     await expect(frameTime).toHaveCSS("font-style", "normal");
     await expect(frameTime).toHaveCSS("font-weight", "400");
     expect(await frameTime.evaluate(el => getComputedStyle(el).color)).toBe(await page.locator(".v2-opt-frame").evaluate(el => getComputedStyle(el).color));
+    const n50Background = await frame.evaluate(el => getComputedStyle(el).backgroundColor);
     const [washBox, cellBox] = await Promise.all([wash.boundingBox(),cell.boundingBox()]);
     expect(Math.abs(washBox!.x-cellBox!.x)).toBeLessThan(1);
     expect(washBox!.y).toBeLessThan(cellBox!.y);
@@ -113,12 +115,15 @@ for (const theme of ["dark", "light"]) {
     await n100.locator('[data-slot][data-half="6"]').first().hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N100: 03:00 – 03:30");
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(216, 222, 233)" : "rgb(52, 59, 70)");
+    expect(await frame.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(n50Background);
     await e50.locator('[data-slot][data-half="6"]').first().hover();
     await expect(page.locator(".v2-opt-frame")).toBeVisible();
     await expect(page.locator(".v2-opt-frame")).toHaveText("E50: 03:00 – 03:30");
     await expect(frameLimit).toHaveCSS("font-style", "italic");
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
     await expect(frameTime).toHaveCSS("font-style", "normal");
+    expect(await frame.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(n50Background);
+    await frame.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-hover-tint-${theme}.png`), scale: "css" });
     await page.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-hour-load-grid-${theme}.png`), clip: { x:0, y:80, width:500, height:550 } });
   });
 }

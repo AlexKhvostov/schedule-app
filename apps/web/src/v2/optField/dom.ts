@@ -179,7 +179,8 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
     const pair = document.createElement("span");
     pair.className = "v2-opt-frame-limit";
     pair.dataset.variant = hit.variant;
-    pair.style.color = limitTone(hit.limit);
+    frame.style.setProperty("--opt-frame-limit-tone", limitTone(hit.limit));
+    pair.style.color = "var(--opt-frame-limit-tone)";
     pair.textContent = pairLabel;
     const time = document.createElement("span");
     time.className = "v2-opt-frame-time";
