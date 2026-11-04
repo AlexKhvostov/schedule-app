@@ -60,17 +60,18 @@ type Props = {
   hourLoad?: HourLoadMap;
   skin?: "classic" | "theme";
   memberId?: string;
+  highlightPreferencesKey?: string | null;
   canActAs?: boolean;
   onKindChange?: (kind: "nitro" | "regular") => void;
 };
 
-export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme", memberId, canActAs = false, onKindChange }: Props) {
+export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme", memberId, highlightPreferencesKey, canActAs = false, onKindChange }: Props) {
   const { t, i18n } = useTranslation();
   const isKit = skin === "theme";
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
-  const preferences = useSchedulePreferences(onKindChange);
-  const { hideTables, dimPast, hidePastDays, displayRange, workHours, showTip, editPulse, busyHint, setBusyHint, limits, setLimits, kinds, setKinds, kind, setKind, kindsRef } = preferences;
+  const preferences = useSchedulePreferences(onKindChange, highlightPreferencesKey);
+  const { hideSlotHighlight, hideTables, dimPast, hidePastDays, displayRange, workHours, showTip, editPulse, busyHint, setBusyHint, limits, setLimits, kinds, setKinds, kind, setKind, kindsRef } = preferences;
   const toolbar = useScheduleToolbar(year);
   const { focus, setToolsOpen } = toolbar;
   const [showMine, setShowMine] = useState(false);
@@ -462,7 +463,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             capacity={capacity}
             grids={shownGridStore}
             players={players}
-            hourLoad={hourLoad}
+            hourLoad={hideSlotHighlight ? undefined : hourLoad}
             onGridChange={onGridChange}
             canRemoveForeign={canRemoveForeign}
             onOverwriteAsk={setOverwriteAsk}

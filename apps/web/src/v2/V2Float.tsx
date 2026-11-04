@@ -74,7 +74,7 @@ export function V2Float({
   return createPortal(
     <div
       className={`v2-float${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
-      style={{ left: box.x, top: box.y, width: box.width, zIndex: z }}
+      style={{ left: box.x, top: box.y, width: box.width, maxHeight: `calc(100dvh - ${box.y + 8}px)`, zIndex: z }}
       role={role}
       aria-label={role ? title : undefined}
       onPointerDown={onFocus}

@@ -7,6 +7,7 @@ import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from ".
 import { ClubHourLoadProvider, useClubHourLoad } from "./ClubHourLoad";
 import { isLiveData, supabaseUrl } from "../data/config";
 import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
+import { slotHighlightStorageKey } from "./slotHighlightPrefs";
 import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
 import { loadPrefs } from "./prefs";
@@ -425,6 +426,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
               capacity={capacity}
               hourLoad={hourLoad}
               memberId={session.memberId}
+              highlightPreferencesKey={slotHighlightStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo")}
               canActAs={isAdmin}
               onKindChange={(kind) => {
                 if (!isLiveData()) return;

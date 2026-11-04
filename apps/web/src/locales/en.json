@@ -404,6 +404,8 @@
     "settings": "Settings",
     "settingsTitle": "Field view",
     "settingsHint": "How to read the grid: the past, your clock, and the slot tooltip.",
+    "hideSlotHighlight": "Disable slot highlighting",
+    "hideSlotHighlightHint": "Hide hourly load colors. Your choice is saved for your account in this browser.",
     "dimPast": "Dim the past",
     "dimPastHint": "Dims the past. Turn off to keep past as bright as the future.",
     "hidePastDays": "Hide past days",
