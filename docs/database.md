@@ -1,6 +1,6 @@
 # База schedule-app
 
-## Компактное чтение и события расписания (локально, 4 ноября 2026)
+## Компактное чтение и события расписания (Working/preview, 4 ноября 2026)
 
 [Миграция](../supabase/migrations/20261104125706_compact_schedule_sync.sql) добавляет `load_schedule_snapshot(year, month, targets = null, directory_only = false) → jsonb`. Доступ — только авторизованным с `schedule` или `schedule.manage`; SECURITY DEFINER использует пустой search_path и явные схемы. `targets` — до 500 пар `{date, kind_id}` внутри выбранного месяца Winamax Nitro/Regular. `null` означает весь месяц, `[]` — пустой набор. При `directory_only` слоты не передаются, справочник включает владельцев выбранного набора.
 
