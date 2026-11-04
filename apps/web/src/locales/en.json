@@ -1678,7 +1678,7 @@
       },
       "search": {
         "h": "Search",
-        "p": "Type two letters in the Aa field. Other marks fade; the hit pulses."
+        "p": "Select a mark in the Aa field. It gets a steady outer glow; all other marks become grayscale."
       },
       "settings": {
         "h": "Settings",

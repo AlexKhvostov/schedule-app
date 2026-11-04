@@ -11006,7 +11006,7 @@ html[data-ui-theme="light"] .v2-opt-merged::before {
 }
 
 .v2-opt.is-find .v2-opt-merged {
-  opacity: 0.13;
+  opacity: 0.55;
 }
 
 .v2-opt-pick {
@@ -11327,19 +11327,7 @@ html[data-ui-theme="light"] .v2-opt-merged::before {
 }
 
 .v2-opt.is-find .v2-opt-cell.is-on {
-  opacity: 0.13;
-}
-
-.v2-opt.is-find .v2-opt-cell.is-on.is-past {
-  opacity: 0.1;
-}
-
-.v2-opt.is-kit.is-find .v2-opt-cell.is-on {
-  opacity: 0.18;
-}
-
-.v2-opt.is-kit.is-find .v2-opt-cell.is-on.is-past {
-  opacity: 0.14;
+  opacity: 0.55;
 }
 
 .v2-opt-cell:hover {
@@ -11797,6 +11785,12 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 
 .v2-opt.is-kit .v2-opt-cell.is-hit {
   outline-color: var(--ring);
+}
+
+/* Search keeps nonmatches legible but fully neutral, including past marks. */
+.v2-opt.is-find .v2-opt-cell.is-on,
+.v2-opt.is-find .v2-opt-merged {
+  filter: grayscale(1);
 }
 
 .v2-opt.is-kit .v2-opt-limit,
