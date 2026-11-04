@@ -65,7 +65,7 @@ test("concurrent drafts reject stale same-pair writes without blocking another p
 });
 
 for (const theme of ["dark", "light"]) {
-  test(`load wash follows exact pairs and cropped hours; separators and hover label in ${theme}`, async ({ page }) => {
+  test(`external load glow follows exact pairs and cropped hours; separators and hover label in ${theme}`, async ({ page }) => {
     await page.addInitScript(({theme, palette}) => {
       localStorage.setItem("v2-ui-theme", theme);
       localStorage.setItem("redparty.demo.limit-palette.v1", JSON.stringify({...palette,"50":{dark:"#66ccff",light:"#126b44"}}));
@@ -83,13 +83,12 @@ for (const theme of ["dark", "light"]) {
     const n50 = day.locator('.v2-opt-limit[data-pair="nitro:50"]');
     const n100 = day.locator('.v2-opt-limit[data-pair="nitro:100"]');
     const e50 = day.locator('.v2-opt-limit[data-pair="regular:50"]');
-    await expect(n50.locator(".v2-hour-wash").first()).toHaveCSS("filter", "blur(2px)");
-    await expect(n100.locator(".v2-hour-wash")).toHaveCount(0);
-    await expect(e50.locator('.v2-hour-wash[data-tone="peach"]')).toHaveCount(0);
-    await expect(e50.locator('.v2-hour-wash[data-tone="sky"]').first()).toBeVisible();
+    await expect(n50.locator("[data-load-tone]").first()).toHaveCSS("box-shadow", /5px 1px/);
+    await expect(n100.locator("[data-load-tone]")).toHaveCount(0);
+    await expect(e50.locator('[data-load-tone="peach"]')).toHaveCount(0);
+    await expect(e50.locator('[data-load-tone="sky"]').first()).toBeVisible();
     await expect(n100).toHaveCSS("border-top-style", "dashed");
     await expect(day.locator('.v2-opt-kind[data-variant="regular"]')).toHaveCSS("border-top-width", "1px");
-    const wash = n50.locator('.v2-hour-wash[data-start-half="6"]').first();
     const cell = n50.locator('[data-slot][data-half="6"]').first();
     await cell.hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N50: 03:00 – 03:30");
@@ -102,9 +101,10 @@ for (const theme of ["dark", "light"]) {
     await expect(frameTime).toHaveCSS("font-weight", "400");
     expect(await frameTime.evaluate(el => getComputedStyle(el).color)).toBe(await page.locator(".v2-opt-frame").evaluate(el => getComputedStyle(el).color));
     const n50Background = await frame.evaluate(el => getComputedStyle(el).backgroundColor);
-    const [washBox, cellBox] = await Promise.all([wash.boundingBox(),cell.boundingBox()]);
-    expect(Math.abs(washBox!.x-cellBox!.x)).toBeLessThan(1);
-    expect(washBox!.y).toBeLessThan(cellBox!.y);
+    // Load changes the exterior shadow only, never the slot's background.
+    const plainCell = n50.locator('[data-slot][data-half="0"]').first();
+    expect(await cell.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(await plainCell.evaluate(el => getComputedStyle(el).backgroundColor));
+    expect(await cell.evaluate(el => getComputedStyle(el).boxShadow)).not.toBe(await plainCell.evaluate(el => getComputedStyle(el).boxShadow));
     const matching = await day.evaluate((node) => [...node.querySelectorAll<HTMLElement>(".v2-opt-limit")].map((group) => {
       const gutter = node.querySelector<HTMLElement>(`.v2-opt-gutter-limit[data-pair="${group.dataset.pair}"]`)!;
       return Math.abs(group.getBoundingClientRect().top - gutter.getBoundingClientRect().top)
@@ -123,7 +123,7 @@ for (const theme of ["dark", "light"]) {
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
     await expect(frameTime).toHaveCSS("font-style", "normal");
     expect(await frame.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(n50Background);
-    await frame.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-hover-tint-${theme}.png`), scale: "css" });
+    await page.screenshot({ clip: (await frame.boundingBox())!, path: path.resolve(`../../memory/tasks/2026-11-04-hover-tint-${theme}.png`), scale: "css" });
     await page.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-hour-load-grid-${theme}.png`), clip: { x:0, y:80, width:500, height:550 } });
   });
 }
@@ -165,7 +165,7 @@ test("all three schedule editors use the same two-column N/E picker", async ({ p
     await picker.getByRole("button",{name:"E100",exact:true}).click();
     await expect(picker.getByRole("button",{name:"E100",exact:true})).toHaveAttribute("aria-pressed","true");
     await expect(picker.getByRole("button",{name:"N100",exact:true})).toHaveAttribute("aria-pressed","false");
-    await expect(picker.getByRole("button",{name:"E100",exact:true}).locator("span")).toHaveCSS("font-style","italic");
+    await expect(picker.getByRole("button",{name:"E100",exact:true}).locator(":scope > span")).toHaveCSS("font-style","italic");
     const boxes = await Promise.all([picker.getByRole("button",{name:"E100",exact:true}).boundingBox(),picker.getByRole("button",{name:"N100",exact:true}).boundingBox()]);
     expect(Math.abs(boxes[0]!.y-boxes[1]!.y)).toBeLessThan(1);
   }

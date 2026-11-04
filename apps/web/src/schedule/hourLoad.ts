@@ -1,19 +1,19 @@
 import { LIMIT_OPTIONS } from "./capacity";
 import type { ScheduleVariant } from "../data/slots";
 
-/** Пастельная радуга: полупрозрачный слой поверх сетки. */
+/** Pastel tones used by the external slot glow. */
 export const LOAD_PASTELS = [
   { id: "clear", color: null, swatch: "transparent" },
-  { id: "rose", color: "rgba(244, 170, 176, 0.22)", swatch: "rgba(244, 170, 176, 0.40)" },
-  { id: "peach", color: "rgba(250, 196, 150, 0.22)", swatch: "rgba(250, 196, 150, 0.40)" },
-  { id: "lemon", color: "rgba(248, 228, 150, 0.22)", swatch: "rgba(248, 228, 150, 0.40)" },
-  { id: "lime", color: "rgba(210, 230, 160, 0.22)", swatch: "rgba(210, 230, 160, 0.40)" },
-  { id: "mint", color: "rgba(170, 220, 186, 0.22)", swatch: "rgba(170, 220, 186, 0.40)" },
-  { id: "aqua", color: "rgba(155, 214, 214, 0.22)", swatch: "rgba(155, 214, 214, 0.40)" },
-  { id: "sky", color: "rgba(160, 196, 236, 0.22)", swatch: "rgba(160, 196, 236, 0.40)" },
-  { id: "iris", color: "rgba(176, 180, 230, 0.22)", swatch: "rgba(176, 180, 230, 0.40)" },
-  { id: "lilac", color: "rgba(206, 180, 230, 0.22)", swatch: "rgba(206, 180, 230, 0.40)" },
-  { id: "pink", color: "rgba(236, 180, 210, 0.22)", swatch: "rgba(236, 180, 210, 0.40)" },
+  { id: "rose", color: "rgba(244, 170, 176, 0.85)", swatch: "rgba(244, 170, 176, 0.40)" },
+  { id: "peach", color: "rgba(250, 196, 150, 0.85)", swatch: "rgba(250, 196, 150, 0.40)" },
+  { id: "lemon", color: "rgba(248, 228, 150, 0.85)", swatch: "rgba(248, 228, 150, 0.40)" },
+  { id: "lime", color: "rgba(210, 230, 160, 0.85)", swatch: "rgba(210, 230, 160, 0.40)" },
+  { id: "mint", color: "rgba(170, 220, 186, 0.85)", swatch: "rgba(170, 220, 186, 0.40)" },
+  { id: "aqua", color: "rgba(155, 214, 214, 0.85)", swatch: "rgba(155, 214, 214, 0.40)" },
+  { id: "sky", color: "rgba(160, 196, 236, 0.85)", swatch: "rgba(160, 196, 236, 0.40)" },
+  { id: "iris", color: "rgba(176, 180, 230, 0.85)", swatch: "rgba(176, 180, 230, 0.40)" },
+  { id: "lilac", color: "rgba(206, 180, 230, 0.85)", swatch: "rgba(206, 180, 230, 0.40)" },
+  { id: "pink", color: "rgba(236, 180, 210, 0.85)", swatch: "rgba(236, 180, 210, 0.40)" },
 ] as const;
 
 export type LoadTone = Exclude<(typeof LOAD_PASTELS)[number]["id"], "clear">;
@@ -49,17 +49,4 @@ export function legacyLoadRow(value: unknown, limit: string): HourLoadRow | null
     return tone && tone.id !== "clear" ? tone.id : null;
   });
   return row.some(Boolean) ? row : null;
-}
-
-/** Static CSS spans follow real half-slots, excluding hidden hours and unavailable capacity. */
-export function hourLoadSegments(row: HourLoadRow | undefined, visibleHalves: number[], allowed: (half: number) => boolean = () => true) {
-  const spans: { startHalf: number; endHalf: number; tone: LoadTone }[] = [];
-  for (const half of visibleHalves) {
-    const tone = row?.[Math.floor(half / 2)];
-    if (!tone || !allowed(half)) continue;
-    const last = spans.at(-1);
-    if (last && last.endHalf === half && last.tone === tone) last.endHalf = half + 1;
-    else spans.push({ startHalf: half, endHalf: half + 1, tone });
-  }
-  return spans;
 }

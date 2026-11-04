@@ -5,7 +5,7 @@ import { visibleMonthDays } from "../schedule/displayRange";
 import { daysInMonth } from "../schedule/plan";
 import { loadSlotLook, lookToVars, SLOT_LOOK_EVENT } from "../schedule/slotLook";
 import { DEFAULT_WORK_HOURS, workGapBefore, workHalfSlots, workHourSegments } from "../schedule/workHours";
-import { navMem } from "./optField/dom";
+import { hideFrame, navMem, navOf } from "./optField/dom";
 import { OptBody, OptHeadNow, WorkGapOverlay, workGridColumn } from "./optField/OptFieldGrid";
 import { OptHelp } from "./optField/OptFieldHelp";
 import { OptTip } from "./optField/OptFieldTip";
@@ -104,19 +104,26 @@ export const OptField = memo(function OptField({
   }, []);
 
   useEffect(() => {
-    const host = daysRef.current?.querySelector(".v2-opt-frame-host");
-    if (!host) return;
+    const root = rootRef.current;
+    if (!root) return;
+    // Keep the hint outside clipped rows and every schedule stacking context.
+    const host = document.createElement("div");
+    host.className = "v2-opt-frame-host";
+    host.setAttribute("aria-hidden", "true");
     const frame = document.createElement("div");
     frame.className = "v2-opt-frame";
     frame.hidden = true;
-    frame.setAttribute("aria-hidden", "true");
     host.appendChild(frame);
+    document.body.appendChild(host);
+    navOf(root).frame = frame;
+    const hide = () => hideFrame(navOf(root));
+    document.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
     return () => {
-      frame.remove();
-      const root = rootRef.current;
-      if (!root) return;
-      const mem = navMem.get(root);
-      if (mem) mem.frame = null;
+      document.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+      host.remove();
+      navMem.delete(root);
     };
   }, []);
 
@@ -255,7 +262,6 @@ export const OptField = memo(function OptField({
               {hidePastDays && days.every((day) => isPastDay(year, monthIndex, day.d, cet)) && (
                 <p className="v2-opt-empty-days">{t("schedule.hidePastEmpty")}</p>
               )}
-              <div className="v2-opt-frame-host" aria-hidden />
             </div>
           </div>
         </div>

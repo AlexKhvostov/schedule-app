@@ -1,3 +1,4 @@
+import { PairLabel } from "./PairLabel";
 import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { pctLabel, type FieldFill } from "../schedule/analytics";
@@ -28,7 +29,7 @@ export function FillByHourChart({
   return (
     <section className="v2-analytics-limit" style={{ ["--fill-tone"]: tone } as CSSProperties}>
       <header className="v2-analytics-limit-head">
-        <h3>{label ?? formatLimit(limit)}</h3>
+        <h3><PairLabel label={label ?? formatLimit(limit)} /></h3>
       </header>
       <div className="v2-fill-chart">
         <div className="v2-opt-foot-chart">

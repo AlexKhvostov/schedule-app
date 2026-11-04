@@ -1,3 +1,4 @@
+import { PairLabel } from "./PairLabel";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { readLegacyHourLoad, saveClubHourLoad } from "../data/hourLoad";
@@ -54,7 +55,7 @@ export function HourLoadEditor() {
     <FoldHead kicker={t("admin.load.kicker")} title={t("admin.load.title")} lead={t("hourLoad.lead")} open={open} onToggle={() => setOpen(!open)} />
     {open && <>
       <div className="v2-hour-load-tools">
-        <strong data-load-pair={key}>{label}</strong>
+        <strong data-load-pair={key}><PairLabel label={label} /></strong>
         {pending > 0 && <span className="v2-muted">{t("hourLoad.pending", { count: pending })}</span>}
       </div>
       {loading && <p role="status">{t("hourLoad.loading")}</p>}

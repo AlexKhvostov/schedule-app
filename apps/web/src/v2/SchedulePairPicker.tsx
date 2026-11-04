@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LIMIT_OPTIONS, formatVariantLimit, limitTone } from "../schedule/capacity";
+import { PairLabel } from "./PairLabel";
 
 type Variant = "nitro" | "regular";
 export function SchedulePairPicker({ variant, limit, onChange, disabled, hasDraft, children }: {
@@ -19,7 +20,7 @@ export function SchedulePairPicker({ variant, limit, onChange, disabled, hasDraf
             aria-label={label} aria-pressed={variant === kind && limit === value}
             title={dirty ? t("pairPicker.unsaved", { pair: label }) : label}
             disabled={disabled} style={{ color: limitTone(value) }} onClick={() => onChange(kind, value)}>
-            <span>{label}</span>{dirty && <small aria-hidden>*</small>}
+            <span><PairLabel label={label} /></span>{dirty && <small aria-hidden>*</small>}
           </button>;
         })}
       </div>)}

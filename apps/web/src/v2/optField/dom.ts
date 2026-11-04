@@ -129,6 +129,12 @@ export function showPick(origin: SlotHit, fromHalf: number, toHalf: number, mode
   pick.dataset.label = slotRangeSpan(a, b);
   pick.classList.toggle("is-off", mode === "remove");
   pick.hidden = false;
+  const root = track.closest<HTMLElement>(".v2-opt");
+  if (root) {
+    placeFrame(navOf(root), origin,
+      `${formatVariantLimit(origin.variant, origin.limit)}: ${slotRangeSpan(a, b)}`,
+      { left, right, top, bottom }, mode);
+  }
 }
 
 export function hidePick(root?: HTMLElement | null) {
@@ -149,31 +155,22 @@ export function navOf(root: HTMLElement): NavMem {
   return mem;
 }
 
-function frameOf(root: HTMLElement, mem: NavMem) {
-  if (mem.frame?.isConnected) return mem.frame;
-  mem.frame = root.querySelector(".v2-opt-frame");
-  return mem.frame;
-}
-
 export function hideFrame(mem: NavMem) {
   if (!mem.frame) return;
   mem.frame.hidden = true;
   mem.col = "";
 }
 
-function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string) {
-  const frame = frameOf(root, mem);
-  if (!frame) return;
-  const host = frame.parentElement;
-  if (!host) return;
-  const hostBox = host.getBoundingClientRect();
-  const cellBox = hit.cell.getBoundingClientRect();
-  const col = String(hit.half);
-  frame.style.left = `${cellBox.left - hostBox.left + cellBox.width / 2}px`;
-  frame.style.top = `${cellBox.top - hostBox.top - 5}px`;
-  frame.style.width = "max-content";
-  frame.style.height = "auto";
-  frame.style.bottom = "auto";
+function placeFrame(
+  mem: NavMem,
+  hit: SlotHit,
+  label: string,
+  anchor = hit.cell.getBoundingClientRect() as Pick<DOMRect, "left" | "right" | "top" | "bottom">,
+  mode: "hover" | "place" | "remove" = "hover",
+) {
+  const frame = mem.frame;
+  if (!frame?.isConnected) return;
+  frame.dataset.mode = mode;
   if (frame.textContent !== label) {
     const pairLabel = formatVariantLimit(hit.variant, hit.limit);
     const pair = document.createElement("span");
@@ -181,20 +178,32 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
     pair.dataset.variant = hit.variant;
     frame.style.setProperty("--opt-frame-limit-tone", limitTone(hit.limit));
     pair.style.color = "var(--opt-frame-limit-tone)";
-    pair.textContent = pairLabel;
+    const prefix = document.createElement("span");
+    prefix.className = "v2-pair-kind";
+    prefix.dataset.variant = hit.variant;
+    prefix.textContent = pairLabel[0];
+    pair.append(prefix, document.createTextNode(pairLabel.slice(1)));
     const time = document.createElement("span");
     time.className = "v2-opt-frame-time";
     time.textContent = label.slice(pairLabel.length);
     frame.replaceChildren(pair, time);
   }
-  mem.col = col;
+  mem.col = String(hit.half);
   frame.hidden = false;
+  const box = frame.getBoundingClientRect();
+  const center = Math.min(window.innerWidth - box.width / 2 - 4,
+    Math.max(box.width / 2 + 4, (anchor.left + anchor.right) / 2));
+  // Below the target when there is no room above; keep either position on-screen.
+  const bottom = anchor.top >= box.height + 9 ? anchor.top - 5 : anchor.bottom + box.height + 5;
+  frame.style.left = `${center}px`;
+  frame.style.top = `${Math.max(box.height + 4, Math.min(window.innerHeight - 4, bottom))}px`;
 }
 
 export function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const kit = root.classList.contains("is-kit");
   const mem = navOf(root);
   if (!hit) {
+    hideFrame(mem);
     if (!root.dataset.row && !mem.block && !mem.hour) return;
     mem.block?.classList.remove("is-hot");
     mem.lane?.classList.remove("is-hot");
@@ -209,7 +218,6 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
     delete root.dataset.row;
     delete root.dataset.lane;
     delete root.dataset.half;
-    hideFrame(mem);
     return;
   }
   const slot = String(hit.half);
@@ -290,7 +298,7 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.lane = lane;
   root.dataset.half = slot;
   if (hoverable) {
-    placeFrame(root, mem, hit, frameLabel);
+    placeFrame(mem, hit, frameLabel);
   }
   else hideFrame(mem);
 }

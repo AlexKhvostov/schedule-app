@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
+import { PairLabel } from "./PairLabel";
 
 export function OptNlChip({
   label,
@@ -22,7 +23,7 @@ export function OptNlChip({
         label
       ) : (
         <span className="v2-limit-chip" aria-label={label} style={chipTone ? { color: chipTone } : undefined}>
-          <span className="v2-opt-limit-label" aria-hidden>{limitLabel}</span>
+          <span className="v2-opt-limit-label" aria-hidden><PairLabel label={limitLabel} /></span>
           {laneNumber && <span className="v2-opt-lane-number" aria-hidden>{laneNumber}</span>}
         </span>
       )}
@@ -48,7 +49,8 @@ export function OptLevelLane({
   ghost?: boolean;
 }) {
   return (
-    <div data-lane={laneKey} className={`v2-opt-lane${ghost ? " is-ghost" : ""}`} aria-hidden={ghost || undefined}>
+    <div data-lane={laneKey} className={`v2-opt-lane${ghost ? " is-ghost" : ""}`} aria-hidden={ghost || undefined}
+      style={{ "--slot-limit-tone": tone } as CSSProperties}>
       {showNl ? <OptNlChip label={label} tone={tone} variant={variant} ghost={ghost} /> : null}
       <div className={`v2-opt-track${ghost ? " is-ghost" : ""}`}>{ghost ? null : children}</div>
     </div>

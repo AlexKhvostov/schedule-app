@@ -1,3 +1,4 @@
+import { PairLabel } from "../PairLabel";
 import { Fragment, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { ScheduleVariant } from "../../data/slots";
@@ -81,7 +82,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
                 className="v2-people-limit"
                 title={t("schedule.colHoursHint", { limit: displayScheduleColumn(limit) })}
               >
-                <span>{displayScheduleColumn(limit)}</span>
+                <span><PairLabel label={displayScheduleColumn(limit)} /></span>
                 <small>{t(showDeadTime ? "schedule.colHoursDeadUnits" : "schedule.colHoursUnit")}</small>
               </th>
             ))}

@@ -428,6 +428,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
               memberId={session.memberId}
               highlightPreferencesKey={slotHighlightStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo")}
               canActAs={isAdmin}
+              canManagePeople={canPeople}
               onKindChange={(kind) => {
                 if (!isLiveData()) return;
                 void loadCapacityLive(kind).then((next) => {
