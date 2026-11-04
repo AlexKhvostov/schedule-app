@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LIMIT_OPTIONS, formatLimit } from "../schedule/capacity";
+import { SchedulePairPicker } from "./SchedulePairPicker";
+import { FoldHead } from "./FoldHead";
 import {
   deadTimeIntervalsEqual,
   formatHalfTime,
@@ -19,6 +20,7 @@ const END_HALVES = Array.from({ length: 48 }, (_, index) => index + 1);
 
 export function DeadTimeEditor() {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const [variant, setVariant] = useState<ScheduleVariant>("nitro");
   const [limit, setLimit] = useState("50");
   const [saved, setSaved] = useState<DeadTimeInterval[]>([]);
@@ -61,28 +63,12 @@ export function DeadTimeEditor() {
 
   return (
     <section className="v2-admin-card">
-      <div className="v2-admin-section-head">
-        <span className="v2-admin-kicker">{t("admin.deadTime.kicker")}</span>
-        <h2>{t("admin.deadTime.title")}</h2>
-        <p>{t("admin.deadTime.lead")}</p>
-      </div>
-      <div className="v2-dead-time-editor" aria-busy={loading || saving}>
-        <div className="v2-dead-time-pair">
-          <div className="v2-seg" aria-label={t("admin.deadTime.variant") }>
-            {(["nitro", "regular"] as const).map((value) => (
-              <button key={value} type="button" className={variant === value ? "is-on" : ""} onClick={() => setVariant(value)}>
-                {value === "nitro" ? "Nitro" : "Regular"}
-              </button>
-            ))}
-          </div>
-          <label>
-            <span>{t("admin.deadTime.limit")}</span>
-            <select value={limit} onChange={(event) => setLimit(event.target.value)}>
-              {LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{formatLimit(value)}</option>)}
-            </select>
-          </label>
-        </div>
-
+      <FoldHead kicker={t("admin.deadTime.kicker")} title={t("admin.deadTime.title")}
+        lead={t("admin.deadTime.lead")} open={open} onToggle={() => setOpen((value) => !value)} />
+      {open && <div className="v2-dead-time-editor" aria-busy={loading || saving}>
+        <SchedulePairPicker variant={variant} limit={limit} disabled={saving}
+          onChange={(kind, value) => { setVariant(kind); setLimit(value); }} />
+        <div className="v2-dead-time-content">
         {loadFailed ? <p className="v2-dead-time-error" role="alert">{t("admin.deadTime.loadErr")}</p> : null}
         {!loading && !loadFailed ? (
           <div className="v2-dead-time-list">
@@ -163,7 +149,8 @@ export function DeadTimeEditor() {
           />
           <span className="v2-muted text-[11px]">{t("admin.deadTime.timezone")}</span>
         </div>
-      </div>
+        </div>
+      </div>}
     </section>
   );
 }

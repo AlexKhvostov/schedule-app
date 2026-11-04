@@ -1,8 +1,5 @@
 import { LIMIT_OPTIONS } from "./capacity";
-
-/** Таблица hour_load: limit × hour(0–23) × color. Позже можно унести в БД как есть. */
-export type HourLoadRow = (string | null)[];
-export type HourLoadMap = Record<string, HourLoadRow>;
+import type { ScheduleVariant } from "../data/slots";
 
 /** Пастельная радуга: полупрозрачный слой поверх сетки. */
 export const LOAD_PASTELS = [
@@ -19,64 +16,50 @@ export const LOAD_PASTELS = [
   { id: "pink", color: "rgba(236, 180, 210, 0.22)", swatch: "rgba(236, 180, 210, 0.40)" },
 ] as const;
 
-const KEY = "v2-hour-load";
-
-export function emptyLoadRow(): HourLoadRow {
-  return Array.from({ length: 24 }, () => null);
+export type LoadTone = Exclude<(typeof LOAD_PASTELS)[number]["id"], "clear">;
+export type HourLoadRow = (LoadTone | null)[];
+export type HourLoadMap = Record<string, HourLoadRow>;
+export const hourLoadKey = (variant: ScheduleVariant, limit: string) => `${variant}:${limit}`;
+export const emptyLoadRow = (): HourLoadRow => Array.from({ length: 24 }, () => null);
+export const defaultHourLoad = (): HourLoadMap => ({});
+export const sameLoadRow = (a: HourLoadRow, b: HourLoadRow) => a.length === b.length && a.every((tone, hour) => tone === b[hour]);
+export const loadToneColor = (tone: LoadTone) => LOAD_PASTELS.find((entry) => entry.id === tone)?.color ?? "transparent";
+export function validLoadKey(key: string) {
+  const [variant, limit, extra] = key.split(":");
+  return extra === undefined && (variant === "nitro" || variant === "regular") && LIMIT_OPTIONS.some((item) => item === limit);
+}
+export function isHourLoadRow(value: unknown): value is HourLoadRow {
+  return Array.isArray(value) && value.length === 24 && value.every((tone) =>
+    tone === null || LOAD_PASTELS.some((entry) => entry.id !== "clear" && entry.id === tone));
+}
+export function isHourLoadMap(value: unknown): value is HourLoadMap {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([key, row]) => validLoadKey(key) && isHourLoadRow(row));
 }
 
-export function cloneHourLoad(map: HourLoadMap): HourLoadMap {
-  return Object.fromEntries(Object.entries(map).map(([limit, row]) => [limit, row.slice()]));
-}
-
-export function sameHourLoad(a: HourLoadMap, b: HourLoadMap) {
-  return LIMIT_OPTIONS.every((limit) => {
-    const left = a[limit] ?? emptyLoadRow();
-    const right = b[limit] ?? emptyLoadRow();
-    return left.length === right.length && left.every((color, hour) => color === right[hour]);
+/** Old browser colors have no tournament kind. Import only into an explicitly selected pair. */
+export function legacyLoadRow(value: unknown, limit: string): HourLoadRow | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const old = (value as Record<string, unknown>)[limit];
+  if (!Array.isArray(old)) return null;
+  const rgb = (color: string) => color.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i)?.slice(1).join(",");
+  const row = emptyLoadRow().map((_, hour) => {
+    const color = old[hour];
+    if (typeof color !== "string") return null;
+    const tone = LOAD_PASTELS.find((entry) => entry.color && rgb(entry.color) === rgb(color));
+    return tone && tone.id !== "clear" ? tone.id : null;
   });
+  return row.some(Boolean) ? row : null;
 }
 
-export function defaultHourLoad(): HourLoadMap {
-  return Object.fromEntries(LIMIT_OPTIONS.map((limit) => [limit, emptyLoadRow()]));
-}
-
-export function loadHourLoad(): HourLoadMap {
-  const base = defaultHourLoad();
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return base;
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    for (const limit of LIMIT_OPTIONS) {
-      const row = parsed[limit];
-      if (!Array.isArray(row)) continue;
-      base[limit] = emptyLoadRow().map((_, hour) => (typeof row[hour] === "string" ? row[hour] : null));
-    }
-  } catch {
-    return base;
+/** Static CSS spans follow real half-slots, excluding hidden hours and unavailable capacity. */
+export function hourLoadSegments(row: HourLoadRow | undefined, visibleHalves: number[], allowed: (half: number) => boolean = () => true) {
+  const spans: { startHalf: number; endHalf: number; tone: LoadTone }[] = [];
+  for (const half of visibleHalves) {
+    const tone = row?.[Math.floor(half / 2)];
+    if (!tone || !allowed(half)) continue;
+    const last = spans.at(-1);
+    if (last && last.endHalf === half && last.tone === tone) last.endHalf = half + 1;
+    else spans.push({ startHalf: half, endHalf: half + 1, tone });
   }
-  return base;
-}
-
-export function saveHourLoad(map: HourLoadMap) {
-  localStorage.setItem(KEY, JSON.stringify(map));
-}
-
-/** Старые сохранения в localStorage держат 0.14 — поднимаем до текущей глубины слоя. */
-function washFill(color: string | null) {
-  if (!color) return "transparent";
-  const match = color.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
-  if (!match) return color;
-  return `rgba(${match[1]}, ${match[2]}, ${match[3]}, 0.22)`;
-}
-
-export function loadGradient(row: HourLoadRow | undefined) {
-  const hours = row ?? emptyLoadRow();
-  if (hours.every((color) => !color)) return "none";
-  const stops = hours.map((color, hour) => {
-    const from = (hour / 24) * 100;
-    const to = ((hour + 1) / 24) * 100;
-    return `${washFill(color)} ${from}% ${to}%`;
-  });
-  return `linear-gradient(to right, ${stops.join(", ")})`;
+  return spans;
 }

@@ -19,7 +19,8 @@ import {
   type HourCaps,
 } from "../schedule/capacity";
 import { weekdayShort } from "../schedule/formatDate";
-import { LOAD_PASTELS, cloneHourLoad, emptyLoadRow, sameHourLoad, type HourLoadMap } from "../schedule/hourLoad";
+import { HourLoadEditor } from "./HourLoadEditor";
+import { SchedulePairPicker } from "./SchedulePairPicker";
 import { MembersAdmin } from "./MembersAdmin";
 import { FoldHead } from "./FoldHead";
 import { V2Root } from "./V2Root";
@@ -59,13 +60,11 @@ type AdminSection = "people" | "schedule" | "root";
 
 type Props = {
   capacity: CapacityMap;
-  hourLoad: HourLoadMap;
   isRoot?: boolean;
   section?: AdminSection;
   variant: "nitro" | "regular";
   onVariantChange: (variant: "nitro" | "regular") => void;
   onCapacityChange: (next: CapacityMap) => void;
-  onHourLoadChange: (next: HourLoadMap) => void;
 };
 
 function nextCap(cap: number, down: boolean) {
@@ -92,12 +91,13 @@ function extremesOf(rows: MatrixRow[]) {
   return { deep, shallow };
 }
 
-export function V2Admin({ capacity, hourLoad, isRoot, section = "people", variant, onVariantChange, onCapacityChange, onHourLoadChange }: Props) {
+export function V2Admin({ capacity, isRoot, section = "people", variant, onVariantChange, onCapacityChange }: Props) {
   const { t, i18n } = useTranslation();
   const [limit, setLimit] = useState("50");
   const [tab, setTab] = useState<"week" | "month">("month");
   const [draft, setDraft] = useState<MatrixRow[] | null>(null);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [controlOpen, setControlOpen] = useState(true);
   const [allowOverwrite, setAllowOverwrite] = useState(false);
   const [overwriteSaving, setOverwriteSaving] = useState(false);
@@ -119,9 +119,6 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
   });
   const [filterLimitsSaving, setFilterLimitsSaving] = useState(false);
   const [filterLimitsSaved, setFilterLimitsSaved] = useState(false);
-  const [loadOpen, setLoadOpen] = useState(false);
-  const [loadDraft, setLoadDraft] = useState<HourLoadMap | null>(null);
-  const [loadSaved, setLoadSaved] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hover, setHover] = useState<{ day: number; hour: number } | null>(null);
   const [range, setRange] = useState<CapRange | null>(null);
@@ -256,41 +253,6 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
       })),
     );
     setSaved(false);
-  };
-
-  const loadMatrix = loadDraft ?? hourLoad;
-  const loadDirty = loadDraft != null && !sameHourLoad(loadDraft, hourLoad);
-
-  const paintLoad = (hour: number, color: string | null) => {
-    setLoadDraft((prev) => {
-      const base = cloneHourLoad(prev ?? hourLoad);
-      const row = (base[limit] ?? Array.from({ length: 24 }, () => null)).slice();
-      row[hour] = color;
-      base[limit] = row;
-      return base;
-    });
-    setLoadSaved(false);
-  };
-
-  const saveLoad = () => {
-    if (!loadDirty || !loadDraft) return;
-    onHourLoadChange(loadDraft);
-    setLoadDraft(null);
-    setLoadSaved(true);
-  };
-
-  const resetLoad = () => {
-    setLoadDraft(null);
-    setLoadSaved(false);
-  };
-
-  const clearLoad = () => {
-    setLoadDraft((prev) => {
-      const base = cloneHourLoad(prev ?? hourLoad);
-      base[limit] = emptyLoadRow();
-      return base;
-    });
-    setLoadSaved(false);
   };
 
   return (
@@ -470,12 +432,9 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
       </section>
       <DeadTimeEditor />
       <section className="v2-admin-card">
-        <div className="v2-admin-section-head">
-          <span className="v2-admin-kicker">{t("admin.filterLimits.kicker")}</span>
-          <h2>{t("admin.filterLimits.title")}</h2>
-          <p>{t("admin.filterLimits.lead")}</p>
-        </div>
-        <div className="v2-filter-limit-editor">
+        <FoldHead kicker={t("admin.filterLimits.kicker")} title={t("admin.filterLimits.title")}
+          lead={t("admin.filterLimits.lead")} open={filtersOpen} onToggle={() => setFiltersOpen((value) => !value)} />
+        {filtersOpen && <div className="v2-filter-limit-editor">
           {(["nitro", "regular"] as const).map((kind) => (
             <fieldset key={kind} className={`v2-filter-limit-kind is-${kind}`}>
               <legend>{kind === "nitro" ? "Nitro" : "Regular"}</legend>
@@ -530,7 +489,7 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
             />
             <span className="v2-muted text-[11px]">{t("admin.filterLimits.hint")}</span>
           </div>
-        </div>
+        </div>}
       </section>
       <section className="v2-admin-card">
         <FoldHead
@@ -541,43 +500,17 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
           onToggle={() => setOpen((value) => !value)}
         />
 
-        <div className="flex" hidden={!open}>
-          <aside className="v2-cap-limits">
-            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.kind")}</div>
-            {(["nitro", "regular"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`v2-cap-limit${variant === value ? " is-on" : ""}`}
-                onClick={() => {
-                  if (value === variant) return;
-                  onVariantChange(value);
-                  setSaved(false);
-                }}
-              >
-                <b>{value === "nitro" ? "Nitro" : "Regular"}</b>
-              </button>
-            ))}
-            <div className="v2-admin-kicker mb-2 mt-5 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
-            {LIMIT_OPTIONS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`v2-cap-limit${limit === value ? " is-on" : ""}`}
-                style={limit === value ? undefined : { color: limitTone(value) }}
-                onClick={() => {
-                  setLimit(value);
-                  setSaved(false);
-                }}
-              >
-                <b>{formatLimit(value)}</b>
-              </button>
-            ))}
+        {open && <div className="flex">
+          <SchedulePairPicker variant={variant} limit={limit} onChange={(kind, value) => {
+            if (kind !== variant) onVariantChange(kind);
+            setLimit(value);
+            setSaved(false);
+          }}>
             <button type="button" className="v2-ctrl mt-4 w-full px-2 text-[11px]" onClick={reset}>
               {t("admin.capacity.resetLimit")}
             </button>
             <p className="v2-muted mt-2 px-1 text-[10px] leading-relaxed">{t("admin.capacity.resetLimitHint")}</p>
-          </aside>
+          </SchedulePairPicker>
 
           <div className="min-w-0 flex-1 v2-cap-body">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -764,98 +697,10 @@ export function V2Admin({ capacity, hourLoad, isRoot, section = "people", varian
               </label>
             </div>
           </div>
-        </div>
+        </div>}
       </section>
 
-      <section className="v2-admin-card mt-6">
-        <FoldHead
-          kicker={t("admin.load.kicker")}
-          title={t("admin.load.title")}
-          lead={t("admin.load.lead")}
-          open={loadOpen}
-          onToggle={() => setLoadOpen((value) => !value)}
-        />
-        {loadOpen && (
-        <div className="flex">
-          <aside className="v2-cap-limits">
-            <div className="v2-admin-kicker mb-2 px-1 text-[10px] tracking-[0.14em] uppercase">{t("admin.capacity.limit")}</div>
-            {LIMIT_OPTIONS.map((value) => (
-              <button
-                key={`load-${value}`}
-                type="button"
-                className={`v2-cap-limit${limit === value ? " is-on" : ""}`}
-                style={limit === value ? undefined : { color: limitTone(value) }}
-                onClick={() => setLimit(value)}
-              >
-                <b>{formatLimit(value)}</b>
-              </button>
-            ))}
-          </aside>
-          <div className="min-w-0 flex-1 v2-cap-body">
-            <div className="v2-load-legend v2-muted">
-              <span>{t("admin.load.legend")}</span>
-              {LOAD_PASTELS.filter((tone) => tone.color).map((tone) => (
-                <span key={tone.id} className="v2-load-chip">
-                  <i style={{ background: tone.swatch }} />
-                  {t(`admin.load.tone.${tone.id}`)}
-                </span>
-              ))}
-            </div>
-            <div className="v2-load-timeline v2-mono">
-              {HOURS.map((hour) => {
-                const wash = loadMatrix[limit]?.[hour];
-                return (
-                  <span
-                    key={hour}
-                    className="v2-load-tick"
-                    style={wash ? { backgroundImage: `linear-gradient(${wash}, ${wash})` } : undefined}
-                  >
-                    {hour}
-                  </span>
-                );
-              })}
-            </div>
-            <div className="v2-load-hours">
-              {HOURS.map((hour) => (
-                <div key={hour} className="v2-load-col">
-                  <b>{hour}</b>
-                  <div className="v2-load-swatches">
-                    {LOAD_PASTELS.map((tone) => {
-                      const on = (loadMatrix[limit]?.[hour] ?? null) === tone.color;
-                      return (
-                        <button
-                          key={`${hour}-${tone.id}`}
-                          type="button"
-                          className={`v2-load-dot${on ? " is-on" : ""}${tone.id === "clear" ? " is-clear" : ""}`}
-                          style={{ background: tone.swatch }}
-                          title={t(`admin.load.tone.${tone.id}`)}
-                          onClick={() => paintLoad(hour, tone.color)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <V2SaveButton
-                dirty={loadDirty}
-                saved={loadSaved}
-                label={t("admin.save")}
-                doneLabel={t("admin.saved")}
-                onClick={saveLoad}
-              />
-              <button type="button" className="v2-ctrl px-4" onClick={resetLoad}>
-                {t("admin.load.reset")}
-              </button>
-              <button type="button" className="v2-ctrl px-4" onClick={clearLoad}>
-                {t("admin.load.clear")}
-              </button>
-            </div>
-          </div>
-        </div>
-        )}
-      </section>
+      <HourLoadEditor />
       <LimitPaletteEditor />
         </>
       ) : null}

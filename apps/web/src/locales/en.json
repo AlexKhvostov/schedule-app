@@ -1,4 +1,21 @@
 {
+  "pairPicker": {
+    "label": "Tournament type and limit",
+    "unsaved": "{{pair}} — unsaved changes"
+  },
+  "hourLoad": {
+    "lead": "Shared club load: tournament type, limit and CET hours.",
+    "pending": "Unsaved pairs: {{count}}",
+    "loading": "Loading hourly load…",
+    "loadError": "Unable to load hourly load. Editing is unavailable for now.",
+    "saveError": "Load was not saved. Your draft is still on screen; please try again.",
+    "conflict": "Another administrator changed this pair. Load the saved values before editing again.",
+    "saving": "Saving…",
+    "save": "Save {{pair}}",
+    "clear": "Clear {{pair}}",
+    "import": "Import old settings into {{pair}}",
+    "scope": "Only the selected pair is saved. Colors apply to all its levels and club members. Save other pairs separately; their drafts remain when switching. Old local settings can be imported into the selected pair and saved."
+  },
   "limitPalette": {
     "title": "Limit colors",
     "kicker": "Club palette",

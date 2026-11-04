@@ -2,6 +2,7 @@ import {
   slotRangeSpan
 } from "../optFieldModel";
 import { type SlotHit } from "./types";
+import { formatVariantLimit } from "../../schedule/capacity";
 
 type NavMem = {
   block: Element | null;
@@ -173,10 +174,10 @@ function placeFrame(root: HTMLElement, mem: NavMem, hit: SlotHit, label: string)
   frame.style.width = "max-content";
   frame.style.height = "auto";
   frame.style.bottom = "auto";
-  if (mem.col !== col) {
+  if (frame.textContent !== label) {
     frame.textContent = label;
-    mem.col = col;
   }
+  mem.col = col;
   frame.hidden = false;
 }
 
@@ -207,12 +208,16 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const lane = hit.lane;
   const late = hit.half % 2 === 1;
   const hoverable = !hit.cell.classList.contains("is-lock");
+  const startHalf = hit.rangeStartHalf ?? hit.half;
+  const endHalf = hit.rangeEndHalf ?? hit.half + 1;
+  const frameLabel = `${formatVariantLimit(hit.variant, hit.limit)}: ${slotRangeSpan(startHalf, endHalf - 1)}`;
   if (
     root.dataset.half === slot
     && root.dataset.row === row
     && root.dataset.lane === lane
     && !mem.frame?.hidden
     && mem.col === slot
+    && mem.frame?.textContent === frameLabel
   ) {
     return;
   }
@@ -275,9 +280,7 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
   root.dataset.lane = lane;
   root.dataset.half = slot;
   if (hoverable) {
-    const startHalf = hit.rangeStartHalf ?? hit.half;
-    const endHalf = hit.rangeEndHalf ?? hit.half + 1;
-    placeFrame(root, mem, hit, slotRangeSpan(startHalf, endHalf - 1));
+    placeFrame(root, mem, hit, frameLabel);
   }
   else hideFrame(mem);
 }

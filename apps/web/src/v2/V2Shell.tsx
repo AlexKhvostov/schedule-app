@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
 import { loadMembers, memberOfSession } from "../schedule/members";
 import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
-import { defaultHourLoad, loadHourLoad, saveHourLoad, type HourLoadMap } from "../schedule/hourLoad";
+import { ClubHourLoadProvider, useClubHourLoad } from "./ClubHourLoad";
 import { isLiveData, supabaseUrl } from "../data/config";
 import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
 import { loadMyCabinet } from "../data/people";
@@ -68,9 +68,9 @@ function V2HeaderClock() {
 type StaffItem = { key: ShellPage; label: string; icon: string; hint?: string };
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
-  return <ClubLimitPaletteProvider key={session.memberId ?? session.role}>
+  return <ClubLimitPaletteProvider key={session.memberId ?? session.role}><ClubHourLoadProvider>
     <V2ShellContent session={session} cursor={cursor} onCursorChange={onCursorChange} onSession={onSession} onLogout={onLogout} />
-  </ClubLimitPaletteProvider>;
+  </ClubHourLoadProvider></ClubLimitPaletteProvider>;
 }
 
 function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
@@ -102,7 +102,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminCapacity, setAdminCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
   const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
-  const [hourLoad, setHourLoad] = useState<HourLoadMap>(() => (typeof window === "undefined" ? defaultHourLoad() : loadHourLoad()));
+  const { map: hourLoad } = useClubHourLoad();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
   const avatarUrl = session.avatarUrl || demoAvatar || null;
@@ -464,7 +464,6 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
                 section={page === "admin-root" ? "root" : page === "admin-schedule" ? "schedule" : "people"}
                 variant={adminVariant}
                 capacity={adminCapacity}
-                hourLoad={hourLoad}
                 onVariantChange={(next) => {
                   setAdminVariant(next);
                   if (isLiveData()) {
@@ -478,10 +477,6 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
                   saveCapacity(next);
                   if (adminVariant === loadPrefs().kinds[0]) setCapacity(next);
                   if (isLiveData()) void saveCapacityLive(adminVariant, next);
-                }}
-                onHourLoadChange={(next) => {
-                  setHourLoad(next);
-                  saveHourLoad(next);
                 }}
               />
             </div>
