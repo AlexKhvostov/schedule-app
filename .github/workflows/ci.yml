@@ -78,6 +78,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/player_schedule_limits.sql
       - name: Check atomic schedule edit contract
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/atomic_schedule_edit.sql
+      - name: Check compact reads and private change notifications
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/compact_schedule.sql
       - name: Check member table preset RPC
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_table_presets.sql
       - name: Check current distance filter metadata
@@ -87,7 +89,7 @@ jobs:
       - name: Check member presence access and activity summary
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_online.sql
       - name: Lint database
-        run: supabase db lint --local --schema public,external_api_private --level warning
+        run: supabase db lint --local --schema public,external_api_private,schedule_private --level warning
       - name: Check external API keys, filters, completeness and quotas
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api.sql
       - name: Check immutable API snapshot pagination
@@ -95,5 +97,45 @@ jobs:
       - name: Check root API client administration
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_root_admin.sql
       - name: Stop local database
+        if: ${{ always() }}
+        run: supabase stop --no-backup
+
+  schedule-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - run: npm ci
+        working-directory: apps/web
+      - run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+      - name: Start disposable Auth, API and Realtime
+        run: |
+          supabase start -x storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,studio,postgres-meta,mailpit
+          supabase status -o json > "$RUNNER_TEMP/schedule-sync-status.json"
+      - name: Check complete month and loading recovery
+        run: node node_modules/@playwright/test/cli.js test --config=playwright.live.config.ts --workers=1
+        working-directory: apps/web
+      - name: Check two real sessions and reconnect
+        run: node node_modules/@playwright/test/cli.js test --config=playwright.sync.config.ts --workers=1
+        working-directory: apps/web
+        env:
+          SCHEDULE_SYNC_STATUS: ${{ runner.temp }}/schedule-sync-status.json
+          SCHEDULE_SYNC_DB_CONTAINER: supabase_db_schedule-app
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: schedule-sync-results
+          path: apps/web/playwright-report/
+          retention-days: 7
+      - name: Stop disposable stack
         if: ${{ always() }}
         run: supabase stop --no-backup

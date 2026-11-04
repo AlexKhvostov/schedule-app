@@ -122,7 +122,7 @@ async function fetchOccupancyRows(
   }
 }
 
-type MonthScheduleRow = {
+export type MonthScheduleRow = {
   member_id: string;
   limit_id: string;
   slot_date: string;
@@ -191,7 +191,7 @@ function missingMonthRpc(message?: string) {
   return Boolean(message && /load_month_schedule|Could not find the function/i.test(message));
 }
 
-function markFromScheduleRow(row: MonthScheduleRow): Mark {
+export function markFromScheduleRow(row: Pick<MonthScheduleRow, "member_id" | "mark_tag" | "mark_bg" | "mark_fg" | "member_tables" | "discord" | "room_nick" | "avatar_url" | "username" | "global_name" | "grid_priority" | "vip_nitro" | "vip_regular">): Mark {
   return {
     t: row.mark_tag ?? "",
     discord: row.discord ?? "",

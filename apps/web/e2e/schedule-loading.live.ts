@@ -25,26 +25,24 @@ async function fixture(page: Page, failSecondPage = false) {
     const reply = (body: unknown) => route.fulfill({ json: body, headers });
     if (path === "/auth/v1/user") return reply(user);
     if (path.endsWith("/rpc/member_access_context")) return reply({ isRoot: true, permissions: [], hasRequiredRole: true });
-    if (path.endsWith("/rpc/load_month_schedule")) {
-      const args = route.request().postDataJSON();
-      const offset = Number(url.searchParams.get("offset") ?? 0);
-      const regular = args.p_variant === "regular";
-      if (!regular) requested.push(offset);
-      await gates[regular ? 0 : offset / 1000].promise;
-      if (!regular && offset === 1000 && failSecondPage) {
+    if (path.endsWith("/rpc/load_schedule_snapshot")) {
+      requested.push(0);
+      await gates[0].promise;
+      if (failSecondPage) {
         return route.fulfill({ status: 503, json: { message: "fixture page failed" } });
       }
-      const rows = regular ? [] : Array.from({ length: Math.min(1000, 2800 - offset) }, (_, i) => {
-        const n = offset + i;
+      const rows = Array.from({ length: 2800 }, (_, n) => {
         const local = n % 1440;
         return {
-          member_id: member.id, limit_id: n < 1440 ? "100" : "50",
-          slot_date: `2026-11-${String(Math.floor(local / 48) + 1).padStart(2, "0")}`,
-          half: local % 48, level: 0, tables: 1, member_tables: 1,
-          mark_tag: "AB", mark_bg: member.mark_bg, mark_fg: member.mark_fg,
+          member_id: member.id, kind_id: n < 1440 ? "n100" : "n50",
+          day: Math.floor(local / 48) + 1,
+          half: local % 48, level: 0, tables: 1,
         };
       });
-      return route.fulfill({ json: rows, headers: { ...headers, "content-range": regular ? "*/0" : `${offset}-${offset + rows.length - 1}/2800` } });
+      return reply({ version: 1, year: 2026, month: 11, slot_count: rows.length, slots: rows,
+        kinds: [{ id: "n50", variant_id: "nitro", limit_id: "50" }, { id: "n100", variant_id: "nitro", limit_id: "100" }],
+        members: [{ ...member, member_id: member.id, member_tables: 1 }],
+      });
     }
     const single = route.request().headers().accept?.includes("object");
     if (path.endsWith("/members")) return reply(single ? member : [member]);
@@ -60,16 +58,14 @@ async function fixture(page: Page, failSecondPage = false) {
   return { gates, requested, recover: () => { failSecondPage = false; } };
 }
 
-test("month stays hidden while real page progress advances, then shows every seat", async ({ page }) => {
+test("compact month stays hidden until the complete response, then shows all 2800 seats", async ({ page }) => {
   const { gates, requested } = await fixture(page);
   await page.goto("/");
-  await expect(page.getByText("Определяем объём данных…")).toBeVisible();
   const bar = page.getByRole("progressbar");
-  await expect(bar).not.toHaveAttribute("aria-valuenow");
+  await expect(bar).toBeVisible();
   await expect(page.locator(".v2-opt-sheet")).toBeHidden();
-  gates[0].release();
-  await expect(page.getByText("Загружено страниц: 2 из 4")).toBeVisible();
-  await expect(bar).toHaveAttribute("aria-valuenow", "50");
+  await expect(page.getByText("Загружено страниц: 0 из 1")).toBeVisible();
+  await expect(bar).toHaveAttribute("aria-valuenow", "0");
   await expect(page.locator(".v2-opt-sheet")).toBeHidden();
   await page.screenshot({ path: test.info().outputPath("loading-desktop.png") });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -79,18 +75,15 @@ test("month stays hidden while real page progress advances, then shows every sea
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   await page.screenshot({ path: test.info().outputPath("loading-mobile.png") });
-  gates[1].release();
-  await expect(page.getByText("Загружено страниц: 3 из 4")).toBeVisible();
-  await expect(bar).toHaveAttribute("aria-valuenow", "75");
-  gates[2].release();
+  gates[0].release();
   await expect(page.locator(".v2-sched-load")).toHaveCount(0);
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
   await expect(page.locator("[data-slot].is-on")).toHaveCount(2800);
   // Development StrictMode may start a second initial load.
-  expect([...new Set(requested)]).toEqual([0, 1000, 2000]);
+  expect([...new Set(requested)]).toEqual([0]);
 });
 
-test("a failed later page keeps the month hidden until retry succeeds", async ({ page }) => {
+test("a failed compact read keeps the month hidden until retry succeeds", async ({ page }) => {
   const { gates, recover } = await fixture(page, true);
   await page.goto("/");
   await expect(page.getByRole("progressbar")).toBeVisible();
