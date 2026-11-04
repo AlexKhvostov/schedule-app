@@ -16562,10 +16562,11 @@ html[data-ui-theme="light"], .v2-palette-sample.is-light { --schedule-nitro: #24
 .v2-prio-switch .v2-prio-tabs button[aria-pressed=true] { color: var(--title); border-color: color-mix(in srgb, var(--title) 40%, var(--border)); background: color-mix(in srgb, var(--title) 12%, var(--card)); font-weight: 700; box-shadow: 0 1px 2px #00000012; }
 .v2-prio-switch .v2-prio-tabs button:hover:not(:disabled):not([aria-selected=true]):not([aria-pressed=true]) { background: color-mix(in srgb, var(--muted-foreground) 10%, transparent); }
 .v2-prio-switch .v2-prio-tabs button:disabled { opacity: .38; }
-.v2-roster-controls { display: grid; gap: 6px; padding: 8px 0 6px; }
-.v2-roster-controls .v2-prio-switch { grid-template-columns: 94px minmax(0, 1fr); gap: 8px; }
+.v2-roster-controls { display: grid; grid-template-columns: minmax(0, 82px) max-content; gap: 2px 4px; padding: 3px 0; margin-bottom: 3px; }
+.v2-roster-controls .v2-prio-switch { grid-column: 1 / -1; grid-template-columns: subgrid; gap: 4px; }
 .v2-roster-controls .v2-prio-switch-label { font-size: 10px; }
-.v2-roster-controls .v2-prio-tabs button { min-height: 26px; padding: 3px 6px; font-size: 11px; }
+.v2-roster-controls .v2-prio-tabs { grid-template-columns: repeat(2, max-content); justify-self: start; gap: 1px; padding: 1px; border-radius: 5px; }
+.v2-roster-controls .v2-prio-tabs button { min-height: 24px; padding: 2px 6px; border-radius: 3px; font-size: 11px; line-height: 18px; white-space: nowrap; }
 @media (max-width: 480px) {
   .v2-prio-slices .v2-prio-switch { grid-template-columns: 104px minmax(0, 1fr); gap: 8px; }
   .v2-prio-switch-label { font-size: 11px; }
