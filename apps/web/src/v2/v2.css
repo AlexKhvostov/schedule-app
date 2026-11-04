@@ -9597,7 +9597,10 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-line: var(--border);
   --opt-frame: var(--primary);
   --opt-sticky: var(--opt-sheet);
+  --opt-board-inset: 4px;
+  --opt-day-border: 2px;
   --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --opt-day-frame: color-mix(in srgb, var(--foreground) 36%, var(--slot-day, var(--card)));
   background: var(--background);
   color: var(--opt-ink);
 }
@@ -9639,7 +9642,7 @@ textarea.v2-ctrl.v2-cab-area {
   flex-direction: column;
   align-items: flex-start;
   width: max-content;
-  padding-inline: 6px;
+  padding-inline: var(--opt-board-inset);
 }
 
 .v2-opt-sheet .v2-days {
@@ -10787,12 +10790,12 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-limit + .v2-opt-limit,
 .v2-opt-gutter-limit + .v2-opt-gutter-limit {
   padding-top: 6px;
-  border-top: 1px dashed color-mix(in srgb, var(--foreground) 34%, transparent);
+  border-top: 1px dashed color-mix(in srgb, var(--foreground) 14%, transparent);
 }
 .v2-opt-kind + .v2-opt-kind,
 .v2-opt-gutter-kind + .v2-opt-gutter-kind {
   padding-top: 6px;
-  border-top: 2px solid color-mix(in srgb, var(--foreground) 38%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 24%, transparent);
 }
 .v2-hour-load-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
 .v2-hour-load-tools .v2-ctrl { min-height: 30px; padding-inline: 12px; }
@@ -11436,11 +11439,10 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   --opt-mute: var(--muted-foreground);
   --opt-line: var(--border);
   --opt-frame: var(--primary);
-  --opt-sheet: var(--card);
-  --opt-sticky: var(--card);
+  --opt-sheet: color-mix(in srgb, var(--foreground) 7%, var(--card));
+  --opt-sticky: var(--opt-sheet);
   --opt-pad-l: 2px;
   --opt-pad-r: 2px;
-  --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
   --slot-future-bg: var(--slot-cell, var(--background));
   --slot-past-bg: var(--slot-past-cell, var(--slot-past));
   background: var(--background);
@@ -11567,12 +11569,30 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   max-width: none;
   padding: var(--opt-row-pad) var(--opt-row-pad) var(--opt-row-pad) 0;
   background: var(--slot-day, var(--card));
-  box-shadow: inset 0 0 0 1px var(--opt-day-stroke);
+  margin-top: 8px;
+  border: var(--opt-day-border) solid var(--opt-day-frame);
+  box-shadow: none;
 }
 
 .v2-opt.is-kit .v2-opt-block.is-today {
   z-index: 1;
-  box-shadow: inset 0 0 0 1px var(--opt-day-stroke);
+  box-shadow: none;
+}
+
+/* Keep the timeline aligned with the physical day border. */
+.v2-opt.is-kit .v2-opt-hours { border: var(--opt-day-border) solid transparent; }
+.v2-opt.is-kit .v2-opt-gutter { left: calc(var(--opt-board-inset) + var(--opt-day-border)); }
+/* The sticky column retains the left edge when the rest of the day scrolls away. */
+.v2-opt.is-kit .v2-opt-block > .v2-opt-gutter::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * (var(--opt-row-pad) + var(--opt-day-border))) 0
+    calc(-1 * (var(--opt-row-pad) + var(--opt-day-border))) calc(-1 * var(--opt-day-border));
+  z-index: 3;
+  border: var(--opt-day-border) solid var(--opt-day-frame);
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  pointer-events: none;
 }
 
 .v2-opt.is-kit .v2-opt-block.is-picking {

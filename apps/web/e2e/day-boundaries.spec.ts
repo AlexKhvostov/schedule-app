@@ -1,15 +1,8 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
-import fs from "node:fs/promises";
-
-const variants = {
-  a: "background:var(--slot-day,var(--card))!important;outline:2px solid color-mix(in srgb,var(--foreground) 35%,transparent)!important;outline-offset:-1px;box-shadow:none!important;",
-  b: "--opt-sticky:color-mix(in srgb,var(--slot-day,var(--card)) 92%,var(--foreground))!important;background:var(--opt-sticky)!important;outline:1.5px solid color-mix(in srgb,var(--foreground) 32%,transparent)!important;outline-offset:-.75px;box-shadow:none!important;",
-  c: "background:var(--slot-day,var(--card))!important;outline:1px solid color-mix(in srgb,var(--foreground) 28%,transparent)!important;outline-offset:-.5px;box-shadow:0 0 8px color-mix(in srgb,var(--foreground) 18%,transparent)!important;",
-};
 
 for (const theme of ["dark", "light"]) {
-  test(`day inset keeps grid aligned and previews borders in ${theme}`, async ({ page }) => {
+  test(`day border stays visible beside sticky dates and preserves hierarchy in ${theme}`, async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-11-04T09:00:00Z"));
     await page.setViewportSize({width:1000,height:820});
     await page.addInitScript((theme) => {
@@ -22,21 +15,41 @@ for (const theme of ["dark", "light"]) {
     await page.getByRole("tab",{name:/Демо/}).click();
     await page.getByRole("button",{name:"Войти для проверки"}).click();
     const sheet=page.locator(".v2-opt-sheet");
-    const first=page.locator(".v2-opt-block").first();
-    await expect(first).toBeVisible();
-    const [sheetBox,dayBox,headBox,gutterBox]=await Promise.all([
-      sheet.boundingBox(),first.boundingBox(),page.locator(".v2-opt-hours .v2-opt-gutter").boundingBox(),first.locator(".v2-opt-gutter").boundingBox(),
-    ]);
-    expect(dayBox!.x-sheetBox!.x).toBeGreaterThanOrEqual(6);
-    expect(dayBox!.x-sheetBox!.x).toBeLessThanOrEqual(8);
-    expect(Math.abs(headBox!.x-gutterBox!.x)).toBeLessThan(1);
-    const out=path.resolve("../../memory/tasks/day-boundaries");
-    await fs.mkdir(out,{recursive:true});
-    for (const [name,css] of Object.entries(variants)) {
-      const style=await page.addStyleTag({content:`.v2-opt.is-kit .v2-opt-block{margin-top:8px!important;${css}}`});
-      await page.screenshot({path:path.join(out,`${theme}-${name}.png`),clip:{x:sheetBox!.x,y:sheetBox!.y,width:480,height:620}});
-      await style.evaluate(el=>el.parentNode?.removeChild(el));
-    }
+    const day=page.locator(".v2-opt-block").nth(1);
+    const gutter=day.locator(".v2-opt-gutter");
+    const head=page.locator(".v2-opt-hours .v2-opt-gutter");
+    await expect(day).toBeVisible();
+    const [sb,db,hb,gb]=await Promise.all([sheet.boundingBox(),day.boundingBox(),head.boundingBox(),gutter.boundingBox()]);
+    expect(db!.x-sb!.x).toBeGreaterThanOrEqual(4);
+    expect(db!.x-sb!.x).toBeLessThanOrEqual(6);
+    expect(Math.abs(hb!.x-gb!.x)).toBeLessThan(1);
+    expect(gb!.x-db!.x).toBe(2);
+    await expect(day).toHaveCSS("border-left-width","2px");
+    await expect(day).toHaveCSS("border-left-style","solid");
+    await expect(day).toHaveCSS("box-shadow","none");
+    await expect(day).toHaveCSS("filter","none");
+    const backgrounds = await Promise.all([sheet.evaluate(el=>getComputedStyle(el).backgroundColor),day.evaluate(el=>getComputedStyle(el).backgroundColor)]);
+    expect(backgrounds[0]).not.toBe(backgrounds[1]);
+    expect(await day.evaluate(el=>{const r=el.getBoundingClientRect();return document.elementFromPoint(r.left+1,r.top+r.height/2)===el})).toBe(true);
+    const kind=day.locator('.v2-opt-kind[data-variant="regular"]');
+    const limit=day.locator('.v2-opt-limit[data-pair="nitro:100"]');
+    await expect(kind).toHaveCSS("border-top-width","1px");
+    await expect(kind).toHaveCSS("border-top-style","solid");
+    await expect(limit).toHaveCSS("border-top-style","dashed");
+    await expect(kind).toHaveCSS("border-top-color",/0[.]24/);
+    await expect(limit).toHaveCSS("border-top-color",/0[.]14/);
+    expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["2px","none","-6px","-2px"]);
+    await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/final-${theme}.png`),clip:{x:sb!.x,y:sb!.y,width:480,height:620}});
+    // Force horizontal scrolling in a desktop container without changing zoom.
+    await sheet.evaluate(el=>{el.style.maxWidth="320px";el.scrollLeft=120});
+    await expect.poll(()=>sheet.evaluate(el=>el.scrollLeft)).toBeGreaterThan(20);
+    const [ss,sg,sh]=await Promise.all([sheet.boundingBox(),gutter.boundingBox(),head.boundingBox()]);
+    expect(Math.abs(sg!.x-sh!.x)).toBeLessThan(1);
+    const edge=sg!.x-2-ss!.x;
+    expect(edge).toBeGreaterThanOrEqual(4);
+    expect(edge).toBeLessThanOrEqual(6);
+    await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/scroll-${theme}.png`),clip:{x:ss!.x,y:ss!.y,width:330,height:620}});
+    await sheet.evaluate(el=>{el.style.maxWidth="";el.scrollLeft=0});
     await page.setViewportSize({width:390,height:844});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   });

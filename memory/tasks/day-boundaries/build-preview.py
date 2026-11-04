@@ -14,9 +14,9 @@ html = """<!doctype html><html lang="ru" data-theme="dark"><meta charset="utf-8"
 <header><div><div class="eyebrow">Red Party · варианты оформления</div><h1>Чуть больше воздуха между днями</h1><p>Одинаковая сетка, отступ от края 6 px, промежуток между днями 8 px.<br>Нажмите на снимок, чтобы рассмотреть его крупнее.</p></div><div class="themes" aria-label="Тема"><button aria-pressed="true" data-theme="dark">Тёмная</button><button aria-pressed="false" data-theme="light">Светлая</button></div></header>
 <main class="cards">
 <article><div class="copy"><h2>A · Чёткая рамка</h2><p>Рамка 2 px. Граница дня заметнее, фон остаётся прежним.</p></div><button class="shot" data-variant="a" aria-label="Увеличить вариант A"><img alt="Вариант A: чёткая рамка"></button></article>
-<article class="recommended"><div class="copy"><h2>B · Рамка и фон <span class="tag">Предлагаю</span></h2><p>Рамка 1,5 px и немного контрастнее фон. День читается как отдельный блок.</p></div><button class="shot" data-variant="b" aria-label="Увеличить вариант B"><img alt="Вариант B: рамка и фон"></button></article>
+<article class="recommended"><div class="copy"><h2>B · Рамка и фон <span class="tag">Исходный вариант</span></h2><p>Рамка 1,5 px и немного контрастнее фон. День читается как отдельный блок.</p></div><button class="shot" data-variant="b" aria-label="Увеличить вариант B"><img alt="Вариант B: рамка и фон"></button></article>
 <article><div class="copy"><h2>C · Мягкое свечение</h2><p>Тонкая рамка и спокойный внешний ореол. Без пульсации и яркого цветного свечения.</p></div><button class="shot" data-variant="c" aria-label="Увеличить вариант C"><img alt="Вариант C: мягкое свечение"></button></article>
-</main><p class="note">Сравнение подготовлено на локальных демонстрационных данных. Для окончательного оформления можно выбрать A, B или C либо совместить элементы.</p>
+</main><p class="note">Историческое сравнение на Demo. После выбора C свечение заменено отличающимся фоном поля; рамка 2 px, отступ 4 px. Итоговые снимки: final-dark.png и final-light.png.</p>
 <dialog><button aria-label="Закрыть увеличенный снимок">Закрыть</button><img alt="Увеличенный вариант"></dialog>
 <script>
 const images=__IMAGES__;let theme='dark';const dialog=document.querySelector('dialog');
