@@ -55,4 +55,9 @@ describe("monthly filling order", () => {
     expect(orderRosterRows(named, source, "nitro").map((p) => p.mark.memberId)).toEqual(["high", "low"]);
     expect(orderRosterRows(named, { ...source, periodStart: "2026-08-01" }, "nitro").map((p) => p.mark.memberId)).toEqual(["low", "high"]);
   });
+  it("does not assign a different group's Core when no supported limits are selected", () => {
+    const result = orderRosterRows(rows, source, "nitro", false);
+    expect(result.every((r) => r.n === 0 && r.core === 0 && !r.excluded)).toBe(true);
+  });
+
 });

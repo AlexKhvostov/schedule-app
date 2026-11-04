@@ -21,7 +21,7 @@ import { markKey, type Mark } from "../schedule/marks";
 import { loadMembers } from "../schedule/members";
 import { emptyMonth } from "../schedule/plan";
 import { groupRosterRows, orderRosterRows, rosterFromGrids, type RosterRow } from "../schedule/roster";
-import { currentPriorityPeriod, isPriorityPreliminary, type PriorityKind } from "../schedule/priorities";
+import { currentPriorityPeriod, groupsForLimits, isPriorityPreliminary, type PriorityGroup, type PriorityKind } from "../schedule/priorities";
 import { FillByHourChart } from "./FillByHourChart";
 import { OptField } from "./OptField";
 import { OverwriteConfirm } from "./OverwriteConfirm";
@@ -88,6 +88,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [manualRosterWidth, setManualRosterWidth] = useState<number | null>(null);
   const [chosenRosterKind, setChosenRosterKind] = useState<PriorityKind>(kind);
   const rosterKind = kinds.includes(chosenRosterKind) ? chosenRosterKind : kinds[0];
+  const [chosenRosterGroup, setChosenRosterGroup] = useState<PriorityGroup>("50-100");
   const rosterTabs = useRef<Partial<Record<PriorityKind, HTMLButtonElement | null>>>({});
   const [peek, setPeek] = useState<RosterRow | null>(null);
   const [limitMarks, setLimitMarks] = useState<Mark[] | null>(null);
@@ -134,7 +135,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const rosterItems = useMemo(() => auxiliaryItems.filter((item) => item.variant === rosterKind), [auxiliaryItems, rosterKind]);
   const rosterLabels = useMemo(() => rosterItems.map((item) => item.label), [rosterItems]);
   const rosterPeriod = currentPriorityPeriod(`${year}-${String(monthIndex + 1).padStart(2, "0")}-01`);
-  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, limits.filter((limit) => filterLimits[rosterKind].includes(limit)));
+  const rosterLimits = limits.filter((limit) => filterLimits[rosterKind].includes(limit));
+  const rosterGroupsAvailable = groupsForLimits(rosterLimits);
+  const hasRosterPriority = rosterGroupsAvailable.length > 0;
+  const rosterGroup = rosterGroupsAvailable.includes(chosenRosterGroup) ? chosenRosterGroup : rosterGroupsAvailable[0] ?? "50-100";
+  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, rosterLimits, rosterGroup);
   const calendarItems = useMemo(
     () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
     [shownGridStore, fetchKey],
@@ -211,11 +216,11 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
     const active = isLiveData() ? activeRows : decorateDemoRoster(activeRows, loadMembers());
     const eligible = new Set(rosterSource.faces.map((mark) => mark.memberId).filter((id): id is string => Boolean(id)));
     const groups = groupRosterRows(active, occupied, eligible);
-    return { ...groups, active: orderRosterRows(groups.active, rosterSource.source, rosterKind) };
-  }, [showPeople, rosterItems, year, monthIndex, cetTick, rosterSource.source, rosterSource.faces, rosterKind]);
+    return { ...groups, active: orderRosterRows(groups.active, rosterSource.source, rosterKind, hasRosterPriority) };
+  }, [showPeople, rosterItems, year, monthIndex, cetTick, rosterSource.source, rosterSource.faces, rosterKind, hasRosterPriority]);
   const roster = rosterGroups.active;
   const historicalRoster = rosterGroups.historical;
-  useEffect(() => { setPeek(null); }, [rosterKind, year, monthIndex]);
+  useEffect(() => { setPeek(null); }, [rosterKind, rosterGroup, year, monthIndex]);
 
   const peopleIdsKey = useMemo(() => {
     if (!showPeople) return "";
@@ -559,7 +564,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         {showPeople && (
           <V2Float
             title={t("schedule.playersTitle")}
-            headerActions={<ScheduleRosterHelp preliminary={Boolean(rosterSource.source && isPriorityPreliminary(rosterSource.source))} />}
+            headerActions={<ScheduleRosterHelp group={hasRosterPriority ? rosterGroup : "none"} preliminary={Boolean(hasRosterPriority && rosterGroup === "50-100" && rosterSource.source && isPriorityPreliminary(rosterSource.source))} />}
             x={peoplePos.x}
             y={peoplePos.y}
             width={rosterWidth}
@@ -571,9 +576,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
             onFocus={() => setFront("people")}
             onClose={() => setShowPeople(false)}
           >
-            {kinds.length > 1 && <div className="v2-roster-controls">
+            {<div className="v2-roster-controls">
               <div className="v2-prio-tabs" role="tablist" aria-label={t("schedule.rosterKinds")}>
-                {kinds.map((variant) => <button key={variant} ref={(node) => { rosterTabs.current[variant] = node; }} type="button" role="tab" id={`roster-tab-${variant}`} aria-controls="roster-panel" aria-selected={rosterKind === variant} tabIndex={rosterKind === variant ? 0 : -1}
+                {(["nitro", "regular"] as const).map((variant) => <button key={variant} ref={(node) => { rosterTabs.current[variant] = node; }} type="button" role="tab" disabled={!kinds.includes(variant)} id={`roster-tab-${variant}`} aria-controls="roster-panel" aria-selected={rosterKind === variant} tabIndex={rosterKind === variant ? 0 : -1}
                   onClick={() => setChosenRosterKind(variant)} onKeyDown={(event) => {
                     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
                     event.preventDefault();
@@ -581,8 +586,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
                     setChosenRosterKind(next); rosterTabs.current[next]?.focus();
                   }}>{t(`priorities.kinds.${variant}`)}</button>)}
               </div>
+              <div className="v2-prio-tabs" role="group" aria-label={t("priorities.limitGroup")}>{(["50-100", "250"] as const).map((g) => <button type="button" key={g} aria-pressed={hasRosterPriority && rosterGroup === g} disabled={!rosterGroupsAvailable.includes(g)} onClick={() => setChosenRosterGroup(g)}>{g === "50-100" ? "50–100" : "250"} €</button>)}</div>
             </div>}
             <div id="roster-panel" role={kinds.length > 1 ? "tabpanel" : undefined} aria-labelledby={kinds.length > 1 ? `roster-tab-${rosterKind}` : undefined}>
+            {!hasRosterPriority && <p>{t("priorities.noSelectedGroup")}</p>}
             {rosterSource.loading && <p role="status">{t("priorities.loading")}</p>}
             {rosterSource.error && <div role="alert"><p>{t("schedule.rosterLoadError")}</p><Button size="sm" onClick={rosterSource.retry}>{t("priorities.retry")}</Button></div>}
             {rosterSource.source && <ScheduleRoster

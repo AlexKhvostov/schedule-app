@@ -100,7 +100,7 @@ export function ScheduleRoster({ roster, historicalRoster, auxiliaryLabels, dead
             const memberDeadTime = deadTimeByMember?.[deadTimeMemberKey(row.mark)];
             const guild = showNick(row.mark.discord) || "—";
             const room = showNick(row.mark.room);
-            const vip = historical || row.excluded ? null : vipOf(row.mark, kind);
+            const vip = historical || row.excluded ? null : row.core ?? vipOf(row.mark, kind);
             return (
               <Fragment key={row.mark.memberId || markKey(row.mark)}>
                 {historical && row === historicalRoster[0] ? (

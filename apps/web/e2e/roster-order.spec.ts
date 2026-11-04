@@ -77,9 +77,10 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
   await page.screenshot({ path: testInfo.outputPath("roster-regular.png") });
   await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
   await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
-  await expect(page.getByRole("tablist", { name: "Вид очереди заполнения" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Регулярные", exact: true })).toBeDisabled();
+  await expect(page.getByRole("group", { name: "Группа лимитов" }).getByRole("button", { name: "250 €", exact: true })).toBeDisabled();
   await expect(table.locator("thead")).toContainText("N50");
-  await expect(page.locator(".v2-roster-controls")).toHaveCount(0);
+  await expect(page.locator(".v2-roster-controls")).toBeVisible();
   await expect(avatar).toBeVisible();
   const resize = page.getByRole("button", { name: "Изменить ширину списка игроков" });
   const widths = () => table.locator("thead th").evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect().width));
@@ -103,4 +104,27 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   expect(box!.y + box!.height).toBeLessThanOrEqual(844);
   await page.screenshot({ path: testInfo.outputPath("roster-help-mobile.png") });
+});
+
+
+for (const limits of [["100", "250"], ["25"]]) test(`monthly roster keeps group controls visible for ${limits.join("/")}`, async ({ page }) => {
+  await page.addInitScript((selected) => localStorage.setItem("v2-schedule-prefs", JSON.stringify({ kinds: ["nitro"], limits: selected })), limits);
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await page.getByRole("button", { name: "Игроки", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Регулярные", exact: true })).toBeDisabled();
+  const group = page.getByRole("group", { name: "Группа лимитов" });
+  const low = group.getByRole("button", { name: "50–100 €", exact: true }), high = group.getByRole("button", { name: "250 €", exact: true });
+  if (limits.includes("250")) {
+    await expect(low).toBeEnabled(); await expect(high).toBeEnabled();
+    await high.click(); await expect(high).toHaveAttribute("aria-pressed", "true");
+    await expect(low).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: "Как устроен порядок игроков" }).hover();
+    await expect(page.getByRole("tooltip")).toContainText("250 € пока не рассчитываются");
+  } else {
+    await expect(low).toBeDisabled(); await expect(high).toBeDisabled();
+    await expect(page.getByText("В фильтрах нет лимитов 50, 100 или 250 €. Приоритет не выбран; игроки показаны по имени.", { exact: true })).toBeVisible();
+    await expect(page.locator(".v2-people-vip-number")).toHaveCount(0);
+  }
 });

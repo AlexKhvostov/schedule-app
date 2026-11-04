@@ -16386,3 +16386,11 @@ button.v2-home-action:hover { transform: translateY(-2px); border-color: color-m
 }
 .v2-online-dot.is-active { background: var(--success); }
 .v2-online-dot.is-idle { background: var(--warning); }
+
+/* Independent priority slices: tournament kind and limit group. */
+.v2-prio-slices { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 10px; background: var(--header); }
+.v2-prio-tabs button[aria-pressed=true] { color: var(--title); border-color: var(--border); background: var(--card); }
+.v2-prio-tabs button:disabled { opacity: .4; cursor: not-allowed; }
+.v2-roster-controls { flex-wrap: wrap; }
+.v2-prio-table.is-core-only { min-width: 280px; }
+.v2-prio-table.is-core-only .is-num, .v2-prio-table.is-core-only .is-period, .v2-prio-table.is-core-only .is-total { display: none; }

@@ -35,6 +35,8 @@ export type AdminPerson = {
   tables: number | null;
   vipNitro: number | null;
   vipRegular: number | null;
+  coreNitro250?: number | null;
+  coreRegular250?: number | null;
   displayName: string | null;
   email: string | null;
   phone: string | null;
@@ -85,6 +87,8 @@ type MemberRow = {
   grid_priority: number;
   vip_nitro: number;
   vip_regular: number;
+  core_nitro_250: number;
+  core_regular_250: number;
   distance_ext_id: string | null;
   auth_user_id: string | null;
   created_at: string;
@@ -287,6 +291,7 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
       tables: member?.tables ?? null,
       vipNitro: member && member.vip_nitro > 0 ? member.vip_nitro : null,
       vipRegular: member && member.vip_regular > 0 ? member.vip_regular : null,
+      coreNitro250: member?.core_nitro_250 ?? 0, coreRegular250: member?.core_regular_250 ?? 0,
       displayName: profile?.display_name ?? null,
       email: profile?.email ?? null,
       phone: profile?.phone ?? null,
@@ -451,6 +456,8 @@ export async function saveMemberClub(
   patch: {
     vipNitro?: number;
     vipRegular?: number;
+    coreNitro250?: number;
+    coreRegular250?: number;
     communityStatus?: "school" | "club" | null;
     guarantorId?: string | null;
   },
@@ -462,6 +469,8 @@ export async function saveMemberClub(
     return Number.isFinite(v) && v > 0 ? Math.min(999, Math.round(v)) : 0;
   };
   const row: Record<string, unknown> = {};
+  if ("coreNitro250" in patch) row.core_nitro_250 = asVip(patch.coreNitro250);
+  if ("coreRegular250" in patch) row.core_regular_250 = asVip(patch.coreRegular250);
   if ("vipNitro" in patch) row.vip_nitro = asVip(patch.vipNitro);
   if ("vipRegular" in patch) row.vip_regular = asVip(patch.vipRegular);
   if ("communityStatus" in patch) {
@@ -501,6 +510,8 @@ export type MyCabinet = {
   createdAt: string | null;
   vipNitro: number | null;
   vipRegular: number | null;
+  coreNitro250?: number | null;
+  coreRegular250?: number | null;
   displayName: string | null;
   email: string | null;
   phone: string | null;
@@ -528,7 +539,7 @@ export async function loadMyCabinet(memberId: string): Promise<MyCabinet | null>
   const db = getSupabase();
   if (!db) return null;
   const [{ data: member }, { data: profile }] = await Promise.all([
-    db.from("members").select("community_status, tables, created_at, vip_nitro, vip_regular").eq("id", memberId).maybeSingle(),
+    db.from("members").select("community_status, tables, created_at, vip_nitro, vip_regular, core_nitro_250, core_regular_250").eq("id", memberId).maybeSingle(),
     db
       .from("profiles")
       .select("display_name, email, phone, city, country, birthday, show_extra_tz, extra_utc, telegram, contact_alt, notify_channel")
@@ -542,6 +553,7 @@ export async function loadMyCabinet(memberId: string): Promise<MyCabinet | null>
     createdAt: member?.created_at ?? null,
     vipNitro: typeof member?.vip_nitro === "number" && member.vip_nitro > 0 ? member.vip_nitro : null,
     vipRegular: typeof member?.vip_regular === "number" && member.vip_regular > 0 ? member.vip_regular : null,
+    coreNitro250: member?.core_nitro_250 ?? 0, coreRegular250: member?.core_regular_250 ?? 0,
     displayName: profile?.display_name ?? null,
     email: profile?.email ?? null,
     phone: profile?.phone ?? null,

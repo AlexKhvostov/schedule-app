@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { loadPriorities } from "../../data/priorities";
 import { loadLimitMarks } from "../../data/players";
 import type { Mark } from "../../schedule/marks";
-import type { PriorityKind, PrioritySource } from "../../schedule/priorities";
+import type { PriorityKind, PriorityGroup, PrioritySource } from "../../schedule/priorities";
 
 type State = { key: string; source: PrioritySource | null; faces: Mark[]; error: string };
 
-export function useRosterSource(enabled: boolean, period: string, kind: PriorityKind, limits: string[]) {
+export function useRosterSource(enabled: boolean, period: string, kind: PriorityKind, limits: string[], group: PriorityGroup) {
   const limitsKey = limits.join(",");
-  const key = `${period}|${kind}|${limitsKey}`;
+  const key = `${period}|${kind}|${group}|${limitsKey}`;
   const [state, setState] = useState<State | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -20,7 +20,7 @@ export function useRosterSource(enabled: boolean, period: string, kind: Priority
       const token = ++generation;
       try {
         const [board, directory] = await Promise.all([
-          loadPriorities(period, false), loadLimitMarks(kind, limitsKey ? limitsKey.split(",") : []),
+          loadPriorities(period, false, kind, group), loadLimitMarks(kind, limitsKey ? limitsKey.split(",") : []),
         ]);
         if (!alive || token !== generation) return;
         const error = board.error || directory.error || (!board.data || !directory.data ? "empty response" : "");
@@ -42,7 +42,7 @@ export function useRosterSource(enabled: boolean, period: string, kind: Priority
       window.removeEventListener("priority-distance-changed", update);
       window.removeEventListener("storage", update);
     };
-  }, [enabled, key, period, kind, limitsKey, retry]);
+  }, [enabled, key, period, kind, group, limitsKey, retry]);
   const current = enabled && state?.key === key ? state : null;
   return { source: current?.source ?? null, faces: current?.faces ?? [], error: current?.error ?? "", loading: enabled && !current, retry: () => setRetry((n) => n + 1) };
 }
