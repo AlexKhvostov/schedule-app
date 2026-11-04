@@ -1,3 +1,5 @@
+import { palettePaint, type PaletteTheme } from "./limitPalette";
+
 export const LIMIT_OPTIONS = ["0.25", "0.50", "1", "2", "5", "10", "25", "50", "100", "250", "500"] as const;
 
 export function formatLimit(limit: string) {
@@ -225,15 +227,8 @@ export function capAt(hours: HourCaps, halfIndex: number) {
   return hours[Math.floor(halfIndex / 2)] ?? 1;
 }
 
-const LIMIT_PAINT: Record<string, string> = {
-  "25": "#9CA3AF",
-  "50": "#22D3EE",
-  "100": "#FBBF24",
-  "250": "#A78BFA",
-  "500": "#F472B6",
-};
-
 export function limitTone(limit: string) {
+  if (limit === "5") return "var(--limit-5)";
   if (limit === "25") return "var(--limit-25)";
   if (limit === "50") return "var(--limit-50)";
   if (limit === "100") return "var(--limit-100)";
@@ -242,8 +237,8 @@ export function limitTone(limit: string) {
   return "var(--muted-foreground)";
 }
 
-export function limitTonePaint(limit: string) {
-  return LIMIT_PAINT[limit] ?? "#C9CDD4";
+export function limitTonePaint(limit: string, theme: PaletteTheme = "dark") {
+  return palettePaint(limit, theme);
 }
 
 export function loadCapacity(): CapacityMap {

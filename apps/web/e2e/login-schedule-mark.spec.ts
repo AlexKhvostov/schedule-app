@@ -645,7 +645,10 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
     nitroChip.evaluate((node) => getComputedStyle(node).color),
     regularChip.evaluate((node) => getComputedStyle(node).color),
   ]);
-  expect(nitroColor).not.toBe(regularColor);
+  // The club palette is shared by denomination; typography distinguishes kinds.
+  expect(nitroColor).toBe(regularColor);
+  await expect(nitroChip.locator(".v2-opt-limit-label")).toHaveCSS("font-style", "normal");
+  await expect(regularChip.locator(".v2-opt-limit-label")).toHaveCSS("font-style", "italic");
 
   await page.getByTitle("Редактирование").click();
   const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"]:not(.is-past):not(.is-lock):not(.is-on)').first();

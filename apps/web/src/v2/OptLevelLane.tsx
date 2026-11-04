@@ -15,11 +15,7 @@ export function OptNlChip({
 }) {
   if (ghost) return <div className="v2-opt-nl is-ghost" aria-hidden />;
   const [limitLabel, laneNumber] = label.split("·");
-  const chipTone = variant === "nitro"
-    ? `color-mix(in srgb, var(--primary) 68%, ${tone ?? "var(--muted-foreground)"})`
-    : variant === "regular"
-      ? `color-mix(in srgb, var(--warning) 68%, ${tone ?? "var(--muted-foreground)"})`
-      : tone;
+  const chipTone = tone;
   return (
     <div className={`v2-opt-nl${lab ? " v2-opt-lab" : ""}`} data-variant={variant}>
       {lab ? (

@@ -52,7 +52,6 @@ function tipDate(year: number, monthIndex: number, day: number, lang: string) {
 }
 
 function mineTone(limit: string) {
-  if (limit === "25") return "#4ADE80";
   return limitTone(limit);
 }
 

@@ -21,6 +21,7 @@ import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slot
 import { usePlayerClock } from "./usePlayerClock";
 import { defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
 import "./v2.css";
+import { ClubLimitPaletteProvider } from "./ClubLimitPalette";
 
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
 const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
@@ -67,6 +68,12 @@ function V2HeaderClock() {
 type StaffItem = { key: ShellPage; label: string; icon: string; hint?: string };
 
 export function V2Shell({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
+  return <ClubLimitPaletteProvider key={session.memberId ?? session.role}>
+    <V2ShellContent session={session} cursor={cursor} onCursorChange={onCursorChange} onSession={onSession} onLogout={onLogout} />
+  </ClubLimitPaletteProvider>;
+}
+
+function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }: Props) {
   const { t, i18n } = useTranslation();
   const nick = session.nick;
   const priorityPreferencesKey = priorityFiltersStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo");

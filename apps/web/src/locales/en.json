@@ -1,4 +1,24 @@
 {
+  "limitPalette": {
+    "title": "Limit colors",
+    "kicker": "Club palette",
+    "lead": "Shared colors for every player. Nitro uses upright text; Regular uses italics.",
+    "limit": "Limit",
+    "light": "Light theme",
+    "dark": "Dark theme",
+    "colorLabel": "Color {{limit}} · {{theme}}",
+    "loading": "Loading palette…",
+    "loadError": "Unable to load the club palette. Editing is unavailable for now.",
+    "retry": "Retry",
+    "saveError": "Unable to save colors. Your draft is still on screen; please try again.",
+    "conflict": "Another administrator changed the palette. Load the saved colors before saving.",
+    "save": "Save colors",
+    "saving": "Saving…",
+    "reset": "Restore poker colors",
+    "discard": "Load saved colors",
+    "contrast": "Low contrast on the preview background: {{items}}. Choose more readable colors.",
+    "scope": "Only you see this preview. Saving updates colors for the whole club, calendar and JPEG. A reset also needs to be saved."
+  },
   "online": {
     "title": "Online",
     "present": "On site",

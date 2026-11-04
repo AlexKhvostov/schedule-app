@@ -70,6 +70,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/security_contracts.sql
       - name: Check schedule filter limit RPC
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/schedule_filter_limits.sql
+      - name: Check club palette and administrator permissions
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/limit_palette.sql
       - name: Check player schedule limit contract
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/player_schedule_limits.sql
       - name: Check atomic schedule edit contract
