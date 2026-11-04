@@ -9611,9 +9611,9 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt-frame-host {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 1100;
   pointer-events: none;
 }
 
@@ -10815,7 +10815,7 @@ textarea.v2-ctrl.v2-cab-area {
   width: max-content;
   height: auto;
   padding: 4px 7px 5px;
-  border: 1px solid color-mix(in srgb, var(--ring) 42%, var(--border));
+  border: 1px solid var(--opt-frame-limit-tone, var(--ring));
   border-radius: 6px;
   background: color-mix(in srgb, var(--opt-frame-limit-tone, var(--ring)) 12%, var(--popover));
   color: var(--popover-foreground);
@@ -11640,13 +11640,6 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   outline-color: var(--ring);
 }
 
-.v2-opt.is-kit .v2-opt-frame {
-  color: var(--popover-foreground);
-  text-shadow: none;
-  background: color-mix(in srgb, var(--opt-frame-limit-tone, var(--ring)) 12%, var(--popover));
-  border-color: color-mix(in srgb, var(--ring) 42%, var(--border));
-}
-
 .v2-opt.is-kit .v2-opt-lane.is-hot .v2-limit-chip {
   background: transparent;
   box-shadow: none;
@@ -11715,22 +11708,6 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   pointer-events: none;
 }
 
-.v2-opt-pick::before {
-  content: attr(data-label);
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  bottom: calc(100% + 3px);
-  padding: 2px 5px;
-  border: 1px solid color-mix(in srgb, var(--title) 34%, var(--border));
-  border-radius: 5px;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  font: 700 8px/1.2 "JetBrains Mono", ui-monospace, monospace;
-  white-space: nowrap;
-  transform: translateX(-50%);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.28);
-}
 
 .v2-opt.is-kit .v2-opt-pick.is-off {
   border-color: var(--destructive);

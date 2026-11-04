@@ -306,7 +306,7 @@ test("separate working-hour blocks crop the schedule and survive reload", async 
   await page.mouse.move(rangeStartBox!.x + rangeStartBox!.width / 2, rangeStartBox!.y + rangeStartBox!.height / 2);
   await page.mouse.down();
   await page.mouse.move(rangeEndBox!.x + rangeEndBox!.width / 2, rangeEndBox!.y + rangeEndBox!.height / 2);
-  await expect(page.locator(".v2-opt-pick")).toHaveCount(0);
+  await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", "01:30 – 02:00");
   await page.mouse.up();
 
   await page.reload();
@@ -396,12 +396,14 @@ test("schedule time hint works in view mode and drag shows the full range", asyn
   await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
   await page.mouse.down();
   await page.mouse.move(endBox!.x + endBox!.width / 2, endBox!.y + endBox!.height / 2);
-  await expect(frame).toBeHidden();
+  await expect(frame).toBeVisible();
+  await expect(frame).toHaveAttribute("data-mode", "place");
   await expect(page.locator(".v2-opt-block.is-picking")).toHaveCount(1);
   await expect(page.locator(".v2-opt-block.is-picking")).toHaveCSS("z-index", "20");
   const first = Math.min(half, targetHalf);
   const last = Math.max(half, targetHalf);
   await expect(page.locator(".v2-opt-pick")).toHaveAttribute("data-label", `${format(first)} – ${format(last + 1)}`);
+  await expect(frame).toHaveText(`${pairLabel}: ${format(first)} – ${format(last + 1)}`);
   await page.mouse.up();
 });
 

@@ -6,7 +6,7 @@ import { isPastSlot, readCet } from "../../schedule/cet";
 import { isSelfSeat } from "../../schedule/marks";
 import { levelAllowed, seatsOf } from "../../schedule/plan";
 import { clampWorkRangeHalf, workHalfSlots } from "../../schedule/workHours";
-import { applyNav, halfOnLane, hideFrame, hidePick, hitFromEvent, hitOnLane, navOf, showPick } from "../optField/dom";
+import { applyNav, halfOnLane, hidePick, hitFromEvent, hitOnLane, showPick } from "../optField/dom";
 import type { OptFieldProps, SlotHit, TipApi, TipPoint } from "./types";
 import {
   packOwner,
@@ -263,7 +263,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     if (mode === "look") return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (root) hideFrame(navOf(root));
+    showPick(hit, hit.half, hit.half, mode);
   }, []);
 
   const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -281,7 +281,6 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     if (root) {
       const cursor = hitOnLane(drag.origin, endHalf);
       if (cursor) applyNav(root, cursor);
-      hideFrame(navOf(root));
     }
     showPick(drag.origin, drag.origin.half, endHalf, drag.mode);
   }, []);
