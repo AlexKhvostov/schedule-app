@@ -1,12 +1,12 @@
 # Эксплуатация
 
-## Локальная оптимизация игроков месяца — 4 ноября2026
+## Выпуск оптимизации игроков месяца — 4 ноября2026
 
-Пакет `codex/compact-month-roster` не опубликован. Перед будущим выпуском клиента нужна [миграция20261104164056](../supabase/migrations/20261104164056_compact_month_roster.sql). Сначала применить её по отдельному разрешению, затем выпускать клиент; старые RPC сохранены, поэтому откат клиента не требует удаления схемы/кэша. Сейчас Working не менялся.
+По прямому поручению Алексея пакет выпущен вmain656806e и Vercel Production, redparty.ru проверен авторизованно. [Миграция20261104164056](../supabase/migrations/20261104164056_compact_month_roster.sql) применена к Working до клиента;4проекции/условные ответы/права проверены транзакцией с rollback,4921слот и прежние настройки сохранены. Старые RPC остаются, откат клиента не требует удаления схемы/кэша. Локальные проверки прошли; статус серверного CI и итоговые пути — в [отчёте](../memory/tasks/2026-11-04-deploy-and-archive.md). [Рабочая папка и архив](local-workspace.md).
 
 Проверки: чистый локальный reset/seed, все16 SQL-наборов включая `month_roster.sql`, database lint, обычные web checks/Demo E2E и `node node_modules/@playwright/test/cli.js test --config=playwright.live.config.ts --workers=1`. Последний прогон перехватывает вымышленные API-ответы и проверяет один запрос, условные массивы, обновление Core/имени, восстановление после ошибки, объединение событий и hidden/closed. В CI новый SQL добавлен в database job; браузерный сценарий входит в существующий schedule-sync job.
 
-Для этой задачи отдельный локальный стенд: project_id `compact-roster-20261104`, порт55862, конфигурация в игнорируемом `supabase/.temp/roster-local`. Не использовать его параметры для Working. [Отчёт](../memory/tasks/2026-11-04-compact-month-roster.md).
+Для этой задачи отдельный локальный стенд: project_id `compact-roster-20261104`, порт55862, конфигурация сохранена в архивной копии `C:/Users/alexe/.codex/worktrees-archive/redparty-2026-11-04/compact-month-roster/schedule-app/supabase/.temp/roster-local`. Не использовать его параметры для Working. [Отчёт](../memory/tasks/2026-11-04-compact-month-roster.md).
 
 Выпуск4 ноября2026 завершён: main2eb0a71, CI41869940908 (web/database/external-api/schedule-sync) и Vercel Production7551879652 успешны. slot_tint в Working, UI проверен. [Отчёт](../memory/tasks/2026-11-04-schedule-followup-release.md). Откат клиента сохраняет добавочную схему и данные.
 

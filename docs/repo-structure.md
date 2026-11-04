@@ -1,6 +1,6 @@
 # Структура репозитория
 
-Локальная доработка4 ноября2026: `apps/web/src/data/roster.ts` — единая условная загрузка окна игроков и ограниченный кэш экрана; `data/rosterRefresh.ts` — объединение сигналов обновления; `schedule/rosterPriorities.ts` — компактный тип и Demo-проекция. Серверный контракт — `supabase/migrations/20261104164056_compact_month_roster.sql`, проверки — `supabase/tests/month_roster.sql` и сценарий в `apps/web/e2e/schedule-loading.live.ts`. [Архитектура](code-architecture.md).
+Выпущено4 ноября2026 вmain656806e: `apps/web/src/data/roster.ts` — единая условная загрузка окна игроков и ограниченный кэш экрана; `data/rosterRefresh.ts` — объединение сигналов обновления; `schedule/rosterPriorities.ts` — компактный тип и Demo-проекция. Серверный контракт — `supabase/migrations/20261104164056_compact_month_roster.sql`, проверки — `supabase/tests/month_roster.sql` и сценарий в `apps/web/e2e/schedule-loading.live.ts`. [Архитектура](code-architecture.md).
 
 ```
 schedule-app/
