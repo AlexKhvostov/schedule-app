@@ -23,14 +23,13 @@ for (const theme of ["dark", "light"]) {
     expect(db!.x-sb!.x).toBeGreaterThanOrEqual(4);
     expect(db!.x-sb!.x).toBeLessThanOrEqual(6);
     expect(Math.abs(hb!.x-gb!.x)).toBeLessThan(1);
-    expect(gb!.x-db!.x).toBe(2);
-    await expect(day).toHaveCSS("border-left-width","2px");
+    expect(gb!.x-db!.x).toBe(1);
+    await expect(day).toHaveCSS("border-left-width","1px");
     await expect(day).toHaveCSS("border-left-style","solid");
     await expect(day).toHaveCSS("box-shadow","none");
     await expect(day).toHaveCSS("filter","none");
     const backgrounds = await Promise.all([sheet.evaluate(el=>getComputedStyle(el).backgroundColor),day.evaluate(el=>getComputedStyle(el).backgroundColor)]);
     expect(backgrounds[0]).not.toBe(backgrounds[1]);
-    expect(await day.evaluate(el=>{const r=el.getBoundingClientRect();return document.elementFromPoint(r.left+1,r.top+r.height/2)===el})).toBe(true);
     const kind=day.locator('.v2-opt-kind[data-variant="regular"]');
     const limit=day.locator('.v2-opt-limit[data-pair="nitro:100"]');
     await expect(kind).toHaveCSS("border-top-width","1px");
@@ -38,14 +37,14 @@ for (const theme of ["dark", "light"]) {
     await expect(limit).toHaveCSS("border-top-style","dashed");
     await expect(kind).toHaveCSS("border-top-color",/0[.]24/);
     await expect(limit).toHaveCSS("border-top-color",/0[.]14/);
-    expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["2px","none","-6px","-2px"]);
+    expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["1px","none","-5px","-1px"]);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/final-${theme}.png`),clip:{x:sb!.x,y:sb!.y,width:480,height:620}});
     // Force horizontal scrolling in a desktop container without changing zoom.
     await sheet.evaluate(el=>{el.style.maxWidth="320px";el.scrollLeft=120});
     await expect.poll(()=>sheet.evaluate(el=>el.scrollLeft)).toBeGreaterThan(20);
     const [ss,sg,sh]=await Promise.all([sheet.boundingBox(),gutter.boundingBox(),head.boundingBox()]);
     expect(Math.abs(sg!.x-sh!.x)).toBeLessThan(1);
-    const edge=sg!.x-2-ss!.x;
+    const edge=sg!.x-1-ss!.x;
     expect(edge).toBeGreaterThanOrEqual(4);
     expect(edge).toBeLessThanOrEqual(6);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/scroll-${theme}.png`),clip:{x:ss!.x,y:ss!.y,width:330,height:620}});

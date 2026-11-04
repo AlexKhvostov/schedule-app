@@ -9598,7 +9598,7 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-frame: var(--primary);
   --opt-sticky: var(--opt-sheet);
   --opt-board-inset: 4px;
-  --opt-day-border: 2px;
+  --opt-day-border: 1px;
   --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
   --opt-day-frame: color-mix(in srgb, var(--foreground) 36%, var(--slot-day, var(--card)));
   background: var(--background);
