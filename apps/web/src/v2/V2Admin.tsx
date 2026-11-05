@@ -28,6 +28,7 @@ import { V2SaveButton } from "./V2SaveButton";
 import { showV2Toast } from "./V2Toast";
 import { DeadTimeEditor } from "./DeadTimeEditor";
 import { LimitPaletteEditor } from "./LimitPaletteEditor";
+import { LockedSlotEditor } from "./LockedSlotEditor";
 import {
   loadScheduleSettings,
   saveActAs,
@@ -698,6 +699,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
             </div>
           </div>
         </div>}
+        <LockedSlotEditor hidden={!open} />
       </section>
 
       <HourLoadEditor />

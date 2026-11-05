@@ -19,6 +19,8 @@ import { OptLevelLane, OptNlChip } from "../OptLevelLane";
 import { MarkFace } from "../ScheduleSlot";
 import type { SchedulePairRow } from "../variantSchedule";
 import { hourLoadKey, loadToneColor, type HourLoadMap, type LoadTone } from "../../schedule/hourLoad";
+import { lockedSlotSegments } from "../../schedule/lockedSlotAppearance";
+import { useClubLimitPalette } from "../ClubLimitPalette";
 
 function levelsOf(
   capacity: CapacityMap,
@@ -311,6 +313,7 @@ export const OptBody = memo(function OptBody({
   self: Mark;
 }) {
   const { t } = useTranslation();
+  const { lockedAppearance } = useClubLimitPalette();
   const sameMonth = cet.year === year && cet.monthIndex === monthIndex;
   const groups = scheduleKindGroups(kinds, limits, pairRows);
   const visiblePairs = new Set(groups.flatMap((group) =>
@@ -380,6 +383,8 @@ export const OptBody = memo(function OptBody({
                     const named = levels.filter((item) => !item.ghost).length;
                     const lanes = levels.map(({ level, ghost }) => {
                       const lane = `${dayIdx}-${group.variant}-${rowInfo.limit}-${level}`;
+                      const closedSegments = ghost ? [] : lockedSlotSegments(visibleHalves.filter(half =>
+                        !levelAllowed(half, level, limitHours) && !seatsOf(row[half], level + 1)[level]), lockedAppearance.merge);
                       const allSegments = ghost || !mergeAdjacentSlots
                         ? []
                         : mergeVisualSlots(Array.from({ length: 48 }, (_, half) => {
@@ -458,6 +463,14 @@ export const OptBody = memo(function OptBody({
                                 />
                               );
                             })}
+                          {closedSegments.map(segment => <div
+                            key={`closed-${segment.startHalf}`}
+                            className="v2-opt-locked-band"
+                            data-start-half={segment.startHalf}
+                            data-end-half={segment.endHalf}
+                            aria-hidden
+                            style={{ gridColumn: `${workGridColumn(visibleHalves, segment.startHalf)} / span ${segment.endHalf - segment.startHalf}`, gridRow: 1 }}
+                          ><span>{lockedAppearance.short}</span></div>)}
                           {segments.map((segment) => {
                             const segmentPast = dimPast && isPastSlot(year, monthIndex, day.d, segment.endHalf - 1, cet);
                             const progress = sameMonth && today && cet.half >= segment.startHalf && cet.half < segment.endHalf

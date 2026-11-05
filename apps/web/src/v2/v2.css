@@ -9644,6 +9644,7 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-board-inset: 4px;
   --opt-day-border: 1px;
   --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --slot-open-stroke: color-mix(in srgb, var(--foreground) 38%, transparent);
   --opt-day-frame: color-mix(in srgb, var(--foreground) 36%, var(--slot-day, var(--card)));
   background: var(--background);
   color: var(--opt-ink);
@@ -10887,7 +10888,7 @@ textarea.v2-ctrl.v2-cab-area {
   overflow: hidden;
   border-radius: 3px;
   background: var(--slot-future-bg, var(--slot-cell, var(--background)));
-  box-shadow: inset 0 0 0 1px var(--opt-day-stroke, color-mix(in srgb, var(--foreground) 22%, transparent));
+  box-shadow: inset 0 0 0 1px var(--slot-open-stroke);
   color: var(--opt-ink);
   cursor: pointer;
   user-select: none;
@@ -10904,7 +10905,8 @@ textarea.v2-ctrl.v2-cab-area {
   visibility: hidden;
 }
 
-.v2-opt-merged {
+.v2-opt-merged,
+.v2-opt-locked-band {
   position: relative;
   z-index: 3;
   display: flex;
@@ -11257,14 +11259,14 @@ html[data-ui-theme="light"] .v2-opt-merged::before {
   filter: none;
 }
 
-.v2-opt-cell.is-lock {
-  border: 1px dashed color-mix(in srgb, var(--foreground) 18%, transparent);
+.v2-opt-cell.is-lock:not(.is-on) {
+  border: 0;
   background: transparent;
   box-shadow: none;
   cursor: not-allowed;
 }
 
-.v2-opt-cell.is-lock.is-past {
+.v2-opt-cell.is-lock.is-past:not(.is-on) {
   background: transparent;
   box-shadow: none;
   filter: none;
@@ -11708,7 +11710,7 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 }
 
 .v2-opt.is-kit .v2-opt-cell:not(.is-on):not(.is-lock):not(.is-past) {
-  box-shadow: inset 0 0 0 1px var(--opt-day-stroke);
+  box-shadow: inset 0 0 0 1px var(--slot-open-stroke);
 }
 
 .v2-opt.is-kit .v2-opt-cell.is-past:not(.is-on):not(.is-lock) {
@@ -11816,7 +11818,7 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   box-shadow: var(--slot-load-shadow);
 }
 .v2-opt .v2-opt-cell[data-load-tone]:not(.is-on):not(.is-past):not(.is-lock) {
-  box-shadow: var(--slot-load-shadow), inset 0 0 0 1px var(--opt-day-stroke);
+  box-shadow: var(--slot-load-shadow), inset 0 0 0 1px var(--slot-open-stroke);
 }
 .v2-opt .v2-opt-cell[data-load-tone].is-on,
 .v2-opt .v2-opt-cell[data-load-tone].is-past:not(.is-on):not(.is-lock) { box-shadow: var(--slot-load-shadow); }
@@ -12890,6 +12892,7 @@ button.v2-role-pill {
   color: var(--muted-foreground);
   font-weight: 500;
 }
+.v2-opt-locked-band > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .v2-mem-who-tip small {
   color: var(--muted-foreground);
@@ -16605,3 +16608,36 @@ html[data-ui-theme="light"], .v2-palette-sample.is-light { --schedule-nitro: #24
   .v2-prio-report > label { display: grid; gap: 3px; }
   .v2-prio-report .v2-prio-window { grid-column: 1 / -1; }
 }
+
+/* Capacity closure is a visual band only. The underlying cells keep hit testing. */
+.v2-opt-locked-band {
+  background: var(--slot-locked-dark, #343e50);
+  color: var(--slot-locked-ink-dark, #fff);
+  border: 0;
+  box-shadow: none;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+html[data-ui-theme="light"] .v2-opt-locked-band {
+  background: var(--slot-locked-light, #d5dbe4);
+  color: var(--slot-locked-ink-light, #000);
+}
+.v2-locked-editor { padding: 20px; border-top: 1px solid var(--border); }
+.v2-locked-editor h3 { font-size: 14px; font-weight: 600; }
+.v2-locked-editor p { margin: 6px 0 14px; font-size: 12px; }
+.v2-locked-editor fieldset { min-width: 0; }
+.v2-locked-texts, .v2-locked-previews { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2-locked-texts label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-width: 0; }
+.v2-locked-texts input { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); }
+.v2-locked-texts input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.v2-locked-merge { display: flex; gap: 8px; align-items: center; margin: 14px 0; font-size: 13px; }
+.v2-locked-preview { min-width: 0; border-radius: 6px; padding: 12px; }
+.v2-locked-preview.is-light { background: #f5f7fa; color: #182233; }
+.v2-locked-preview.is-dark { background: #151a24; color: #e6eaf0; }
+.v2-locked-preview label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.v2-locked-preview input { width: 32px; height: 26px; cursor: pointer; }
+.v2-locked-preview-track { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; margin-top: 12px; }
+.v2-locked-preview-track.is-merged { grid-template-columns: 1fr; }
+.v2-locked-preview-track span { background: var(--preview-locked); color: var(--preview-ink); height: 24px; border-radius: 4px; font: 11px/24px "JetBrains Mono", monospace; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-locked-editor .v2-palette-actions { margin-top: 14px; }
+@media (max-width: 600px) { .v2-locked-texts, .v2-locked-previews { grid-template-columns: 1fr; } }

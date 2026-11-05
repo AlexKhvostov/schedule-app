@@ -53,7 +53,8 @@ for (const theme of ["dark", "light"]) {
     await expect(page.locator(".v2-hour-wash")).toHaveCount(0);
     const closed = cell("nitro", "100", 18, 1);
     await expect(closed).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(closed).toHaveCSS("border-top-style", "dashed");
+    await expect(closed).toHaveCSS("border-top-width", "0px");
+    await expect(closed.locator("..").locator('.v2-opt-locked-band[data-start-half="18"]')).toBeVisible();
     await expect(closed).not.toHaveAttribute("data-load-tone");
     const past = page.locator('.v2-opt-block[data-row="2"] [data-slot][data-variant="nitro"][data-limit="50"][data-half="18"]').first();
     await expect(past).not.toHaveAttribute("data-future");

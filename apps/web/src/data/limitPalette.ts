@@ -2,6 +2,7 @@ import { getSupabase } from "./client";
 import { isDevSandboxEnabled } from "./config";
 import { isLimitPalette, normalizeLimitPalette, sameLimitPalette, type LimitPalette } from "../schedule/limitPalette";
 import { isSlotTint, normalizeSlotTint, sameSlotTint, type SlotTint } from "../schedule/slotAppearance";
+import { LOCKED_APPEARANCE_KEY } from "./lockedSlotAppearance";
 
 const STORAGE_KEY = "redparty.demo.limit-palette.v1";
 const APPEARANCE_KEY = "redparty.demo.slot-appearance.v1";
@@ -67,7 +68,7 @@ export async function saveClubLimitPalette(palette: LimitPalette, expected: Limi
 }
 
 export function subscribeClubLimitPalette(onChange: () => void) {
-  const onStorage = (event: StorageEvent) => { if (event.key === STORAGE_KEY || event.key === APPEARANCE_KEY || event.key === null) onChange(); };
+  const onStorage = (event: StorageEvent) => { if (event.key === STORAGE_KEY || event.key === APPEARANCE_KEY || event.key === LOCKED_APPEARANCE_KEY || event.key === null) onChange(); };
   window.addEventListener(EVENT, onChange);
   window.addEventListener("storage", onStorage);
   window.addEventListener("focus", onChange);

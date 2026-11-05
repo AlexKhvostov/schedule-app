@@ -1,5 +1,11 @@
 # База schedule-app
 
+## Оформление закрытой ёмкости — 5 ноября 2026
+
+Миграция [20261105093758_locked_slot_appearance.sql](../supabase/migrations/20261105093758_locked_slot_appearance.sql), пока только локальная: `schedule_settings.locked_slot_appearance` — обязательный JSON `{light,dark,short,long,merge}`. Строгая проверка пяти ключей, цветов `#RRGGBB`, строк до 12/120 символов и boolean. Defaults: `#d5dbe4`, `#343e50`, пустые строки, merge=true.
+
+`save_schedule_locked_appearance(p_appearance,p_expected)` проверяет auth.uid и актуальное `schedule.manage`, блокирует строку, сравнивает ожидаемое значение, меняет только новый столбец. Цвета приводятся к нижнему регистру; регистр описаний сохраняется. SECURITY DEFINER нужен для записи защищённой колонки, search_path пустой, PUBLIC/anon EXECUTE отозван, прямой UPDATE клиентам не выдан. Чтение — через существующую RLS schedule_settings; действующий триггер аудита сохраняет updated_by. [SQL-контракт](../supabase/tests/locked_slot_appearance.sql) проверяет запись/чтение, валидацию, отсутствие частичной записи, конфликт, root/обычный администратор/игрок/anon/отозванное право и неизменность других настроек. Occupancy не меняется.
+
 ## Фон будущих слотов (Working, 4 ноября 2026)
 
 [Миграция](../supabase/migrations/20261104153303_slot_tint.sql) добавляет `schedule_settings.slot_tint`: ровно `{enabled: boolean, strength: integer 0..30}`, NOT NULL, по умолчанию `{enabled:true,strength:8}`, строгий CHECK. Новый RPC `save_schedule_appearance(p_palette,p_expected_palette,p_tint,p_expected_tint)` проверяет личность и `schedule.manage`, блокирует строку и сравнивает обе исходные версии перед единым UPDATE. Конфликт — `40001 / palette-conflict`, невалидный JSON — `22023`; прямой UPDATE и анонимный EXECUTE закрыты, search_path пустой. Чтение/RLS/аудит/Realtime прежние.

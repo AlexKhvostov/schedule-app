@@ -20,6 +20,7 @@ import { MarkFace } from "../ScheduleSlot";
 import { loadTheme, type UiTheme } from "../theme";
 import { usePlayerClock } from "../usePlayerClock";
 import { type SlotHit, type TipApi, type TipPoint } from "./types";
+import { useClubLimitPalette } from "../ClubLimitPalette";
 
 const TIP_SLACK = 12;
 
@@ -45,6 +46,7 @@ export function OptTip({
   skin?: "classic" | "theme";
 }) {
   const { t, i18n } = useTranslation();
+  const { lockedAppearance } = useClubLimitPalette();
   const [hover, setHover] = useState<SlotHit | null>(null);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -204,7 +206,8 @@ export function OptTip({
         </div>
       ) : locked ? (
         <div className="v2-opt-tip-note">
-          <strong>{t("v2.tip.locked", { n: hover.level + 1 })}</strong>
+          <strong>{lockedAppearance.short.trim() || t("v2.tip.locked", { n: hover.level + 1 })}</strong>
+          {lockedAppearance.long.trim() && <p>{lockedAppearance.long}</p>}
           <p>{t("v2.tip.lockedHint", { cap, need: hover.level + 1 })}</p>
         </div>
       ) : (

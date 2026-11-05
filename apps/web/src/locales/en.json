@@ -1907,5 +1907,18 @@
     "requestNextHint": "Use this request only when pagination.has_more=true. Replace <next_cursor> with pagination.next_cursor from the response. Do not repeat dates or filters.",
     "responseExample": "Example response for Nitro 50 for one day",
     "compactNotes": "start/end are local Europe/Madrid times. The end is exclusive; 24:00 means midnight at the start of the next day. time_resolution is normally absent. ambiguous, nonexistent or transition appears only for problematic daylight-saving times: do not automatically schedule an exact notification for such a slot.\n\ntables is the table count; null means it was not specified or the table feature is disabled. owner.name is the server nickname, falling back to the available Discord name, then the saved display name. discord_id is a string and may be null; without it the bot should display the name only.\n\nMerge pages by date, line.id and slot.start. Replays must not duplicate marks; empty arrays on later pages must not erase previously received entries. v1 uses Winamax and EUR limits."
+  },
+  "lockedSlots": {
+    "reset": "Restore default appearance",
+    "title": "Closed slots",
+    "lead": "Club-wide appearance of capacity-closed slots. Descriptions are optional: leave them empty for a plain color band. The short text appears on the band, the long text in the tooltip.",
+    "short": "Short description (up to 12 characters)",
+    "long": "Long description (up to 120 characters)",
+    "merge": "Merge adjacent closed slots",
+    "color": "Closed slot color · {{theme}}",
+    "save": "Save closed slots",
+    "loadError": "Could not load closed slot appearance.",
+    "saveError": "Could not save appearance. Your changes remain in the form.",
+    "conflict": "Another administrator changed the closed slot appearance. Load the saved settings before editing again."
   }
 }
