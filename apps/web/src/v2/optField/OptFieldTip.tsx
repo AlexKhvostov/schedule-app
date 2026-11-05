@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { SchedulePlayer } from "../../data/players";
 import { monthGridKey, type MonthGridStore } from "../../data/slots";
-import { formatLimit, hoursOf, weekdayOf, type CapacityMap } from "../../schedule/capacity";
+import { formatLimit, hoursOf, weekdayOf, type VariantCapacityMap } from "../../schedule/capacity";
 import { levelAllowed, seatsOf } from "../../schedule/plan";
 import {
   displayNick,
@@ -38,7 +38,7 @@ export function OptTip({
   year: number;
   monthIndex: number;
   grids: MonthGridStore;
-  capacity: CapacityMap;
+  capacity: VariantCapacityMap;
   showTip: boolean;
   countTables?: boolean;
   players?: SchedulePlayer[];
@@ -133,7 +133,7 @@ export function OptTip({
   }, [hover]);
 
   if (!hover) return null;
-  const hoursCaps = hoursOf(capacity, hover.limit, hover.day, weekdayOf(year, monthIndex, hover.day));
+  const hoursCaps = hoursOf(capacity[hover.variant], hover.limit, hover.day, weekdayOf(year, monthIndex, hover.day));
   const locked = !levelAllowed(hover.half, hover.level, hoursCaps);
   const mark = seatsOf(
     grids[monthGridKey(hover.variant, hover.limit)]?.[hover.dayIdx]?.[hover.half],

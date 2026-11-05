@@ -7,7 +7,7 @@ import type { RosterPrioritySource } from "../../schedule/rosterPriorities";
 
 type State = { key: string; source: RosterPrioritySource | null; faces: Mark[]; error: string };
 
-export function useRosterSource(enabled: boolean, period: string, kind: PriorityKind, limits: string[], group: PriorityGroup, account = "demo") {
+export function useRosterSource(enabled: boolean, period: string | null, kind: PriorityKind, limits: string[], group: PriorityGroup, account = "demo") {
   const limitsKey = [...new Set(limits)].sort().join(",");
   const key = `${account}|${rosterQueryKey({ period, kind, group, limits })}`;
   // Recreate both in-flight requests and saved revisions when the account changes.

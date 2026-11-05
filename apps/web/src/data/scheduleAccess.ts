@@ -14,17 +14,19 @@ export function accessKey(variant: string, limit: string) {
   return `${variant}:${limit}`;
 }
 
-export async function loadScheduleAccess(memberId: string): Promise<ScheduleAccessKey[]> {
-  const map = await loadScheduleAccessMap([memberId]);
+export async function loadScheduleAccess(memberId: string, strict = false): Promise<ScheduleAccessKey[]> {
+  const map = await loadScheduleAccessMap([memberId], strict);
   return map.get(memberId) ?? [];
 }
 
-export async function loadScheduleAccessMap(memberIds: string[]): Promise<Map<string, ScheduleAccessKey[]>> {
+export async function loadScheduleAccessMap(memberIds: string[], strict = false): Promise<Map<string, ScheduleAccessKey[]>> {
   const map = new Map<string, ScheduleAccessKey[]>();
   const ids = [...new Set(memberIds.filter(Boolean))];
   const db = getSupabase();
+  if (!db && strict) throw new Error("not-configured");
   if (!db || !ids.length) return map;
   const { data, error } = await db.rpc("effective_schedule_access", { p_member_ids: ids });
+  if (error && strict) throw error;
   if (error || !data) return map;
   for (const row of data as { member_id: string; variant_id: string; limit_id: string }[]) {
     const key = asKey(row);

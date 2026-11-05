@@ -22,6 +22,7 @@ export type LimitProfile = {
   monthOn: boolean;
 };
 export type CapacityMap = Record<string, LimitProfile>;
+export type VariantCapacityMap = Record<"nitro" | "regular", CapacityMap>;
 
 export function defaultHourCaps(): HourCaps {
   return Array.from({ length: 24 }, () => 1);
@@ -241,9 +242,10 @@ export function limitTonePaint(limit: string, theme: PaletteTheme = "dark") {
   return palettePaint(limit, theme);
 }
 
-export function loadCapacity(): CapacityMap {
+export function loadCapacity(variant: "nitro" | "regular" = "nitro"): CapacityMap {
   try {
-    const raw = localStorage.getItem("v2-capacity");
+    // Keep legacy Demo settings as an initial value, then save each variant separately.
+    const raw = localStorage.getItem(`v2-capacity-${variant}`) ?? localStorage.getItem("v2-capacity");
     if (!raw) return defaultCapacity();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return Object.fromEntries(LIMIT_OPTIONS.map((limit) => [limit, normalizeProfile(parsed[limit])]));
@@ -252,6 +254,6 @@ export function loadCapacity(): CapacityMap {
   }
 }
 
-export function saveCapacity(capacity: CapacityMap) {
-  localStorage.setItem("v2-capacity", JSON.stringify(capacity));
+export function saveCapacity(capacity: CapacityMap, variant: "nitro" | "regular" = "nitro") {
+  localStorage.setItem(`v2-capacity-${variant}`, JSON.stringify(capacity));
 }

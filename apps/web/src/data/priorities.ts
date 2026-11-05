@@ -1,3 +1,4 @@
+import { demoActivePriority } from "./activePriority";
 import { loadRoleAccess, rolesWithGrantedAccess } from "./roleAccess";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
@@ -65,9 +66,13 @@ export function demoPrioritySlice(periodStart: string, canManage: boolean, kind:
     lastMonthEntries: people.flatMap((p) => p.entries).filter((e) => e.month === shiftPriorityMonth(periodStart, -1) && e.values.some((v) => ["50", "100"].includes(v.limit))).length };
   demoCache.set(key, { fingerprint, source }); return source;
 }
-export async function loadPriorities(periodStart: string, demoCanManage: boolean, kind: PriorityKind = "nitro", group: PriorityGroup = "50-100", refresh = false) {
-  if (!isLiveData()) return refresh && !demoCanManage ? { data: null, error: "forbidden" } : { data: demoPrioritySlice(periodStart, demoCanManage, kind, group, refresh), error: null };
-  return rpc<PrioritySource>("load_priority_slice", { p_period_start: periodStart, p_variant: kind, p_group: group, p_refresh: refresh });
+export async function loadPriorities(periodStart: string | null, demoCanManage: boolean, kind: PriorityKind = "nitro", group: PriorityGroup = "50-100", refresh = false) {
+  if (!isLiveData()) {
+    if (refresh && !demoCanManage) return { data: null, error: "forbidden" };
+    const active = demoActivePriority();
+    return { data: { ...demoPrioritySlice(periodStart ?? active.activePeriod, demoCanManage, kind, group, refresh), ...active, canActivate: demoCanManage }, error: null };
+  }
+  return rpc<PrioritySource>("load_priority_view", { p_period_start: periodStart, p_variant: kind, p_group: group, p_refresh: refresh });
 }
 export async function loadPriorityFilterRoles() {
   if (!isLiveData()) return { data: [

@@ -1,3 +1,4 @@
+import { setActivePriority } from "../data/activePriority";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,6 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const { t, i18n } = useTranslation();
   const [today, setToday] = useState(priorityToday);
   const [chosenPeriod, setChosenPeriod] = useState("");
-  const period = chosenPeriod || currentPriorityPeriod(today);
   const [kind, setKind] = useState<PriorityKind>(() => loadPriorityFilters(preferencesKey).kind ?? "nitro");
   const [group, setGroup] = useState<PriorityGroup>(() => loadPriorityFilters(preferencesKey).group ?? "50-100");
   const kindTabs = useRef<Record<PriorityKind, HTMLButtonElement | null>>({ nitro: null, regular: null });
@@ -64,6 +64,7 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   useEffect(() => { savePriorityFilters(preferencesKey, { ...filters, kind, group }); }, [preferencesKey, filters, kind, group]);
   const [vipOn, setVipOn] = useState(true);
   const [source, setSource] = useState<PrioritySource | null>(null);
+  const period = chosenPeriod || source?.periodStart || "";
   const [accessRoles, setAccessRoles] = useState<GuildRole[]>([]);
   const [requests, setRequests] = useState<PriorityRequestSummary[]>([]);
   const [requestAuthors, setRequestAuthors] = useState<Record<string, string>>({});
@@ -84,13 +85,14 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const refresh = useCallback(async () => {
     const token = ++generation.current;
     try {
-      const [board, list, roles] = await Promise.all([loadPriorities(period, canManageDemo, kind, group), listPriorityRequests(period), loadPriorityFilterRoles()]);
+      const [board, roles] = await Promise.all([loadPriorities(chosenPeriod || null, canManageDemo, kind, group), loadPriorityFilterRoles()]);
+      const list = board.data ? await listPriorityRequests(board.data.periodStart) : { data: null, error: null };
       if (token !== generation.current) return;
       setLoading(false);
       if (board.error || list.error || roles.error || !board.data) { setError(board.error || list.error || roles.error || "empty response"); setSource(null); setDetail(null); return; }
       setAccessRoles(roles.data); setSource(board.data); setRequests(list.data ?? []); setError("");
     } catch (e) { if (token === generation.current) { setError(String(e)); setSource(null); setLoading(false); } }
-  }, [period, canManageDemo, kind, group]);
+  }, [chosenPeriod, canManageDemo, kind, group]);
   useEffect(() => {
     viewEpoch.current++; setBusy(false); setDetail(null); setRequestList(false); setDeleteId(null);
     setLoading(true); setSource(null); setRequests([]); setSelected([]); setComposing(false); setHover(null); setInspect(null);
@@ -118,7 +120,7 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
     }
     return options;
   }, [current, accessRoles, filters.roleIds, t]);
-  const months = priorityMonths(period);
+  const months = period ? priorityMonths(period) : [];
   const canManage = current?.canManage ?? false;
   const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled, detail.snapshot.version >= 3 ? "slice" : detail.snapshot.version >= 2 ? "distance" : "legacy-vip-seats", detail.snapshot.group ?? "50-100").filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
   const requestIds = requests.map((r) => r.id).join(",");
@@ -133,14 +135,14 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
     }).catch((e) => { if (!cancelled) setNotice(t("priorities.operationError", { reason: String(e) })); });
     return () => { cancelled = true; };
   }, [requestList, canManage, canManageDemo, requestIds, t]);
-  const periods = Array.from({ length: 16 }, (_, i) => shiftPriorityMonth(currentPriorityPeriod(today), 3 - i * 3));
+  const periods = [...new Set([...Array.from({ length: 16 }, (_, i) => shiftPriorityMonth(currentPriorityPeriod(today), 3 - i * 3)), source?.activePeriod, period].filter((p): p is string => Boolean(p)))].sort().reverse();
   const summary = {
     players: visible.length,
     points: visible.reduce((sum, row) => sum + row.total, 0),
     vip: visible.filter((row) => row.vip > 0 && !row.excluded).length,
     excluded: visible.filter((row) => row.excluded).length,
   };
-  const errorText = (code: string) => t(code === "priority-stale" ? "priorities.stale" : code === "priority-vip-exclusion-conflict" ? "priorities.vipConflict" : "priorities.operationError", { reason: code });
+  const errorText = (code: string) => t(code === "priority-active-conflict" ? "priorities.activeConflict" : code === "priority-stale" ? "priorities.stale" : code === "priority-vip-exclusion-conflict" ? "priorities.vipConflict" : "priorities.operationError", { reason: code });
   const run = async (operation: () => Promise<{ error: string | null }>, onSuccess?: () => void) => {
     const epoch = viewEpoch.current;
     setBusy(true); setNotice("");
@@ -162,9 +164,14 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
         <Button size="sm" variant="outline" onClick={() => setRequestList(true)} disabled={!current || busy}>{t("priorities.requests")} · {requests.length}{requests.some((r) => !r.closedAt) && <b className="v2-prio-new">{t("priorities.new")} {requests.filter((r) => !r.closedAt).length}</b>}</Button></header>
       <div className="v2-prio-report">
         <label>{t("priorities.room")}<input aria-label={t("priorities.room")} value="Winamax" readOnly disabled /></label>
-        <label>{t("priorities.reportMonth")}<select aria-label={t("priorities.reportMonth")} value={chosenPeriod} disabled={busy || composing} onChange={(e) => setChosenPeriod(e.target.value)}>{periods.map((p) => <option key={p} value={p === currentPriorityPeriod(today) ? "" : p}>{monthFormat.format(new Date(p))}</option>)}</select></label>
-        {group === "50-100" && <div className="v2-prio-window"><span>{t("priorities.calculationMonths")}</span><div>{[0, 3].map((i) => <span key={i}>({monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))}) <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b></span>)}</div></div>}
+        <label>{t("priorities.reportMonth")}<select aria-label={t("priorities.reportMonth")} value={period} disabled={loading || busy || composing} onChange={(e) => setChosenPeriod(e.target.value === source?.activePeriod ? "" : e.target.value)}>{!period && <option value="">{t("priorities.loading")}</option>}{periods.map((p) => <option key={p} value={p}>{monthFormat.format(new Date(p))}{p === source?.activePeriod ? ` · ${t("priorities.activeLabel")}` : ""}</option>)}</select></label>
+        {period && group === "50-100" && <div className="v2-prio-window"><span>{t("priorities.calculationMonths")}</span><div>{[0, 3].map((i) => <span key={i}>({monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))}) <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b></span>)}</div></div>}
       </div>
+      {current?.activePeriod && <div className="v2-prio-active-selection">
+        <span data-testid="active-priority">{t("priorities.activeForSchedule", { period: monthFormat.format(new Date(current.activePeriod)) })}</span>
+        {period !== current.activePeriod && <span className="v2-muted">{t("priorities.previewOnly")}</span>}
+        {current.canActivate && <Button size="sm" variant="outline" disabled={busy || composing || period === current.activePeriod} onClick={() => void run(() => setActivePriority(period, current.activeRevision!, canManageDemo), () => setChosenPeriod(""))}>{t("priorities.useForSorting")}</Button>}
+      </div>}
       <div className="v2-prio-controls">
       <section className="v2-prio-control-group v2-prio-rating" aria-label={t("priorities.groups.rating")}><h2>{t("priorities.groups.rating")}</h2><div className="v2-prio-slices">
         <div className="v2-prio-switch"><span className="v2-prio-switch-label">{t("priorities.kind")}</span>

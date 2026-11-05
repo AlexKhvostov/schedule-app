@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { CET, formatHm, tzFromUtcOffset, savePlayerUtc } from "../schedule/cet";
 import { loadMembers, memberOfSession } from "../schedule/members";
-import { defaultCapacity, loadCapacity, saveCapacity, type CapacityMap } from "../schedule/capacity";
+import { defaultCapacity, loadCapacity, saveCapacity, type VariantCapacityMap } from "../schedule/capacity";
 import { ClubHourLoadProvider, useClubHourLoad } from "./ClubHourLoad";
 import { isLiveData, supabaseUrl } from "../data/config";
 import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
@@ -100,8 +100,13 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const [adminOpen, setAdminOpen] = useState(false);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
   const [slotTheme, setSlotTheme] = useState(() => (typeof window === "undefined" ? null : loadSlotTheme()));
-  const [capacity, setCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
-  const [adminCapacity, setAdminCapacity] = useState<CapacityMap>(() => (typeof window === "undefined" ? defaultCapacity() : loadCapacity()));
+  const [capacity, setCapacity] = useState<VariantCapacityMap>(() => ({
+    nitro: typeof window === "undefined" || isLiveData() ? defaultCapacity() : loadCapacity("nitro"),
+    regular: typeof window === "undefined" || isLiveData() ? defaultCapacity() : loadCapacity("regular"),
+  }));
+  const [capacityReady, setCapacityReady] = useState(() => !isLiveData());
+  const [capacityError, setCapacityError] = useState(false);
+  const [capacityAttempt, setCapacityAttempt] = useState(0);
   const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
   const { map: hourLoad } = useClubHourLoad();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
@@ -192,13 +197,17 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
 
   useEffect(() => {
     if (!isLiveData()) return;
-    void loadCapacityLive(loadPrefs().kinds[0]).then((next) => {
-      if (next) {
-        setCapacity(next);
-        setAdminCapacity(next);
+    let alive = true;
+    setCapacityError(false);
+    void Promise.all([loadCapacityLive("nitro"), loadCapacityLive("regular")]).then(([nitro, regular]) => {
+      if (!nitro || !regular) throw new Error("capacity-unavailable");
+      if (alive) {
+        setCapacity({ nitro, regular });
+        setCapacityReady(true);
       }
-    });
-  }, []);
+    }).catch(() => { if (alive) setCapacityError(true); });
+    return () => { alive = false; };
+  }, [capacityAttempt]);
 
   useEffect(() => {
     const sync = () => setSlotTheme(loadSlotTheme());
@@ -418,7 +427,13 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
               />
             </div>
           )}
-          {canGrid && page === "schedule" && (
+          {!capacityReady && ((canGrid && page === "schedule") || (canScheduleAdmin && page === "admin-schedule")) && (
+            <div className="p-4" role={capacityError ? "alert" : "status"}>
+              {t(capacityError ? "admin.capacity.loadErr" : "admin.capacity.loading")}
+              {capacityError && <button type="button" className="v2-ctrl ml-3 px-3" onClick={() => setCapacityAttempt(value => value + 1)}>{t("admin.capacity.retry")}</button>}
+            </div>
+          )}
+          {canGrid && page === "schedule" && capacityReady && (
             <V2Schedule
               skin="theme"
               cursor={cursor}
@@ -429,12 +444,6 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
               highlightPreferencesKey={slotHighlightStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo")}
               canActAs={isAdmin}
               canManagePeople={canPeople}
-              onKindChange={(kind) => {
-                if (!isLiveData()) return;
-                void loadCapacityLive(kind).then((next) => {
-                  if (next) setCapacity(next);
-                });
-              }}
             />
           )}
           {isRoot && page === "uikit" && (
@@ -460,26 +469,23 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
               <V2Distances />
             </div>
           )}
-          {((page === "admin-people" && canPeople) || (page === "admin-schedule" && canScheduleAdmin) || (page === "admin-root" && isRoot)) && (
+          {((page === "admin-people" && canPeople) || (page === "admin-schedule" && canScheduleAdmin && capacityReady) || (page === "admin-root" && isRoot)) && (
             <div className="min-h-0 flex-1 overflow-auto">
               <V2Admin
                 isRoot={isRoot}
                 section={page === "admin-root" ? "root" : page === "admin-schedule" ? "schedule" : "people"}
                 variant={adminVariant}
-                capacity={adminCapacity}
-                onVariantChange={(next) => {
-                  setAdminVariant(next);
+                capacity={capacity[adminVariant]}
+                onVariantChange={setAdminVariant}
+                onCapacityChange={async (next, limit) => {
+                  // Save only the edited pair; untouched limits must not overwrite newer settings.
                   if (isLiveData()) {
-                    void loadCapacityLive(next).then((map) => {
-                      if (map) setAdminCapacity(map);
-                    });
+                    const result = await saveCapacityLive(adminVariant, { [limit]: next[limit] });
+                    if (result.error) throw new Error(result.error);
+                  } else {
+                    saveCapacity(next, adminVariant);
                   }
-                }}
-                onCapacityChange={(next) => {
-                  setAdminCapacity(next);
-                  saveCapacity(next);
-                  if (adminVariant === loadPrefs().kinds[0]) setCapacity(next);
-                  if (isLiveData()) void saveCapacityLive(adminVariant, next);
+                  setCapacity(current => ({ ...current, [adminVariant]: next }));
                 }}
               />
             </div>

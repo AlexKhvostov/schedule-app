@@ -80,6 +80,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/player_schedule_limits.sql
       - name: Check atomic schedule edit contract
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/atomic_schedule_edit.sql
+      - name: Check ordinary player act-as access and restrictions
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/schedule_act_as.sql
       - name: Check compact reads and private change notifications
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/compact_schedule.sql
       - name: Check member table preset RPC
@@ -90,6 +92,10 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/live_priorities.sql
       - name: Check saved priority matrix
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/priority_matrix.sql
+      - name: Check active rating selection and permissions
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/active_priority.sql
+      - name: Check Nitro and Regular capacity isolation
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/capacity.sql
       - name: Check compact monthly roster and conditional reads
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/month_roster.sql
       - name: Check member presence access and activity summary

@@ -1,5 +1,5 @@
 import { hoursOf, lanesForDay, weekdayOf, type CapacityMap, type HourCaps } from "./capacity";
-import { capFor, levelAllowed, occupiedCount, seatsOf, type Occupancy } from "./plan";
+import { capFor, levelAllowed, seatsOf, type Occupancy } from "./plan";
 import { isPastSlot, type CetStamp } from "./cet";
 
 export type FieldFill = {
@@ -31,7 +31,7 @@ export function fieldFill(
       : hours;
     row.forEach((cell, half) => {
       const cap = capFor(half, dayHours);
-      const used = Math.min(occupiedCount(cell), cap);
+      const used = cell.slice(0, cap).filter(Boolean).length;
       const past = isPastSlot(year, monthIndex, dayIdx + 1, half, cet);
       seats += cap;
       taken += used;

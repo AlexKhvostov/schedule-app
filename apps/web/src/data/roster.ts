@@ -1,3 +1,5 @@
+import { demoActivePriority } from "./activePriority";
+import { isPriorityPeriod } from "../schedule/priorities";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { demoPrioritySlice } from "./priorities";
@@ -6,7 +8,7 @@ import type { Mark } from "../schedule/marks";
 import type { PriorityGroup, PriorityKind } from "../schedule/priorities";
 import { compactRosterPriorities, type RosterPrioritySource } from "../schedule/rosterPriorities";
 
-export type RosterQuery = { period: string; kind: PriorityKind; group: PriorityGroup; limits: string[] };
+export type RosterQuery = { period: string | null; kind: PriorityKind; group: PriorityGroup; limits: string[] };
 export type RosterSnapshot = { source: RosterPrioritySource; faces: Mark[]; directoryRevision: string };
 export type RosterResponse = Omit<RosterPrioritySource, "people"> & {
   people: RosterPrioritySource["people"] | null; directoryRevision: string; faces: Mark[] | null;
@@ -18,7 +20,7 @@ export function rosterQueryKey(query: RosterQuery) {
 
 async function readRoster(query: RosterQuery, previous?: RosterSnapshot): Promise<RosterResponse> {
   if (!isLiveData()) {
-    const source = compactRosterPriorities(demoPrioritySlice(query.period, false, query.kind, query.group), query.kind, query.group);
+    const source = compactRosterPriorities(demoPrioritySlice(query.period ?? demoActivePriority().activePeriod, false, query.kind, query.group), query.kind, query.group);
     const directory = await loadLimitMarks(query.kind, query.limits);
     if (directory.error || !directory.data) throw new Error(directory.error || "empty response");
     const directoryRevision = JSON.stringify(directory.data);
@@ -27,8 +29,8 @@ async function readRoster(query: RosterQuery, previous?: RosterSnapshot): Promis
   }
   const db = getSupabase();
   if (!db) throw new Error("not-configured");
-  const { data, error } = await db.rpc("load_month_roster", {
-    p_period_start: query.period, p_variant: query.kind, p_group: query.group, p_limit_ids: query.limits,
+  const { data, error } = await db.rpc(query.period === null ? "load_active_month_roster" : "load_month_roster", {
+    ...(query.period === null ? {} : { p_period_start: query.period }), p_variant: query.kind, p_group: query.group, p_limit_ids: query.limits,
     p_priority_revision: previous?.source.revision ?? null, p_directory_revision: previous?.directoryRevision ?? null,
   });
   if (error || !data) throw new Error(error?.message || "empty response");
@@ -49,7 +51,7 @@ export function createRosterLoader(read: RosterRead = readRoster) {
       if (existing) return existing;
       const previous = cache.get(key);
       const request = read(query, previous).then((result) => {
-        if (result.periodStart !== query.period || result.kind !== query.kind || result.group !== query.group
+        if (!isPriorityPeriod(result.periodStart) || (query.period !== null && result.periodStart !== query.period) || result.kind !== query.kind || result.group !== query.group
           || (result.people === null && (!previous || previous.source.revision !== result.revision))
           || (result.faces === null && (!previous || previous.directoryRevision !== result.directoryRevision))) {
           throw new Error("roster-response-mismatch");
@@ -58,7 +60,7 @@ export function createRosterLoader(read: RosterRead = readRoster) {
         const next: RosterSnapshot = { source: { ...source, people: source.people ?? previous!.source.people },
           faces: faces ?? previous!.faces, directoryRevision };
         if (previous && next.source.people === previous.source.people
-          && next.source.today === previous.source.today && next.source.lastMonthEntries === previous.source.lastMonthEntries
+          && next.source.periodStart === previous.source.periodStart && next.source.today === previous.source.today && next.source.lastMonthEntries === previous.source.lastMonthEntries
           && next.source.calculatedAt === previous.source.calculatedAt && next.source.revision === previous.source.revision) {
           next.source = previous.source;
         }

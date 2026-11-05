@@ -196,6 +196,11 @@
     }
   },
   "priorities": {
+    "activeForSchedule": "Schedule uses: {{period}}",
+    "activeLabel": "active",
+    "previewOnly": "Viewing another calculation does not change the schedule order.",
+    "useForSorting": "Use for sorting",
+    "activeConflict": "Another administrator changed the active calculation. Refresh the data and choose again.",
     "groups": {"rating": "Ranking", "filters": "Player filters", "display": "Display"},
     "periodHint": "Three months of €50 and €100 volume. Points: (€50 × 1 + €100 × 2) × {{weight}}. Hover over a player’s volume to see both stakes.",
 
@@ -487,6 +492,9 @@
     "retryLoad": "Retry loading",
     "toastConflict": "These slots have changed. The schedule is refreshing — check the range and try again.",
     "toastNoAccess": "No access to this schedule. An admin grants it.",
+    "brushAccessLoading": "Checking the selected player's access. Wait for loading to finish and try again.",
+    "brushAccessError": "Could not check the player's access. Select the mark again or refresh the page to retry.",
+    "playLimitRequiredOther": "Player {{player}} has not selected {{variant}} · {{limit}}. Ask the player or an administrator to add it to that player's game settings.",
     "toastLimitDisabled": "An administrator disabled this limit for new marks.",
     "limitDisabled": "Disabled by administrator",
     "demoReset": "Reset demo schedule",
@@ -1013,6 +1021,10 @@
       "emptyPeople": "Nobody yet. After a Discord login you can grant administrator here."
     },
     "capacity": {
+      "saveErr": "Capacity was not saved. Your edits remain in the editor — please retry.",
+      "retry": "Retry",
+      "loadErr": "Could not load capacity. Please retry.",
+      "loading": "Loading schedule capacity…",
       "kicker": "field rule",
       "title": "Capacity by CET hour",
       "lead": "Pick Nitro or Regular first, then a buy-in and a matrix: month 31×24 or week 7×24. Click to set depth, then save.",
@@ -1025,7 +1037,7 @@
       "previewDeep": "Deepest",
       "previewShallow": "Shallowest",
       "previewSame": "Every day looks the same",
-      "previewLook": "How these days look on the schedule. Light cells are open, hatch is closed.",
+      "previewLook": "Preview of the selected matrix. The schedule also applies enabled week and month rules.",
       "matrixReset": "Reset matrix",
       "colSlots": "slots",
       "cellTip": "{{day}} · {{start}}–{{end}} · depth {{cap}} · {{slots}} slots in the day",
@@ -1039,9 +1051,9 @@
       "apply": "Apply",
       "applied": "Saved",
       "resetLimit": "Reset limit",
-      "resetLimitHint": "Restores the shared rule: day 1, night 2. A day has 64 slots: 48 in the row plus 16 at night.",
+      "resetLimitHint": "Restores capacity 1 at every hour: one lane, 48 half-hour slots per day. Clears week and month rules.",
       "resetSelected": "Reset selected",
-      "resetSelectedHint": "Selected days go back to day 1 and night 2.",
+      "resetSelectedHint": "Restores capacity 1 at every hour for the selected days.",
       "halfHint": "One hour is 2 slots, one row is 48. Night at capacity 2 adds 16 more, 64 in the day.",
       "openHalf": "Level {{n}} is open at {{start}}:{{half}}",
       "lockedHalf": "Level {{n}} is closed at {{start}}:{{half}}",

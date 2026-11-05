@@ -39,13 +39,15 @@ function asPlay(row: PlayerRow): RoomPlay | null {
   });
 }
 
-export async function loadMyPlays(memberId: string): Promise<RoomPlay[]> {
+export async function loadMyPlays(memberId: string, strict = false): Promise<RoomPlay[]> {
   const db = getSupabase();
+  if (!db && strict) throw new Error("not-configured");
   if (!db) return [];
   const { data, error } = await db
     .from("players")
     .select("id, rooms(slug), player_limits(variant_id, limit_id), player_nicks(nick, at, source, distance_month)")
     .eq("member_id", memberId);
+  if (error && strict) throw error;
   if (error || !data?.length) return [];
   return (data as PlayerRow[]).map(asPlay).filter((row): row is RoomPlay => Boolean(row));
 }

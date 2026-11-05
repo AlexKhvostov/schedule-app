@@ -38,7 +38,10 @@ export type DayLevel = { level: number; ghost: boolean };
 
 /** Lanes for the day. Equalize keeps extra rows as ghost spacers so every day is the same height. */
 export function shownLevels(depth: number, hours: HourCaps, dayRow?: Seat[][]): DayLevel[] {
-  const n = Math.max(1, depth);
+  // Reducing capacity must not hide existing marks on higher levels.
+  const occupiedDepth = (dayRow ?? []).reduce((max, cell) =>
+    cell.reduce((size, mark, level) => mark ? Math.max(size, level + 1) : size, max), 0);
+  const n = Math.max(1, depth, occupiedDepth);
   const rows: DayLevel[] = [];
   for (let level = 0; level < n; level += 1) {
     let live = false;

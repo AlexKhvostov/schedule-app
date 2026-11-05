@@ -71,7 +71,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     const now = readCet();
     const grid = p.grids[monthGridKey(origin.variant, origin.limit)];
     if (!grid?.[origin.dayIdx]) return;
-    const hoursCaps = hoursOf(p.capacity, origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
+    const hoursCaps = hoursOf(p.capacity[origin.variant], origin.limit, origin.day, weekdayOf(p.year, p.monthIndex, origin.day));
     const from = Math.min(origin.half, endHalf);
     const to = Math.max(origin.half, endHalf);
     const visible = new Set(workHalfSlots(p.workHours));
@@ -197,7 +197,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
 
   const inspectHit = (hit: SlotHit, rest: TipPoint) => {
     const p = propsRef.current;
-    const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
+    const hoursCaps = hoursOf(p.capacity[hit.variant], hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
     const mark = seatsOf(
       p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],
@@ -236,7 +236,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     const p = propsRef.current;
     const now = readCet();
     const past = isPastSlot(p.year, p.monthIndex, hit.day, hit.half, now);
-    const hoursCaps = hoursOf(p.capacity, hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
+    const hoursCaps = hoursOf(p.capacity[hit.variant], hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
     const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
     const seats = seatsOf(
       p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],

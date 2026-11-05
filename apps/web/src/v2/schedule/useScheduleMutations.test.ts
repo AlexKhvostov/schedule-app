@@ -6,12 +6,15 @@ import type { OverwriteAsk } from "../optFieldModel";
 import { ScheduleMonthState } from "./scheduleMonthState";
 import type { useScheduleMonth } from "./useScheduleMonth";
 
-const mocks = vi.hoisted(() => ({ ask: null as OverwriteAsk | null, stateIndex: 0, own: vi.fn(), atomic: vi.fn(), notify: vi.fn(), toast: vi.fn() }));
+const mocks = vi.hoisted(() => ({ ask: null as OverwriteAsk | null, stateIndex: 0, own: vi.fn(), atomic: vi.fn(), notify: vi.fn(), toast: vi.fn(), missing: vi.fn() }));
 vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useRef: (current: unknown) => ({ current }),
   useEffect: vi.fn(),
-  useState: (initial: unknown) => [mocks.stateIndex++ === 0 ? mocks.ask : initial, vi.fn()],
+  useState: (initial: unknown) => {
+    const index = mocks.stateIndex++;
+    return [index === 0 ? mocks.ask : initial, index === 2 ? mocks.missing : vi.fn()];
+  },
 }));
 vi.mock("../../data/config", () => ({ isLiveData: () => true }));
 vi.mock("../../data/notifyMark", () => ({ notifyMarkRemoved: mocks.notify }));
@@ -24,13 +27,15 @@ import { useScheduleMutations } from "./useScheduleMutations";
 
 const self = { ...ME, memberId: "self" };
 const other = { ...ME, t: "BB", memberId: "other" };
-function StartMutations(controller: ScheduleMonthState, actingRef = { current: "self" as string | undefined }) {
+function StartMutations(controller: ScheduleMonthState, actingRef = { current: "self" as string | undefined }, overrides: Partial<Parameters<typeof useScheduleMutations>[0]> = {}) {
   mocks.stateIndex = 0;
   return useScheduleMutations({ year: 2026, monthIndex: 9,
     month: { controller } as ReturnType<typeof useScheduleMonth>,
     selfIdRef: { current: "self" }, actingRef,
     accessRef: { current: new Set(["nitro:50"]) }, selectedPlayPairsRef: { current: new Set(["nitro:50"]) },
+    brushAccessRef: { current: { memberId: actingRef.current, status: "ready" } },
     filterLimits: { nitro: ["50"], regular: ["50"] }, t: ((key: string) => key) as TFunction, language: "ru",
+    ...overrides,
   });
 }
 function controller(grid = emptyMonth(2026, 9)) {
@@ -45,9 +50,53 @@ function foreignAsk() {
     slots: [{ date: "2026-10-21", half: 2, level: 0 }], people: [], memberIds: ["other"] };
   return before;
 }
-afterEach(() => { mocks.ask = null; mocks.own.mockReset(); mocks.atomic.mockReset(); mocks.notify.mockReset(); mocks.toast.mockReset(); vi.useRealTimers(); });
+afterEach(() => { mocks.ask = null; mocks.own.mockReset(); mocks.atomic.mockReset(); mocks.notify.mockReset(); mocks.toast.mockReset(); mocks.missing.mockReset(); vi.useRealTimers(); });
 
 describe("schedule mutation orchestration", () => {
+  it.each(["loading", "error"] as const)("blocks changes while brush access is %s without reporting missing permission", (status) => {
+    const month = controller();
+    StartMutations(month, { current: "other" }, { brushAccessRef: { current: { memberId: "other", status } } })
+      .onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, other));
+    expect(mocks.atomic).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith("err", status === "loading" ? "schedule.brushAccessLoading" : "schedule.brushAccessError");
+    expect(month.pendingCount).toBe(0);
+  });
+
+  it("rejects stale ready access belonging to the previous brush", () => {
+    const month = controller();
+    StartMutations(month, { current: "other" }, { brushAccessRef: { current: { memberId: "self", status: "ready" } } })
+      .onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, other));
+    expect(mocks.atomic).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith("err", "schedule.brushAccessLoading");
+  });
+
+  it("distinguishes a loaded empty access list from a loading failure", () => {
+    const month = controller();
+    StartMutations(month, { current: "other" }, { accessRef: { current: new Set() } })
+      .onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, other));
+    expect(mocks.atomic).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith("err", "schedule.toastNoAccess");
+  });
+
+  it("identifies the recipient when their game limit is not selected", () => {
+    const month = controller();
+    StartMutations(month, { current: "other" }, { selectedPlayPairsRef: { current: new Set() } })
+      .onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, { ...other, discord: "Recipient" }));
+    expect(mocks.atomic).not.toHaveBeenCalled();
+    expect(mocks.missing).toHaveBeenCalledWith({ variant: "nitro", limit: "50", memberId: "other", playerName: "Recipient" });
+  });
+
+  it("keeps the original recipient for a delayed server rejection after switching brush", async () => {
+    let reject!: (value: { error: string }) => void;
+    mocks.atomic.mockReturnValue(new Promise(resolve => { reject = resolve; }));
+    const month = controller(), acting = { current: "other" };
+    StartMutations(month, acting).onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, { ...other, discord: "Recipient" }));
+    await vi.waitFor(() => expect(mocks.atomic).toHaveBeenCalled());
+    acting.current = "self";
+    reject({ error: "schedule-player-limit-not-selected" });
+    await vi.waitFor(() => expect(mocks.missing).toHaveBeenCalledWith({ variant: "nitro", limit: "50", memberId: "other", playerName: "Recipient" }));
+  });
+
   it("does not put or persist an empty brush", () => {
     const month = controller();
     StartMutations(month).onGridChange("nitro", "50", patchSeat(month.snapshot.grids["nitro:50"], 20, 2, 0, { ...self, t: "" }));

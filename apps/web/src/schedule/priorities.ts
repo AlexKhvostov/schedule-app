@@ -9,7 +9,7 @@ export type PriorityPerson = {
   plays: PriorityKind[]; coreNitro250?: number; coreRegular250?: number; calculation?: SavedPriorityCalculation; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
 };
 export type SavedPriorityCalculation = { periodStart: string; kind: PriorityKind; group: PriorityGroup; months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number };
-export type PrioritySource = { kind?: PriorityKind; group?: PriorityGroup; calculatedAt?: string; periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
+export type PrioritySource = { activePeriod?: string; activeRevision?: number; canActivate?: boolean; kind?: PriorityKind; group?: PriorityGroup; calculatedAt?: string; periodStart: string; today: string; lastMonthEntries: number; people: PriorityPerson[]; canManage: boolean; revision: string };
 export type PriorityMonth = { month: string; nitro50: number; regular50: number; nitro100: number; regular100: number };
 export type CalculatedPriority = PriorityPerson & { calculationKind?: PriorityKind; group?: PriorityGroup; months: PriorityMonth[]; distanceCells: [number, number, number, number]; pointCells: [number, number, number, number]; total: number; rank: number | null; excluded: boolean; vip: number };
 export type PriorityFilters = { kind?: PriorityKind; group?: PriorityGroup; roleIds: string[]; active: boolean; scheduleActive: boolean };
@@ -26,6 +26,9 @@ export function currentPriorityPeriod(today = priorityToday()) {
   const month = Number(today.slice(5, 7));
   const start = [11, 8, 5, 2].find((value) => value <= month);
   return start ? `${today.slice(0, 4)}-${String(start).padStart(2, "0")}-01` : `${Number(today.slice(0, 4)) - 1}-11-01`;
+}
+export function isPriorityPeriod(value: unknown): value is string {
+  return typeof value === "string" && /^(20\d{2}|2100)-(02|05|08|11)-01$/.test(value);
 }
 export function priorityMonths(period: string) { return Array.from({ length: 6 }, (_, i) => shiftPriorityMonth(period, i - 6)); }
 export function isPriorityPreliminary(source: Pick<PrioritySource, "today" | "periodStart" | "lastMonthEntries">) {

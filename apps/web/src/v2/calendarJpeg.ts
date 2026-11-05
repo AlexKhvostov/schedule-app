@@ -2,6 +2,7 @@ import { limitTonePaint } from "../schedule/capacity";
 import type { ScheduleVariant } from "../data/slots";
 import type { ShiftRun } from "./myShifts";
 import { DEFAULT_WORK_HOURS, visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
+import { calendarHasBothKinds, calendarKindLetter, calendarLegendGroups } from "./calendarPresentation";
 
 const WIDTH = 680;
 const PAD = 12;
@@ -9,7 +10,7 @@ const DATE_W = 54;
 const HOUR_H = 28;
 const CHIP_H = 16;
 const TITLE_H = 50;
-const FOOT_H = 34;
+const FOOT_H = 54;
 const DPR = 2;
 
 function cssVar(name: string, fallback: string) {
@@ -50,6 +51,7 @@ type Opts = {
   kicker: string;
   meta: string;
   dayLabel: string;
+  kindLabels: Record<ScheduleVariant, string>;
 };
 
 export type CalendarShiftRun = ShiftRun & {
@@ -67,28 +69,6 @@ function variantFont(variant: ScheduleVariant, size: number) {
 function mineTone(limit: string) {
   const theme = document.documentElement.dataset.uiTheme === "light" ? "light" : "dark";
   return cssVar(`--limit-${limit}`, limitTonePaint(limit, theme));
-}
-
-function drawPairLabel(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, variant: ScheduleVariant) {
-  const centered = ctx.textAlign === "center";
-  if (centered) x -= ctx.measureText(label).width / 2;
-  const align = ctx.textAlign;
-  ctx.textAlign = "left";
-  ctx.strokeText(label, x, y);
-  const ink = ctx.fillStyle;
-  ctx.fillStyle = cssVar(variant === "nitro" ? "--schedule-nitro" : "--schedule-regular", variant === "nitro" ? "#68b5ff" : "#f3ce62");
-  ctx.fillText(label[0], x, y);
-  ctx.fillStyle = ink;
-  if (label.length > 1) ctx.fillText(label.slice(1), x + ctx.measureText(label[0]).width, y);
-  ctx.textAlign = align;
-}
-
-function variantInk(variant: ScheduleVariant) {
-  return variant === "nitro" ? "#071014" : "#ffffff";
-}
-
-function variantOutline(variant: ScheduleVariant) {
-  return variant === "nitro" ? "rgba(255, 255, 255, 0.96)" : "rgba(7, 16, 20, 0.96)";
 }
 
 function slotX(trackW: number, visibleSlot: number, slotCount: number) {
@@ -119,10 +99,14 @@ function endsSixHourSection(hour: number) {
 
 export async function downloadCalendarJpeg(opts: Opts) {
   await document.fonts.ready;
-  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel } = opts;
+  const { title, tag, days, runs, usedColumns, today, dimPast, nowAt, kicker, meta, dayLabel, kindLabels } = opts;
+  const showKindLetters = calendarHasBothKinds(runs);
+  const legendGroups = calendarLegendGroups(usedColumns);
   const visibleSlotCount = workHalfSlots(DEFAULT_WORK_HOURS).length;
   const rowH = 22;
-  const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + PAD;
+  // Wrap the full limit catalog into three samples per row in each group.
+  const legendRows = Math.max(1, ...legendGroups.map((group) => Math.ceil(group.items.length / 3)));
+  const height = PAD + TITLE_H + HOUR_H + days.length * rowH + FOOT_H + (legendRows - 1) * 22 + PAD;
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * DPR;
   canvas.height = height * DPR;
@@ -268,15 +252,11 @@ export async function downloadCalendarJpeg(opts: Opts) {
         }
         ctx.restore();
         ctx.save();
-        ctx.fillStyle = variantInk(run.variant);
-        ctx.strokeStyle = variantOutline(run.variant);
-        ctx.lineWidth = 1.6;
-        ctx.lineJoin = "round";
+        ctx.fillStyle = paint.text;
         ctx.font = variantFont(run.variant, len <= 2 ? 8 : 10);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const runLabel = len >= 6 ? run.label : run.label.slice(0, 1);
-        drawPairLabel(ctx, runLabel, x + w / 2, cy + CHIP_H / 2, run.variant);
+        if (showKindLetters) ctx.fillText(calendarKindLetter(run.variant), x + w / 2, cy + CHIP_H / 2);
         ctx.restore();
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
@@ -296,21 +276,39 @@ export async function downloadCalendarJpeg(opts: Opts) {
   }
 
   const footY = sheetY + sheetH + 14;
-  let legendX = PAD;
-  for (const column of usedColumns) {
-    ctx.fillStyle = mineTone(column.limit);
-    ctx.beginPath();
-    ctx.arc(legendX + 4, footY + 6, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = variantInk(column.variant);
-    ctx.strokeStyle = variantOutline(column.variant);
-    ctx.lineWidth = 1.6;
-    ctx.lineJoin = "round";
-    ctx.font = variantFont(column.variant, 11);
-    const label = column.label;
-    drawPairLabel(ctx, label, legendX + 14, footY, column.variant);
-    legendX += ctx.measureText(label).width + 28;
-  }
+  const groupWidth = sheetW / Math.max(1, legendGroups.length);
+  legendGroups.forEach(({ variant, items }, groupIndex) => {
+    const groupX = PAD + groupIndex * groupWidth;
+    const inset = groupIndex ? 14 : 0;
+    if (groupIndex) {
+      ctx.strokeStyle = paint.lineStrong;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(groupX, footY);
+      ctx.lineTo(groupX, footY + 16 + legendRows * 22);
+      ctx.stroke();
+    }
+    ctx.fillStyle = paint.muted;
+    ctx.font = `${variant === "regular" ? "italic " : ""}500 11px Inter, IBM Plex Sans, sans-serif`;
+    ctx.fillText(kindLabels[variant], groupX + inset, footY);
+    items.forEach((column, index) => {
+      const x = groupX + inset + (index % 3) * 72;
+      const y = footY + 18 + Math.floor(index / 3) * 22;
+      ctx.fillStyle = mineTone(column.limit);
+      roundRect(ctx, x, y, 18, 14, 2);
+      ctx.fill();
+      ctx.font = variantFont(variant, 10);
+      ctx.fillStyle = paint.text;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(calendarKindLetter(variant), x + 9, y + 7);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = mineTone(column.limit);
+      ctx.font = variantFont(variant, 11);
+      ctx.fillText(column.limit, x + 24, y + 1);
+    });
+  });
 
   await new Promise<void>((resolve, reject) => {
     canvas.toBlob((blob) => {

@@ -12,6 +12,13 @@ import type { Occupancy } from "../../schedule/plan";
 import type { OverwriteAsk } from "../optFieldModel";
 import { showV2Toast } from "../V2Toast";
 import type { useScheduleMonth } from "./useScheduleMonth";
+import type { BrushAccessState } from "./useScheduleBrush";
+
+type PlacementTarget = { memberId?: string; playerName: string };
+function placementTarget(edits: GridEdit[], memberId?: string): PlacementTarget {
+  const mark = edits.find((edit) => edit.after)?.after;
+  return { memberId, playerName: mark?.discord || mark?.t || "" };
+}
 
 type Options = {
   year: number;
@@ -21,19 +28,20 @@ type Options = {
   actingRef: MutableRefObject<string | undefined>;
   accessRef: MutableRefObject<Set<string>>;
   selectedPlayPairsRef: MutableRefObject<Set<string> | null>;
+  brushAccessRef: MutableRefObject<BrushAccessState>;
   filterLimits: ScheduleFilterLimits;
   t: TFunction;
   language: string;
 };
 
-export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, filterLimits, t, language }: Options) {
+export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language }: Options) {
   const { controller } = month;
   const current = useRef(controller);
   current.current = controller;
   const [overwriteAsk, setOverwriteAsk] = useState<OverwriteAsk | null>(null);
   const [overwriteBusy, setOverwriteBusy] = useState(false);
   const overwritePending = useRef(false);
-  const [missingPlayPair, setMissingPlayPair] = useState<{ variant: ScheduleVariant; limit: string } | null>(null);
+  const [missingPlayPair, setMissingPlayPair] = useState<({ variant: ScheduleVariant; limit: string } & PlacementTarget) | null>(null);
 
   useEffect(() => {
     setOverwriteAsk(null);
@@ -43,14 +51,21 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   }, [controller]);
 
   const placementAllowed = useCallback((variant: ScheduleVariant, limit: string, edits: GridEdit[]) => {
+    const access = brushAccessRef.current;
+    if (access.memberId !== actingRef.current || access.status !== "ready") {
+      showV2Toast("err", t(access.memberId === actingRef.current && access.status === "error"
+        ? "schedule.brushAccessError" : "schedule.brushAccessLoading"));
+      return false;
+    }
     if (!edits.some((edit) => edit.after)) return true;
+    if (edits.some((edit) => edit.after?.memberId && edit.after.memberId !== actingRef.current)) return false;
     if (edits.some((edit) => edit.after && !edit.after.t.trim())) return false;
     if (isLiveData() && !accessRef.current.has(accessKey(variant, limit))) {
       showV2Toast("err", t("schedule.toastNoAccess"));
       return false;
     }
     if (selectedPlayPairsRef.current !== null && !selectedPlayPairsRef.current.has(accessKey(variant, limit))) {
-      setMissingPlayPair({ variant, limit });
+      setMissingPlayPair({ variant, limit, ...placementTarget(edits, actingRef.current) });
       return false;
     }
     if (!filterLimits[variant].includes(limit)) {
@@ -58,10 +73,10 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
       return false;
     }
     return true;
-  }, [accessRef, selectedPlayPairsRef, filterLimits, t]);
+  }, [accessRef, selectedPlayPairsRef, brushAccessRef, actingRef, filterLimits, t]);
 
-  const showWriteError = (error: string, variant: ScheduleVariant, limit: string) => {
-    if (error.includes("schedule-player-limit-not-selected")) setMissingPlayPair({ variant, limit });
+  const showWriteError = (error: string, variant: ScheduleVariant, limit: string, target: PlacementTarget) => {
+    if (error.includes("schedule-player-limit-not-selected")) setMissingPlayPair({ variant, limit, ...target });
     else showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess")
       : error.includes("schedule-conflict") ? t("schedule.toastConflict") : t("schedule.toastSaveError"));
   };
@@ -92,9 +107,10 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     const self = selfIdRef.current;
     const painter = actingRef.current;
     if (!controller.snapshot.ready || !self || !painter) return;
+    const target = placementTarget(edits, painter);
     void controller.edit(key, edits, () => writeEdits(variant, limit, edits, self, painter)).then((error) => {
       if (current.current !== controller) return;
-      if (error) showWriteError(error, variant, limit);
+      if (error) showWriteError(error, variant, limit, target);
       else showV2Toast(edits[0].after ? "ok" : "off", t(edits[0].after ? "schedule.toastPlaced" : "schedule.toastRemoved"));
     });
   };
@@ -121,6 +137,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     const self = selfIdRef.current;
     const painter = actingRef.current;
     if (!controller.snapshot.ready || !self || !painter) return;
+    const target = placementTarget(edits, painter);
     const foreign = action === "wipe" ? ask.slots.map((slot) => ({
       ...slot, memberId: ask.before[Number(slot.date.slice(8, 10)) - 1]?.[slot.half]?.[slot.level]?.memberId ?? "",
     })) : [];
@@ -139,7 +156,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
       setOverwriteAsk(null);
       if (error) {
         if (error.includes("overwrite-off")) showV2Toast("err", t("schedule.overwrite.off"));
-        else showWriteError(error, ask.variant, ask.limit);
+        else showWriteError(error, ask.variant, ask.limit, target);
       } else showV2Toast(ask.kind === "place" && action === "empty" ? "ok" : "off", t(toastKey));
     });
   };

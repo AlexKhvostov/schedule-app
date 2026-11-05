@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import type { SchedulePlayer } from "../../data/players";
 import { type MonthGridStore, type ScheduleVariant } from "../../data/slots";
-import { type CapacityMap } from "../../schedule/capacity";
+import { type VariantCapacityMap } from "../../schedule/capacity";
 import { type DisplayRange } from "../../schedule/displayRange";
 import { type HourLoadMap } from "../../schedule/hourLoad";
 import { type Mark } from "../../schedule/marks";
@@ -31,7 +31,7 @@ export type OptFieldProps = {
   kinds: ScheduleVariant[];
   limits: string[];
   pairRows?: SchedulePairRow[];
-  capacity: CapacityMap;
+  capacity: VariantCapacityMap;
   grids: MonthGridStore;
   hourLoad?: HourLoadMap;
   onGridChange: (variant: ScheduleVariant, limit: string, next: Occupancy) => void;

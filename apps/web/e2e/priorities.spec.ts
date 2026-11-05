@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { priorityFiltersStorageKey } from "../src/v2/priorityFilterPrefs";
-import { currentPriorityPeriod, priorityMonths, type PriorityPerson } from "../src/schedule/priorities";
+import { priorityMonths, type PriorityPerson } from "../src/schedule/priorities";
 
 async function enter(page: Page) {
   await page.goto("/");
@@ -98,7 +98,7 @@ test("distance ranking ignores Core badges and keeps kind filters", async ({ pag
 
 test("existing version-one request facts render raw distances and keep the original weighted total", async ({ page }) => {
   await enter(page);
-  const periodStart = currentPriorityPeriod(), months = priorityMonths(periodStart);
+  const periodStart = "2026-08-01", months = priorityMonths(periodStart);
   const person: PriorityPerson = { memberId: "legacy-player", nick: "Сохранённый игрок", avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 3, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [
     { id: "n", month: months[0], variant: "nitro", part: 1, values: [{ limit: "50", tournaments: 11 }, { limit: "100", tournaments: 7 }] },
     { id: "r-old", month: months[0], variant: "regular", part: 2, values: [{ limit: "50", tournaments: 2 }] },
@@ -161,10 +161,10 @@ test("report row stays above side-by-side selectors and filters", async ({ page 
   const month = page.getByLabel("Отчётный месяц", { exact: true });
   const periods = await month.locator("option").evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
   expect(periods).toHaveLength(16);
-  expect(periods.filter((p) => p === "")).toHaveLength(1);
-  expect(periods[1]).toBe("");
+  expect(periods).toContain("2026-08-01");
+  await expect(month).toHaveValue("2026-08-01");
   const newest = new Date(periods[0]);
-  for (let i = 2; i < periods.length; i++) {
+  for (let i = 1; i < periods.length; i++) {
     const expected = new Date(Date.UTC(newest.getUTCFullYear(), newest.getUTCMonth() - i * 3, 1)).toISOString().slice(0, 10);
     expect(periods[i]).toBe(expected);
   }
@@ -173,7 +173,7 @@ test("report row stays above side-by-side selectors and filters", async ({ page 
   await expect(page.locator(".v2-prio-window")).toContainText("октябрь 2025");
   await expect(page.locator(".v2-prio-window")).toContainText("ноябрь 2025");
   await expect(page.locator(".v2-prio-window")).toContainText("январь 2026");
-  await month.selectOption("");
+  await month.selectOption("2026-08-01");
   await expect(page.locator(".v2-prio-table tbody tr")).not.toHaveCount(0);
   const filters = await page.locator(".v2-prio-filters").boundingBox();
   const tabs = await page.getByRole("tablist", { name: "Вид турниров" }).boundingBox();

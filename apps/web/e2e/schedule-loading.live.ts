@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { LIMIT_OPTIONS } from "../src/schedule/capacity";
 
 function gate() {
   let release!: () => void;
@@ -50,13 +51,63 @@ async function fixture(page: Page, failSecondPage = false) {
       const identity = { member_id: member.id, provider: "email", username: "fixture" };
       return reply(single ? identity : [identity]);
     }
-    if (path.endsWith("/schedule_kinds")) return reply([
-      { id: "n50", limit_id: "50", variant_id: "nitro" }, { id: "n100", limit_id: "100", variant_id: "nitro" },
-    ]);
+    if (path.endsWith("/schedule_kinds")) return reply(["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant === "nitro" ? "n" : "e"}${limit}`, limit_id: limit, variant_id: variant }))));
     return reply(single ? null : []);
   });
   return { gates, requested, recover: () => { failSecondPage = false; } };
 }
+
+test("capacity read failures hide the grid until both kinds load successfully", async ({ page }) => {
+  const { gates } = await fixture(page); gates.forEach(g => g.release());
+  let failed = true;
+  await page.route("**/rest/v1/capacity_rules?**", async route => {
+    if (failed) return route.fulfill({ status: 503, json: { message: "capacity offline" } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/");
+  const error = page.getByRole("alert").filter({ hasText: "Не удалось загрузить ёмкость" });
+  await expect(error).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".v2-opt-sheet")).toHaveCount(0);
+  failed = false;
+  await error.getByRole("button", { name: "Повторить", exact: true }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+});
+
+test("Regular capacity saves only its edited limit and a rejected save retains the draft", async ({ page }) => {
+  const { gates } = await fixture(page); gates.forEach(g => g.release());
+  let failSave = true;
+  const saves: { p_variant: string; p_profiles: Record<string, { hours: number[]; days: Record<string, number[]> }> }[] = [];
+  await page.route("**/rest/v1/capacity_rules?**", async route => {
+    const query = new URL(route.request().url()).searchParams.get("kind_id") ?? "";
+    const regular = query.includes("e50");
+    return route.fulfill({ json: LIMIT_OPTIONS.map(limit => ({ kind_id: `${regular ? "e" : "n"}${limit}`, layer: "base", hours: Array(24).fill(regular ? 3 : 1) })) });
+  });
+  await page.route("**/rpc/save_capacity_profiles", async route => {
+    saves.push(route.request().postDataJSON());
+    if (failSave) return route.fulfill({ status: 403, json: { message: "forbidden" } });
+    return route.fulfill({ json: null });
+  });
+  await page.goto("/#admin-schedule");
+  const panel = page.locator(".v2-admin-card").filter({ has: page.getByText("Ёмкость по часам CET", { exact: true }) });
+  await panel.getByRole("button", { name: "Развернуть", exact: true }).click();
+  await panel.getByRole("button", { name: "E50", exact: true }).click();
+  const cell = panel.locator(".v2-cap-mx-cell").nth(4 * 24 + 8);
+  await expect(cell).toHaveText("3");
+  await cell.click();
+  await panel.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(page.getByText("Ёмкость не сохранена. Изменения остались в редакторе — повторите сохранение.", { exact: true })).toBeVisible();
+  await expect(cell).toHaveText("4");
+  await expect(panel.getByRole("button", { name: "Сохранить", exact: true })).toBeEnabled();
+  failSave = false;
+  await panel.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Сохранено", exact: true })).toBeVisible();
+  expect(saves).toHaveLength(2);
+  expect(saves[1].p_variant).toBe("regular");
+  expect(Object.keys(saves[1].p_profiles)).toEqual(["50"]);
+  expect(saves[1].p_profiles["50"].days["5"][8]).toBe(4);
+  await panel.getByRole("button", { name: "N50", exact: true }).click();
+  await expect(cell).toHaveText("1");
+});
 
 test("compact month stays hidden until the complete response, then shows all 2800 seats", async ({ page }) => {
   const { gates, requested } = await fixture(page);
@@ -100,14 +151,14 @@ test("a failed compact read keeps the month hidden until retry succeeds", async 
 test("monthly roster uses one conditional compact read, coalesces events and pauses while hidden", async ({ page }) => {
   const { gates } = await fixture(page);
   const requests: Record<string, unknown>[] = [];
-  let revision = "p1", directoryRevision = "d1", fail = false;
+  let revision = "p1", directoryRevision = "d1", activePeriod = "2026-08-01", fail = false;
   const forbiddenLoads: string[] = [];
   page.on("request", (request) => { if (request.url().endsWith("/rpc/load_priority_slice")) forbiddenLoads.push(request.url()); });
-  await page.route("**/rpc/load_month_roster", async (route) => {
+  await page.route("**/rpc/load_active_month_roster", async (route) => {
     const body = route.request().postDataJSON(); requests.push(body);
     if (fail) return route.fulfill({ status: 503, json: { message: "roster offline" } });
     await route.fulfill({ json: {
-      periodStart: body.p_period_start, kind: body.p_variant, group: body.p_group,
+      periodStart: activePeriod, kind: body.p_variant, group: body.p_group,
       today: "2026-11-04", lastMonthEntries: 20, revision, directoryRevision,
       people: body.p_priority_revision === revision ? null : [
         { memberId: "a", core: revision === "p1" ? 3 : 0, score: 5, excluded: false },
@@ -128,6 +179,8 @@ test("monthly roster uses one conditional compact read, coalesces events and pau
   const ids = () => roster.locator(".v2-people-row:not(.is-historical)").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-member")));
   await expect.poll(ids).toEqual(["a", "b", "c"]);
   expect(requests).toHaveLength(1);
+  expect(requests[0]).not.toHaveProperty("p_period_start");
+  await expect(page.locator(".v2-roster-active-period")).toContainText("август");
   const burst = () => page.evaluate(() => {
     window.dispatchEvent(new Event("focus"));
     window.dispatchEvent(new Event("priority-distance-changed"));
@@ -137,9 +190,10 @@ test("monthly roster uses one conditional compact read, coalesces events and pau
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1]).toMatchObject({ p_priority_revision: "p1", p_directory_revision: "d1" });
   await expect.poll(ids).toEqual(["a", "b", "c"]);
-  revision = "p2"; directoryRevision = "d2";
+  revision = "p2"; directoryRevision = "d2"; activePeriod = "2026-11-01";
   await burst(); await expect.poll(ids).toEqual(["c", "b", "a"]);
   await expect(roster).toContainText("Beta updated");
+  await expect(page.locator(".v2-roster-active-period")).toContainText("ноябрь");
   expect(requests).toHaveLength(3);
   await page.clock.install();
   await page.evaluate(() => {

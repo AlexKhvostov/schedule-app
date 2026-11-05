@@ -6,7 +6,6 @@ import {
   applyMatrix,
   clampCap,
   defaultHourCaps,
-  hoursOf,
   formatLimit,
   limitTone,
   maxLevels,
@@ -65,7 +64,7 @@ type Props = {
   section?: AdminSection;
   variant: "nitro" | "regular";
   onVariantChange: (variant: "nitro" | "regular") => void;
-  onCapacityChange: (next: CapacityMap) => void;
+  onCapacityChange: (next: CapacityMap, limit: string) => Promise<void>;
 };
 
 function nextCap(cap: number, down: boolean) {
@@ -121,6 +120,9 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
   const [filterLimitsSaving, setFilterLimitsSaving] = useState(false);
   const [filterLimitsSaved, setFilterLimitsSaved] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savingCapacity, setSavingCapacity] = useState(false);
+  const savingCapacityRef = useRef(false);
+  const [equalize, setEqualizeDraft] = useState(false);
   const [hover, setHover] = useState<{ day: number; hour: number } | null>(null);
   const [range, setRange] = useState<CapRange | null>(null);
   const [weekOn, setWeekOn] = useState(true);
@@ -187,22 +189,24 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
     setHover(null);
     setRange(null);
     const next = profileOf(capacity, limit);
+    setEqualizeDraft(next.equalize);
     setWeekOn(next.weekOn);
     setMonthOn(next.monthOn);
-  }, [limit, tab, variant, weekLabels]);
+  }, [limit, tab, variant, weekLabels, section]);
 
   const baseline = useMemo(() => {
+    const stored = profileOf(capacity, limit);
     if (tab === "week") {
       return weekLabels.map((item) => ({
         id: item.id,
         label: item.label,
-        hours: hoursOf(capacity, limit, undefined, item.id).slice(),
+        hours: (stored.weekdays[String(item.id)] ?? stored.hours).slice(),
       }));
     }
     return Array.from({ length: 31 }, (_, i) => i + 1).map((day) => ({
       id: day,
       label: String(day),
-      hours: hoursOf(capacity, limit, day).slice(),
+      hours: (stored.days[String(day)] ?? stored.hours).slice(),
     }));
   }, [capacity, limit, tab, weekLabels]);
   baselineRef.current = baseline;
@@ -211,39 +215,41 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
   const filterLimitsDirty =
     filterLimits.nitro.join("|") !== savedFilterLimits.nitro.join("|") ||
     filterLimits.regular.join("|") !== savedFilterLimits.regular.join("|");
-  const flagsDirty = weekOn !== profile.weekOn || monthOn !== profile.monthOn;
+  const flagsDirty = weekOn !== profile.weekOn || monthOn !== profile.monthOn || equalize !== profile.equalize;
   const dirty = (draft != null && !sameMatrix(draft, baseline)) || flagsDirty;
   const extremes = useMemo(() => extremesOf(matrix), [matrix]);
   const sameDepth = Boolean(extremes.deep && extremes.shallow && extremes.deep.id === extremes.shallow.id);
+
+  const persistCapacity = async (next: CapacityMap) => {
+    if (savingCapacityRef.current) return;
+    savingCapacityRef.current = true;
+    setSavingCapacity(true);
+    setSaved(false);
+    try {
+      await onCapacityChange(next, limit);
+      setDraft(null);
+      const updated = profileOf(next, limit);
+      setWeekOn(updated.weekOn);
+      setMonthOn(updated.monthOn);
+      setEqualizeDraft(updated.equalize);
+      setSaved(true);
+    } catch {
+      showV2Toast("err", t("admin.capacity.saveErr"));
+    } finally {
+      savingCapacityRef.current = false;
+      setSavingCapacity(false);
+    }
+  };
 
   const save = () => {
     if (!dirty) return;
     let next = capacity;
     if (draft != null && !sameMatrix(draft, baseline)) next = applyMatrix(next, limit, tab, draft);
-    if (flagsDirty) next = setRuleFlags(next, limit, { weekOn, monthOn });
-    onCapacityChange(next);
-    setDraft(null);
-    setSaved(true);
+    next = setEqualize(setRuleFlags(next, limit, { weekOn, monthOn }), limit, equalize);
+    void persistCapacity(next);
   };
 
-  const reset = () => {
-    onCapacityChange(resetLimit(capacity, limit));
-    setDraft(loadMatrixAfterReset());
-    setWeekOn(true);
-    setMonthOn(true);
-    setSaved(false);
-  };
-
-  const loadMatrixAfterReset = () => {
-    if (tab === "week") {
-      return weekLabels.map((item) => ({ id: item.id, label: item.label, hours: defaultHourCaps() }));
-    }
-    return Array.from({ length: 31 }, (_, i) => i + 1).map((day) => ({
-      id: day,
-      label: String(day),
-      hours: defaultHourCaps(),
-    }));
-  };
+  const reset = () => { void persistCapacity(resetLimit(capacity, limit)); };
 
   const resetMatrix = () => {
     setDraft(
@@ -501,7 +507,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
           onToggle={() => setOpen((value) => !value)}
         />
 
-        {open && <div className="flex">
+        {open && <fieldset disabled={savingCapacity} className="flex min-w-0 border-0 p-0" aria-busy={savingCapacity}>
           <SchedulePairPicker variant={variant} limit={limit} onChange={(kind, value) => {
             if (kind !== variant) onVariantChange(kind);
             setLimit(value);
@@ -612,7 +618,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
                 {(sameDepth ? [extremes.deep] : [extremes.deep, extremes.shallow]).map((row, index) => {
                   const own = maxLevels(row.hours);
                   const deepMax = maxLevels(extremes.deep?.hours ?? row.hours);
-                  const shown = profile.equalize ? deepMax : own;
+                  const shown = equalize ? deepMax : own;
                   return (
                     <div key={`${row.id}-${index}`} className="v2-cap-peek-day">
                       <div className="v2-cap-peek-meta">
@@ -691,14 +697,14 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
               <label className="flex cursor-pointer items-center gap-2 text-[13px]" title={t("admin.capacity.equalizeHint")}>
                 <input
                   type="checkbox"
-                  checked={profile.equalize}
-                  onChange={(event) => onCapacityChange(setEqualize(capacity, limit, event.target.checked))}
+                  checked={equalize}
+                  onChange={(event) => { setEqualizeDraft(event.target.checked); setSaved(false); }}
                 />
                 <span>{t("admin.capacity.equalize")}</span>
               </label>
             </div>
           </div>
-        </div>}
+        </fieldset>}
         <LockedSlotEditor hidden={!open} />
       </section>
 

@@ -8,6 +8,7 @@ import { daysInMonth, type Occupancy } from "../schedule/plan";
 import { formatDayLong } from "../schedule/formatDate";
 import { DEFAULT_WORK_HOURS, visibleWorkRuns, workHalfSlots, workHourSegments, workTrackProgress } from "../schedule/workHours";
 import { downloadCalendarJpeg, type CalendarShiftRun } from "./calendarJpeg";
+import { calendarHasBothKinds, calendarKindLetter, calendarLegendGroups } from "./calendarPresentation";
 import { loadTheme } from "./theme";
 import { usePlayerClock } from "./usePlayerClock";
 import { hourBoundaries, myShifts, uniqueShiftHours } from "./myShifts";
@@ -116,6 +117,8 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
     ) as CalendarShiftRun[], [columns, grids, tag]);
   const runs = allRuns;
   const usedColumns = columns.filter((column) => runs.some((run) => run.label === column.label));
+  const showKindLetters = calendarHasBothKinds(runs);
+  const legendGroups = calendarLegendGroups(usedColumns);
   const physicalHours = uniqueShiftHours(allRuns);
   const hours = workHourSegments(DEFAULT_WORK_HOURS);
   const visibleSlotCount = workHalfSlots(DEFAULT_WORK_HOURS).length;
@@ -266,6 +269,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                       <button
                         key={`${run.label}-${run.start}-${segmentIndex}`}
                         type="button"
+                        aria-label={`${tipDate(year, monthIndex, day.d, i18n.language)} · ${run.label} · ${clock(segment.start)}–${clock(segment.end)} CET`}
                         className={`v2-mine-chip is-${run.variant}${len <= 2 ? " is-tight" : ""}${runPast && dimPastShifts ? " is-past" : ""}`}
                         style={{
                           left: box.left,
@@ -288,7 +292,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                           </span>
                         )}
                         <span className="v2-chip-face">
-                          <PairLabel label={len >= 4 ? run.label : run.label.slice(0, 1)} />
+                          {showKindLetters ? calendarKindLetter(run.variant) : null}
                         </span>
                       </button>
                     );
@@ -302,11 +306,18 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
 
         <footer className="v2-mine-foot">
           <div className="v2-mine-legends">
-            {usedColumns.map((column) => (
-              <span key={column.key} className={`v2-mine-legend is-${column.variant}`}>
-                <i style={{ background: mineTone(column.limit) }} />
-                <PairLabel label={column.label} />
-              </span>
+            {legendGroups.map(({ variant, items }) => (
+              <div key={variant} className={`v2-mine-legend-group is-${variant}`} role="group" aria-label={t(`v2.tip.${variant}`)}>
+                <span className="v2-mine-legend-heading">{t(`v2.tip.${variant}`)}</span>
+                <div className="v2-mine-legend-items">
+                  {items.map((column) => (
+                    <span key={column.key} className={`v2-mine-legend is-${variant}`} style={{ color: mineTone(column.limit) }}>
+                      <i className="v2-mine-swatch" style={{ background: mineTone(column.limit) }}>{calendarKindLetter(variant)}</i>
+                      <span>{column.limit}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           <button
@@ -330,6 +341,7 @@ export function V2MyCalendar({ year, monthIndex, title, tag, columns, grids, tod
                 kicker: t("schedule.myCalendar"),
                 meta: `${tag} · ${t("schedule.myShifts", { n: allRuns.length })} · ${t("schedule.myHours", { n: physicalHours })}`,
                 dayLabel: t("v2.day"),
+                kindLabels: { nitro: t("v2.tip.nitro"), regular: t("v2.tip.regular") },
               }).finally(() => setSaving(false));
             }}
           >

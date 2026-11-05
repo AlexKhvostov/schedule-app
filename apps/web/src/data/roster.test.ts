@@ -3,11 +3,23 @@ import { createRosterLoader, type RosterQuery, type RosterResponse, type RosterR
 
 const query: RosterQuery = { period: "2026-11-01", kind: "nitro", group: "50-100", limits: ["100", "50"] };
 function response(q = query): RosterResponse {
-  return { periodStart: q.period, kind: q.kind, group: q.group, today: "2026-11-04", lastMonthEntries: 20, revision: "p1",
+  return { periodStart: q.period ?? "2026-08-01", kind: q.kind, group: q.group, today: "2026-11-04", lastMonthEntries: 20, revision: "p1",
     people: [{ memberId: "a", core: 0, score: 12, excluded: false }], directoryRevision: "d1",
     faces: [{ memberId: "a", discord: "Alpha", t: "AA", bg: "#000", fg: "#fff", room: "", tables: 1 }] };
 }
 describe("conditional monthly roster", () => {
+  it("follows a server-selected period and never reuses a stale array across activation", async () => {
+    const q = { ...query, period: null };
+    const read = vi.fn().mockResolvedValue(response(q)); const loader = createRosterLoader(read);
+    const first = await loader.load(q);
+    read.mockResolvedValue({ ...response(q), periodStart: "2026-11-01", revision: "nov", people: null });
+    await expect(loader.load(q)).rejects.toThrow("roster-response-mismatch");
+    read.mockResolvedValue({ ...response(q), periodStart: "2026-11-01", revision: "nov", people: [{ memberId: "a", core: 0, score: 99, excluded: false }], faces: null });
+    const next = await loader.load(q);
+    expect(first.source.periodStart).toBe("2026-08-01");
+    expect(next.source.periodStart).toBe("2026-11-01"); expect(next.source.people[0].score).toBe(99);
+    expect(next.faces).toBe(first.faces);
+  });
   it("shares concurrent reads and reuses both unchanged arrays while updating status metadata", async () => {
     const read = vi.fn().mockResolvedValue(response());
     const loader = createRosterLoader(read);

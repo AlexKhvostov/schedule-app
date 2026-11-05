@@ -11,6 +11,8 @@ import { schedulePlayPairKeys } from "../../schedule/playerScheduleLimits";
 import { readSession } from "../session";
 import { loadTablePresetSelection, saveTablePresetSelection } from "../tablePresetSelection";
 
+export type BrushAccessState = { memberId?: string; status: "loading" | "ready" | "error" };
+
 export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, limitMarks }: {
   memberId?: string;
   mayActAs: boolean;
@@ -31,6 +33,8 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
   const accessRef = useRef<Set<string>>(new Set());
 
   const selectedPlayPairsRef = useRef<Set<string> | null>(null);
+  const brushAccessRef = useRef<BrushAccessState>({ status: "loading" });
+  const [accessRevision, setAccessRevision] = useState(0);
 
   const selfMarkRef = useRef(selfMark);
 
@@ -52,6 +56,9 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
 
   useEffect(() => {
     const id = actingId || selfId;
+    const request: BrushAccessState = { memberId: id, status: "loading" };
+    brushAccessRef.current = request;
+    accessRef.current = new Set();
     selectedPlayPairsRef.current = null;
     if (!id) {
       accessRef.current = new Set();
@@ -65,18 +72,33 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
         for (const limit of member?.limits ?? []) selected.add(accessKey("nitro", limit));
       }
       selectedPlayPairsRef.current = selected;
+      request.status = "ready";
       return;
     }
     let live = true;
-    void Promise.all([loadScheduleAccess(id), loadMyPlays(id)]).then(([rows, plays]) => {
-      if (!live) return;
+    void Promise.all([loadScheduleAccess(id, true), loadMyPlays(id, true)]).then(([rows, plays]) => {
+      if (!live || brushAccessRef.current !== request || actingRef.current !== id) return;
       accessRef.current = new Set(rows.map((row) => accessKey(row.variant, row.limit)));
       selectedPlayPairsRef.current = schedulePlayPairKeys(plays);
+      request.status = "ready";
+    }).catch(() => {
+      if (live && brushAccessRef.current === request) request.status = "error";
     });
     return () => {
       live = false;
     };
-  }, [actingId, selfId]);
+  }, [actingId, selfId, accessRevision]);
+
+  const changeActing = (id: string) => {
+    // Invalidate synchronously: even a click before the next effect cannot use
+    // the previous player's permissions. Selecting the same player retries.
+    brushAccessRef.current = { memberId: id, status: "loading" };
+    accessRef.current = new Set();
+    selectedPlayPairsRef.current = null;
+    actingRef.current = id;
+    setActingId(id);
+    setAccessRevision((value) => value + 1);
+  };
 
   useEffect(() => {
     const applySelf = (mark: Mark, id?: string) => {
@@ -208,20 +230,20 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
 
   const applyActAs = (id: string) => {
     if (selfId && id === selfId) {
-      setActingId(selfId);
+      changeActing(selfId);
       setMe(selfMarkRef.current);
       return;
     }
     const row = players.find((item) => item.id === id);
     if (row) {
       const mark = markFromPlayer(row);
-      setActingId(row.id);
+      changeActing(row.id);
       setMe(mark);
       return;
     }
     const mark = (limitMarks ?? []).find((item) => item.memberId === id);
     if (!mark?.memberId) return;
-    setActingId(mark.memberId);
+    changeActing(mark.memberId);
     setMe(mark);
   };
 
@@ -246,8 +268,7 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
     const player = players.find((row) => row.id === targetId);
     const base = targetId === selfId ? selfMarkRef.current : player ? markFromPlayer(player) : null;
     if (!base) return;
-    actingRef.current = targetId;
-    setActingId(targetId);
+    changeActing(targetId);
     saveTablePresetSelection(targetId, value);
     setTablePresets([...presets]);
     setTablePresetOwnerId(targetId);
@@ -256,5 +277,5 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
       setSelfMark((mark) => ({ ...mark, tables: value }));
     }
   };
-  return { selfMark, selfMarkRef, me, actingId, actingRef, selfId, selfIdRef, accessRef, selectedPlayPairsRef, players, tablePresets, tablePresetOwnerId, actPlayers, applyActAs, loadTablePresetsForPlayer, selectTablePreset };
+  return { selfMark, selfMarkRef, me, actingId, actingRef, selfId, selfIdRef, accessRef, selectedPlayPairsRef, brushAccessRef, players, tablePresets, tablePresetOwnerId, actPlayers, applyActAs, loadTablePresetsForPlayer, selectTablePreset };
 }

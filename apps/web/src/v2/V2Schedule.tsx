@@ -10,7 +10,7 @@ import {
   monthGridKey
 } from "../data/slots";
 import { columnFill, fieldFill } from "../schedule/analytics";
-import { LIMIT_OPTIONS, formatLimit, type CapacityMap } from "../schedule/capacity";
+import { LIMIT_OPTIONS, formatLimit, type VariantCapacityMap } from "../schedule/capacity";
 import { readCet } from "../schedule/cet";
 import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadTimeStats";
 import { demoMonthPlan } from "../schedule/demoPlan";
@@ -21,7 +21,7 @@ import { markKey, type Mark } from "../schedule/marks";
 import { loadMembers } from "../schedule/members";
 import { emptyMonth } from "../schedule/plan";
 import { groupRosterRows, orderRosterRows, rosterFromGrids, type RosterRow } from "../schedule/roster";
-import { currentPriorityPeriod, groupsForLimits, isPriorityPreliminary, type PriorityGroup, type PriorityKind } from "../schedule/priorities";
+import { groupsForLimits, isPriorityPreliminary, type PriorityGroup, type PriorityKind } from "../schedule/priorities";
 import { FillByHourChart } from "./FillByHourChart";
 import { OptField } from "./OptField";
 import { OverwriteConfirm } from "./OverwriteConfirm";
@@ -59,7 +59,7 @@ const ScheduleMemberProfile = lazy(() => import("./ScheduleMemberProfile").then(
 type Props = {
   cursor: Date;
   onCursorChange: (value: Date) => void;
-  capacity: CapacityMap;
+  capacity: VariantCapacityMap;
   hourLoad?: HourLoadMap;
   skin?: "classic" | "theme";
   memberId?: string;
@@ -111,12 +111,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const brush = useScheduleBrush({
     memberId, mayActAs: canActAs || allowActAs, editByButton, canEdit, limitMarks,
   });
-  const { selfMark, me, actingId, actingRef, selfId, selfIdRef, accessRef, selectedPlayPairsRef, players, tablePresets, tablePresetOwnerId, actPlayers, applyActAs, loadTablePresetsForPlayer, selectTablePreset } = brush;
+  const { selfMark, me, actingId, actingRef, selfId, selfIdRef, accessRef, selectedPlayPairsRef, brushAccessRef, players, tablePresets, tablePresetOwnerId, actPlayers, applyActAs, loadTablePresetsForPlayer, selectTablePreset } = brush;
   const month = useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef, t });
   const { setGridStore, busyRemote, requestedLimits, fetchKey, gridLoading, shownGridStore } = month;
 
   const { overwriteAsk, setOverwriteAsk, overwriteBusy, missingPlayPair, setMissingPlayPair, onGridChange, confirmOverwrite } = useScheduleMutations({
-    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, filterLimits, t, language: i18n.language,
+    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language: i18n.language,
   });
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const mayActAs = canActAs || allowActAs;
@@ -140,12 +140,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const auxiliaryGrids = useMemo(() => gridsByVariantLabel(auxiliaryItems), [auxiliaryItems]);
   const rosterItems = useMemo(() => auxiliaryItems.filter((item) => item.variant === rosterKind), [auxiliaryItems, rosterKind]);
   const rosterLabels = useMemo(() => rosterItems.map((item) => item.label), [rosterItems]);
-  const rosterPeriod = currentPriorityPeriod(`${year}-${String(monthIndex + 1).padStart(2, "0")}-01`);
+  // The server resolves the shared active rating, independently of the open schedule month.
   const rosterLimits = limits.filter((limit) => filterLimits[rosterKind].includes(limit));
   const rosterGroupsAvailable = groupsForLimits(rosterLimits);
   const hasRosterPriority = rosterGroupsAvailable.length > 0;
   const rosterGroup = rosterGroupsAvailable.includes(chosenRosterGroup) ? chosenRosterGroup : rosterGroupsAvailable[0] ?? "50-100";
-  const rosterSource = useRosterSource(showPeople, rosterPeriod, rosterKind, rosterLimits, rosterGroup, memberId);
+  const rosterSource = useRosterSource(showPeople, null, rosterKind, rosterLimits, rosterGroup, memberId);
   const calendarItems = useMemo(
     () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
     [shownGridStore, fetchKey],
@@ -255,8 +255,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         key: item.key,
         label: item.label,
         limit: item.limit,
-        fill: fieldFill(item.grid, year, monthIndex, cetTick, item.limit, undefined, capacity),
-        cols: columnFill({ [item.limit]: item.grid }, [item.limit], capacity, year, monthIndex),
+        fill: fieldFill(item.grid, year, monthIndex, cetTick, item.limit, undefined, capacity[item.variant]),
+        cols: columnFill({ [item.limit]: item.grid }, [item.limit], capacity[item.variant], year, monthIndex),
       }));
     },
     [showAnalytics, auxiliaryItems, year, monthIndex, cetTick, capacity],
@@ -594,6 +594,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               <div className="v2-prio-tabs" role="group" aria-label={t("priorities.limitGroup")}>{(["50-100", "250"] as const).map((g) => <button type="button" key={g} aria-pressed={hasRosterPriority && rosterGroup === g} disabled={!rosterGroupsAvailable.includes(g)} onClick={() => setChosenRosterGroup(g)}>{g === "50-100" ? "50–100" : "250"} €</button>)}</div>
               </div>
             </div>
+            {hasRosterPriority && rosterSource.source && <p className="v2-roster-active-period">{t("priorities.activeForSchedule", { period: new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(rosterSource.source.periodStart)) })}</p>}
             <div id="roster-panel" role={kinds.length > 1 ? "tabpanel" : undefined} aria-labelledby={kinds.length > 1 ? `roster-tab-${rosterKind}` : undefined}>
             {!hasRosterPriority && <p>{t("priorities.noSelectedGroup")}</p>}
             {rosterSource.loading && <p role="status">{t("priorities.loading")}</p>}
@@ -641,22 +642,23 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
           footer={(
             <>
               <Button variant="outline" onClick={() => setMissingPlayPair(null)}>{t("schedule.close")}</Button>
-              <Button
+              {missingPlayPair?.memberId === selfId && <Button
                 onClick={() => {
                   setMissingPlayPair(null);
                   window.location.hash = "cabinet-game";
                 }}
               >
                 {t("schedule.openGameSettings")}
-              </Button>
+              </Button>}
             </>
           )}
         >
           {missingPlayPair ? (
             <p className="v2-play-limit-required">
-              {t("schedule.playLimitRequiredBody", {
+              {t(missingPlayPair.memberId === selfId ? "schedule.playLimitRequiredBody" : "schedule.playLimitRequiredOther", {
                 variant: missingPlayPair.variant === "nitro" ? "Nitro" : "Regular",
                 limit: formatLimit(missingPlayPair.limit),
+                player: missingPlayPair.playerName,
               })}
             </p>
           ) : null}

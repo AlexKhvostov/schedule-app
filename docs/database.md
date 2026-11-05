@@ -1,5 +1,7 @@
 # База schedule-app
 
+Доработка5 ноября2026, миграция применена к Working перед тестовым выпуском: миграция [20261105102935](../supabase/migrations/20261105102935_active_priority_selection.sql) добавляет закрытую RLS-таблицу priority_settings(id=true, active_period=2026-08-01, revision=0). set_active_priority(date,bigint) — admin.people/root и auth.uid, проверка даты и ожидаемого счётчика под FOR UPDATE; load_priority_view(date,text,text,boolean) — прежние права чтения, null выбирает активный период и возвращает activePeriod/activeRevision/canActivate; load_active_month_roster(text,text,text[],text,text) — schedule, период определяется сервером. Чтения удерживают FOR SHARE настройки и переиспользуют существующие RPC/кэш, прямые права на таблицу отсутствуют. Старые функции сохранены. Контракт: [active_priority.sql](../supabase/tests/active_priority.sql).
+
 ## Оформление закрытой ёмкости — 5 ноября 2026
 
 Миграция [20261105093758_locked_slot_appearance.sql](../supabase/migrations/20261105093758_locked_slot_appearance.sql), применена в Working 5 ноября 2026: `schedule_settings.locked_slot_appearance` — обязательный JSON `{light,dark,short,long,merge}`. Строгая проверка пяти ключей, цветов `#RRGGBB`, строк до 12/120 символов и boolean. Defaults: `#d5dbe4`, `#343e50`, пустые строки, merge=true.
@@ -341,3 +343,12 @@ erDiagram
 Триггеры distance_entries/values инвалидируют подходящие шестимесячные окна только50–100 и только затронутого вида. Удаление entry тоже инвалидирует окно, включая каскадное удаление values. Изменения справочников инвалидируют метаданные; неизменённые entries переиспользуют расчёт. Новый период создаётся лениво. Cron не добавляется.
 
 `submit_priority_slice_request` сохраняет неизменяемый снимокv3 с группой, временем и расчётом. Существующие заявки/RPCv1/v2 и права приватного разбора сохранены. `list_priority_requests` добавляет группу без раскрытия автора/комментария. Проверка: `supabase/tests/priority_matrix.sql` плюс прежние SQL-контракты.
+
+
+## Локальная проверка ёмкости 5 ноября 2026
+
+Схема и RPC ёмкости не менялись. `capacity_flags` и `capacity_rules` привязаны к `schedule_kinds.id` (вид + лимит); `hours_of(kind,date)` и серверный guard используют именно этот kind. `save_capacity_profiles` уже допускает частичный объект: исправленный клиент передаёт одну выбранную пару вместо всех 11 лимитов вида. SQL-контракт [capacity.sql](../supabase/tests/capacity.sql) проверяет 22 пары, минимум недели/месяца, отключение правил, запрет записи в закрытый уровень, сохранение старой метки при уменьшении глубины и запрет чужого сохранения. Всё в локальной транзакции с rollback, Working не менялась.
+
+## Исправление чтения прав чужой кисти — 5 ноября 2026
+
+[20261105112048_schedule_act_as_access.sql](../supabase/migrations/20261105112048_schedule_act_as_access.sql) заменяет только `effective_schedule_access(uuid[])`: помимо self/admin.people разрешает минимальное чтение пар вида/лимита активному автору с `schedule`, когда `schedule_settings.allow_act_as=true`. Пары получателя по-прежнему вычисляет `member_has_schedule_limit`; анонимный вызов запрещён, `search_path` пустой, ссылки на объекты квалифицированы. RPC записи и триггеры не меняются. `schedule_act_as.sql` проверяет обычного автора, настройку вкл/выкл, self/admin, блокировки, пустую метку, игровые/клубные лимиты, закрытое/занятое место, прошлое и отдельный запрет чужого удаления. Пока только локально; [результат](../memory/tasks/2026-11-05-act-as-fix.md).

@@ -1,4 +1,4 @@
-import { defaultCapacity, emptyProfile, normalizeHours, type CapacityMap, type HourCaps } from "../schedule/capacity";
+import { LIMIT_OPTIONS, defaultCapacity, emptyProfile, normalizeHours, type CapacityMap, type HourCaps } from "../schedule/capacity";
 import { getSupabase } from "./client";
 import { loadKinds } from "./kinds";
 
@@ -11,12 +11,13 @@ export async function loadCapacityLive(variant: "nitro" | "regular"): Promise<Ca
   if (!db) return null;
   const kinds = await loadKinds();
   const wanted = kinds.filter((row) => row.variantId === variant);
-  if (!wanted.length) return defaultCapacity();
+  if (LIMIT_OPTIONS.some(limit => !wanted.some(kind => kind.limitId === limit))) throw new Error("capacity-kinds-unavailable");
   const ids = wanted.map((row) => row.id);
-  const [{ data: flags }, { data: rules }] = await Promise.all([
+  const [{ data: flags, error: flagsError }, { data: rules, error: rulesError }] = await Promise.all([
     db.from("capacity_flags").select("kind_id, equalize, week_on, month_on").in("kind_id", ids),
     db.from("capacity_rules").select("kind_id, layer, day_of_month, weekday, hours").in("kind_id", ids),
   ]);
+  if (flagsError || rulesError) throw new Error("capacity-load-failed");
   const next = defaultCapacity();
   for (const kind of wanted) {
     const profile = emptyProfile();

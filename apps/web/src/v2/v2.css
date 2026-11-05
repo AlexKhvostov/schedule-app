@@ -8532,20 +8532,6 @@ textarea.v2-ctrl.v2-cab-area {
   letter-spacing: 0.01em;
 }
 
-.v2-mine-chip.is-nitro .v2-chip-face {
-  color: #071014;
-  -webkit-text-stroke: 0.75px rgb(255 255 255 / 0.96);
-  paint-order: stroke fill;
-  text-shadow: 0 0 1px rgb(255 255 255 / 0.9);
-}
-
-.v2-mine-legend.is-nitro {
-  color: #071014;
-  -webkit-text-stroke: 0.75px rgb(255 255 255 / 0.96);
-  paint-order: stroke fill;
-  text-shadow: 0 0 1px rgb(255 255 255 / 0.9);
-}
-
 .v2-mine-legend.is-regular,
 .v2-mine-chip.is-regular .v2-chip-face {
   font-family: "IBM Plex Sans", Inter, sans-serif;
@@ -8554,24 +8540,16 @@ textarea.v2-ctrl.v2-cab-area {
   letter-spacing: 0;
 }
 
-.v2-mine-chip.is-regular .v2-chip-face {
-  color: #fff;
-  -webkit-text-stroke: 0.75px rgb(7 16 20 / 0.96);
-  paint-order: stroke fill;
-  text-shadow: 0 0 1px rgb(7 16 20 / 0.9);
-}
-
-.v2-mine-legend.is-regular {
-  color: #fff;
-  -webkit-text-stroke: 0.75px rgb(7 16 20 / 0.96);
-  paint-order: stroke fill;
-  text-shadow: 0 0 1px rgb(7 16 20 / 0.9);
-}
-
-.v2-mine-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.v2-mine-legend .v2-mine-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  height: 14px;
+  border-radius: 2px;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 10px;
 }
 
 .v2-mine-toggle {
@@ -8600,6 +8578,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-mine-foot {
+  contain: inline-size;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -8609,10 +8588,36 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-mine-legends {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  align-items: stretch;
+  gap: 12px;
+  flex: 1;
   min-width: 0;
+}
+
+.v2-mine-legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.v2-mine-legend-group + .v2-mine-legend-group {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.v2-mine-legend-heading {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.v2-mine-legend-group.is-regular .v2-mine-legend-heading { font-style: italic; }
+
+.v2-mine-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .v2-mine-hours,
@@ -8843,10 +8848,8 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-mine-chip .v2-chip-face {
   max-width: 100%;
   overflow: hidden;
-  color: inherit;
-  text-shadow:
-    0 1px 0 rgb(255 255 255 / 0.62),
-    0 0 2px rgb(255 255 255 / 0.42);
+  color: var(--foreground);
+  text-shadow: none;
 }
 
 .v2-mine-chip.is-past {
@@ -16641,3 +16644,7 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-locked-preview-track span { background: var(--preview-locked); color: var(--preview-ink); height: 24px; border-radius: 4px; font: 11px/24px "JetBrains Mono", monospace; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2-locked-editor .v2-palette-actions { margin-top: 14px; }
 @media (max-width: 600px) { .v2-locked-texts, .v2-locked-previews { grid-template-columns: 1fr; } }
+
+.v2-prio-active-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; font-size: 12px; }
+.v2-prio-active-selection > [data-testid] { font-weight: 600; }
+.v2-roster-active-period { margin: 3px 0 6px; font-size: 11px; }

@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { monthGridKey, type MonthGridStore, type ScheduleVariant } from "../../data/slots";
-import { hoursOf, lanesForDay, limitTone, weekdayOf, type CapacityMap } from "../../schedule/capacity";
+import { hoursOf, lanesForDay, limitTone, weekdayOf, type CapacityMap, type VariantCapacityMap } from "../../schedule/capacity";
 import { isPastDay, isPastSlot, type CetStamp } from "../../schedule/cet";
 import { type Mark } from "../../schedule/marks";
 import { levelAllowed, seatsOf, shownLevels, type Occupancy } from "../../schedule/plan";
@@ -302,7 +302,7 @@ export const OptBody = memo(function OptBody({
   limits: string[];
   pairRows?: SchedulePairRow[];
   hourLoad?: HourLoadMap;
-  capacity: CapacityMap;
+  capacity: VariantCapacityMap;
   grids: MonthGridStore;
   days: { d: number; wd: string; weekend: boolean }[];
   cet: CetStamp;
@@ -347,7 +347,7 @@ export const OptBody = memo(function OptBody({
                   <div key={group.variant} className="v2-opt-gutter-kind" data-variant={group.variant}>
                     {group.rows.map((rowInfo) => {
                       const grid = grids[monthGridKey(group.variant, rowInfo.limit)];
-                      const { levels } = levelsOf(capacity, rowInfo.limit, day.d, year, monthIndex, grid?.[dayIdx]);
+                      const { levels } = levelsOf(capacity[group.variant], rowInfo.limit, day.d, year, monthIndex, grid?.[dayIdx]);
                       const named = levels.filter((row) => !row.ghost).length;
                       const chips = levels.map(({ level, ghost }) => (
                         <OptNlChip
@@ -379,7 +379,7 @@ export const OptBody = memo(function OptBody({
                 <div key={group.variant} className="v2-opt-kind" data-variant={group.variant}>
                   {group.rows.map((rowInfo) => {
                     const row = grids[monthGridKey(group.variant, rowInfo.limit)]?.[dayIdx] ?? [];
-                    const { hours: limitHours, levels } = levelsOf(capacity, rowInfo.limit, day.d, year, monthIndex, row);
+                    const { hours: limitHours, levels } = levelsOf(capacity[group.variant], rowInfo.limit, day.d, year, monthIndex, row);
                     const named = levels.filter((item) => !item.ghost).length;
                     const lanes = levels.map(({ level, ghost }) => {
                       const lane = `${dayIdx}-${group.variant}-${rowInfo.limit}-${level}`;
