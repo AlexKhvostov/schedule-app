@@ -2,7 +2,7 @@
 
 ## Оформление закрытой ёмкости — 5 ноября 2026
 
-Миграция [20261105093758_locked_slot_appearance.sql](../supabase/migrations/20261105093758_locked_slot_appearance.sql), пока только локальная: `schedule_settings.locked_slot_appearance` — обязательный JSON `{light,dark,short,long,merge}`. Строгая проверка пяти ключей, цветов `#RRGGBB`, строк до 12/120 символов и boolean. Defaults: `#d5dbe4`, `#343e50`, пустые строки, merge=true.
+Миграция [20261105093758_locked_slot_appearance.sql](../supabase/migrations/20261105093758_locked_slot_appearance.sql), применена в Working 5 ноября 2026: `schedule_settings.locked_slot_appearance` — обязательный JSON `{light,dark,short,long,merge}`. Строгая проверка пяти ключей, цветов `#RRGGBB`, строк до 12/120 символов и boolean. Defaults: `#d5dbe4`, `#343e50`, пустые строки, merge=true.
 
 `save_schedule_locked_appearance(p_appearance,p_expected)` проверяет auth.uid и актуальное `schedule.manage`, блокирует строку, сравнивает ожидаемое значение, меняет только новый столбец. Цвета приводятся к нижнему регистру; регистр описаний сохраняется. SECURITY DEFINER нужен для записи защищённой колонки, search_path пустой, PUBLIC/anon EXECUTE отозван, прямой UPDATE клиентам не выдан. Чтение — через существующую RLS schedule_settings; действующий триггер аудита сохраняет updated_by. [SQL-контракт](../supabase/tests/locked_slot_appearance.sql) проверяет запись/чтение, валидацию, отсутствие частичной записи, конфликт, root/обычный администратор/игрок/anon/отозванное право и неизменность других настроек. Occupancy не меняется.
 
