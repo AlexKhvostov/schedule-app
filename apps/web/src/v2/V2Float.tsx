@@ -8,6 +8,7 @@ type Props = {
   y: number;
   width?: number;
   height?: number;
+  maxHeight?: number;
   z?: number;
   resizeLabel?: string;
   onResizeWidth?: (width: number) => void;
@@ -29,6 +30,7 @@ export function V2Float({
   y,
   width = 300,
   height,
+  maxHeight,
   z = 40,
   resizeLabel,
   onResizeWidth,
@@ -80,7 +82,7 @@ export function V2Float({
     <div
       ref={panel}
       className={`v2-float${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
-      style={{ left: box.x, top: box.y, width: box.width, height, maxHeight: `calc(100dvh - ${box.y + 8}px)`, zIndex: z }}
+      style={{ left: box.x, top: box.y, width: box.width, height, maxHeight: maxHeight === undefined ? `calc(100dvh - ${box.y + 8}px)` : `min(${maxHeight}px, calc(100dvh - ${box.y + 8}px))`, zIndex: z }}
       role={role}
       aria-label={role ? title : undefined}
       onPointerDown={onFocus}

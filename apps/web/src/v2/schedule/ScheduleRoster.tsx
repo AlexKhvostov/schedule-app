@@ -10,11 +10,11 @@ import { ScheduleSlot } from "../ScheduleSlot";
 import { publicDiscordName, rowInitials, showNick } from "../schedulePresentation";
 import { displayScheduleColumn } from "../variantSchedule";
 
-const ROSTER_LIMIT_WIDTH = 54;
-const ROSTER_MIN_NAME_WIDTH = 36;
+const ROSTER_LIMIT_WIDTH = 44;
+const ROSTER_MIN_NAME_WIDTH = 24; // 18px avatar + 3px cell padding on each side.
 
 export function rosterTableWidth(limitCount: number, showDeadTime: boolean, nameWidth = ROSTER_MIN_NAME_WIDTH) {
-  return 24 + nameWidth + 44 + (limitCount + 1) * ROSTER_LIMIT_WIDTH + (showDeadTime ? 62 : 0) + 26;
+  return 24 + nameWidth + 32 + (limitCount + 1) * ROSTER_LIMIT_WIDTH + (showDeadTime ? 50 : 0) + 22;
 }
 
 type Props = {
@@ -43,10 +43,11 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
       let width = ROSTER_MIN_NAME_WIDTH;
       for (const label of table.current.querySelectorAll("th:nth-child(2), .v2-people-nicks > *")) {
         range.selectNodeContents(label);
-        const padding = label.tagName === "TH" ? 8 : 42;
+        const padding = label.tagName === "TH" ? 8 : 28;
         width = Math.max(width, Math.ceil(range.getBoundingClientRect().width) + padding);
       }
-      onNameWidth(width);
+      // Long names must not expand the whole window; full names remain in tooltips.
+      onNameWidth(Math.min(150, width));
     };
     measure();
     void document.fonts.ready.then(measure);
@@ -139,7 +140,7 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
                 <td>
                   <span className="v2-people-who">
                     <PersonAvatar src={row.mark.avatarUrl} label={rowInitials(guild, row.mark.t)} size="sm" />
-                    <span className="v2-people-nicks">
+                    <span className="v2-people-nicks" title={room ? `${guild} · ${room}` : guild}>
                       <b title={guild}>{guild}</b>
                       {room ? <span title={room}>{room}</span> : null}
                     </span>

@@ -587,6 +587,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
             y={peoplePos.y}
             width={rosterWidth}
             height={manualRosterHeight}
+            maxHeight={manualRosterHeight === undefined ? 560 : undefined}
             resizeLabel={t("schedule.playersResize")}
             onResizeWidth={(width) => {
               setRosterWidthAdjusted(true);

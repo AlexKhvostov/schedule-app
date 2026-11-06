@@ -119,9 +119,16 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
   await page.mouse.up();
   const narrowed = await widths();
   expect(initial[1]).toBeGreaterThan(narrowed[1]);
-  expect(narrowed[1]).toBeCloseTo(36, 0);
+  expect(narrowed[1]).toBeGreaterThanOrEqual(24);
+  expect(narrowed[1]).toBeLessThan(25);
   expect(narrowed.filter((_, index) => index !== 1)).toEqual(initial.filter((_, index) => index !== 1));
   await expect(avatar).toBeVisible();
+  expect(await active.evaluateAll(rows => rows.every(row => {
+    const cell = row.children[1].getBoundingClientRect();
+    const avatar = row.querySelector('.v2-ava')!.getBoundingClientRect();
+    const names = row.querySelector('.v2-people-nicks')!.getBoundingClientRect();
+    return avatar.width === 18 && avatar.left >= cell.left && avatar.right <= cell.right && names.width < 1;
+  }))).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await info.click();

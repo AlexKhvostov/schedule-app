@@ -14286,7 +14286,7 @@ img.v2-people-ava {
 }
 
 .v2-people-col-mark {
-  width: 44px;
+  width: 32px;
 }
 
 .v2-people-col-limit {
@@ -14294,11 +14294,11 @@ img.v2-people-ava {
 }
 
 .v2-people-col-dead {
-  width: 62px;
+  width: 50px;
 }
 
 .v2-people-col-tick {
-  width: 26px;
+  width: 22px;
 }
 
 .v2-people-table th {
@@ -14339,14 +14339,14 @@ img.v2-people-ava {
 
 .v2-people-table th:nth-child(3),
 .v2-people-table td:nth-child(3) {
-  width: 44px;
+  width: 32px;
   text-align: center;
 }
 
 .v2-people-table th.v2-people-limit {
   min-width: 0;
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 3px;
+  padding-right: 3px;
   overflow: visible;
   color: var(--foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -14367,7 +14367,7 @@ img.v2-people-ava {
 .v2-people-table th.v2-people-limit small,
 .v2-people-table th.v2-people-dead-total small,
 .v2-people-num small {
-  margin-top: 2px;
+  margin-top: 0;
   color: var(--muted-foreground);
   font-size: 8px;
   font-weight: 650;
@@ -14376,15 +14376,15 @@ img.v2-people-ava {
 
 .v2-people-table th.v2-people-dead-total,
 .v2-people-num.v2-people-dead-total {
-  width: 62px;
+  width: 50px;
   color: color-mix(in srgb, var(--warning) 76%, var(--foreground));
 }
 
 .v2-people-num {
   width: 48px;
   min-width: 0;
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 3px;
+  padding-right: 3px;
   color: var(--foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
@@ -14412,24 +14412,34 @@ img.v2-people-ava {
 }
 
 .v2-people-table td {
-  padding: 2px 4px;
+  padding: 1px 3px;
   border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
   vertical-align: middle;
 }
 
 .v2-people-table td.v2-people-num {
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 3px;
+  padding-right: 3px;
 }
 
 .v2-people-row {
-  height: 33px;
+  height: 24px;
   cursor: pointer;
 }
 
 .v2-people-table .v2-mark-chip {
+  --opt-cell-w: 16px;
+  --opt-cell-h: 16px;
   display: flex;
+  width: 16px;
+  height: 16px;
   margin-inline: auto;
+}
+
+.v2-people-table .v2-mark-chip .v2-opt-cell {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
 }
 
 .v2-people-table td.v2-people-message {
@@ -14447,16 +14457,16 @@ img.v2-people-ava {
 }
 
 .v2-people-row.is-vip td {
-  background: color-mix(in srgb, #d4a017 18%, transparent);
+  background: color-mix(in srgb, #d4a017 4%, transparent);
 }
 
 .v2-people-row.is-vip td:first-child {
-  box-shadow: inset 2px 0 0 #d4a017;
+  box-shadow: inset 3px 0 0 #d4a017;
 }
 
 .v2-people-row.is-vip:hover td,
 .v2-people-row.is-vip:focus-visible td {
-  background: color-mix(in srgb, #d4a017 28%, transparent);
+  background: color-mix(in srgb, #d4a017 8%, transparent);
 }
 
 .v2-people-rank {
@@ -14495,7 +14505,7 @@ img.v2-people-ava {
 .v2-people-who {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -14503,13 +14513,15 @@ img.v2-people-ava {
 
 .v2-people-nicks {
   min-width: 0;
+  overflow: hidden;
 }
 
 .v2-people-who .v2-ava.is-sm {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  flex: 0 0 28px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  flex: 0 0 18px;
+  font-size: 8px;
 }
 
 .v2-people-nicks b {
@@ -14518,7 +14530,7 @@ img.v2-people-ava {
   color: var(--foreground);
   font-size: 11px;
   font-weight: 650;
-  line-height: 1.2;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -14528,7 +14540,7 @@ img.v2-people-ava {
   overflow: hidden;
   font-size: 10px;
   font-weight: 400;
-  line-height: 1.2;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted-foreground);
@@ -14550,9 +14562,9 @@ img.v2-people-ava {
 
 .v2-people-table th.v2-people-tick-h,
 .v2-people-table td.v2-people-tick-cell {
-  width: 26px;
-  padding-left: 6px;
-  padding-right: 6px;
+  width: 22px;
+  padding-left: 3px;
+  padding-right: 3px;
   color: var(--muted-foreground);
   text-align: center;
   text-transform: none;

@@ -3,6 +3,7 @@ import { SEED_MEMBERS } from "../src/schedule/members";
 
 for (const theme of ["dark", "light"]) {
   test(`monthly roster scrolls every mark beneath its flush header in ${theme}`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000); // This scenario reloads each queue and both viewport sizes.
     const template = SEED_MEMBERS.find(member => member.id === "RP-104")!;
     const members = Array.from({ length: 40 }, (_, i) => ({
       ...template, id: `scroll-${i}`, discord: `player-${String(i).padStart(2, "0")}`, avatarUrl: undefined,
@@ -22,6 +23,23 @@ for (const theme of ["dark", "light"]) {
     const scroll = panel.locator(".v2-float-body");
     await expect(panel.locator('.v2-people-row[data-member^="scroll-"]')).toHaveCount(40);
     await page.setViewportSize({ width: 1280, height: 720 });
+    const density = await panel.evaluate(node => {
+      const rows = [...node.querySelectorAll('.v2-people-row')];
+      const body = node.querySelector('.v2-float-body')!;
+      return {
+        width: node.getBoundingClientRect().width,
+        height: node.getBoundingClientRect().height,
+        rowHeights: rows.map(row => row.getBoundingClientRect().height),
+        avatars: rows.map(row => row.querySelector('.v2-ava')!.getBoundingClientRect().width),
+        scrolls: body.scrollHeight > body.clientHeight,
+      };
+    });
+    expect(density.height).toBeLessThanOrEqual(560);
+    expect(density.width).toBeLessThanOrEqual(400);
+    expect(density.rowHeights.every(height => height <= 24.5)).toBe(true);
+    expect(density.avatars.every(width => width === 18)).toBe(true);
+    expect(density.scrolls).toBe(true);
+    await panel.screenshot({ path: `../../memory/tasks/2026-11-06-roster-density-${theme}.png` });
     const resize = panel.getByRole("button", { name: "Изменить ширину и высоту списка игроков" });
     const before = (await panel.boundingBox())!;
     const grip = (await resize.boundingBox())!;
@@ -54,9 +72,11 @@ for (const theme of ["dark", "light"]) {
     await page.reload();
     await page.getByRole("button", { name: "Открыть инструменты", exact: true }).click();
     await page.getByRole("button", { name: "Игроки", exact: true }).click();
+    await expect(panel.locator('.v2-people-row[data-member^="scroll-"]')).toHaveCount(40);
     const mobile = (await panel.boundingBox())!;
     expect(mobile.width).toBeLessThanOrEqual(374);
     expect(mobile.y + mobile.height).toBeLessThanOrEqual(472);
+    await panel.screenshot({ path: `../../memory/tasks/2026-11-06-roster-density-mobile-${theme}.png` });
     await page.setViewportSize({ width: 1280, height: 720 });
     await expect.poll(async () => (await panel.boundingBox())!.width).toBe(savedSize.width);
     expect((await panel.boundingBox())!.height).toBe(savedSize.height);
