@@ -23,7 +23,7 @@ function MonthWidgets({report,query,onPlayer}:{report:MonthReport;query:MonthlyQ
   return <>
     <div className={monthly.kpis}>{profile?<><strong>{report.player}</strong>{(["maxPoints","maxSpeed","avgSpeed"] as const).map(key=><span key={key}>{t(`monthly.${key}`)} <b>{format(metrics[key])}</b></span>)}</>:<><span>{t("monthly.playerCount",{count:report.playerCount})}</span><span>Σ <b>{report.total??"—"}</b></span></>}</div>
     <MonthHeatmap scrollRef={mapScroll} onScroll={sync} report={report} onCell={profile?undefined:setSelection} />
-    <AnalyticsPanel title={t(profile?"blocks.hourlySpeed.title":"blocks.hourTotals.title")} description={t(profile?"monthly.profileSpeedNote":"monthly.hourSumNote")}><HourlyChart align={geometry} scrollRef={plotScroll} onScroll={sync} title={t(profile?"points.speed":"blocks.hourTotals.title")} variant={profile?"line":"bar"} values={profile?metrics.hourly:report.byHour} onSelect={profile?undefined:hour=>setSelection({day:null,hour})} /></AnalyticsPanel>
+    <AnalyticsPanel help={profile ? "profileHours" : "hourTotals"} title={t(profile?"blocks.hourlySpeed.title":"blocks.hourTotals.title")} description={t(profile?"monthly.profileSpeedNote":"monthly.hourSumNote")}><HourlyChart align={geometry} scrollRef={plotScroll} onScroll={sync} title={t(profile?"points.speed":"blocks.hourTotals.title")} variant={profile?"line":"bar"} values={profile?metrics.hourly:report.byHour} onSelect={profile?undefined:hour=>setSelection({day:null,hour})} /></AnalyticsPanel>
     {selection&&<DensityDetail key={`${selection.day}:${selection.hour}`} query={query} selection={selection} onClose={()=>setSelection(null)} onPlayer={onPlayer} />}
   </>;
 }
@@ -41,7 +41,7 @@ export function MonthlyPage({section,state,dispatch,demo,onPlayer}:{section:Mont
     {result.status==="error"&&<div className={styles.state} role="alert"><p>{t("points.error")}</p><button type="button" onClick={()=>dispatch({type:"refresh"})}>{t("points.retry")}</button></div>}
     {result.status==="ready"&&(result.data.kind==="month"?<div className={styles.widgets} key={result.key}><MonthWidgets report={result.data.report} query={state.applied} onPlayer={onPlayer} /></div>:result.data.report.rows.length?<div className={styles.widgets} key={result.key}>
       <SpeedRanking report={result.data.report} onPlayer={onPlayer} />
-      <AnalyticsPanel title={t("blocks.hourlySpeed.title")} description={t("monthly.hourSpeedNote")}><HourlyChart title={t("points.speed")} values={result.data.report.topHours} comparison={result.data.report.allHours} /></AnalyticsPanel>
+      <AnalyticsPanel help="speedHours" title={t("blocks.hourlySpeed.title")} description={t("monthly.hourSpeedNote")}><HourlyChart title={t("points.speed")} values={result.data.report.topHours} comparison={result.data.report.allHours} /></AnalyticsPanel>
     </div>:<p className={styles.state} role="status">{t("points.empty")}</p>)}
   </div>;
 }

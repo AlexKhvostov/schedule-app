@@ -9,7 +9,7 @@ import styles from "../monthly.module.css";
 export function SpeedRanking({ report, onPlayer }: { report: SpeedReport; onPlayer: (name: string) => void }) {
   const { t } = useTranslation("analytics"), regs = useRegs();
   const max = Math.max(1, ...report.rows.map(r => r.max));
-  return <AnalyticsPanel title={t("blocks.speedRanking.title")} description={t("monthly.speedNote")}>
+  return <AnalyticsPanel help="speedRanking" title={t("blocks.speedRanking.title")} description={t("monthly.speedNote")}>
     {regs.error && <div role="alert" className={styles.registryNotice}><span>{t(regs.error === "write" ? "regs.writeError" : "regs.readError")}</span><button type="button" disabled={regs.busy || regs.loading} onClick={() => void regs.refresh()}>{t("filters.refresh")}</button></div>}
     {(regs.loading || regs.busy || regs.feedback) && <p className={styles.registryNotice} role="status">{t(regs.busy ? "regs.verifying" : regs.loading ? "regs.loading" : "regs.saved")}</p>}
     <div className={styles.rankingScroll} role="region" tabIndex={0} aria-label={t("blocks.speedRanking.title")}><table className={styles.ranking} data-testid="speed-ranking"><thead><tr><th>{t("points.player")}</th><th title={t("monthly.speedDefinition")}>{t("monthly.maxSpeed")}</th><th title={t("monthly.speedDefinition")}>{t("monthly.avgSpeed")}</th><th>{t("monthly.maxPoints")}</th><th>{t("regs.destination")}</th><th>{t("regs.actions")}</th></tr></thead><tbody>

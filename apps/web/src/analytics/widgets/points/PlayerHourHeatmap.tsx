@@ -23,7 +23,7 @@ export function PlayerHourHeatmap({ data, now, onPlayer, range, scrollRef, onScr
     if (cell.empty || cell.carry === null) return "empty";
     return cell.hasSnapshot ? "observed" : "carried";
   };
-  return <AnalyticsPanel title={t("blocks.pointsMap.title")} description={t("points.heatmapNote")} actions={<span>{t("points.count", { count: data.players.length, total: data.total })}</span>}>
+  return <AnalyticsPanel help="pointsMap" title={t("blocks.pointsMap.title")} description={t("points.heatmapNote")} actions={<span>{t("points.count", { count: data.players.length, total: data.total })}</span>}>
     <div ref={scrollRef} onScroll={onScroll} data-testid="points-map-scroll" className={styles.tableScroll} tabIndex={0} role="region" aria-label={t("points.heatmapScroll")}>
       <table className={styles.heatmap} style={{ minWidth: 161 + (range.end - range.start) * 30 }} data-testid="points-heatmap"><thead><tr><th scope="col">{t("points.player")}</th><th scope="col">Σ</th>{Array.from({ length: range.end - range.start }, (_, index) => range.start + index).map(h => <th scope="col" key={h} data-hour={h}>{String(h).padStart(2, "0")}</th>)}</tr></thead>
         <tbody>{data.players.map(player => <tr key={player.name} data-player={player.name}>

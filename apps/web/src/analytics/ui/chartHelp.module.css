@@ -1,0 +1,15 @@
+.trigger { display:inline-flex; flex:none; align-items:center; }
+.trigger .button { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; min-height:28px; padding:0; border:1px solid var(--input); border-radius:50%; background:transparent; color:var(--muted-foreground); }
+.button span { font-family:Georgia,serif; font-size:16px; font-style:italic; font-weight:700; line-height:1; }
+.trigger .button:hover { color:var(--title); border-color:var(--ring); background:var(--muted); }
+.trigger .button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.content h3 { margin:14px 0 4px; font-size:12px; font-weight:650; color:var(--foreground); }
+.content .summary { color:var(--foreground); font-size:13px; line-height:1.6; }
+.content aside { margin-top:14px; padding:9px 11px; border-left:2px solid var(--primary); border-radius:0 5px 5px 0; background:var(--muted); }
+.content aside h3 { margin-top:0; }
+.content .context { margin-top:14px; padding-top:9px; border-top:1px solid var(--border); font-size:11px; }
+@media(max-width:760px) { .trigger .button { width:32px; height:32px; min-height:32px; } }
+
+.trigger .content p { margin:0 0 12px; font-size:13px; line-height:1.6; }
+.trigger .content aside p { margin-bottom:0; }
+.trigger .content .context { margin:14px 0 0; padding-top:9px; font-size:11px; }

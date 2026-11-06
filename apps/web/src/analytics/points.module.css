@@ -85,3 +85,5 @@
 .scrubberInput::-webkit-slider-runnable-track { height:4px; background:transparent; }
 .scrubberInput::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; box-sizing:border-box; width:14px; height:14px; margin-top:-5px; border:2px solid var(--card); border-radius:50%; background:var(--primary); }
 .scrubberInput::-moz-range-track { height:4px; background:transparent; }.scrubberInput::-moz-range-progress { background:transparent; }.scrubberInput::-moz-range-thumb { box-sizing:border-box; width:14px; height:14px; border:2px solid var(--card); border-radius:50%; background:var(--primary); }
+
+.panelHeading { display:flex; align-items:center; gap:7px; min-width:0; }

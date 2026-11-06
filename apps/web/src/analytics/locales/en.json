@@ -296,5 +296,60 @@
     "quickRemoveName": "Remove {{name}} from list",
     "confirmRemoveName": "Confirm removal of {{name}}",
     "quickRemoved": "{{name}} removed from the list. Save verified."
+  },
+  "help": {
+    "open": "About “{{title}}”",
+    "reading": "How to read it",
+    "interaction": "What you can do",
+    "note": "Keep in mind",
+    "context": "Hours use Spain time. The report follows the applied filters.",
+    "pointsMap": {
+      "summary": "Shows how players earned points during the selected day. Each row is a player and each column is an hour.",
+      "reading": "The large number is accumulated points at that hour; the + number is the gain. Brighter green means a larger gain, while the large number’s styling highlights higher accumulated scores. The blue Σ column is the player’s daily maximum.",
+      "interaction": "Select a cell for details or a nickname to open the player profile. Top and sorting change the rows shown. A red diamond marks Red Party; a blue crystal marks other regulars.",
+      "note": "An empty cell need not mean zero: data may be missing or the hour may be in the future. ! marks a collection outage. Without a new sample, the last known value may be carried forward."
+    },
+    "pointsChart": {
+      "summary": "Compares players’ accumulated points over the day. Each player has a coloured line: time runs horizontally and points vertically.",
+      "reading": "A rising line means more points. A flat section may mean no gain or no new samples: the last known value is carried forward between samples.",
+      "interaction": "Hover or move the blue slider to see readings at that time. Select a nickname on the left to hide or restore its line. Choose an hour range, show speed, or drag the bottom edge to resize the chart.",
+      "note": "Lines represent players on the current map. Optional speed is expressed in points per hour and estimated from nearby available samples; it is not another points total."
+    },
+    "playerMonth": {
+      "summary": "Shows one player’s activity for the selected month and limit. Rows are days and columns are hours.",
+      "reading": "The large cell number is accumulated points; the + number is the hourly gain. Brighter green means a larger gain. The Σ column holds the daily result.",
+      "interaction": "Select a cell for points, gain and speed details. “Full month” expands all days. On narrow screens, the map and lower chart scroll horizontally together.",
+      "note": "Empty or future hours do not prove that the player was inactive. ! indicates a data collection outage."
+    },
+    "profileHours": {
+      "summary": "Helps show which hours the selected player usually earns points fastest. The line shows average speed for each hour across days of the month.",
+      "reading": "Hours run horizontally; speed in points per hour runs vertically. For example, 08:00 combines available speed samples from that hour on different days, rather than points from one day.",
+      "interaction": "Hover or use Tab to select an hour and see its exact value below the chart. Hours align with the columns of the map above.",
+      "note": "The average includes available zero-speed values, but excludes empty hours and collection outages. It can therefore differ from the average in the speed ranking."
+    },
+    "speedRanking": {
+      "summary": "Compares players’ point-earning speed for the selected month and limit.",
+      "reading": "Max speed is the best sample; Avg speed is the average of qualifying samples, in points per hour. Max points is the highest daily result in the period. Bars help compare speeds; the note under the maximum shows the best sample’s gain and duration.",
+      "interaction": "Select a nickname to open its profile. Top limits the number of players shown. The right columns show registry membership and add/remove actions; the badge by each nickname also identifies the list.",
+      "note": "The ranking uses only positive speeds measured over more than 20 minutes. Do not directly compare these averages with profile averages, which also include zeros."
+    },
+    "speedHours": {
+      "summary": "Compares hourly speed for players in the current Top with everyone matching the filters.",
+      "reading": "Blue bars show average speed for the displayed Top; the warm-coloured line shows everyone matching the filters. Hours run horizontally; points per hour run vertically. Qualifying samples from the month are combined.",
+      "interaction": "Hover or use Tab to select an hour and see both values below. Changing Top changes the bar sample; the line still represents the full filtered group.",
+      "note": "Only positive speeds measured over more than 20 minutes are included. A gap means no qualifying samples. These are average speeds, not point totals or player counts."
+    },
+    "densityMap": {
+      "summary": "Shows the days and hours when the selected group earned more points. This measures point volume, not the number of players.",
+      "reading": "Each row is a day and each column an hour. A cell contains the players’ combined point gain for that hour. Brighter green means more points; Σ shows the daily total.",
+      "interaction": "Select a populated cell to see individual players’ contributions for that hour. “Full month” expands all days. Hours align with the lower bars and both charts scroll horizontally together.",
+      "note": "Empty cells can mean missing data or future hours. ! marks a collection outage. A large value alone does not indicate more players: one player can contribute a large gain."
+    },
+    "hourTotals": {
+      "summary": "Adds up the point gains for each hour across all days of the selected month and all players matching the filters.",
+      "reading": "Each bar is one hour of the day. For example, 08:00 adds the 08:00 column of the upper map across all days. Bar height is the total points: a taller bar means more volume during that hour.",
+      "interaction": "Hover or use Tab to select an hour for its exact total. Select the bar to see players and their contributions for that hour across the whole month.",
+      "note": "This is a sum, not a daily average, speed or player count. The current month is incomplete, and collection gaps can reduce the available volume."
+    }
   }
 }

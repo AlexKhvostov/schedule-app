@@ -19,7 +19,7 @@ export function PointsTimeline({ report, now, onRetry, range, onRange, geometry,
   const all = useMemo(() => buildTimeline(report.series, report.heatmap.day, report.heatmap.limit, now), [report, now]);
   const shown = all.map((player, index) => ({ ...player, color: lineColors[index % lineColors.length] })).filter(player => !hidden.includes(player.name));
   const selected = Math.min(end * 60 - 6, Math.max(start * 60, minute));
-  return <AnalyticsPanel title={t("blocks.pointsChart.title")} actions={<div className={styles.chartControls}>
+  return <AnalyticsPanel help="pointsChart" title={t("blocks.pointsChart.title")} actions={<div className={styles.chartControls}>
         <label>{t("points.zoomFrom")}<select aria-label={t("points.zoomFrom")} value={start} onChange={e => { const next = Number(e.target.value); onRange({ start: next, end: next >= end ? next + 1 : end }); }}>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{clockLabel(h * 60)}</option>)}</select></label>
         <label>{t("points.zoomTo")}<select aria-label={t("points.zoomTo")} value={end} onChange={e => { const next = Number(e.target.value); onRange({ end: next, start: next <= start ? next - 1 : start }); }}>{Array.from({ length: 24 }, (_, h) => <option key={h + 1} value={h + 1}>{clockLabel((h + 1) * 60)}</option>)}</select></label>
         <button type="button" onClick={() => { onRange({ start: 0, end: 24 }); setHidden([]); }}>{t("points.resetChart")}</button>
