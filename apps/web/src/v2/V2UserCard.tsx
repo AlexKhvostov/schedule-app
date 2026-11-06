@@ -45,24 +45,24 @@ export function V2UserCard({ row, givenName, monthLabel, limits, x, y, z, onMove
         <div className="v2-user-card-hero">
           <PersonAvatar src={row.mark.avatarUrl} label={rowInitials(givenName || discord || username, row.mark.t)} size="lg" />
           <div className="v2-user-identity">
-            <h3>{givenName?.trim()}</h3>
+            <div className="v2-user-name-row">
+              <h3>{givenName?.trim()}</h3>
+              <div className="v2-user-profile-action" tabIndex={profileAvailable ? undefined : 0} aria-describedby={profileAvailable ? undefined : hintId}>
+                <button type="button" className="v2-ctrl" disabled={!profileAvailable} aria-label={t("schedule.openProfile")}
+                  onClick={() => { if (profileAvailable && row.mark.memberId) onOpenProfile?.(row.mark.memberId); }}>
+                  {t("schedule.userProfile")}
+                </button>
+                {!profileAvailable && <span className="v2-user-profile-hint" role="tooltip" id={hintId}>{profileHint}</span>}
+              </div>
+            </div>
             <dl className="v2-user-accounts">
               <div><dt>{t("v2.tip.discord")}:</dt><dd>{discord}</dd></div>
               <div><dt>{t("v2.tip.winamax")}:</dt><dd>{room}</dd></div>
             </dl>
           </div>
-          <div className="v2-user-card-actions">
-            <div className="v2-user-profile-action" tabIndex={profileAvailable ? undefined : 0} aria-describedby={profileAvailable ? undefined : hintId}>
-              <button type="button" className="v2-ctrl" disabled={!profileAvailable} aria-label={t("schedule.openProfile")}
-                onClick={() => { if (profileAvailable && row.mark.memberId) onOpenProfile?.(row.mark.memberId); }}>
-                {t("schedule.userProfile")}
-              </button>
-              {!profileAvailable && <span className="v2-user-profile-hint" role="tooltip" id={hintId}>{profileHint}</span>}
-            </div>
-            <span className="v2-mark-chip" title={t("schedule.colMark")}>
-              <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
-            </span>
-          </div>
+          <span className="v2-mark-chip v2-user-corner-mark" title={t("schedule.colMark")}>
+            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
+          </span>
         </div>
         <dl className="v2-user-account-details">
           <div><dt>{t("schedule.userServerNick")}</dt><dd>{guildNick}</dd></div>

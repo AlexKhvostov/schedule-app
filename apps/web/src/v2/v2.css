@@ -16684,8 +16684,9 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 
 .v2-user-card { display: grid; gap: 5px; }
 .v2-user-card-hero {
+  position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   column-gap: 8px;
   row-gap: 5px;
@@ -16701,15 +16702,17 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.v2-user-card-actions {
+.v2-user-name-row {
   display: flex;
-  flex-direction: column;
-  align-self: stretch;
-  align-items: end;
+  align-items: start;
   justify-content: space-between;
-  gap: 5px;
+  gap: 6px;
+  margin-bottom: 3px;
 }
-.v2-user-card-hero .v2-user-profile-action { margin: 0; }
+.v2-user-name-row h3 { flex: 1; min-width: 0; }
+.v2-user-card-hero .v2-user-profile-action { flex: none; margin: 0; }
+.v2-user-card-hero .v2-user-profile-action > button { height: 24px; min-height: 24px; padding: 2px 6px; font-size: 11px; line-height: 18px; }
+.v2-user-corner-mark { position: absolute; right: 8px; bottom: 8px; }
 .v2-user-card-hero .v2-user-profile-hint { right: 0; left: auto; max-width: min(220px, 65vw); }
 .v2-user-accounts,
 .v2-user-account-details {
@@ -16729,6 +16732,7 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
   align-items: baseline;
 }
 .v2-user-accounts > div { grid-template-columns: 58px minmax(0, 1fr); }
+.v2-user-accounts > div:last-child { min-height: 20px; padding-right: 28px; }
 .v2-user-account-details > div { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 :is(.v2-user-accounts, .v2-user-account-details) dt { color: var(--muted-foreground); }
 :is(.v2-user-accounts, .v2-user-account-details) dd { min-height: 1.2em; margin: 0; overflow-wrap: anywhere; }
