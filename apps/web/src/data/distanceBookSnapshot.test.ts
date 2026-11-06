@@ -67,4 +67,15 @@ describe("current people metadata in distance snapshots", () => {
     setup(); mock.settings.mockResolvedValue({ data: null, error: { message: "network" } });
     expect((await loadDistanceBook("2026-10-01")).error).toBe("network");
   });
+  it("keeps multiple IDs of an inactive card together without enabling manual creation", async () => {
+    setup();
+    mock.rpc.mockResolvedValue({ data: { people_filters_version: 1, people: [], limits: ["50"],
+      entries: [{ ...entry, member_id: "inactive-card" }, { ...entry, id: "second",
+        member_id: "inactive-card", distance_ext_id: "456" }] } });
+    const book = await loadDistanceBook("2026-10-01");
+    expect(book.people).toHaveLength(1);
+    expect(book.people[0]).toMatchObject({ memberId: null, distanceIds: ["123", "456"], total: 240 });
+    expect(filterDistancePeople(book.people, { variants: ["nitro"], query: "456", onlyRedParty: false,
+      onlyActiveProfiles: true, id: "all", presence: "all" })).toHaveLength(0);
+  });
 });

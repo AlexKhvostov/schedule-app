@@ -121,15 +121,17 @@ export async function loadDistanceBook(monthStart: string, roomSlug = "winamax")
     const linkedMember = row.member_id ?? row.profile_member_id;
     let person = linkedMember ? people.get(linkedMember) : undefined;
     if (!person) {
-      const key = `orphan:${row.distance_ext_id}`; person = people.get(key);
+      // Inactive cards still own their current IDs, but cannot receive new manual records.
+      const key = linkedMember ? `inactive:${linkedMember}` : `orphan:${row.distance_ext_id}`; person = people.get(key);
       if (!person) {
         const gameNick = String(row.game_nick ?? "").trim();
         const discordNick = String(row.discord_nick ?? "").trim();
-        person = { key, playerId: row.distance_ext_id, nick: discordNick || gameNick || row.distance_ext_id, discordNick, gameNick,
+        person = { key, playerId: row.distance_ext_id, distanceIds: [], nick: discordNick || gameNick || row.distance_ext_id, discordNick, gameNick,
           discordId: row.discord_id ? String(row.discord_id) : null, memberId: null, avatarUrl: row.avatar_url ?? null, onGuild: Boolean(row.present),
           redParty: Boolean(row.present) && roleHasId(row.roles, roleId), hasActiveProfile: Boolean(row.has_active_profile), orphan: true, slices: [], at: emptyAt(), nitroTotal: 0, regularTotal: 0, total: 0, updatedAt: null };
         people.set(key, person);
       }
+      if (!person.distanceIds!.includes(row.distance_ext_id)) person.distanceIds!.push(row.distance_ext_id);
     }
     if (!person.playerId) person.playerId = row.distance_ext_id;
     if (!person.gameNick && row.game_nick) person.gameNick = row.game_nick;
