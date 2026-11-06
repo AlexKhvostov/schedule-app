@@ -9,7 +9,7 @@ if (process.env.VERCEL_ENV === "production" && missingProductionEnv.length) {
 
 const localDevelopmentConnections =
   process.env.NODE_ENV === "development"
-    ? " http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://dashboard.redparty.ru"
+    ? " http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*"
     : "";
 
 const contentSecurityPolicy = [
@@ -18,7 +18,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob: https://cdn.discordapp.com https://*.discordapp.com",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${localDevelopmentConnections}`,
+  `connect-src 'self' https://dashboard.redparty.ru https://*.supabase.co wss://*.supabase.co${localDevelopmentConnections}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

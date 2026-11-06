@@ -5,8 +5,8 @@ import { restoreRegSides } from "./playerNames";
 export const analyticsEndpoint = "https://dashboard.redparty.ru/api/index.php";
 export type AnalyticsMode = "demo" | "live" | "unconfigured";
 export function resolveAnalyticsMode(development: boolean, sandbox: boolean, selected: string | null): AnalyticsMode {
-  // The legacy PHP reports are public. Production remains closed until server authorization is deployed.
-  if (!development) return "unconfigured";
+  // Production uses the existing PHP API; its server authorization is a separate deployment.
+  if (!development) return "live";
   if (selected === "live") return "live";
   return selected === "demo" || sandbox ? "demo" : "unconfigured";
 }
@@ -43,11 +43,11 @@ export function createHttpSources(fetcher: typeof fetch = fetch, timeoutMs = 30_
 }
 export async function getPointsSource(mode: AnalyticsMode): Promise<PointsSource> {
   if (mode === "demo") return (await import("./demoPoints")).demoPointsSource;
-  if (mode === "live" && process.env.NODE_ENV === "development") return createHttpSources().points;
+  if (mode === "live") return createHttpSources().points;
   throw new Error("analytics-unconfigured");
 }
 export async function getMonthlySource(mode: AnalyticsMode): Promise<MonthlySource> {
   if (mode === "demo") return (await import("./demoMonthly")).demoMonthlySource;
-  if (mode === "live" && process.env.NODE_ENV === "development") return createHttpSources().monthly;
+  if (mode === "live") return createHttpSources().monthly;
   throw new Error("analytics-unconfigured");
 }

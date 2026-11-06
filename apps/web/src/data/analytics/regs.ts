@@ -51,6 +51,6 @@ export function createHttpRegSource(fetcher: typeof fetch=fetch): RegSource {
 }
 export async function getRegSource(mode: AnalyticsMode): Promise<RegSource> {
   if(mode==="demo")return (await import("./demoRegs")).demoRegsSource;
-  if(mode==="live"&&process.env.NODE_ENV==="development")return createHttpRegSource();
+  if(mode==="live")return createHttpRegSource();
   throw Error("analytics-unconfigured");
 }

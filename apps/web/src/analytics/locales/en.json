@@ -243,7 +243,7 @@
     "demo": "Demo",
     "live": "Live data",
     "unconfigured": "Not connected",
-    "liveHint": "Real PHP API data · local preview"
+    "liveHint": "Real PHP API data"
   },
   "regs": {
     "open": "Open regular lists",

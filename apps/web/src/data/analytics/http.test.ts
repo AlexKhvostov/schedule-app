@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { analyticsEndpoint, createHttpSources, resolveAnalyticsMode } from "./http";
 
 describe("read-only PHP transport", () => {
-  it("keeps production closed regardless of a stored local preview choice", () => {
-    expect(resolveAnalyticsMode(false, true, "live")).toBe("unconfigured");
+  it("uses live data in production regardless of a stored local preview choice", () => {
+    for (const selected of [null, "demo", "live"]) {
+      expect(resolveAnalyticsMode(false, true, selected)).toBe("live");
+      expect(resolveAnalyticsMode(false, false, selected)).toBe("live");
+    }
     expect(resolveAnalyticsMode(true, true, null)).toBe("demo");
     expect(resolveAnalyticsMode(true, false, null)).toBe("unconfigured");
     expect(resolveAnalyticsMode(true, true, "live")).toBe("live");
