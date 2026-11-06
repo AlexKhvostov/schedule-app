@@ -133,7 +133,7 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
     if (!row) return;
     applySelf(markFromPlayer({
       id: row.id,
-      nick: row.discord,
+      nick: row.discordDisplay || row.discord,
       publicCode: row.room,
       roomNick: row.room,
       avatarUrl: row.avatar,

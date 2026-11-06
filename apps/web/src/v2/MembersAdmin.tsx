@@ -34,7 +34,6 @@ import { MembersRoleSettings } from "./members/MembersRoleSettings";
 import { MembersSystemSettings } from "./members/MembersSystemSettings";
 import { DiscordSnapshotModal } from "./members/DiscordSnapshotModal";
 import {
-  discordLine,
   filterAndSortPeople,
   peopleCounts,
   roomNickLines,
@@ -80,7 +79,6 @@ function PersonTip({
   };
 
   const discordNick = row.globalName?.trim() || row.username;
-  const serverNick = row.nick?.trim() || "";
 
   return (
     <div className="v2-mem-who" ref={wrapRef} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
@@ -92,10 +90,6 @@ function PersonTip({
                 <span>{t("admin.people.tipDiscord")}</span>
                 <b>{discordNick}</b>
                 {row.globalName && row.globalName !== row.username ? <small>@{row.username}</small> : null}
-              </p>
-              <p>
-                <span>{t("admin.people.tipServer")}</span>
-                <b className={serverNick ? undefined : "is-empty"}>{serverNick || "—"}</b>
               </p>
               {rooms.map((item) => (
                 <p key={item.roomId}>
@@ -115,10 +109,12 @@ function NickFilter({
   value,
   onChange,
   people,
+  roomNicks,
 }: {
   value: string;
   onChange: (value: string) => void;
   people: AdminPerson[];
+  roomNicks: Map<string, MemberRoomNick[]>;
 }) {
   const { t } = useTranslation();
   const boxRef = useRef<HTMLLabelElement>(null);
@@ -185,7 +181,7 @@ function NickFilter({
                 }}
               >
                 <b>{discordPrimary(row)}</b>
-                <small>{discordLine(row)}</small>
+                <small>{roomNickLines(row.memberId, roomNicks)[0].nick}</small>
               </button>
             </li>
           ))}
@@ -414,7 +410,7 @@ export function MembersAdmin() {
               <span className="v2-section-count">{people.length}</span>
             </header>
           <div className="v2-mem-filters">
-            <NickFilter value={nickQ} onChange={setNickQ} people={people} />
+            <NickFilter value={nickQ} onChange={setNickQ} people={people} roomNicks={roomNicks} />
             <CompactField label={t("admin.people.colAccess")}>
               <NativeSelect className="w-full" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
                 {(["all", "active", "blocked", "left", "root", "bot"] as const).map((key) => (
@@ -472,7 +468,7 @@ export function MembersAdmin() {
                           <PersonChip
                             src={row.avatarUrl}
                             name={discordPrimary(row)}
-                            sub={`${discordLine(row)}${row.bot ? ` · ${t("admin.people.access.bot")}` : ""}${row.memberId && !row.onGuild ? ` · ${t("admin.people.leftGuild")}` : ""}`}
+                            sub={roomNickLines(row.memberId, roomNicks)[0].nick}
                             onClick={() => setProfileFor(row.discordId)}
                           />
                         </PersonTip>
@@ -511,7 +507,7 @@ export function MembersAdmin() {
                         </td>
                       ))}
                       <td>
-                        <span className="v2-mem-id" title={row.distanceExtId || undefined}>{row.distanceExtId || "—"}</span>
+                        <span className="v2-mem-id" title={row.distanceIds?.join(", ") || row.distanceExtId || undefined}>{row.distanceIds?.join(", ") || row.distanceExtId || "—"}</span>
                       </td>
                     </tr>
                   );

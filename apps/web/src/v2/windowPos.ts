@@ -1,6 +1,33 @@
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 const KEY = "v2-window-pos-d";
+const SIZE_KEY = "v2-window-size-d";
+
+type WindowSize = { width?: number; height?: number };
+
+export function loadWindowSize(id: string): WindowSize {
+  if (typeof window === "undefined") return {};
+  try {
+    const value = JSON.parse(localStorage.getItem(SIZE_KEY) ?? "{}")[id];
+    const valid = (size: unknown): size is number => typeof size === "number" && Number.isFinite(size) && size > 0;
+    return { width: valid(value?.width) ? value.width : undefined, height: valid(value?.height) ? value.height : undefined };
+  } catch {
+    return {};
+  }
+}
+
+export function saveWindowSize(id: string, size: WindowSize) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(SIZE_KEY);
+    let sizes: Record<string, WindowSize> = {};
+    try {
+      const parsed = JSON.parse(raw ?? "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) sizes = parsed;
+    } catch { /* Replace malformed local preferences. */ }
+    localStorage.setItem(SIZE_KEY, JSON.stringify({ ...sizes, [id]: size }));
+  } catch { /* Keep the in-memory size when storage is unavailable. */ }
+}
 
 export function centerPos(width = 320, height = 280): WindowPos {
   if (typeof window === "undefined") return { x: 40, y: 80 };

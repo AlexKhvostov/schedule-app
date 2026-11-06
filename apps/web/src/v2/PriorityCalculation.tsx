@@ -28,7 +28,7 @@ export function PriorityCalculation({ row, cell, showHeading = true }: { row: Ca
   const { t, i18n } = useTranslation();
   const num = (n: number) => priorityNumber(n, i18n.language);
   const points = (n: number) => priorityPoints(n, i18n.language);
-  if (row.group === "250") return <div className="v2-prio-calculation"><b>{row.nick} · 250 € · {t(`priorities.kinds.${row.calculationKind ?? "nitro"}`)}</b><p>{row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : t("priorities.noCore")}</p><p>{t("priorities.noDistance250")}</p></div>;
+  if (row.group === "250") return <div className="v2-prio-calculation"><b>{row.nick} · 250-500 € · {t(`priorities.kinds.${row.calculationKind ?? "nitro"}`)}</b><p>{row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : t("priorities.noCore")}</p><p>{t("priorities.noDistance250")}</p></div>;
   const kinds = priorityBreakdown(row.months).filter((k) => !row.calculationKind || k.kind === row.calculationKind);
   const kindNames = kinds.map((k) => t(`priorities.kinds.${k.kind}`)).join(" + ");
   const sourceKinds = kinds.map((k) => k.kind);

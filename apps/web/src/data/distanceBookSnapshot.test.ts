@@ -5,7 +5,7 @@ vi.mock("./config", () => ({ isLiveData: () => true }));
 vi.mock("./client", () => ({ getSupabase: () => ({ rpc: mock.rpc,
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mock.settings }) }) }),
 }) }));
-import { loadDistanceBook } from "./distanceBook";
+import { loadDistanceBook, filterDistancePeople, distanceBookCsv } from "./distanceBook";
 
 const entry = { id: "history", member_id: null, distance_ext_id: "123", discord_id: "111111111111111111", game_nick: "HistoryPlayer", variant_id: "nitro", part: 1,
   source: "historical", created_at: "2026-10-01", updated_at: "2026-10-01", values: [{ limit_id: "50", tournaments: 120 }],
@@ -40,6 +40,26 @@ describe("current people metadata in distance snapshots", () => {
     const book = await loadDistanceBook("2026-10-01");
     expect(book.people).toHaveLength(1);
     expect(book.people[0]).toMatchObject({ memberId: "current-profile", hasActiveProfile: true, total: 120 });
+  });
+  it("groups multiple IDs once and exports each record with its own ID and source nickname", async () => {
+    setup();
+    mock.rpc.mockResolvedValue({ data: { people_filters_version: 1,
+      people: [{ member_id: "current", distance_ext_id: "123", distance_ids: ["123", "456"],
+        discord_nick: "CurrentPlayer", present: true, roles: entry.roles, has_active_profile: true }],
+      entries: [{ ...entry, member_id: "current" }, { ...entry, id: "second", member_id: "current",
+        distance_ext_id: "456", game_nick: "SecondNick" }], limits: ["50"] } });
+    const book = await loadDistanceBook("2026-10-01");
+    expect(book.people).toHaveLength(1);
+    expect(book.people[0].total).toBe(240);
+    expect(filterDistancePeople(book.people, { variants: ["nitro"], query: "456", onlyRedParty: true,
+      onlyActiveProfiles: true, id: "all", presence: "all" })).toHaveLength(1);
+    const csv = distanceBookCsv({ monthStart: "2026-10-01", roomTitle: "Winamax", people: book.people,
+      limits: ["50"], variants: ["nitro"], labels: { month: "", room: "", distanceId: "", discordId: "",
+        discordNick: "", gameNick: "", variant: "", part: "", comment: "", created: "", updated: "", total: "" } });
+    expect(csv).toContain('123');
+    expect(csv).toContain('456');
+    expect(csv).toContain("SecondNick");
+    expect(csv).toContain("HistoryPlayer");
   });
   it("fails explicitly when the current-role contract or settings cannot be loaded", async () => {
     setup(); mock.rpc.mockResolvedValue({ data: { entries: [entry] } });

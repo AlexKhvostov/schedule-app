@@ -1,17 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PRIORITY_DEFAULT_ROLE_ID } from "../schedule/priorities";
 import { loadPriorityFilters, parsePriorityFilters, priorityFiltersStorageKey, savePriorityFilters } from "./priorityFilterPrefs";
 
 afterEach(() => vi.unstubAllGlobals());
-const defaults = { roleIds: [], active: false, scheduleActive: false };
+const defaults = { roleIds: [PRIORITY_DEFAULT_ROLE_ID], active: true, scheduleActive: false };
 
 describe("saved priority filters", () => {
-  it("uses unrestricted defaults for missing, malformed or wrong-shaped storage", () => {
+  it("defaults to active RedParty profiles for missing, malformed or wrong-shaped storage", () => {
     for (const raw of [null, "{", "null", "5", "[]", '"bad"']) expect(parsePriorityFilters(raw)).toEqual(defaults);
   });
   it("validates fields independently, deduplicates roles and keeps unavailable IDs removable", () => {
     expect(parsePriorityFilters(JSON.stringify({ roleIds: ["rp", 4, " rp ", null, "", "old-role"], active: "true", scheduleActive: true })))
-      .toEqual({ roleIds: ["rp", "old-role"], active: false, scheduleActive: true });
+      .toEqual({ roleIds: ["rp", "old-role"], active: true, scheduleActive: true });
     expect(parsePriorityFilters('{"roleIds":{},"active":true}')).toEqual({ ...defaults, active: true });
+    expect(parsePriorityFilters('{"roleIds":[],"active":false}')).toEqual({ roleIds: [], active: false, scheduleActive: false });
   });
   it("stores roles and both booleans independently for accounts and environments", () => {
     const data = new Map<string, string>();

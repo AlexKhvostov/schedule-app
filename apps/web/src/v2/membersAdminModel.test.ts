@@ -132,10 +132,10 @@ describe("members admin model", () => {
     }
   });
 
-  it("sorts displayed guild names and status groups in both directions", () => {
+  it("sorts public Discord names and status groups in both directions", () => {
     const rows = [
-      person({ discordId: "blocked", username: "alpha", nick: "Zulu", accessStatus: "blocked" }),
-      person({ discordId: "active", username: "zulu", nick: "Alpha" }),
+      person({ discordId: "blocked", username: "alpha", nick: "Alpha", globalName: "Zulu", accessStatus: "blocked" }),
+      person({ discordId: "active", username: "zulu", nick: "Zulu", globalName: "Alpha" }),
       person({ discordId: "root", username: "middle", clubRoles: ["root"] }),
     ];
     expect(filterAndSortPeople(rows, "", "all", "nick", new Set()).map((row) => row.discordId)).toEqual(["active", "root", "blocked"]);

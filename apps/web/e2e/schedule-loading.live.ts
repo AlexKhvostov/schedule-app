@@ -169,7 +169,7 @@ test("monthly roster uses one conditional compact read, coalesces events and pau
         { memberId: "c", core: revision === "p1" ? 0 : 1, score: 10, excluded: false },
       ],
       directory: body.p_directory_revision === directoryRevision ? null : ["a", "b", "c"].map((id) => ({
-        member_id: id, public_code: id, discord_guild_nick: id === "b" && directoryRevision === "d2" ? "Beta updated" : id,
+        member_id: id, public_code: id, discord_global_name: id === "b" && directoryRevision === "d2" ? "Beta updated" : id,
         mark_tag: id.toUpperCase(), mark_bg: "#468ec6", mark_fg: "#fff", tables: 1,
       })),
     } });
@@ -211,7 +211,7 @@ test("monthly roster uses one conditional compact read, coalesces events and pau
   await page.clock.fastForward(150); await expect.poll(() => requests.length).toBe(4);
   fail = true; await burst(); await page.clock.fastForward(150);
   await expect(page.locator("#roster-panel [role=alert]")).toBeVisible();
-  await expect(roster).toHaveCount(0);
+  await expect(roster.locator(".v2-people-row")).toHaveCount(0);
   fail = false;
   await page.locator("#roster-panel [role=alert] button").click(); await page.clock.fastForward(150);
   await expect.poll(ids).toEqual(["c", "b", "a"]);

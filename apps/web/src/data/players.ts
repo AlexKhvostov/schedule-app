@@ -61,11 +61,9 @@ export function markFromPlayer(row: SchedulePlayer): Mark {
 
 function nickOf(row: DirectoryRow) {
   return (
-    row.discord_guild_nick ||
     row.discord_global_name ||
-    row.discord_username ||
-    row.guild_nick ||
     row.display_name ||
+    row.discord_username ||
     row.username ||
     row.public_code ||
     ""
@@ -119,7 +117,7 @@ function demoPlayers(): SchedulePlayer[] {
     .filter((row) => row.status === "active" && row.appAccess)
     .map((row) => ({
       id: row.id,
-      nick: row.discord,
+      nick: row.discordDisplay || row.discord,
       publicCode: row.room,
       roomNick: row.room,
       markTag: row.mark.t.trim(),
@@ -152,7 +150,7 @@ function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] 
     })
     .map((row) => ({
       t: row.mark.t.trim(),
-      discord: row.discord,
+      discord: row.discordDisplay || row.discord,
       room: row.room,
       bg: row.mark.bg || MARK_CATALOG[row.mark.colorId]?.bg || ME.bg,
       fg: row.mark.fg || MARK_FG_DEFAULT,

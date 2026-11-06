@@ -4,7 +4,7 @@ import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { loadMembers, limitsOfKind } from "../schedule/members";
 import { demoDistanceBook } from "./distanceBook";
-import { calculatePriority, priorityMonths, priorityToday, type PriorityGroup, shiftPriorityMonth, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
+import { calculatePriority, PRIORITY_DEFAULT_ROLE_ID, priorityGroupLimits, priorityMonths, priorityToday, type PriorityGroup, shiftPriorityMonth, type PriorityKind, type PriorityPerson, type PrioritySource } from "../schedule/priorities";
 
 export type PriorityRequestSummary = { id: string; periodStart: string; variant: PriorityKind; group?: PriorityGroup; createdAt: string; closedAt: string | null; response: string | null; targets: { memberId: string; nick: string }[] };
 export type PriorityRequestDetail = { id: string; variant: PriorityKind; author: string; comment: string; createdAt: string; closedAt: string | null; response: string | null; snapshot: Pick<PrioritySource, "periodStart" | "today" | "lastMonthEntries" | "people"> & { version: number; group?: PriorityGroup; calculatedAt?: string; rankingPeople: PriorityPerson[]; vipEnabled: boolean } };
@@ -26,7 +26,7 @@ export function demoPrioritySource(periodStart: string, canManage: boolean): Pri
   const members = loadMembers();
   const firstBook = demoDistanceBook(months[0]);
   const people: PriorityPerson[] = firstBook.people.filter((p) => p.memberId).map((p) => ({
-    memberId: p.memberId!, nick: p.nick, avatarUrl: p.avatarUrl, redParty: p.redParty, team50: true, hasActiveProfile: p.hasActiveProfile,
+    memberId: p.memberId!, nick: p.nick, gameNick: p.gameNick, avatarUrl: p.avatarUrl, redParty: p.redParty, team50: true, hasActiveProfile: p.hasActiveProfile,
     plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false,
     entries: months.flatMap((month) => demoDistanceBook(month).people.find((row) => row.memberId === p.memberId)?.slices.map((s) => ({
       id: s.id, month, variant: s.variant, part: s.part, values: Object.entries(s.byLimit).map(([limit, cell]) => ({ limit, tournaments: cell.hands })),
@@ -41,7 +41,7 @@ export function demoPrioritySource(periodStart: string, canManage: boolean): Pri
   });
   for (const p of people) p.discordRoles = [
     { id: "demo-decorative", name: "Demo decoration", color: null },
-    ...(p.redParty ? [{ id: "1208022351652986891", name: "RedParty", color: null }] : []),
+    ...(p.redParty ? [{ id: PRIORITY_DEFAULT_ROLE_ID, name: "RedParty", color: null }] : []),
     ...(p.team50 ? [{ id: "1208022278088949770", name: "Nitro 50+", color: null }] : []),
   ];
   for (const p of people) { const m = members.find((m) => m.id === p.memberId); if (m) { p.vipNitro = m.vipNitro ?? 0; p.vipRegular = m.vipRegular ?? 0; } p.excludedNitro = exclusions[p.memberId]?.nitro ?? false; p.excludedRegular = exclusions[p.memberId]?.regular ?? false; }
@@ -51,13 +51,18 @@ const demoCache = new Map<string, { fingerprint: string; source: PrioritySource 
 export function demoPrioritySlice(periodStart: string, canManage: boolean, kind: PriorityKind, group: PriorityGroup, force = false): PrioritySource {
   const raw = demoPrioritySource(periodStart, canManage);
   const key = `${periodStart}|${kind}|${group}`;
-  const fingerprint = raw.revision;
+  const members = new Map(loadMembers().map((member) => [member.id, member]));
+  const fingerprint = JSON.stringify([raw.revision, [...members.values()]]);
   const saved = demoCache.get(key);
   if (!force && saved?.fingerprint === fingerprint) return { ...saved.source, canManage, today: priorityToday() };
   const people = raw.people.map((person) => {
-    const member = loadMembers().find((m) => m.id === person.memberId);
-    const plays = member ? (["nitro", "regular"] as const).filter((k) => (member.plays ?? []).some((play) => play.roomId === "winamax" && limitsOfKind(play, k).some((limit) => group === "250" ? limit === "250" : ["50", "100"].includes(limit)))) : person.plays;
-    const p = { ...person, plays, coreNitro250: person.memberId === "demo-priority-2" ? 2 : 0, coreRegular250: person.memberId === "demo-priority-1" ? 1 : 0,
+    const member = members.get(person.memberId);
+    const plays = member ? (["nitro", "regular"] as const).filter((k) => (member.plays ?? []).some((play) => play.roomId === "winamax" && limitsOfKind(play, k).some((limit) => priorityGroupLimits[group].includes(limit))))
+      : group === "250" && person.memberId === "demo-priority-0" ? []
+      : group === "250" && person.memberId === "demo-priority-1" ? ["regular" as const]
+      : group === "250" && person.memberId === "demo-priority-2" ? ["nitro" as const]
+      : person.plays;
+    const p = { ...person, plays, coreNitro250: member?.coreNitro250 ?? (person.memberId === "demo-priority-2" ? 2 : 0), coreRegular250: member?.coreRegular250 ?? (person.memberId === "demo-priority-1" ? 1 : 0),
       entries: person.entries.filter((e) => group === "50-100" && e.variant === kind) };
     const result = calculatePriority(p, periodStart, kind, group);
     return { ...p, calculation: { periodStart, kind, group, months: result.months, distanceCells: result.distanceCells, pointCells: result.pointCells, total: result.total } };
@@ -76,7 +81,7 @@ export async function loadPriorities(periodStart: string | null, demoCanManage: 
 }
 export async function loadPriorityFilterRoles() {
   if (!isLiveData()) return { data: [
-    { id: "1208022351652986891", name: "RedParty", color: null },
+    { id: PRIORITY_DEFAULT_ROLE_ID, name: "RedParty", color: null },
     { id: "1208022278088949770", name: "Nitro 50+", color: null },
   ], error: null };
   const result = await loadRoleAccess();

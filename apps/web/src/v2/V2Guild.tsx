@@ -171,7 +171,7 @@ export function V2Guild() {
                           <PersonAvatar src={row.avatarUrl} label={personLabel(row)} />
                           <span>
                             <b>{personLabel(row)}</b>
-                            {row.bot ? <small>{t("guild.bot")}</small> : row.nick && row.globalName ? <small>{row.globalName}</small> : null}
+                            {row.bot ? <small>{t("guild.bot")}</small> : null}
                           </span>
                         </div>
                       </td>

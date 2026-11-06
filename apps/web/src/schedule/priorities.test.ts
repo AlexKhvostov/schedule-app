@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { calculatePriority, coreOf, groupsForLimits, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityBreakdown, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
+import { calculatePriority, coreOf, priorityGroupLimits, currentPriorityPeriod, filterPriorities, isPriorityPreliminary, listHighPriorityParticipants, priorityBreakdown, priorityMonths, priorityToday, rankPriorities, type PriorityPerson } from "./priorities";
 const person = (id: string, patch: Partial<PriorityPerson> = {}): PriorityPerson => ({ memberId: id, nick: id, avatarUrl: null, redParty: true, team50: true, hasActiveProfile: true, plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false, entries: [], ...patch });
 describe("priority calculation", () => {
+  it("combines 250–500 participants by manual Core without adding lower-only players or distance", () => {
+    const rows = listHighPriorityParticipants([
+      person("lower-only", { plays: [], vipNitro: 1, vipRegular: 1 }),
+      person("core-only", { plays: [], coreRegular250: 1 }),
+      person("both", { coreNitro250: 7, coreRegular250: 2, excludedNitro: true }),
+      person("nitro", { plays: ["nitro"], coreNitro250: 3 }),
+      person("regular", { plays: ["regular"] }),
+      person("excluded", { plays: ["regular"], excludedRegular: true }),
+      person("two-cores", { coreNitro250: 9, coreRegular250: 4 }),
+    ]);
+    expect(rows.map(({ memberId, core, excluded }) => [memberId, core, excluded])).toEqual([
+      ["core-only", 1, false], ["both", 2, false], ["nitro", 3, false], ["two-cores", 4, false], ["regular", null, false], ["excluded", null, true],
+    ]);
+    expect(filterPriorities(rows, { roleIds: [], active: false, scheduleActive: true }, "both").map((row) => row.memberId))
+      .toEqual(["both", "nitro", "two-cores", "regular", "excluded"]);
+  });
   it("uses six shifted months across year boundaries", () => {
     expect(priorityMonths("2026-08-01")).toEqual(["2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01", "2026-07-01"]);
     expect(priorityMonths("2026-02-01")).toEqual(["2025-08-01", "2025-09-01", "2025-10-01", "2025-11-01", "2025-12-01", "2026-01-01"]);
@@ -149,10 +165,7 @@ describe("independent priority slices", () => {
     expect(calculatePriority(cached,"2026-08-01","nitro","250").total).toBe(0);
     expect(calculatePriority(cached,"2026-11-01","nitro").total).toBe(0);
   });
-  it("derives available groups strictly from schedule filters", () => {
-    expect(groupsForLimits(["50"])).toEqual(["50-100"]);
-    expect(groupsForLimits(["100","250"])).toEqual(["50-100","250"]);
-    expect(groupsForLimits(["250"])).toEqual(["250"]);
-    expect(groupsForLimits(["25","500"])).toEqual([]);
+  it("keeps both limits in each priority group", () => {
+    expect(priorityGroupLimits).toEqual({ "50-100": ["50", "100"], "250": ["250", "500"] });
   });
 });

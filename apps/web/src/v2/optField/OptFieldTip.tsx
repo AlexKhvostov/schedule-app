@@ -9,7 +9,6 @@ import {
   displayNick,
   markWithPlayerIdentity,
   packOwner,
-  playerForMark,
   slotHoursValue,
   slotRangeSpan,
   tablesLabel,
@@ -140,9 +139,7 @@ export function OptTip({
     hover.level + 1,
   )[hover.level];
   const displayMark = mark ? markWithPlayerIdentity(mark, players) : null;
-  const player = mark ? playerForMark(mark, players) : null;
   const owner = displayMark ? packOwner(displayMark) : null;
-  const profileName = player?.profileName?.trim();
   const cap = hoursCaps[Math.floor(hover.half / 2)] ?? 1;
   const rangeStartHalf = hover.rangeStartHalf ?? hover.half;
   const rangeEndHalf = hover.rangeEndHalf ?? hover.half + 1;
@@ -190,9 +187,8 @@ export function OptTip({
         <div className="v2-opt-tip-who">
           <PersonAvatar src={owner.avatarUrl} label={owner.discord} size="md" />
           <div className="v2-opt-tip-person">
-            {profileName ? <b>{profileName}</b> : null}
+            <b>{owner.discord}</b>
             <div className="v2-opt-tip-nicks">
-              <span><i>{t("v2.tip.discord")}</i><em>{owner.discord}</em></span>
               <span><i>{t("v2.tip.gameNick")}</i><em>{displayNick(owner.room)}</em></span>
             </div>
             {countTables ? <small>{tablesLabel(displayMark.tables, i18n.language)}</small> : null}

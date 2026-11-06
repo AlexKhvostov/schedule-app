@@ -25,12 +25,16 @@ begin
   select required_discord_role_id into rp from club_settings where id;
   insert into discord_guild_roles(role_id,name) values('1208022278088949770','Priority test 50+') on conflict(role_id) do update set name=excluded.name;
   insert into discord_role_permissions(role_id,permission_code) values('1208022278088949770','schedule') on conflict do nothing;
+  insert into discord_role_schedule_limits(role_id,variant_id,limit_id)
+    values('1208022278088949770','nitro','50'),('1208022278088949770','nitro','500')
+    on conflict do nothing;
   insert into identities(member_id,provider,provider_uid,guild_present,discord_roles) values
     (player_id,'discord','990000000000000101',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770'))),
     (target,'discord','990000000000000102',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770')));
   insert into discord_members(discord_id,username,present,roles) values
     ('990000000000000101','PriorityPlayer',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770'))),
     ('990000000000000102','PriorityTarget',true,jsonb_build_array(jsonb_build_object('id',rp),jsonb_build_object('id','1208022278088949770')));
+  update discord_members set global_name='Public Priority', guild_nick='Server Priority' where discord_id='990000000000000102';
   insert into members(public_code,access_status) values('RP-PRIONOROOM','blocked') returning id into no_room;
   insert into members(public_code,access_status) values('RP-PRIOVACATION','active') returning id into vacation;
   insert into members(public_code,access_status) values('RP-PRIOSTAFF','active') returning id into staff_only;
@@ -50,6 +54,9 @@ begin
     select id,'nitro','50' from players where member_id in(player_id,target) and room_id=room on conflict do nothing;
   insert into player_limits(player_id,variant_id,limit_id)
     select id,'regular','100' from players where member_id in(player_id,target) and room_id=room on conflict do nothing;
+  insert into player_limits(player_id,variant_id,limit_id)
+    select id,'nitro','500' from players where member_id=target and room_id=room on conflict do nothing;
+  insert into player_nicks(player_id,nick,at) select id,'PriorityWin',now() from players where member_id=target and room_id=room;
   insert into distance_entries(member_id,room_id,month_start,variant_id,source,distance_ext_id,part)
     select target,room,'2026-07-01','nitro','manual','987650',n from generate_series(1,20) n;
   insert into distance_values(entry_id,limit_id,tournaments)
@@ -65,6 +72,7 @@ begin
   source:=load_priority_slice('2026-08-01','nitro','50-100');
   select p into cached from jsonb_array_elements(source->'people') p where p->>'memberId'=target::text;
   if (cached->'calculation'->>'total')::numeric <> 320 or cached->'calculation'->'distanceCells' <> '[0,0,200,60]'::jsonb then raise exception 'nitro calculation mixes variants or wrong weights: %',cached; end if;
+  if cached->>'nick' is distinct from 'Public Priority' or cached->>'gameNick' is distinct from 'PriorityWin' then raise exception 'incorrect public and Winamax names: %',cached; end if;
   original_calc:=cached->'calculation'; calculated:=source->>'calculatedAt';
   if load_priority_slice('2026-08-01','nitro','50-100')->>'calculatedAt' is distinct from calculated then raise exception 'unchanged read recalculates'; end if;
   next_source:=load_priority_slice('2026-08-01','regular','50-100');
@@ -72,6 +80,8 @@ begin
   if (cached->'calculation'->>'total')::numeric <> 5.5 then raise exception 'regular calculation includes Nitro'; end if;
   next_source:=load_priority_slice('2026-08-01','nitro','250');
   if exists(select 1 from jsonb_array_elements(next_source->'people') p where (p->'calculation'->>'total')::numeric<>0 or p->'entries'<>'[]'::jsonb) then raise exception '250 has distances'; end if;
+  select p into cached from jsonb_array_elements(next_source->'people') p where p->>'memberId'=target::text;
+  if not coalesce(cached->'plays' ? 'nitro',false) then raise exception '500-only participation is missing from 250-500'; end if;
   if has_table_privilege('authenticated','public.priority_rating_cache','SELECT') or has_function_privilege('authenticated','public.priority_slice_source(date,text,text,boolean)','EXECUTE') then raise exception 'cache access leak'; end if;
   begin perform load_priority_slice('2026-08-01','nitro','50-100',true); raise exception 'player forced refresh'; exception when sqlstate '42501' then null; end;
   begin update members set core_nitro_250=777 where id=player_id; raise exception 'player assigned Core'; exception when sqlstate '42501' then null; end;
@@ -89,11 +99,29 @@ begin
   next_source:=public.priority_slice_source('2026-08-01','nitro','50-100');
   select p into cached from jsonb_array_elements(next_source->'people') p where p->>'memberId'=target::text;
   if cached->'calculation' is distinct from original_calc or (cached->>'vipNitro')::int<>0 or (cached->>'coreNitro250')::int<>998 then raise exception 'Core overwrote another cell or calculation'; end if;
+  update members set vip_nitro=991,vip_regular=992 where id=player_id;
   begin update members set core_nitro_250=998 where id=player_id; raise exception 'duplicate group Core accepted'; exception when sqlstate '23505' then null; end;
   update distance_values set tournaments=20 where entry_id in(select id from distance_entries where member_id=target and variant_id='nitro') and limit_id='50';
   perform set_config('request.jwt.claim.sub',admin_auth::text,true);
   execute 'set local role authenticated';
   source:=load_priority_slice('2026-08-01','nitro','50-100');
+  next_source:=load_active_month_roster('both','250',array['250','500']);
+  select p into cached from jsonb_array_elements(next_source->'people') p where p->>'memberId'=target::text;
+  if cached is null or (cached->>'tier')::int<>0 or (cached->>'core')::int<>997 or (cached->>'score')::int<>0 then
+    raise exception 'high Core must use the smaller of both numbers: %',cached;
+  end if;
+  select p into cached from jsonb_array_elements(next_source->'people') p where p->>'memberId'=player_id::text;
+  if cached is null or (cached->>'tier')::int<>1 or (cached->>'core')::int<>991 then
+    raise exception 'nitro fallback must precede regular: %',cached;
+  end if;
+  if exists(select 1 from jsonb_array_elements(next_source->'people') p where (p->>'core')::int<=0)
+     or has_function_privilege('anon','public.load_active_month_roster(text,text,text[],text,text)','EXECUTE') then
+    raise exception 'combined queue includes a non-Core player or is callable by anon';
+  end if;
+  cached:=load_active_month_roster('both','250',array['250','500'],next_source->>'revision',next_source->>'directoryRevision');
+  if cached->'people' is distinct from 'null'::jsonb or cached->'directory' is distinct from 'null'::jsonb then
+    raise exception 'unchanged combined roster ignored revisions';
+  end if;
   if not (source->>'canManage')::boolean then raise exception 'cache reused another caller permissions'; end if;
   select p into cached from jsonb_array_elements(source->'people') p where p->>'memberId'=target::text;
   if (cached->'calculation'->>'total')::numeric <> 520 then raise exception 'latest month not refreshed'; end if;

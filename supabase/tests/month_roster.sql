@@ -14,7 +14,7 @@ begin
   insert into auth.users(instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values
     ('00000000-0000-0000-0000-000000000000',actor_auth,'authenticated','authenticated','roster-reader@example.invalid','',now(),now(),now()),
     ('00000000-0000-0000-0000-000000000000',outsider_auth,'authenticated','authenticated','roster-outsider@example.invalid','',now(),now(),now());
-  insert into members(auth_user_id,public_code,access_status) values(actor_auth,'ROSTER-READER','active') returning id into actor;
+  insert into members(auth_user_id,public_code,access_status,distance_ext_id) values(actor_auth,'ROSTER-READER','active','987651') returning id into actor;
   insert into members(auth_user_id,public_code,access_status) values(outsider_auth,'ROSTER-OUT','active') returning id into outsider;
   target:=actor;
   update members set mark_tag='ZX',vip_nitro=998,vip_regular=997,core_nitro_250=996,core_regular_250=995 where id=target;

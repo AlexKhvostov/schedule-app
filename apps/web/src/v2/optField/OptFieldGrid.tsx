@@ -12,10 +12,10 @@ import {
   hiddenSelfHalves,
   nowHeadLeft,
   nowLineLeft,
-  packOwner,
   scheduleKindGroups
 } from "../optFieldModel";
 import { OptLevelLane, OptNlChip } from "../OptLevelLane";
+import { showNick } from "../schedulePresentation";
 import { MarkFace } from "../ScheduleSlot";
 import type { SchedulePairRow } from "../variantSchedule";
 import { hourLoadKey, loadToneColor, type HourLoadMap, type LoadTone } from "../../schedule/hourLoad";
@@ -84,6 +84,36 @@ function OptFace({ tag, tables, showTables, on }: { tag?: string; tables?: numbe
   return <MarkFace letters={tag?.trim() || "—"} tables={tables} showTables={showTables} />;
 }
 
+function useFittedSlotName(root: RefObject<HTMLDivElement | null>, mark: Mark | null | undefined, showTables: boolean) {
+  const short = mark?.t.trim() || "—";
+  const primary = showNick(mark?.globalName);
+  const room = showNick(mark?.room);
+  const full = primary && room && room.toLowerCase() !== primary.toLowerCase()
+    ? `${primary} · ${room}`
+    : primary;
+  const [label, setLabel] = useState(short);
+  const hasName = Boolean(primary);
+
+  useLayoutEffect(() => {
+    const node = root.current;
+    if (!node || !hasName) return;
+    const room = node.querySelector<HTMLElement>("[data-measure='full']");
+    const discord = node.querySelector<HTMLElement>("[data-measure='primary']");
+    const update = () => {
+      const allowance = Math.max(0, node.clientWidth - (showTables ? 18 : 8));
+      setLabel(room && room.scrollWidth <= allowance ? full : discord && discord.scrollWidth <= allowance ? primary : short);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    if (room) observer.observe(room);
+    if (discord) observer.observe(discord);
+    return () => observer.disconnect();
+  }, [root, full, primary, short, showTables, hasName]);
+
+  return { label: hasName ? label : short, full, primary };
+}
+
 const MergedMark = memo(function MergedMark({
   segment,
   visibleHalves,
@@ -98,33 +128,9 @@ const MergedMark = memo(function MergedMark({
   pastPct?: number;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const owner = packOwner(segment.mark);
+  const { label, full, primary } = useFittedSlotName(root, segment.mark, showTables);
   const short = segment.mark.t.trim() || "—";
-  const primary = owner.discord || short;
-  const full = owner.room && owner.room.toLowerCase() !== primary.toLowerCase()
-    ? `${primary} · ${owner.room}`
-    : primary;
-  const [label, setLabel] = useState(short);
   const span = segment.endHalf - segment.startHalf;
-
-  useLayoutEffect(() => {
-    const node = root.current;
-    if (!node) return;
-    const update = () => {
-      if (span === 1) {
-        setLabel(short);
-        return;
-      }
-      const room = node.querySelector<HTMLElement>("[data-measure='full']");
-      const discord = node.querySelector<HTMLElement>("[data-measure='primary']");
-      const allowance = Math.max(0, node.clientWidth - (showTables ? 18 : 8));
-      setLabel(room && room.scrollWidth <= allowance ? full : discord && discord.scrollWidth <= allowance ? primary : short);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [full, primary, short, showTables, span]);
 
   const start = workGridColumn(visibleHalves, segment.startHalf);
   return (
@@ -166,6 +172,7 @@ const OptCell = memo(function OptCell({
   limit,
   lane,
   tag,
+  player,
   tables,
   bg,
   fg,
@@ -195,6 +202,7 @@ const OptCell = memo(function OptCell({
   limit: string;
   lane: string;
   tag?: string;
+  player?: Mark | null;
   tables?: number;
   bg?: string;
   fg?: string;
@@ -218,8 +226,12 @@ const OptCell = memo(function OptCell({
 }) {
   const on = Boolean(bg);
   const mark = tag?.trim().toUpperCase() || undefined;
+  const root = useRef<HTMLDivElement>(null);
+  const { label, full, primary } = useFittedSlotName(root, player, showTables);
+  const face = player ? label : tag;
   return (
     <div
+      ref={root}
       role="gridcell"
       data-slot=""
       data-day={dayIdx}
@@ -251,10 +263,14 @@ const OptCell = memo(function OptCell({
         } as CSSProperties
       }
     >
-      <OptFace tag={tag} tables={tables} showTables={showTables} on={on} />
+      <OptFace tag={face} tables={tables} showTables={showTables} on={on} />
+      {primary && <>
+        <span className="v2-opt-merged-measure" data-measure="full">{full}</span>
+        <span className="v2-opt-merged-measure" data-measure="primary">{primary}</span>
+      </>}
       {nowPct != null && (
         <span className="v2-opt-now-dim" aria-hidden>
-          <OptFace tag={tag} tables={tables} showTables={showTables} on={on} />
+          <OptFace tag={face} tables={tables} showTables={showTables} on={on} />
         </span>
       )}
     </div>
@@ -442,6 +458,7 @@ export const OptBody = memo(function OptBody({
                                   limit={rowInfo.limit}
                                   lane={lane}
                                   tag={mark?.t}
+                                  player={mergedSegment ? null : mark}
                                   tables={mark?.tables}
                                   bg={mark?.bg}
                                   fg={mark?.fg}

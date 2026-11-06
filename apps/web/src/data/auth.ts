@@ -162,12 +162,10 @@ async function loadLiveMemberForAuthUser(authUserId: string, signal = new AbortC
   signal.throwIfAborted();
   if (discordError) throw discordError;
   const nick =
-    discord?.guild_nick ||
     discord?.global_name ||
-    discord?.username ||
-    ident?.guild_nick ||
-    ident?.username ||
     ident?.display_name ||
+    discord?.username ||
+    ident?.username ||
     member.public_code;
   return {
     id: member.id,

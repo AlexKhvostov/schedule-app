@@ -1,14 +1,16 @@
 import { demoActivePriority } from "./activePriority";
-import { isPriorityPeriod } from "../schedule/priorities";
+import { LIMIT_OPTIONS } from "../schedule/capacity";
+import { loadMembers } from "../schedule/members";
+import { isPriorityPeriod, priorityToday } from "../schedule/priorities";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { demoPrioritySlice } from "./priorities";
 import { loadLimitMarks, markOf, type DirectoryRow } from "./players";
 import type { Mark } from "../schedule/marks";
-import type { PriorityGroup, PriorityKind } from "../schedule/priorities";
-import { compactRosterPriorities, type RosterPrioritySource } from "../schedule/rosterPriorities";
+import type { PriorityGroup } from "../schedule/priorities";
+import { combinedCorePriority, compactRosterPriorities, type RosterKind, type RosterPrioritySource } from "../schedule/rosterPriorities";
 
-export type RosterQuery = { period: string | null; kind: PriorityKind; group: PriorityGroup; limits: string[] };
+export type RosterQuery = { period: string | null; kind: RosterKind; group: PriorityGroup; limits: string[] };
 export type RosterSnapshot = { source: RosterPrioritySource; faces: Mark[]; directoryRevision: string };
 export type RosterResponse = Omit<RosterPrioritySource, "people"> & {
   people: RosterPrioritySource["people"] | null; directoryRevision: string; faces: Mark[] | null;
@@ -20,12 +22,31 @@ export function rosterQueryKey(query: RosterQuery) {
 
 async function readRoster(query: RosterQuery, previous?: RosterSnapshot): Promise<RosterResponse> {
   if (!isLiveData()) {
-    const source = compactRosterPriorities(demoPrioritySlice(query.period ?? demoActivePriority().activePeriod, false, query.kind, query.group), query.kind, query.group);
-    const directory = await loadLimitMarks(query.kind, query.limits);
-    if (directory.error || !directory.data) throw new Error(directory.error || "empty response");
-    const directoryRevision = JSON.stringify(directory.data);
+    const period = query.period ?? demoActivePriority().activePeriod;
+    const { kind, group } = query;
+    let source: RosterPrioritySource;
+    let faces: Mark[];
+    if (kind === "both") {
+      const members = loadMembers();
+      const directories = await Promise.all((["nitro", "regular"] as const).map((variant) => loadLimitMarks(variant, [...LIMIT_OPTIONS])));
+      const people = members.flatMap((member) => {
+        const priority = combinedCorePriority(member.id, member.coreNitro250 ?? 0, member.coreRegular250 ?? 0, member.vipNitro, member.vipRegular);
+        return priority ? [priority] : [];
+      });
+      const ids = new Set(people.map((person) => person.memberId));
+      faces = [...new Map(directories.flatMap((directory) => directory.data ?? [])
+        .filter((face) => face.memberId && ids.has(face.memberId))
+        .map((face) => [face.memberId, face])).values()];
+      source = { periodStart: period, kind, group, today: priorityToday(), lastMonthEntries: 0, revision: JSON.stringify([period, people]), people };
+    } else {
+      source = compactRosterPriorities(demoPrioritySlice(period, false, kind, group), kind, group);
+      const directory = await loadLimitMarks(kind, query.limits);
+      if (directory.error || !directory.data) throw new Error(directory.error || "empty response");
+      faces = directory.data;
+    }
+    const directoryRevision = JSON.stringify(faces);
     return { ...source, people: previous?.source.revision === source.revision ? null : source.people,
-      directoryRevision, faces: previous?.directoryRevision === directoryRevision ? null : directory.data };
+      directoryRevision, faces: previous?.directoryRevision === directoryRevision ? null : faces };
   }
   const db = getSupabase();
   if (!db) throw new Error("not-configured");

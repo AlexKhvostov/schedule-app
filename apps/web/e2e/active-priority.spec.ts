@@ -6,6 +6,7 @@ async function enter(page: Page) {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
   await page.goto("/#priorities");
   await expect(page.getByLabel("Отчётный месяц", { exact: true })).toHaveValue("2026-08-01");
 }
@@ -34,10 +35,14 @@ test("preview is temporary; activation is shared and survives reload; members ca
   await second.getByRole("button", { name: "Игроки", exact: true }).click();
   await expect(second.locator(".v2-roster-active-period")).toContainText("август");
   await select.selectOption("2026-11-01");
+  await page.getByRole("tab", { name: "250-500", exact: true }).click();
+  await expect(select).toHaveValue("2026-11-01");
   await activate.click();
   await expect(page.getByTestId("active-priority")).toContainText("ноябрь");
   await expect(second.locator(".v2-roster-active-period")).toContainText("ноябрь");
   await second.close();
+  await page.getByRole("tab", { name: "E50-100", exact: true }).click();
+  await expect(select).toHaveValue("2026-11-01");
   await page.reload();
   await expect(select).toHaveValue("2026-11-01");
   await select.selectOption("2026-08-01");

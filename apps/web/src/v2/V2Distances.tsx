@@ -197,7 +197,6 @@ export function V2Distances() {
     for (const row of cells) {
       if (existing.has(dumpSliceKey(row.distance_ext_id, row.variant_id, row.limit_id))) {
         skipDup += 1;
-        continue;
       }
       payload.push(row);
       const link = flags.byExt.get(row.distance_ext_id);
@@ -209,11 +208,11 @@ export function V2Distances() {
         unmatched.push({ playerId: row.distance_ext_id, nick: person?.nick ?? "" });
       }
     }
-    return { payload, cells: cells.length, write: payload.length, skipDup, withCard, withDiscord, unmatched };
+    return { payload, cells: cells.length, write: payload.filter((row) => row.hands > 0 && !existing.has(dumpSliceKey(row.distance_ext_id, row.variant_id, row.limit_id))).length, skipDup, withCard, withDiscord, unmatched };
   }, [dump, existing, flags]);
 
   const onWrite = async () => {
-    if (!plan?.write || !monthStart || writeBusy) return;
+    if (!plan?.cells || !monthStart || writeBusy) return;
     setWriteBusy(true);
     setWriteError(null);
     const saved = await saveDistanceDump({
@@ -556,9 +555,9 @@ export function V2Distances() {
                 <p className="v2-dist-write-ok">{t("admin.distance.writeDone", { n: writeResult.inserted, skip: writeResult.skipped })}</p>
               ) : null}
               <V2SaveButton
-                dirty={Boolean(plan?.write && monthStart) && !writeBusy}
+                dirty={Boolean(plan?.cells && monthStart) && !writeBusy}
                 saved={Boolean(writeResult && writeResult.inserted > 0)}
-                disabled={!plan?.write || !monthStart || writeBusy}
+                disabled={!plan?.cells || !monthStart || writeBusy}
                 label={t("admin.distance.write")}
                 doneLabel={t("admin.distance.written")}
                 onClick={() => void onWrite()}

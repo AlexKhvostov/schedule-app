@@ -121,7 +121,7 @@ test("cancelled schedule drag keeps cells empty and the next drag still works", 
   await expect(end).toHaveClass(/is-on/);
 });
 
-test("cabinet game limits block new marks but keep old shifts in an unnumbered roster section", async ({ page }) => {
+test("cabinet game limits block new marks but keep old shifts in the schedule", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.locator(".v2-dev-login select").selectOption("RP-415");
@@ -160,9 +160,7 @@ test("cabinet game limits block new marks but keep old shifts in an unnumbered r
 
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
   const players = page.locator(".v2-float", { has: page.getByRole("heading", { name: "Игроки месяца" }) });
-  await expect(players.locator(".v2-people-historical-head")).toContainText("Есть смены, но игровые лимиты отключены");
-  const historical = players.locator(".v2-people-row.is-historical", { hasText: "you" }).first();
-  await expect(historical.locator(".v2-people-rank")).toHaveText("");
+  await expect(players.locator('.v2-people-row[data-member="RP-415"] .v2-people-rank > b')).toHaveText(/\d+/);
 
   await players.locator(".v2-modal-close").click();
   await expect(oldOwn).toBeVisible();
@@ -804,7 +802,7 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await expect(page.locator(".v2-user-card")).toContainText("N50");
   await expect(page.locator(".v2-user-card")).not.toContainText("E50");
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
-  await page.getByRole("tab", { name: "Регулярные", exact: true }).click();
+  await page.getByRole("button", { name: "E50-100", exact: true }).click();
   await expect(peopleTable.locator("thead")).toContainText("E50");
   await expect(peopleTable.locator("thead")).not.toContainText("N50");
   await expect(currentRow.locator(".v2-people-num small")).toHaveCount(0);
@@ -996,9 +994,8 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await expect(tip.locator(".v2-opt-tip-limit")).toHaveText(`${limit} €`);
   await expect(tip.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
   await expect(tip.locator(".v2-opt-tip-who img.v2-ava")).toHaveAttribute("src", /cdn\.discordapp\.com/);
-  await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("Ярослав");
-  await expect(tip.locator(".v2-opt-tip-nicks > span").nth(0)).toContainText("Discordyou");
-  await expect(tip.locator(".v2-opt-tip-nicks > span").nth(1)).toContainText("Игровой никYouNick");
+  await expect(tip.locator(".v2-opt-tip-person > b")).toHaveText("you");
+  await expect(tip.locator(".v2-opt-tip-nicks")).toContainText("Игровой никYouNick");
   await expect(tip.locator(".v2-opt-tip-person > small")).toContainText("6");
   await expect(tip.locator(".v2-opt-tip-mark b")).toHaveText("YO");
   await expect(tip.locator(".v2-opt-tip-mark i")).toHaveText("6");
@@ -1130,8 +1127,8 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await middle.click({ button: "right" });
   await expect(page.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(mergedTime);
   await expect(page.locator(".v2-opt-tip-time.is-cet > small")).toHaveText("· 1,5 ч");
-  await expect(page.locator(".v2-opt-tip-person > b")).toHaveText("Ярослав");
-  await expect(page.locator(".v2-opt-tip-nicks")).toContainText("Discordyou");
+  await expect(page.locator(".v2-opt-tip-person > b")).toHaveText("you");
+  await expect(page.locator(".v2-opt-tip-nicks")).toContainText("YouNick");
 
   const hiddenHour = Math.floor(run!.half / 2);
   const hiddenHourLabel = `${String(hiddenHour).padStart(2, "0")}:00–${String(hiddenHour + 1).padStart(2, "0")}:00`;
@@ -1174,9 +1171,15 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   expect(singleLayout.tablesTop).toBeGreaterThan(singleLayout.lettersTop);
   expect(singleLayout.tablesBottom).toBeLessThanOrEqual(singleLayout.cellBottom);
 
+  const medium = await page.addStyleTag({ content: ".v2-opt-merged.is-single { width: 55px; }" });
+  await expect(single.locator(".v2-opt-merged-label")).toHaveText("you");
+  await medium.evaluate((node) => { node.textContent = ".v2-opt-merged.is-single { width: 150px; }"; });
+  await expect(single.locator(".v2-opt-merged-label")).toHaveText("you · YouNick");
+  await medium.evaluate((node) => { node.parentNode?.removeChild(node); });
+
   const expectFullTag = async (mark: import("@playwright/test").Locator, labelSelector: string) => {
     const label = mark.locator(labelSelector);
-    await expect(label).toHaveText("YO");
+    await expect(label).toHaveText(/^(YO|you)$/);
     await expect.poll(() => label.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
     const bounds = await mark.evaluate((node, selector) => {
       const cell = node.getBoundingClientRect();
@@ -1193,7 +1196,7 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
   await expect(tablesToggle).not.toHaveClass(/is-on/);
   await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание" }).click();
   await expect(single.locator(":scope > i")).toHaveCount(0);
-  await expectFullTag(single, ".v2-opt-merged-label");
+  await expect(single.locator(".v2-opt-merged-label")).toHaveText(/^(YO|you)$/);
 
   await page.goto("/#admin-schedule");
   await expect(mergeToggle).toHaveAttribute("aria-pressed", "true");
@@ -1209,6 +1212,9 @@ test("merged marks keep real half-hour editing and split at an edge or in the mi
 
 
 test("dead-time statistics appear only while intervals exist and update in both open panels", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("v2-schedule-prefs", JSON.stringify({ kinds: ["nitro"], limits: ["50"] }));
+  });
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
@@ -1221,22 +1227,34 @@ test("dead-time statistics appear only while intervals exist and update in both 
   const ordinaryHours = await hours.locator("tbody tr td:first-of-type").allTextContents();
   const names = await people.locator(".v2-people-nicks").allTextContents();
 
-  for (const enabled of [false, true, false]) {
-    await page.evaluate((enabled) => {
-      localStorage.setItem("redparty.demo.dead-time.v1", JSON.stringify(enabled
-        ? [{ id: "test", variant: "nitro", limit: "50", startHalf: 0, endHalf: 48 }] : []));
+  for (const pair of [null, { variant: "regular", limit: "50" }, { variant: "nitro", limit: "100" }, { variant: "nitro", limit: "50" }, null]) {
+    const enabled = pair?.variant === "nitro" && pair.limit === "50";
+    await page.evaluate((pair) => {
+      localStorage.setItem("redparty.demo.dead-time.v1", JSON.stringify(pair
+        ? [{ id: "test", ...pair, startHalf: 0, endHalf: 48 }] : []));
       window.dispatchEvent(new Event("redparty:demo-dead-time"));
-    }, enabled);
-    await expect(hours.locator("thead .is-dead")).toHaveCount(enabled ? 1 : 0);
+    }, pair);
+    await expect(hours.locator("thead .is-dead")).toHaveCount(pair ? 1 : 0);
     await expect(people.locator("thead .v2-people-dead-total")).toHaveCount(enabled ? 1 : 0);
     await expect(people.locator("col.v2-people-col-dead")).toHaveCount(enabled ? 1 : 0);
+    await expect(people.locator("thead th").last()).toHaveClass(/v2-people-tick-h/);
+    await expect(people.locator("tbody tr").first().locator("td").last()).toHaveClass(/v2-people-tick-cell/);
     await expect(people.locator("thead .v2-people-limit small").first()).toHaveText(enabled ? "ч / м.ч." : "ч");
+    await expect(page.getByRole("checkbox", { name: "Показывать мёртвые часы" })).toHaveCount(enabled ? 1 : 0);
     if (enabled) {
       await expect(people.locator(".v2-people-num small").first()).toBeVisible();
       await expect(hours.locator("tfoot .is-dead")).toBeVisible();
+      await expect(people.locator("thead th").nth(-2)).toHaveClass(/v2-people-dead-total/);
+      const toggle = page.getByRole("checkbox", { name: "Показывать мёртвые часы" });
+      await toggle.uncheck();
+      await expect(people.locator("thead .v2-people-dead-total")).toHaveCount(0);
+      await expect(people.locator("thead th").nth(-2)).toHaveClass(/v2-people-hours-total/);
+      await expect(hours.locator("tfoot .is-dead")).toBeVisible();
+      await toggle.check();
+      await expect(people.locator("thead .v2-people-dead-total")).toHaveCount(1);
     } else {
       await expect(people.locator(".v2-people-num small, .v2-people-dead-total")).toHaveCount(0);
-      await expect(hours.locator(".is-dead")).toHaveCount(0);
+      if (!pair) await expect(hours.locator(".is-dead")).toHaveCount(0);
     }
     await expect(hours.locator("tbody tr td:first-of-type")).toHaveText(ordinaryHours);
     await expect(people.locator(".v2-people-nicks")).toHaveText(names);

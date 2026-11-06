@@ -1,10 +1,14 @@
 export type PriorityKind = "nitro" | "regular";
+export const PRIORITY_DEFAULT_ROLE_ID = "1208022351652986891"; // RedParty
 export type PriorityGroup = "50-100" | "250";
 export const priorityGroups: PriorityGroup[] = ["50-100", "250"];
-export function groupsForLimits(limits: readonly string[]): PriorityGroup[] { return priorityGroups.filter((g) => g === "250" ? limits.includes("250") : limits.some((l) => l === "50" || l === "100")); }
+export const priorityGroupLimits = { "50-100": ["50", "100"], "250": ["250", "500"] } satisfies Record<PriorityGroup, string[]>;
+export function priorityGroupLabel(group: PriorityGroup) {
+  return group === "50-100" ? "50–100" : priorityGroupLimits[group].join("-");
+}
 export type PriorityEntry = { id: string; month: string; variant: PriorityKind; part: number; values: { limit: string; tournaments: number }[] };
 export type PriorityPerson = {
-  memberId: string; nick: string; avatarUrl: string | null; redParty: boolean; team50: boolean; hasActiveProfile: boolean;
+  memberId: string; nick: string; gameNick?: string; avatarUrl: string | null; redParty: boolean; team50: boolean; hasActiveProfile: boolean;
   discordRoles?: { id: string; name: string; color: string | null }[];
   plays: PriorityKind[]; coreNitro250?: number; coreRegular250?: number; calculation?: SavedPriorityCalculation; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
 };
@@ -99,9 +103,24 @@ export function rankPriorities(people: PriorityPerson[], period: string, kind: P
   for (const row of rows) if (!row.excluded && row.vip > 0) row.rank = row.vip;
   return rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || (a.excluded ? compare(a, b) : (a.rank ?? 0) - (b.rank ?? 0)));
 }
-export function filterPriorities(rows: CalculatedPriority[], filters: PriorityFilters, kind: PriorityKind) {
+export function filterPriorities<T extends PriorityPerson>(rows: T[], filters: PriorityFilters, kind: PriorityKind | "both") {
   const roles = new Set(filters.roleIds);
   return rows.filter((row) => (!roles.size || row.discordRoles?.some((role) => roles.has(role.id)))
     && (!filters.active || row.hasActiveProfile)
-    && (!filters.scheduleActive || row.plays.includes(kind)));
+    && (!filters.scheduleActive || (kind === "both" ? row.plays.length > 0 : row.plays.includes(kind))));
+}
+
+/** The 250–500 slice supplies both kinds' eligibility and manual Core numbers. */
+export function listHighPriorityParticipants(people: PriorityPerson[]) {
+  return people.flatMap((person) => {
+    const kinds = (["nitro", "regular"] as const).filter((kind) =>
+      person.plays.includes(kind) || coreOf(person, kind, "250") > 0);
+    if (!kinds.length) return [];
+    const eligible = kinds.filter((kind) => !(kind === "nitro" ? person.excludedNitro : person.excludedRegular));
+    const cores = eligible.map((kind) => coreOf(person, kind, "250")).filter((core) => core > 0);
+    return [{ ...person, excluded: !eligible.length, core: cores.length ? Math.min(...cores) : null }];
+  }).sort((a, b) => Number(a.excluded) - Number(b.excluded)
+    || (a.core ?? Infinity) - (b.core ?? Infinity)
+    || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" })
+    || a.memberId.localeCompare(b.memberId));
 }

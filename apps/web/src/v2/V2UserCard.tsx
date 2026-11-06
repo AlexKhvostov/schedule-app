@@ -6,11 +6,13 @@ import { ScheduleSlot } from "./ScheduleSlot";
 import { V2Float } from "./V2Float";
 import { PairLabel } from "./PairLabel";
 import { displayScheduleColumn } from "./variantSchedule";
+import { rowInitials, showNick } from "./schedulePresentation";
 
 type Props = {
   row: RosterRow;
   givenName?: string;
   monthLabel: string;
+  limits: readonly string[];
   x: number;
   y: number;
   z: number;
@@ -22,92 +24,73 @@ type Props = {
   onOpenProfile?: (memberId: string) => void;
 };
 
-function isClubCode(value?: string | null) {
-  return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
-}
-
-function showNick(value?: string | null) {
-  const text = value?.trim() ?? "";
-  if (!text || isClubCode(text)) return "";
-  return text;
-}
-
-function initials(nick: string, mark: string) {
-  const letters = nick.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const parts = letters.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  if (mark.trim()) return mark.trim().slice(0, 2).toUpperCase();
-  return (parts[0] || "?").slice(0, 2).toUpperCase();
-}
-
-export function V2UserCard({ row, givenName, monthLabel, x, y, z, onMove, onFocus, onClose, showTables = false, canManageProfile = false, onOpenProfile }: Props) {
+export function V2UserCard({ row, givenName, monthLabel, limits, x, y, z, onMove, onFocus, onClose, showTables = false, canManageProfile = false, onOpenProfile }: Props) {
   const { t } = useTranslation();
   const hintId = useId();
   const profileAvailable = canManageProfile && !!row.mark.memberId && !!onOpenProfile;
   const profileHint = t(canManageProfile ? "schedule.profileUnavailable" : "schedule.profileAdminsOnly");
-  const guild = showNick(row.mark.discord) || "—";
+  const discord = showNick(row.mark.globalName);
   const room = showNick(row.mark.room);
-  const user = showNick(row.mark.username);
-  const globalName = showNick(row.mark.globalName);
-  const name = givenName?.trim() || "";
+  const guildNick = showNick(row.mark.guildNick);
+  const username = showNick(row.mark.username);
+  const stats = [
+    [t("schedule.colHours"), formatHours(row.hours)],
+    [t("schedule.colLeft"), formatHours(row.left)],
+    [t("schedule.colMarksShort"), row.slots],
+  ];
 
   return (
-    <V2Float title={t("schedule.userCard")} x={x} y={y} width={320} z={z} compact className="v2-user-float" onMove={onMove} onFocus={onFocus} onClose={onClose}>
+    <V2Float title={t("schedule.userCard")} x={x} y={y} width={350} z={z} compact className="v2-user-float" onMove={onMove} onFocus={onFocus} onClose={onClose}>
       <div className="v2-user-card">
         <div className="v2-user-card-hero">
-          <PersonAvatar src={row.mark.avatarUrl} label={initials(guild, row.mark.t)} size="lg" />
-          <div className="min-w-0 flex-1">
-            <h3 id="v2-user-card-title">{guild}</h3>
-            {user ? <p>@{user}</p> : null}
+          <PersonAvatar src={row.mark.avatarUrl} label={rowInitials(givenName || discord || username, row.mark.t)} size="lg" />
+          <div className="v2-user-identity">
+            <h3>{givenName?.trim()}</h3>
+            <dl className="v2-user-accounts">
+              <div><dt>{t("v2.tip.discord")}:</dt><dd>{discord}</dd></div>
+              <div><dt>{t("v2.tip.winamax")}:</dt><dd>{room}</dd></div>
+            </dl>
           </div>
-          <span className="v2-mark-chip">
-            <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
-          </span>
-        </div>
-        <div className="v2-user-profile-action" tabIndex={profileAvailable ? undefined : 0} aria-describedby={profileAvailable ? undefined : hintId}>
-          <button type="button" className="v2-ctrl" disabled={!profileAvailable}
-            onClick={() => { if (profileAvailable && row.mark.memberId) onOpenProfile?.(row.mark.memberId); }}>
-            {t("schedule.openProfile")}
-          </button>
-          {!profileAvailable && <span className="v2-user-profile-hint" role="tooltip" id={hintId}>{profileHint}</span>}
-        </div>
-        <p className="v2-user-card-lead">{t("schedule.userCardHint")}</p>
-        <div className="v2-club-facts">
-          {name ? (
-            <div className="v2-club-fact">
-              <span>{t("schedule.colName")}</span>
-              <b>{name}</b>
+          <div className="v2-user-card-actions">
+            <div className="v2-user-profile-action" tabIndex={profileAvailable ? undefined : 0} aria-describedby={profileAvailable ? undefined : hintId}>
+              <button type="button" className="v2-ctrl" disabled={!profileAvailable} aria-label={t("schedule.openProfile")}
+                onClick={() => { if (profileAvailable && row.mark.memberId) onOpenProfile?.(row.mark.memberId); }}>
+                {t("schedule.userProfile")}
+              </button>
+              {!profileAvailable && <span className="v2-user-profile-hint" role="tooltip" id={hintId}>{profileHint}</span>}
             </div>
-          ) : null}
-          {globalName && globalName !== guild ? (
-            <div className="v2-club-fact">
-              <span>{t("schedule.colDiscordName")}</span>
-              <b>{globalName}</b>
-            </div>
-          ) : null}
-          <div className="v2-club-fact">
-            <span>{t("v2.tip.discord")}</span>
-            <b>{guild}</b>
-          </div>
-          <div className="v2-club-fact">
-            <span>{t("v2.tip.winamax")}</span>
-            <b>{room || "—"}</b>
-          </div>
-          <div className="v2-club-fact">
-            <span>{monthLabel}</span>
-            <b>{t("schedule.monthStat", { hours: formatHours(row.hours), slots: row.slots })}</b>
-          </div>
-          {Object.entries(row.byLimit).map(([limit, stat]) => (
-            <div key={limit} className="v2-club-fact">
-              <span><PairLabel label={t("schedule.limitCol", { limit: displayScheduleColumn(limit) })} /></span>
-              <b>{t("schedule.limitMonthStat", { marks: stat.slots, hours: formatHours(stat.hours), left: formatHours(stat.left) })}</b>
-            </div>
-          ))}
-          <div className="v2-club-fact">
-            <span>{t("schedule.colLeft")}</span>
-            <b>{t("schedule.hoursLeft", { n: formatHours(row.left) })}</b>
+            <span className="v2-mark-chip" title={t("schedule.colMark")}>
+              <ScheduleSlot letters={row.mark.t} bg={row.mark.bg} fg={row.mark.fg} tables={row.mark.tables} showTables={showTables} />
+            </span>
           </div>
         </div>
+        <dl className="v2-user-account-details">
+          <div><dt>{t("schedule.userServerNick")}</dt><dd>{guildNick}</dd></div>
+          <div><dt>{t("schedule.userDiscordHandle")}</dt><dd>{username && `@${username}`}</dd></div>
+        </dl>
+        <section className="v2-user-section">
+          <h4>{monthLabel}</h4>
+          <dl className="v2-user-metrics">
+            {stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          </dl>
+          {limits.length > 0 && <table className="v2-user-limits">
+            <thead><tr>
+              <th scope="col">{t("schedule.colLimit")}</th>
+              <th scope="col">{t("schedule.colHoursShort")}</th>
+              <th scope="col">{t("schedule.colLeftShort")}</th>
+              <th scope="col">{t("schedule.colMarksShort")}</th>
+            </tr></thead>
+            <tbody>{limits.map((limit) => {
+              const stat = row.byLimit[limit];
+              return <tr key={limit}>
+                <th scope="row"><PairLabel label={displayScheduleColumn(limit)} /></th>
+                <td>{stat && formatHours(stat.hours)}</td>
+                <td>{stat && formatHours(stat.left)}</td>
+                <td>{stat?.slots}</td>
+              </tr>;
+            })}</tbody>
+          </table>}
+        </section>
       </div>
     </V2Float>
   );

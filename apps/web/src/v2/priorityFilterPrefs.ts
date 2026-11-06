@@ -1,11 +1,11 @@
-import type { PriorityFilters } from "../schedule/priorities";
+import { PRIORITY_DEFAULT_ROLE_ID, type PriorityFilters } from "../schedule/priorities";
 
 export function priorityFiltersStorageKey(memberId: string | undefined, scope: string) {
   return memberId ? `v2-priority-filters-1:${encodeURIComponent(scope)}:${encodeURIComponent(memberId)}` : null;
 }
 
 export function parsePriorityFilters(raw: string | null): PriorityFilters {
-  const defaults: PriorityFilters = { roleIds: [], active: false, scheduleActive: false };
+  const defaults: PriorityFilters = { roleIds: [PRIORITY_DEFAULT_ROLE_ID], active: true, scheduleActive: false };
   try {
     const value: unknown = JSON.parse(raw ?? "null");
     if (!value || typeof value !== "object" || Array.isArray(value)) return defaults;
@@ -15,8 +15,8 @@ export function parsePriorityFilters(raw: string | null): PriorityFilters {
       ...(saved.group === "50-100" || saved.group === "250" ? { group: saved.group } : {}),
       roleIds: Array.isArray(saved.roleIds)
         ? [...new Set(saved.roleIds.filter((id): id is string => typeof id === "string").map((id) => id.trim()).filter(Boolean))]
-        : [],
-      active: saved.active === true,
+        : defaults.roleIds,
+      active: typeof saved.active === "boolean" ? saved.active : defaults.active,
       scheduleActive: saved.scheduleActive === true,
     };
   } catch {

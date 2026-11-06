@@ -7,9 +7,11 @@ type Props = {
   x: number;
   y: number;
   width?: number;
+  height?: number;
   z?: number;
   resizeLabel?: string;
   onResizeWidth?: (width: number) => void;
+  onResizeHeight?: (height: number) => void;
   compact?: boolean;
   className?: string;
   footer?: ReactNode;
@@ -26,9 +28,11 @@ export function V2Float({
   x,
   y,
   width = 300,
+  height,
   z = 40,
   resizeLabel,
   onResizeWidth,
+  onResizeHeight,
   compact,
   className,
   footer,
@@ -39,7 +43,8 @@ export function V2Float({
   onClose,
   children,
 }: Props) {
-  const resize = useRef<{ start: number; width: number } | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const resize = useRef<{ x: number; y: number; width: number; height: number; lastX: number; lastY: number } | null>(null);
   const drag = useRef<{ ox: number; oy: number } | null>(null);
   const box = typeof window === "undefined" ? { x, y, width } : fitFloat(x, y, width);
 
@@ -73,8 +78,9 @@ export function V2Float({
 
   return createPortal(
     <div
+      ref={panel}
       className={`v2-float${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
-      style={{ left: box.x, top: box.y, width: box.width, maxHeight: `calc(100dvh - ${box.y + 8}px)`, zIndex: z }}
+      style={{ left: box.x, top: box.y, width: box.width, height, maxHeight: `calc(100dvh - ${box.y + 8}px)`, zIndex: z }}
       role={role}
       aria-label={role ? title : undefined}
       onPointerDown={onFocus}
@@ -103,22 +109,34 @@ export function V2Float({
       {footer}
       {onResizeWidth && <button
         type="button"
-        className="v2-float-resize"
+        className={`v2-float-resize${onResizeHeight ? " is-two-axis" : ""}`}
         aria-label={resizeLabel}
         title={resizeLabel}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
+          if (event.button !== 0 || !panel.current) return;
+          const size = panel.current.getBoundingClientRect();
           event.currentTarget.setPointerCapture(event.pointerId);
-          resize.current = { start: event.clientX, width: box.width };
+          resize.current = { x: event.clientX, y: event.clientY, width: size.width, height: size.height,
+            lastX: event.clientX, lastY: event.clientY };
         }}
         onPointerMove={(event) => {
-          if (resize.current) onResizeWidth(resize.current.width + event.clientX - resize.current.start);
+          const start = resize.current;
+          if (!start) return;
+          if (event.clientX !== start.lastX) onResizeWidth(start.width + event.clientX - start.x);
+          if (event.clientY !== start.lastY) onResizeHeight?.(start.height + event.clientY - start.y);
+          start.lastX = event.clientX;
+          start.lastY = event.clientY;
         }}
         onLostPointerCapture={() => { resize.current = null; }}
         onKeyDown={(event) => {
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          event.preventDefault();
-          onResizeWidth(box.width + (event.key === "ArrowLeft" ? -12 : 12));
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            onResizeWidth(box.width + (event.key === "ArrowLeft" ? -12 : 12));
+          }
+          if (onResizeHeight && panel.current && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+            onResizeHeight(panel.current.getBoundingClientRect().height + (event.key === "ArrowUp" ? -12 : 12));
+          }
         }}
       />}
     </div>,

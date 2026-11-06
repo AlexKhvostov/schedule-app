@@ -88,7 +88,7 @@ function personFromRow(row: DiscordMemberRow): GuildPerson {
 }
 
 export function personLabel(row: Pick<GuildPerson, "nick" | "globalName" | "username">) {
-  return row.nick || row.globalName || row.username;
+  return row.globalName?.trim() || row.username;
 }
 
 export async function loadCachedRoster(): Promise<GuildRoster | null> {

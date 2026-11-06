@@ -1,30 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Mark } from "./marks";
-import { groupRosterRows, orderRosterRows, type RosterRow } from "./roster";
+import { orderRosterRows, type RosterRow } from "./roster";
 import type { PriorityPerson, PrioritySource } from "./priorities";
-import { compactRosterPriorities } from "./rosterPriorities";
+import { combinedCorePriority, compactRosterPriorities } from "./rosterPriorities";
 
 function row(id: string, n: number): RosterRow {
   const mark: Mark = { t: id.slice(0, 2).toUpperCase(), discord: id, room: "", bg: "#000", fg: "#fff", tables: 1, memberId: id };
   return { n, mark, limit: "N50", byLimit: {}, slots: 0, hours: 0, left: 0 };
 }
-
-describe("groupRosterRows", () => {
-  it("numbers eligible players and moves marked ineligible players to an unnumbered tail", () => {
-    const eligible = new Set(["active-a", "active-b"]);
-    const result = groupRosterRows(
-      [row("active-a", 7), row("active-b", 9)],
-      [row("active-a", 1), row("old-mark", 2)],
-      eligible,
-    );
-
-    expect(result.active.map((item) => [item.mark.memberId, item.n])).toEqual([
-      ["active-a", 1],
-      ["active-b", 2],
-    ]);
-    expect(result.historical.map((item) => [item.mark.memberId, item.n])).toEqual([["old-mark", 0]]);
-  });
-});
 
 describe("monthly filling order", () => {
   const rows = [row("low", 1), row("high", 2), row("vip3", 3), row("vip1", 4), row("out", 5), row("missing", 6)];
@@ -58,9 +41,17 @@ describe("monthly filling order", () => {
     expect(orderRosterRows(named, compactRosterPriorities(source, "nitro", "50-100"), "nitro").map((p) => p.mark.memberId)).toEqual(["high", "low"]);
     expect(orderRosterRows(named, compactRosterPriorities({ ...source, periodStart: "2026-08-01" }, "nitro", "50-100"), "nitro").map((p) => p.mark.memberId)).toEqual(["low", "high"]);
   });
-  it("does not assign a different group's Core when no supported limits are selected", () => {
-    const result = orderRosterRows(rows, compactRosterPriorities(source, "nitro", "50-100"), "nitro", false);
-    expect(result.every((r) => r.n === 0 && r.core === 0 && !r.excluded)).toBe(true);
+  it("sorts combined Core by tier first and by number within a tier", () => {
+    const people = [
+      combinedCorePriority("low", 8, 4, 1, 1)!,
+      combinedCorePriority("high", 0, 2, 0, 0)!,
+      combinedCorePriority("vip3", 0, 0, 3, 1)!,
+      combinedCorePriority("vip1", 0, 0, 0, 1)!,
+    ];
+    expect(combinedCorePriority("missing", 0, 0, 0, 0)).toBeNull();
+    const combined = { ...compactRosterPriorities(source, "nitro", "250"), kind: "both" as const, people };
+    expect(orderRosterRows(rows.slice(0, 4), combined, "nitro").map((p) => [p.mark.memberId, p.core]))
+      .toEqual([["high", 2], ["low", 4], ["vip3", 3], ["vip1", 1]]);
   });
 
   it("uses only the selected group's Core, with alphabetical zero-score order on 250", () => {

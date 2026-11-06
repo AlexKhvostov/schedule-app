@@ -1,3 +1,6 @@
+import { parseDistanceIds } from "./distanceIds";
+import { notifyPriorityDistanceChanged } from "./priorityRefresh";
+import { loadMembers } from "../schedule/members";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { personLabel, type GuildRole } from "./guild";
@@ -29,6 +32,7 @@ export type AdminPerson = {
   approvedAt: string | null;
   gridPriority: number | null;
   distanceExtId: string | null;
+  distanceIds?: string[];
   markTag: string | null;
   markBg: string;
   markFg: string;
@@ -90,6 +94,7 @@ type MemberRow = {
   core_nitro_250: number;
   core_regular_250: number;
   distance_ext_id: string | null;
+  distance_ids?: string[];
   auth_user_id: string | null;
   created_at: string;
   approved_at: string | null;
@@ -140,9 +145,9 @@ export function personTitle(row: Pick<AdminPerson, "nick" | "globalName" | "user
   return row.displayName || personLabel(row);
 }
 
-/** How they appear on the club server: guild nick, else Discord display name, else username. */
+/** Public Discord display name, with the account handle as a fallback. */
 export function discordPrimary(row: Pick<AdminPerson, "nick" | "globalName" | "username">) {
-  return row.nick || row.globalName || row.username;
+  return personLabel(row);
 }
 
 type IdentRow = {
@@ -284,7 +289,8 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
       createdAt: member?.created_at ?? null,
       approvedAt: member?.approved_at ?? null,
       gridPriority: member ? member.grid_priority : null,
-      distanceExtId: member?.distance_ext_id ?? distanceByDiscord.get(discordId) ?? null,
+      distanceExtId: member ? member.distance_ext_id : distanceByDiscord.get(discordId) ?? null,
+      distanceIds: member?.distance_ids,
       markTag: member?.mark_tag ?? null,
       markBg: member?.mark_bg ?? "#76a5af",
       markFg: member?.mark_fg ?? "#1a2118",
@@ -413,32 +419,18 @@ export async function dismissJoinRequest(id: string) {
   return { error: error?.message ?? error?.code ?? null };
 }
 
-export async function saveMemberDistanceId(memberId: string | null, value: string, discordId: string) {
+export async function saveMemberDistanceId(memberId: string, value: string, expectedIds: string[]) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
-  const text = value.trim();
-  const distance_ext_id = text ? text : null;
-  if (distance_ext_id && !/^[0-9]{1,12}$/.test(distance_ext_id)) return { error: "bad-shape" as const };
-  if (memberId) {
-    const { error } = await db.from("members").update({ distance_ext_id }).eq("id", memberId);
-    const code = error?.code ?? error?.message ?? null;
-    if (code) {
-      if (code === "23505" || /members_distance_ext_id/i.test(String(code))) return { error: "duplicate" as const };
-      return { error: String(code) };
-    }
-  }
-  if (distance_ext_id) {
-    const { error } = await db.from("discord_distance_ids").upsert({ discord_id: discordId, distance_ext_id });
-    const code = error?.code ?? error?.message ?? null;
-    if (code) {
-      if (code === "23505" || /discord_distance_ids/i.test(String(code))) return { error: "duplicate" as const };
-      return { error: String(code) };
-    }
-  } else {
-    const { error } = await db.from("discord_distance_ids").delete().eq("discord_id", discordId);
-    if (error) return { error: error.message ?? error.code ?? "save" };
-  }
-  return { error: null };
+  const ids = parseDistanceIds(value);
+  if (!ids) return { error: "bad-shape" as const };
+  const { error } = await db.rpc("save_member_distance_ids", {
+    p_member_id: memberId, p_ids: ids, p_expected_ids: expectedIds,
+  });
+  if (!error) notifyPriorityDistanceChanged();
+  if (error?.code === "23505") return { error: "duplicate" as const };
+  if (error?.code === "40001") return { error: "stale" as const };
+  return { error: error?.message ?? null };
 }
 
 export async function saveMemberMark(memberId: string, mark: { tag: string | null; bg: string; fg: string }) {
@@ -594,6 +586,14 @@ export async function loadPublicNames(memberIds: string[]): Promise<Map<string, 
   const map = new Map<string, string>();
   const ids = [...new Set(memberIds.filter(Boolean))];
   if (!ids.length) return map;
+  if (!isLiveData()) {
+    const requested = new Set(ids);
+    for (const member of loadMembers()) {
+      const name = member.name.trim();
+      if (name && requested.has(member.id)) map.set(member.id, name);
+    }
+    return map;
+  }
   const db = getSupabase();
   if (!db) return map;
   const { data } = await db.rpc("public_display_names", { p_ids: ids });

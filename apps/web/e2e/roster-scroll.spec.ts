@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
-import path from "node:path";
 import { SEED_MEMBERS } from "../src/schedule/members";
 
 for (const theme of ["dark", "light"]) {
-  test(`monthly roster scrolls every mark beneath its flush header in ${theme}`, async ({ page }) => {
+  test(`monthly roster scrolls every mark beneath its flush header in ${theme}`, async ({ page }, testInfo) => {
     const template = SEED_MEMBERS.find(member => member.id === "RP-104")!;
     const members = Array.from({ length: 40 }, (_, i) => ({
       ...template, id: `scroll-${i}`, discord: `player-${String(i).padStart(2, "0")}`, avatarUrl: undefined,
@@ -22,6 +21,45 @@ for (const theme of ["dark", "light"]) {
     const panel = page.locator(".v2-roster-float");
     const scroll = panel.locator(".v2-float-body");
     await expect(panel.locator('.v2-people-row[data-member^="scroll-"]')).toHaveCount(40);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const resize = panel.getByRole("button", { name: "Изменить ширину и высоту списка игроков" });
+    const before = (await panel.boundingBox())!;
+    const grip = (await resize.boundingBox())!;
+    const x = grip.x + grip.width / 2;
+    const y = grip.y + grip.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 80);
+    await page.mouse.up();
+    const after = (await panel.boundingBox())!;
+    expect(after.height).toBeCloseTo(before.height - 80, 0);
+    expect(after.width).toBe(before.width);
+    await resize.press("ArrowDown");
+    expect((await panel.boundingBox())!.height).toBeCloseTo(after.height + 12, 0);
+    await resize.press("ArrowRight");
+    const savedSize = (await panel.boundingBox())!;
+    await page.reload();
+    await page.getByRole("button", { name: "Игроки", exact: true }).click();
+    await expect(panel.locator('.v2-people-row[data-member^="scroll-"]')).toHaveCount(40);
+    for (const name of ["E50-100", "250-500", "N50-100"]) {
+      await panel.getByRole("button", { name, exact: true }).click();
+      await page.reload();
+      await page.getByRole("button", { name: "Игроки", exact: true }).click();
+      await expect(panel.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+      const restored = (await panel.boundingBox())!;
+      expect(restored.width).toBe(savedSize.width);
+      expect(restored.height).toBe(savedSize.height);
+    }
+    await page.setViewportSize({ width: 390, height: 480 });
+    await page.reload();
+    await page.getByRole("button", { name: "Открыть инструменты", exact: true }).click();
+    await page.getByRole("button", { name: "Игроки", exact: true }).click();
+    const mobile = (await panel.boundingBox())!;
+    expect(mobile.width).toBeLessThanOrEqual(374);
+    expect(mobile.y + mobile.height).toBeLessThanOrEqual(472);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBe(savedSize.width);
+    expect((await panel.boundingBox())!.height).toBe(savedSize.height);
     // Enable hit testing only: the real mark layers must not paint above the header.
     await page.addStyleTag({ content: ".v2-people-table .v2-mark-chip, .v2-people-table .v2-mark-chip * { pointer-events: auto !important; }" });
     for (const width of [1280, 390]) {
@@ -42,12 +80,12 @@ for (const theme of ["dark", "light"]) {
           });
         })).toBe(true);
       }
-      if (width === 1280) await panel.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-04-roster-scroll-${theme}.png`) });
+      if (width === 1280) await panel.screenshot({ path: testInfo.outputPath(`roster-scroll-${theme}.png`) });
     }
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
     await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
-    await expect(panel.getByRole("tab", { name: "Регулярные", exact: true })).toBeDisabled();
+    await expect(panel.getByRole("button", { name: "E50-100", exact: true })).toBeEnabled();
     await scroll.evaluate(node => { node.scrollTop = 180; });
     await expect.poll(() => panel.locator("thead th").first().evaluate(cell => Math.abs(cell.getBoundingClientRect().top - cell.closest(".v2-float-body")!.getBoundingClientRect().top))).toBeLessThan(0.6);
   });

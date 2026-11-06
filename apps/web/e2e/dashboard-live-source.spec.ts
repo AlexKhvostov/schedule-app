@@ -77,3 +77,33 @@ for (const theme of ["dark", "light"]) test(`detail dialogs stay centered, scrol
   await dialog.getByRole("button", { name: "Закрыть подробности", exact: true }).click();
   await expect(dialog).toHaveCount(0);
 });
+
+test("monthly loading survives 30 seconds and explains the 90-second timeout", async ({ page }) => {
+  let release: (() => void) | undefined;
+  await page.route("https://dashboard.redparty.ru/api/index.php?**", async route => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("__route") === "/api/regs") { await route.fulfill({ json: { regs: [] } }); return; }
+    const payload = await demoMonthlySource.heatmap(params, new AbortController().signal);
+    await new Promise<void>(resolve => { release = resolve; });
+    await route.fulfill({ json: payload }).catch(() => {});
+  });
+  await page.goto("/#dashboard/density");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await expect(page.getByTestId("month-heatmap")).toBeVisible();
+  await page.clock.install();
+  await page.getByLabel("Данные", { exact: true }).selectOption("live");
+  await expect.poll(() => Boolean(release)).toBe(true);
+  await expect(page.getByRole("status").filter({ hasText: "до 90 секунд" })).toBeVisible();
+  await page.clock.fastForward(35_000);
+  await expect(page.getByRole("status").filter({ hasText: "до 90 секунд" })).toBeVisible();
+  release!(); release = undefined;
+  await expect(page.getByTestId("month-heatmap")).toBeVisible();
+  await page.getByRole("button", { name: "Обновить", exact: true }).click();
+  await expect.poll(() => Boolean(release)).toBe(true);
+  await page.clock.fastForward(90_000);
+  await expect(page.getByTestId("dashboard").getByRole("alert")).toContainText("за 90 секунд");
+  await expect(page.getByRole("button", { name: "Повторить загрузку" })).toBeVisible();
+  release!();
+  await page.unrouteAll({ behavior: "wait" });
+});

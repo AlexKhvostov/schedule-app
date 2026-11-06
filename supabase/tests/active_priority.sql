@@ -16,7 +16,7 @@ begin
     (reader_auth,'authenticated','authenticated','active-reader@example.invalid','',now(),now()),
     (outsider_auth,'authenticated','authenticated','active-outsider@example.invalid','',now(),now());
   insert into public.members(auth_user_id,public_code,access_status) values(admin_auth,'ACT-ADMIN','active') returning id into admin_id;
-  insert into public.members(auth_user_id,public_code,access_status) values(reader_auth,'ACT-READER','active') returning id into reader_id;
+  insert into public.members(auth_user_id,public_code,access_status,distance_ext_id) values(reader_auth,'ACT-READER','active','987650') returning id into reader_id;
   insert into public.members(auth_user_id,public_code,access_status) values(outsider_auth,'ACT-OUT','active') returning id into outsider_id;
   insert into public.member_roles(member_id,role_id) values(admin_id,'root');
   insert into public.discord_guild_roles(role_id,name) values('active-reader-role','Priority reader');

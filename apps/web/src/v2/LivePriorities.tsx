@@ -9,7 +9,8 @@ import { catalogRoles, RolePick } from "./RolePills";
 import { PersonAvatar } from "./PersonAvatar";
 import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num, priorityPoints as points } from "./PriorityCalculation";
 import { closePriorityRequest, deletePriorityRequest, getPriorityRequest, listPriorityRequests, loadPriorityRequestAuthors, loadPriorityFilterRoles, loadPriorities, submitPriorityRequest, type PriorityRequestDetail, type PriorityRequestSummary } from "../data/priorities";
-import { currentPriorityPeriod, filterPriorities, isPriorityPreliminary, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityFilters, type PriorityKind, type PriorityGroup, type PrioritySource } from "../schedule/priorities";
+import { currentPriorityPeriod, filterPriorities, isPriorityPreliminary, listHighPriorityParticipants, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityFilters, type PrioritySource } from "../schedule/priorities";
+import { PriorityTabLabel, priorityTabs, type PriorityTab } from "./PriorityTabLabel";
 
 function PriorityTooltip({ row, cell, anchor }: { row: CalculatedPriority; cell: number; anchor: HTMLElement }) {
   const ref = useRef<HTMLElement>(null);
@@ -55,16 +56,23 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const { t, i18n } = useTranslation();
   const [today, setToday] = useState(priorityToday);
   const [chosenPeriod, setChosenPeriod] = useState("");
-  const [kind, setKind] = useState<PriorityKind>(() => loadPriorityFilters(preferencesKey).kind ?? "nitro");
-  const [group, setGroup] = useState<PriorityGroup>(() => loadPriorityFilters(preferencesKey).group ?? "50-100");
-  const kindTabs = useRef<Record<PriorityKind, HTMLButtonElement | null>>({ nitro: null, regular: null });
+  const [tab, setTab] = useState<PriorityTab>(() => {
+    const saved = loadPriorityFilters(preferencesKey);
+    return saved.group === "250" ? "both" : saved.kind ?? "nitro";
+  });
+  const high = tab === "both";
+  // Either 250–500 slice contains both kinds' manual Core and limit eligibility.
+  const kind = high ? "nitro" : tab;
+  const group = high ? "250" : "50-100";
+  const tabs = useRef<Record<PriorityTab, HTMLButtonElement | null>>({ nitro: null, regular: null, both: null });
   const monthFormat = new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric", timeZone: "UTC" });
   const [filters, setFilters] = useState<PriorityFilters>(() => loadPriorityFilters(preferencesKey));
   const changeFilters = (next: PriorityFilters) => { setFilters(next); savePriorityFilters(preferencesKey, { ...next, kind, group }); };
   useEffect(() => { savePriorityFilters(preferencesKey, { ...filters, kind, group }); }, [preferencesKey, filters, kind, group]);
   const [vipOn, setVipOn] = useState(true);
   const [source, setSource] = useState<PrioritySource | null>(null);
-  const period = chosenPeriod || source?.periodStart || "";
+  const requestedPeriod = chosenPeriod || null;
+  const period = requestedPeriod || source?.periodStart || "";
   const [accessRoles, setAccessRoles] = useState<GuildRole[]>([]);
   const [requests, setRequests] = useState<PriorityRequestSummary[]>([]);
   const [requestAuthors, setRequestAuthors] = useState<Record<string, string>>({});
@@ -85,17 +93,17 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const refresh = useCallback(async () => {
     const token = ++generation.current;
     try {
-      const [board, roles] = await Promise.all([loadPriorities(chosenPeriod || null, canManageDemo, kind, group), loadPriorityFilterRoles()]);
+      const [board, roles] = await Promise.all([loadPriorities(requestedPeriod, canManageDemo, kind, group), loadPriorityFilterRoles()]);
       const list = board.data ? await listPriorityRequests(board.data.periodStart) : { data: null, error: null };
       if (token !== generation.current) return;
       setLoading(false);
       if (board.error || list.error || roles.error || !board.data) { setError(board.error || list.error || roles.error || "empty response"); setSource(null); setDetail(null); return; }
       setAccessRoles(roles.data); setSource(board.data); setRequests(list.data ?? []); setError("");
     } catch (e) { if (token === generation.current) { setError(String(e)); setSource(null); setLoading(false); } }
-  }, [chosenPeriod, canManageDemo, kind, group]);
+  }, [requestedPeriod, canManageDemo, kind, group]);
   useEffect(() => {
     viewEpoch.current++; setBusy(false); setDetail(null); setRequestList(false); setDeleteId(null);
-    setLoading(true); setSource(null); setRequests([]); setSelected([]); setComposing(false); setHover(null); setInspect(null);
+    setLoading(true); setRequests([]); setSelected([]); setComposing(false); setHover(null); setInspect(null);
     void refresh();
     const update = () => { setToday(priorityToday()); void refresh(); };
     const timer = window.setInterval(update, 30000);
@@ -108,18 +116,20 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
     const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) { setHover(null); setInspect(null); setDeleteId(null); setDetail(null); setRequestList(false); detailGeneration.current++; } };
     window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close);
   }, [busy]);
-  const current = source?.periodStart === period && source.kind === kind && source.group === group ? source : null;
-  const ranked = useMemo(() => current ? rankPriorities(current.people, period, kind, vipOn, "slice", group) : [], [current, period, kind, vipOn, group]);
+  const current = !loading && source?.periodStart === period && source.kind === kind && source.group === group ? source : null;
+  const ranked = useMemo(() => current && !high ? rankPriorities(current.people, period, kind, vipOn, "slice") : [], [current, high, period, kind, vipOn]);
   const visible = useMemo(() => filterPriorities(ranked, filters, kind), [ranked, filters, kind]);
+  const participants = useMemo(() => current && high ? listHighPriorityParticipants(current.people) : [], [current, high]);
+  const visibleParticipants = useMemo(() => filterPriorities(participants, filters, "both"), [participants, filters]);
   const roleOptions = useMemo(() => {
-    const counts = new Map(catalogRoles(current?.people ?? []).map((row) => [row.role.id, row.n]));
+    const counts = new Map(catalogRoles(source?.people ?? []).map((row) => [row.role.id, row.n]));
     const options = accessRoles.map((role) => ({ role, n: counts.get(role.id) ?? 0 }));
     // Keep a saved role removable even if no current player has it anymore.
     for (const id of filters.roleIds) if (!options.some((option) => option.role.id === id)) {
       options.push({ role: { id, name: t("priorities.filters.unavailableRole", { id }), color: null }, n: 0 });
     }
     return options;
-  }, [current, accessRoles, filters.roleIds, t]);
+  }, [source, accessRoles, filters.roleIds, t]);
   const months = period ? priorityMonths(period) : [];
   const canManage = current?.canManage ?? false;
   const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled, detail.snapshot.version >= 3 ? "slice" : detail.snapshot.version >= 2 ? "distance" : "legacy-vip-seats", detail.snapshot.group ?? "50-100").filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
@@ -160,69 +170,91 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const toggleSelected = (id: string, checked: boolean) => setSelected(checked ? [...selected, id] : selected.filter((value) => value !== id));
   return <div className="v2-prio-stage v2-prio-live min-h-0 flex-1 overflow-auto">
     <section className="v2-admin-card v2-prio-card">
-      <header className="v2-prio-head"><h1>{t("nav.priorities")}</h1><span className={`v2-prio-status${current && group === "50-100" && !isPriorityPreliminary(current) ? " is-final" : ""}`}>{t(group === "250" ? "priorities.coreOnly" : current && !isPriorityPreliminary(current) ? "priorities.calculated" : "priorities.preliminary")}</span><span>{t("priorities.sliceScope", { kind: t(`priorities.kinds.${kind}`), group: group === "50-100" ? "50–100" : "250" })}</span>
+      <header className="v2-prio-head"><h1>{t("nav.priorities")}</h1><span translate="no">Winamax</span>
         <Button size="sm" variant="outline" onClick={() => setRequestList(true)} disabled={!current || busy}>{t("priorities.requests")} · {requests.length}{requests.some((r) => !r.closedAt) && <b className="v2-prio-new">{t("priorities.new")} {requests.filter((r) => !r.closedAt).length}</b>}</Button></header>
       <div className="v2-prio-report">
-        <label>{t("priorities.room")}<input aria-label={t("priorities.room")} value="Winamax" readOnly disabled /></label>
-        <label>{t("priorities.reportMonth")}<select aria-label={t("priorities.reportMonth")} value={period} disabled={loading || busy || composing} onChange={(e) => setChosenPeriod(e.target.value === source?.activePeriod ? "" : e.target.value)}>{!period && <option value="">{t("priorities.loading")}</option>}{periods.map((p) => <option key={p} value={p}>{monthFormat.format(new Date(p))}{p === source?.activePeriod ? ` · ${t("priorities.activeLabel")}` : ""}</option>)}</select></label>
-        {period && group === "50-100" && <div className="v2-prio-window"><span>{t("priorities.calculationMonths")}</span><div>{[0, 3].map((i) => <span key={i}>({monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))}) <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b></span>)}</div></div>}
-      </div>
-      {current?.activePeriod && <div className="v2-prio-active-selection">
-        <span data-testid="active-priority">{t("priorities.activeForSchedule", { period: monthFormat.format(new Date(current.activePeriod)) })}</span>
-        {period !== current.activePeriod && <span className="v2-muted">{t("priorities.previewOnly")}</span>}
-        {current.canActivate && <Button size="sm" variant="outline" disabled={busy || composing || period === current.activePeriod} onClick={() => void run(() => setActivePriority(period, current.activeRevision!, canManageDemo), () => setChosenPeriod(""))}>{t("priorities.useForSorting")}</Button>}
-      </div>}
-      <div className="v2-prio-controls">
-      <section className="v2-prio-control-group v2-prio-rating" aria-label={t("priorities.groups.rating")}><h2>{t("priorities.groups.rating")}</h2><div className="v2-prio-slices">
-        <div className="v2-prio-switch"><span className="v2-prio-switch-label">{t("priorities.kind")}</span>
-      <div className="v2-prio-tabs" role="tablist" aria-label={t("priorities.kind")}>{(["nitro", "regular"] as const).map((k) => <button key={k} ref={(node) => { kindTabs.current[k] = node; }} id={`priority-tab-${k}`} type="button" role="tab" aria-selected={kind === k} aria-controls={`priority-panel-${k}`} tabIndex={kind === k ? 0 : -1} disabled={busy || composing} onClick={() => { setKind(k); setHover(null); }} onKeyDown={(e) => {
-        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-        e.preventDefault(); const next = e.key === "Home" ? "nitro" : e.key === "End" ? "regular" : k === "nitro" ? "regular" : "nitro";
-        setKind(next); setHover(null); kindTabs.current[next]?.focus();
-      }}>{t(`priorities.kinds.${k}`)}</button>)}</div>
-        </div>
-        <div className="v2-prio-switch"><span className="v2-prio-switch-label">{t("priorities.limitGroup")}</span>
-      <div className="v2-prio-tabs" role="group" aria-label={t("priorities.limitGroup")}>{(["50-100", "250"] as const).map((g) => <button key={g} type="button" aria-pressed={group === g} disabled={busy || composing} onClick={() => setGroup(g)}>{g === "50-100" ? "50–100" : "250"} €</button>)}</div>
-        </div>
-      </div>
-      </section>
-        <section className="v2-prio-control-group v2-prio-filters" aria-label={t("priorities.groups.filters")}>
-          <h2>{t("priorities.groups.filters")}</h2>
-          <div className="v2-prio-role-field"><span>{t("priorities.filters.roleLabel")}</span>
-            <RolePick roles={roleOptions} picked={new Set(filters.roleIds)} label={t("priorities.filters.roles")} emptyLabel={t("priorities.filters.allRoles")} onToggle={(id) => changeFilters({ ...filters, roleIds: filters.roleIds.includes(id) ? filters.roleIds.filter((role) => role !== id) : [...filters.roleIds, id] })} />
+        <div className="v2-prio-report-main">
+          <div className="v2-prio-report-period">
+            <label htmlFor="priority-report-month">{t("priorities.reportMonth")}</label>
+            <select id="priority-report-month" name="reportMonth" aria-describedby={period ? (source?.activePeriod ? "priority-calculation-months priority-active-period" : "priority-calculation-months") : undefined}
+              value={period} disabled={loading || busy || composing} onChange={(e) => setChosenPeriod(e.target.value === source?.activePeriod ? "" : e.target.value)}>
+              {!period && <option value="">{t("priorities.loading")}</option>}
+              {periods.map((p) => <option key={p} value={p}>{monthFormat.format(new Date(p))}{p === source?.activePeriod ? ` · ${t("priorities.activeLabel")}` : ""}</option>)}
+            </select>
           </div>
-          <div className="v2-prio-checkboxes">{(["scheduleActive", "active"] as const).map((key) => <label key={key} className="v2-prio-check" title={key === "scheduleActive" ? t("priorities.filters.scheduleActiveHint") : undefined}><input type="checkbox" checked={filters[key]} onChange={(e) => changeFilters({ ...filters, [key]: e.target.checked })} />{t(`priorities.filters.${key}`)}</label>)}</div>
-        </section>
-        <section className="v2-prio-control-group v2-prio-display" aria-label={t("priorities.groups.display")}>
-          <h2>{t("priorities.groups.display")}</h2>
-          <label className="v2-prio-check" title={t("priorities.vipDisplayHint")}><input type="checkbox" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
-        </section>
+          {source?.activePeriod && <div className="v2-prio-active-selection">
+            <span id="priority-active-period" data-testid="active-priority"
+              title={period !== source.activePeriod ? t("priorities.previewOnly") : undefined}>
+              {t("priorities.activeForSchedule", { period: monthFormat.format(new Date(source.activePeriod)) })}
+            </span>
+            {source.canActivate && <Button size="sm" variant={period === source.activePeriod ? "outline" : "default"}
+              disabled={!current || busy || composing || period === source.activePeriod || source.activeRevision === undefined}
+              onClick={() => {
+                const revision = source.activeRevision;
+                if (revision !== undefined) void run(() => setActivePriority(period, revision, canManageDemo), () => setChosenPeriod(""));
+              }}>{t("priorities.useForSorting")}</Button>}
+          </div>}
+        </div>
+        {period && <div className="v2-prio-window" id="priority-calculation-months">
+          <span>{t("priorities.calculationMonths")}</span>
+          <div>{[0, 3].map((i) => <span key={i}>
+            {monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))} <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b>
+          </span>)}</div>
+        </div>}
       </div>
-      <aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>
-        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current && !(group === "250" && key === "points") ? (key === "points" ? points : num)(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
+      <section className="v2-prio-global-filters" aria-labelledby="priority-filters-heading">
+        <h2 id="priority-filters-heading">{t("priorities.groups.filters")}</h2>
+        <RolePick roles={roleOptions} picked={new Set(filters.roleIds)} label={t("priorities.filters.roles")} emptyLabel={t("priorities.filters.allRoles")} onToggle={(id) => changeFilters({ ...filters, roleIds: filters.roleIds.includes(id) ? filters.roleIds.filter((role) => role !== id) : [...filters.roleIds, id] })} />
+        <label className="v2-prio-check"><input type="checkbox" name="active" checked={filters.active} onChange={(e) => changeFilters({ ...filters, active: e.target.checked })} />{t("priorities.filters.active")}</label>
+        <label className="v2-prio-check" title={t("priorities.filters.scheduleActiveHint")}><input type="checkbox" name="scheduleActive" checked={filters.scheduleActive} onChange={(e) => changeFilters({ ...filters, scheduleActive: e.target.checked })} />{t("priorities.filters.scheduleActive")}</label>
+        <div role="group" aria-label={t("priorities.groups.display")}>
+          <label className="v2-prio-check" title={t("priorities.vipDisplayHint")}><input type="checkbox" name="showCore" checked={vipOn} onChange={(e) => setVipOn(e.target.checked)} />{t("priorities.vipDisplay")}</label>
+        </div>
+      </section>
+      <div className="v2-roster-tabs v2-prio-limit-tabs" role="tablist" aria-label={t("priorities.limitGroup")}>
+        {priorityTabs.map((key, index) => <button key={key} ref={(node) => { tabs.current[key] = node; }} id={`priority-tab-${key}`} type="button" role="tab" aria-selected={tab === key} aria-controls={`priority-panel-${key}`} tabIndex={tab === key ? 0 : -1} disabled={busy || composing} onClick={() => setTab(key)} onKeyDown={(e) => {
+          const last = priorityTabs.length - 1;
+          const nextIndex = e.key === "Home" ? 0 : e.key === "End" ? last : e.key === "ArrowLeft" ? (index + last) % priorityTabs.length : e.key === "ArrowRight" ? (index + 1) % priorityTabs.length : null;
+          if (nextIndex === null) return;
+          e.preventDefault();
+          const next = priorityTabs[nextIndex];
+          setTab(next); tabs.current[next]?.focus();
+        }}><PriorityTabLabel tab={key} /></button>)}
+      </div>
+      {priorityTabs.map((key) => <div key={key} id={`priority-panel-${key}`} role="tabpanel" aria-labelledby={`priority-tab-${key}`} hidden={tab !== key} tabIndex={0}>{tab === key && <>
+      <div className="v2-prio-matrix-meta">
+        <span className={`v2-prio-status${current && !high && !isPriorityPreliminary(current) ? " is-final" : ""}`}>{t(high ? "priorities.coreOnly" : current && !isPriorityPreliminary(current) ? "priorities.calculated" : "priorities.preliminary")}</span>
+      </div>
+      {!high && <><aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>
+        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? (key === "points" ? points : num)(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
       </aside>
-      <div className="v2-prio-actions"><div className="v2-prio-update-meta"><span>{current?.calculatedAt && t("priorities.calculatedAt", { date: new Date(current.calculatedAt).toLocaleString(i18n.language, { timeZone: "Europe/Minsk" }) })}</span>{group === "50-100" && <span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span>}</div>{canManage && <Button size="sm" variant="outline" disabled={busy || composing} onClick={() => void run(() => loadPriorities(period, canManageDemo, kind, group, true))}>{t("priorities.refresh")}</Button>}</div>
-      {(["nitro", "regular"] as const).map((k) => <div key={k} id={`priority-panel-${k}`} role="tabpanel" aria-labelledby={`priority-tab-${k}`} hidden={kind !== k} tabIndex={0}>{kind === k && <>
-      <div className="v2-prio-actions"><span>{t("priorities.count", { n: visible.length })}</span><span>{t(group === "250" ? "priorities.noDistance250" : "priorities.sliceDistanceHint", { kind: t(`priorities.kinds.${kind}`) })}</span></div>
+      <div className="v2-prio-actions"><div className="v2-prio-update-meta"><span>{current?.calculatedAt && t("priorities.calculatedAt", { date: new Date(current.calculatedAt).toLocaleString(i18n.language, { timeZone: "Europe/Minsk" }) })}</span><span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span></div>{canManage && <Button size="sm" variant="outline" disabled={busy || composing} onClick={() => void run(() => loadPriorities(period, canManageDemo, kind, group, true))}>{t("priorities.refresh")}</Button>}</div></>}
+      <div className="v2-prio-actions"><span>{t("priorities.count", { n: high ? visibleParticipants.length : visible.length })}</span><span>{high ? t("priorities.combinedParticipants") : t("priorities.sliceDistanceHint", { kind: t(`priorities.kinds.${kind}`) })}</span></div>
       {loading && <p className="v2-muted">{t("priorities.loading")}</p>}
       {error && <div role="alert" className="v2-prio-error"><p>{t("priorities.loadError", { reason: error })}</p><Button size="sm" onClick={() => void refresh()}>{t("priorities.retry")}</Button></div>}
-      {current && <div className="v2-prio-scroll"><table className={`v2-prio-table${group === "250" ? " is-core-only" : ""}${composing ? " is-selecting" : ""}`}>
+      {high && current && <div className="v2-prio-scroll"><table className="v2-prio-table is-core-only">
+        <thead><tr><th scope="col" className="is-nick">{t("priorities.col.nick")}</th>{vipOn && <th scope="col" className="is-core" translate="no">Core</th>}</tr></thead>
+        <tbody>{visibleParticipants.map((row) => <tr key={row.memberId} data-member={row.memberId} className={row.excluded ? "is-excluded" : vipOn && row.core ? "is-vip" : ""}>
+          <td className="is-nick"><div className="v2-prio-person"><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}{row.gameNick && <small>{row.gameNick}</small>}{row.excluded && <small>{t("priorities.excluded")}</small>}</span></div></td>
+          {vipOn && <td className="is-core">{row.core === null ? "—" : num(row.core, i18n.language)}</td>}
+        </tr>)}</tbody></table>{!visibleParticipants.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
+      {!high && <>{current && <div className="v2-prio-scroll"><table className={`v2-prio-table${composing ? " is-selecting" : ""}`}>
         <colgroup>{composing && <col className="is-select" />}<col className="is-rank" /><col className="is-nick" />{[0, 1, 2, 3].map((i) => <col key={i} className="is-num" />)}<col className="is-total" /></colgroup>
         <thead><tr>{composing && <th rowSpan={2} className="is-select">✓</th>}<th rowSpan={2} className="is-rank">#</th><th rowSpan={2} className="is-nick">{t("priorities.col.nick")}</th>{[0, 3].map((i) => <th key={i} colSpan={2} className={`is-period is-period-${i === 0 ? "old" : "new"}`} title={t("priorities.periodHint", { weight: num(i === 0 ? 0.5 : 1, i18n.language) })}>{ml(months[i])}–{ml(months[i + 2])}<small>{t("priorities.scoreFactor", { n: num(i === 0 ? 0.5 : 1, i18n.language) })}</small></th>)}<th rowSpan={2} className="is-total" title={t("priorities.pointsHint")}>{t("priorities.col.total")}<small>{t("priorities.pointsHintShort")}</small></th></tr>
           <tr>{[0, 1, 2, 3].map((i) => <th key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}`}>{i % 2 ? "100" : "50"} €<small>{t("priorities.scoreFactor", { n: i % 2 ? 2 : 1 })}</small></th>)}</tr></thead>
         <tbody>{visible.map((row) => <tr key={row.memberId} data-member={row.memberId} className={`${row.vip > 0 ? "is-vip" : ""}${row.excluded ? " is-excluded" : ""}`}>
           {composing && <td className="is-select"><input type="checkbox" aria-label={t("priorities.selectPerson", { nick: row.nick })} checked={selected.includes(row.memberId)} disabled={busy} onChange={(e) => toggleSelected(row.memberId, e.target.checked)} /></td>}
           <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : undefined}>{row.rank ?? "—"}</span></td>
-          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : ""}</small></span></button></td>
-          {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{group === "250" ? "—" : num(value, i18n.language)}</button></td>)}
-          <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{group === "250" ? "—" : points(row.total, i18n.language)}</button></td>
+          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}{row.gameNick && <small>{row.gameNick}</small>}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : ""}</small></span></button></td>
+          {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{num(value, i18n.language)}</button></td>)}
+          <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{points(row.total, i18n.language)}</button></td>
         </tr>)}</tbody></table>{!visible.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
       <div className="v2-prio-request-actions"><Button size="sm" variant="outline" disabled={!current || busy} onClick={() => { setComposing(!composing); setSelected([]); setComment(""); setNotice(""); }}>{!composing && <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />}{t(composing ? "priorities.cancelRequest" : "priorities.submitRequest")}</Button></div>
       {composing && <form className="v2-prio-compose" onSubmit={(e) => { e.preventDefault(); if (!current || !selected.length || busy) return;
         const people = current.people.filter((p) => selected.includes(p.memberId));
         void run(() => submitPriorityRequest({ periodStart: period, variant: kind, group, people, comment, author, vipEnabled: true, revision: current.revision }), () => { setComposing(false); setSelected([]); setComment(""); setNotice(t("priorities.sent")); });
       }}><p>{t("priorities.requestInstruction")}</p><label>{t("priorities.comment")}<textarea aria-label={t("priorities.comment")} maxLength={2000} value={comment} disabled={busy} onChange={(e) => setComment(e.target.value)} /></label><span>{t("priorities.selected", { n: selected.length })}</span><Button size="sm" type="submit" disabled={busy || !selected.length || selected.length > 50 || !current}>{t("priorities.sendRequest")}</Button></form>}
-      {notice && <p role="status" className="v2-prio-notice">{notice}</p>}
+      </>}{notice && <p role="status" className="v2-prio-notice">{notice}</p>}
       </>}</div>)}
     </section>
     {hover && !inspect && !detail && <PriorityTooltip {...hover} />}

@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { createRosterLoader, rosterQueryKey } from "../../data/roster";
 import { createRosterRefresh } from "../../data/rosterRefresh";
 import type { Mark } from "../../schedule/marks";
-import type { PriorityKind, PriorityGroup } from "../../schedule/priorities";
-import type { RosterPrioritySource } from "../../schedule/rosterPriorities";
+import type { PriorityGroup } from "../../schedule/priorities";
+import type { RosterKind, RosterPrioritySource } from "../../schedule/rosterPriorities";
 
 type State = { key: string; source: RosterPrioritySource | null; faces: Mark[]; error: string };
 
-export function useRosterSource(enabled: boolean, period: string | null, kind: PriorityKind, limits: string[], group: PriorityGroup, account = "demo") {
+export function useRosterSource(enabled: boolean, period: string | null, kind: RosterKind, limits: string[], group: PriorityGroup, account = "demo") {
   const limitsKey = [...new Set(limits)].sort().join(",");
   const key = `${account}|${rosterQueryKey({ period, kind, group, limits })}`;
   // Recreate both in-flight requests and saved revisions when the account changes.

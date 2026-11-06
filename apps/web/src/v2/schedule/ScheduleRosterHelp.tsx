@@ -23,7 +23,7 @@ export function ScheduleRosterHelp({ preliminary, group }: { preliminary: boolea
       onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}
     >i</button>
     {open && createPortal(<span ref={tip} id={id} role="tooltip" className="v2-roster-help-tip" style={position}>
-      {t(group === "none" ? "priorities.noSelectedGroup" : group === "250" ? "priorities.noDistance250" : "schedule.rosterOrderHint")}
+      {t(group === "250" ? "schedule.rosterCoreOnlyHint" : "schedule.rosterOrderHint")}
       {preliminary && <span>{t("schedule.rosterPreliminary")}</span>}
     </span>, document.body)}
   </span>;

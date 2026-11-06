@@ -1,9 +1,7 @@
 import type { CSSProperties } from "react";
 import type { SchedulePlayer } from "../data/players";
-import type { ClubMember } from "../schedule/members";
 import type { Occupancy } from "../schedule/plan";
 import { gridEdits } from "../schedule/gridEdits";
-import type { RosterRow } from "../schedule/roster";
 
 export type SeatDiff = {
   day: number;
@@ -24,23 +22,6 @@ export function seatDiffs(prev: Occupancy, next: Occupancy) {
     undone: edit.before,
   }));
 }
-export function decorateDemoRoster(rows: RosterRow[], people: ClubMember[]): RosterRow[] {
-  return rows.map((row) => {
-    const person = people.find((item) => (row.mark.t && item.mark.t === row.mark.t) || item.discord === row.mark.discord);
-    if (!person) return row;
-    return {
-      ...row,
-      mark: {
-        ...row.mark,
-        memberId: person.id,
-        avatarUrl: person.avatar || row.mark.avatarUrl,
-        vipNitro: person.vipNitro || row.mark.vipNitro,
-        vipRegular: person.vipRegular || row.mark.vipRegular,
-      },
-    };
-  });
-}
-
 function isClubCode(value?: string | null) {
   return Boolean(value && /^RP-[0-9A-Fa-f]{6}$/i.test(value.trim()));
 }
@@ -51,17 +32,12 @@ export function showNick(value?: string | null) {
   return text;
 }
 
+export function publicDiscordName(globalName?: string | null, username?: string | null, legacy?: string | null) {
+  return showNick(globalName) || showNick(username) || showNick(legacy);
+}
+
 export function whoLines(row: SchedulePlayer) {
-  const server = showNick(row.guildNick);
-  const handle = showNick(row.username) ? `@${row.username}` : "";
-  const discord = showNick(row.globalName) || handle || showNick(row.nick);
-  const title = server || discord || "—";
-  const extra = [discord, handle].filter((value) => {
-    if (!value) return false;
-    const bare = value.replace(/^@/, "");
-    return bare.toLowerCase() !== title.replace(/^@/, "").toLowerCase();
-  });
-  return { title, sub: [...new Set(extra)].join(" · ") };
+  return { title: publicDiscordName(row.globalName, row.username, row.guildNick ? "" : row.nick) || "—", sub: showNick(row.roomNick) };
 }
 
 export function rowInitials(nick: string, mark: string) {

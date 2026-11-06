@@ -1,3 +1,4 @@
+import { memberDistanceIds, parseDistanceIds } from "../data/distanceIds";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -120,7 +121,7 @@ function Fact({ label, children, mono }: { label: string; children: ReactNode; m
   return (
     <div className="v2-cab-fact">
       <span>{label}</span>
-      <b className={`${empty ? "is-empty" : ""}${mono ? " v2-mono" : ""}`.trim() || undefined}>{children || "—"}</b>
+      <b className={`${empty ? "is-empty" : ""}${mono ? " v2-mono" : ""}`.trim() || undefined}>{empty ? null : children}</b>
     </div>
   );
 }
@@ -220,7 +221,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const [vipRegular, setVipRegular] = useState(vipText(person.vipRegular));
   const [community, setCommunity] = useState<"school" | "club">(person.communityStatus === "school" ? "school" : "club");
   const [guarantorId, setGuarantorId] = useState(person.guarantorId ?? "");
-  const [distanceId, setDistanceId] = useState(person.distanceExtId ?? "");
+  const [distanceId, setDistanceId] = useState(memberDistanceIds(person).join(" "));
 
   const [plays, setPlays] = useState<RoomPlay[]>([]);
   const [savedPlays, setSavedPlays] = useState<RoomPlay[]>([]);
@@ -246,7 +247,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     setCoreNitro250(vipText(person.coreNitro250)); setCoreRegular250(vipText(person.coreRegular250));
     setCommunity(person.communityStatus === "school" ? "school" : "club");
     setGuarantorId(person.guarantorId ?? "");
-    setDistanceId(person.distanceExtId ?? "");
+    setDistanceId(memberDistanceIds(person).join(" "));
     const nextLogin = packPersonLogin(person);
     setLogin(nextLogin);
     setSavedLogin(nextLogin);
@@ -301,7 +302,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     vipRegular !== vipText(person.vipRegular) || coreNitro250 !== vipText(person.coreNitro250) || coreRegular250 !== vipText(person.coreRegular250) ||
     community !== (person.communityStatus === "school" ? "school" : "club") ||
     guarantorId !== (person.guarantorId ?? "") ||
-    distanceId.trim() !== (person.distanceExtId ?? "").trim();
+    distanceId.trim() !== (memberDistanceIds(person).join(" ")).trim();
   const activePlay = plays.find((row) => row.id === playId) ?? plays[0];
   const roomNick = activePlay?.nick.trim() || "—";
   const guarantors = guarantorOptions(people, person.memberId, guarantorId);
@@ -370,6 +371,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
 
   const saveClub = async () => {
     if (!person.memberId) return;
+    if (!parseDistanceIds(distanceId)) { showV2Toast("err", t("admin.people.distanceIdBad")); return; }
     setSaving(true);
     const club = await saveMemberClub(person.memberId, {
       vipNitro: Number(vipNitro) || 0,
@@ -385,9 +387,10 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
       else fail();
       return;
     }
-    const distance = await saveMemberDistanceId(person.memberId, distanceId, person.discordId);
+    const distance = await saveMemberDistanceId(person.memberId, distanceId, memberDistanceIds(person));
     setSaving(false);
     if (distance.error === "duplicate") showV2Toast("err", t("admin.people.distanceIdDup"));
+    else if (distance.error === "stale") showV2Toast("err", t("admin.people.distanceIdsStale"));
     else if (distance.error === "bad-shape") showV2Toast("err", t("admin.people.distanceIdBad"));
     else if (distance.error) fail();
     else ok();
@@ -429,7 +432,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
           <div className="min-w-0 flex-1">
             <span className="v2-admin-kicker">{t("admin.people.cardKicker")}</span>
             <h3>{discordPrimary(person)}</h3>
-            <p>@{person.username}</p>
+            <p>{plays.find((play) => play.roomId === "winamax")?.nick}</p>
           </div>
           {person.markTag ? (
             <span className="v2-mark-chip">
@@ -487,7 +490,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       </span>
                     )}
                     <div className="v2-cab-idcopy">
-                      <b>{dash(person.nick || person.globalName)}</b>
+                      <b>{dash(discordPrimary(person))}</b>
                       <span>{t("cabinet.assignedNick")}</span>
                     </div>
                   </div>
@@ -584,10 +587,10 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       <Field label={t("admin.people.distanceIdLong")} hint={t("admin.people.distanceIdHint")}>
                         <input
                           className="v2-ctrl v2-mono w-full px-3"
-                          inputMode="numeric"
+                          inputMode="text"
                           placeholder={t("admin.people.distanceIdPh")}
                           value={distanceId}
-                          onChange={(event) => setDistanceId(event.target.value.replace(/[^\d]/g, "").slice(0, 12))}
+                          onChange={(event) => setDistanceId(event.target.value)}
                         />
                       </Field>
                     </div>
@@ -615,8 +618,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                         </Field>
                       </div>
                       <div className="v2-prio-edit-grid">
-                        <Field label="250 · Nitro"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreNitro250} onChange={(e) => setCoreNitro250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
-                        <Field label="250 · Regular"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
+                        <Field label="250-500 · Nitro"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreNitro250} onChange={(e) => setCoreNitro250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
+                        <Field label="250-500 · Regular"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
                       </div>
                       {person.memberId && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
                     </div>
@@ -644,7 +647,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                         setCoreNitro250(vipText(person.coreNitro250)); setCoreRegular250(vipText(person.coreRegular250));
                         setCommunity(person.communityStatus === "school" ? "school" : "club");
                         setGuarantorId(person.guarantorId ?? "");
-                        setDistanceId(person.distanceExtId ?? "");
+                        setDistanceId(memberDistanceIds(person).join(" "));
                       }}
                     />
                   </StaffOnly>

@@ -125,6 +125,8 @@ export type ClubMember = {
   status: MemberStatus;
   appAccess: boolean;
   isAdmin?: boolean;
+  coreNitro250?: number;
+  coreRegular250?: number;
   vipNitro: number;
   vipRegular: number;
   distance: number;
@@ -160,6 +162,7 @@ export const SEED_MEMBERS: ClubMember[] = [
     status: "active",
     appAccess: true,
     isAdmin: true,
+    coreNitro250: 2,
     vipNitro: 1,
     vipRegular: 2,
     distance: 2,
@@ -176,7 +179,7 @@ export const SEED_MEMBERS: ClubMember[] = [
     status: "active",
     appAccess: true,
     vipNitro: 0,
-    vipRegular: 0,
+    vipRegular: 30,
     distance: 8,
     mark: mark(48, "SV"),
   },
@@ -257,6 +260,7 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["100", "250"],
     status: "active",
     appAccess: true,
+    coreRegular250: 7,
     vipNitro: 3,
     vipRegular: 0,
     distance: 19,

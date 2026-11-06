@@ -38,7 +38,7 @@ export function MonthlyPage({section,state,dispatch,demo,onPlayer}:{section:Mont
     </div>}
     {result.status==="idle"&&<p className={styles.state}>{t("monthly.choosePlayer")}</p>}
     {result.status==="loading"&&<p className={styles.state} role="status">{t("monthly.loading")}</p>}
-    {result.status==="error"&&<div className={styles.state} role="alert"><p>{t("points.error")}</p><button type="button" onClick={()=>dispatch({type:"refresh"})}>{t("points.retry")}</button></div>}
+    {result.status==="error"&&<div className={styles.state} role="alert"><p>{t(result.timeout?"monthly.timeout":"points.error")}</p><button type="button" onClick={()=>dispatch({type:"refresh"})}>{t("points.retry")}</button></div>}
     {result.status==="ready"&&(result.data.kind==="month"?<div className={styles.widgets} key={result.key}><MonthWidgets report={result.data.report} query={state.applied} onPlayer={onPlayer} /></div>:result.data.report.rows.length?<div className={styles.widgets} key={result.key}>
       <SpeedRanking report={result.data.report} onPlayer={onPlayer} />
       <AnalyticsPanel help="speedHours" title={t("blocks.hourlySpeed.title")} description={t("monthly.hourSpeedNote")}><HourlyChart title={t("points.speed")} values={result.data.report.topHours} comparison={result.data.report.allHours} /></AnalyticsPanel>

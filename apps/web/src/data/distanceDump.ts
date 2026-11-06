@@ -1,3 +1,4 @@
+import { parseDistanceIds } from "./distanceIds";
 import { getSupabase } from "./client";
 import { notifyPriorityDistanceChanged } from "./priorityRefresh";
 
@@ -131,7 +132,8 @@ export function parseDistanceCsv(text: string, fileName: string): DistanceDump &
 
   for (const line of lines.slice(1)) {
     const cells = splitCsvLine(line, sep);
-    const playerId = cells[iId] ?? "";
+    const parsedIds = parseDistanceIds(cells[iId] ?? "");
+    const playerId = parsedIds?.length === 1 ? parsedIds[0] : "";
     const nick = cells[iNick] ?? "";
     const rawLimit = cells[iLimit] ?? "";
     const tournaments = parseNumber(cells[iTour] ?? "");
@@ -456,7 +458,7 @@ export function dumpWriteRows(dump: DistanceDump): DistanceDumpRow[] {
   for (const person of dump.people) {
     for (const variant of ["nitro", "regular"] as const) {
       for (const [limitId, hands] of Object.entries(person.at[variant])) {
-        if (hands > 0) {
+        if (hands >= 0) {
           rows.push({
             distance_ext_id: person.playerId,
             variant_id: variant,
@@ -479,45 +481,36 @@ export async function loadDistancePeopleFlags(): Promise<DistancePeopleFlags> {
   const empty = { redPartyIds: new Set<string>(), cardIds: new Set<string>(), byExt: new Map<string, DistanceLink>(), ready: false };
   const db = getSupabase();
   if (!db) return empty;
-  const [{ data: settings }, { data: cards }, { data: map }, { data: guild }, { data: idents }] = await Promise.all([
+  const [{ data: settings }, { data: cards }, { data: guild }, { data: idents }] = await Promise.all([
     db.from("club_settings").select("required_discord_role_id").eq("id", true).maybeSingle(),
-    db.from("members").select("id, distance_ext_id").not("distance_ext_id", "is", null),
-    db.from("discord_distance_ids").select("discord_id, distance_ext_id"),
+    db.from("member_distance_ids").select("member_id, distance_ext_id"),
     db.from("discord_members").select("discord_id, roles"),
     db.from("identities").select("member_id, provider_uid").eq("provider", "discord"),
   ]);
   const roleId = String(settings?.required_discord_role_id || FALLBACK_REDPARTY_ROLE);
   const cardIds = new Set<string>();
-  const memberExt = new Map<string, string>();
+  const memberExt: { memberId: string; ext: string }[] = [];
   const byExt = new Map<string, DistanceLink>();
   for (const row of cards ?? []) {
     const ext = String(row.distance_ext_id ?? "").trim();
     if (!ext) continue;
     cardIds.add(ext);
-    memberExt.set(String(row.id), ext);
-    byExt.set(ext, { discordId: null, memberId: String(row.id) });
+    memberExt.push({ memberId: String(row.member_id), ext });
+    byExt.set(ext, { discordId: null, memberId: String(row.member_id) });
   }
   const redByDiscord = new Map<string, boolean>();
   for (const row of guild ?? []) {
     redByDiscord.set(String(row.discord_id), roleHasId(row.roles, roleId));
   }
   const redPartyIds = new Set<string>();
-  for (const row of map ?? []) {
-    const ext = String(row.distance_ext_id);
-    const discordId = String(row.discord_id);
-    const prev = byExt.get(ext);
-    byExt.set(ext, { discordId, memberId: prev?.memberId ?? null });
-    if (redByDiscord.get(discordId)) redPartyIds.add(ext);
-  }
   const identDiscord = new Map<string, string>();
   for (const row of idents ?? []) {
     identDiscord.set(String(row.member_id), String(row.provider_uid));
   }
-  for (const [memberId, ext] of memberExt) {
+  for (const { memberId, ext } of memberExt) {
     const discordId = identDiscord.get(memberId);
     if (discordId) {
-      const prev = byExt.get(ext);
-      byExt.set(ext, { discordId: prev?.discordId ?? discordId, memberId });
+      byExt.set(ext, { discordId, memberId });
       if (redByDiscord.get(discordId)) redPartyIds.add(ext);
     }
   }

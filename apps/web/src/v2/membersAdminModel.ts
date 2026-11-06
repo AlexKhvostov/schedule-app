@@ -7,14 +7,6 @@ export type StatusFilter = "all" | "active" | "blocked" | "left" | "root" | "bot
 export type SortKey = "access" | "nick" | "mark" | "roles" | "distanceId" | "vipNitro" | "vipRegular";
 export type SortDirection = "asc" | "desc";
 
-export function discordLine(row: AdminPerson) {
-  const extra =
-    row.globalName && row.globalName !== discordPrimary(row) && row.globalName !== row.username
-      ? ` · ${row.globalName}`
-      : "";
-  return `@${row.username}${extra}`;
-}
-
 export function roomNickLines(memberId: string | null, map: Map<string, MemberRoomNick[]>) {
   const have = memberId ? map.get(memberId) ?? [] : [];
   if (!have.some((row) => row.roomId === "winamax")) return [{ roomId: "winamax", nick: "" }, ...have];
@@ -86,6 +78,7 @@ export function filterAndSortPeople(
       row.publicCode,
       row.displayName,
       row.distanceExtId,
+      ...(row.distanceIds ?? []),
       ...row.discordRoles.map((role) => role.name),
     ]
       .filter(Boolean)

@@ -15,7 +15,7 @@ describe("schedule presentation helpers", () => {
     expect(rowInitials("", "")).toBe("?");
   });
 
-  it("uses the Discord server nickname as the primary visible name", () => {
+  it("uses the public Discord name and Winamax nick", () => {
     const lines = whoLines({
       id: "1",
       nick: "fallback",
@@ -29,7 +29,7 @@ describe("schedule presentation helpers", () => {
       globalName: "Alex Global",
       username: "alex",
     });
-    expect(lines).toEqual({ title: "Server Alex", sub: "Alex Global · @alex" });
+    expect(lines).toEqual({ title: "Alex Global", sub: "PokerNick" });
   });
 
   it("clamps heat intensity", () => {

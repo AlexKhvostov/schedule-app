@@ -45,4 +45,40 @@ describe("read-only PHP transport", () => {
     await expect(createHttpSources(fetcher).monthly.cell(new URLSearchParams(), controller.signal)).rejects.toThrow();
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it("accepts a monthly response after the former 30-second deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher: typeof fetch = async (_, init) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(new Response('{}', { headers: { 'Content-Type': 'application/json' } })), 35_000);
+        init!.signal!.addEventListener('abort', () => { clearTimeout(timer); reject(init!.signal!.reason); });
+      });
+      const request = createHttpSources(fetcher).monthly.heatmap(new URLSearchParams(), new AbortController().signal);
+      const assertion = expect(request).resolves.toEqual({});
+      await vi.advanceTimersByTimeAsync(35_000);
+      await assertion;
+    } finally { vi.useRealTimers(); }
+  });
+  it("times out monthly requests at 90 seconds while ordinary requests keep 30 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      const fetcher: typeof fetch = async (_, init) => new Promise((_, reject) => {
+        signals.push(init!.signal!);
+        init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason));
+      });
+      const sources = createHttpSources(fetcher);
+      const monthly = expect(sources.monthly.heatmap(new URLSearchParams(), new AbortController().signal)).rejects.toThrow('analytics-timeout');
+      const ordinary = expect(sources.points.heatmap(new URLSearchParams(), new AbortController().signal)).rejects.toThrow('analytics-timeout');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(signals[0].aborted).toBe(false);
+      expect(signals[1].aborted).toBe(true);
+      await ordinary;
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(signals[0].aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await monthly;
+      expect(signals[0].aborted).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
 });

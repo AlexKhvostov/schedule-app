@@ -15,6 +15,7 @@ export type RosterRow = {
   n: number;
   excluded?: boolean;
   core?: number;
+  coreTier?: number;
   mark: Mark;
   limit: string;
   byLimit: Record<string, LimitHours>;
@@ -23,43 +24,29 @@ export type RosterRow = {
   left: number;
 };
 
-export type RosterGroups = {
-  active: RosterRow[];
-  historical: RosterRow[];
-};
-
 /** Filling order is separate from the distance ranking and from legacy grid_priority. */
-export function orderRosterRows(rows: readonly RosterRow[], source: RosterPrioritySource, kind: PriorityKind, enabled = true): RosterRow[] {
-  if (!enabled) return rows.map((row) => ({ ...row, n: 0, core: 0, excluded: false })).sort((a,b) => a.mark.discord.localeCompare(b.mark.discord, "ru", { numeric: true, sensitivity: "base" }) || personKey(a.mark).localeCompare(personKey(b.mark)));
+export function orderRosterRows(rows: readonly RosterRow[], source: RosterPrioritySource, kind: PriorityKind): RosterRow[] {
   const people = new Map(source.people.map((person) => [person.memberId, person]));
   const ranked = rows.map((row) => {
     const person = row.mark.memberId ? people.get(row.mark.memberId) : undefined;
     return {
       row: { ...row, core: person ? person.core : source.group === "250" ? 0 : vipOf(row.mark, kind) ?? 0, excluded: person?.excluded ?? false },
+      tier: person?.tier ?? 0,
       score: person?.score ?? 0,
       vip: person ? person.core : source.group === "250" ? 0 : vipOf(row.mark, kind),
     };
   });
   ranked.sort((a, b) => Number(a.row.excluded) - Number(b.row.excluded)
+    || a.tier - b.tier
     || (a.row.excluded ? 0 : rankKey(a.vip) - rankKey(b.vip))
     || b.score - a.score
     || a.row.mark.discord.localeCompare(b.row.mark.discord, "ru", { numeric: true, sensitivity: "base" })
     || personKey(a.row.mark).localeCompare(personKey(b.row.mark)));
-  return ranked.map(({ row }, index) => ({ ...row, n: row.excluded ? 0 : index + 1 }));
-}
-
-export function groupRosterRows(
-  activeRows: readonly RosterRow[],
-  occupiedRows: readonly RosterRow[],
-  eligibleMemberIds: ReadonlySet<string>,
-): RosterGroups {
-  const active = activeRows.map((row, index) => ({ ...row, n: index + 1 }));
-  const activeKeys = new Set(active.map((row) => personKey(row.mark)));
-  const historical = occupiedRows
-    .filter((row) => !activeKeys.has(personKey(row.mark)))
-    .filter((row) => !row.mark.memberId || !eligibleMemberIds.has(row.mark.memberId))
-    .map((row) => ({ ...row, n: 0 }));
-  return { active, historical };
+  return ranked.map(({ row, tier }, index) => ({
+    ...row,
+    n: row.excluded ? 0 : index + 1,
+    coreTier: source.kind === "both" ? tier : undefined,
+  }));
 }
 
 export function hoursFromSlots(slots: number) {
@@ -156,10 +143,7 @@ function finishPeople(
 }
 
 function faceOf(mark: Mark, faces: Mark[]) {
-  if (mark.memberId) {
-    const hit = faces.find((row) => row.memberId === mark.memberId);
-    if (hit) return hit;
-  }
+  if (mark.memberId) return faces.find((row) => row.memberId === mark.memberId);
   const tag = mark.t.trim().toUpperCase();
   if (tag) {
     const hit = faces.find((row) => row.t.trim().toUpperCase() === tag);

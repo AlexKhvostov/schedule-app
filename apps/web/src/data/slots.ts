@@ -194,7 +194,7 @@ function missingMonthRpc(message?: string) {
 export function markFromScheduleRow(row: Pick<MonthScheduleRow, "member_id" | "mark_tag" | "mark_bg" | "mark_fg" | "member_tables" | "discord" | "room_nick" | "avatar_url" | "username" | "global_name" | "grid_priority" | "vip_nitro" | "vip_regular">): Mark {
   return {
     t: row.mark_tag ?? "",
-    discord: row.discord ?? "",
+    discord: row.global_name || row.username || row.discord || "",
     room: row.room_nick ?? "",
     bg: row.mark_bg ?? "",
     fg: row.mark_fg ?? "",
@@ -266,7 +266,7 @@ async function loadMonthGridsLegacy(
     const snap = ident?.provider_uid ? discordById.get(ident.provider_uid) : undefined;
     marks.set(person.id, {
       t: person.mark_tag ?? "",
-      discord: snap?.guild_nick || ident?.guild_nick || snap?.username || ident?.username || ident?.display_name || "",
+      discord: snap?.global_name || ident?.display_name || snap?.username || ident?.username || "",
       room: roomNicks.get(person.id) ?? "",
       bg: person.mark_bg,
       fg: person.mark_fg,

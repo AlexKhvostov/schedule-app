@@ -1307,28 +1307,41 @@ html[data-ui-theme="light"],
 /* Live priorities: two weighted periods, dense readable rows, touch details. */
 .v2-prio-live { padding: 6px; }
 .v2-prio-live .v2-prio-card { max-width: 1100px; margin: 0 auto; }
-.v2-prio-live .v2-prio-head { gap: 6px 10px; padding: 7px 9px; font-size: 11px; }
-.v2-prio-live .v2-prio-head h1 { font-size: 12px; }
-.v2-prio-live .v2-prio-head > button { margin-left: auto; }
+.v2-prio-live .v2-prio-head { align-items: center; gap: 6px 10px; padding: 8px 12px; background: var(--card); font-size: 12px; }
+.v2-prio-live .v2-prio-head h1 { color: var(--foreground); font-size: 17px; line-height: 1.25; letter-spacing: normal; text-transform: none; }
+.v2-prio-live .v2-prio-head > span { color: var(--muted-foreground); }
+.v2-prio-live .v2-prio-head > button { margin-inline-start: auto; }
 .v2-prio-status { padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted-foreground); }
 .v2-prio-status.is-final { color: var(--title); border-color: color-mix(in srgb,var(--title) 35%,var(--border)); }
 .v2-prio-new { color: var(--title); font-size: 10px; }
-.v2-prio-report { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 6px 9px; border-bottom: 1px solid var(--border); font-size: 11px; }
-.v2-prio-report > label { display: flex; align-items: center; gap: 7px; color: var(--muted-foreground); }
-.v2-prio-report input,.v2-prio-report select { min-height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--foreground); padding: 2px 7px; }
-.v2-prio-report input { width: 105px; cursor: default; opacity: 1; background: var(--muted); }
-.v2-prio-report select { max-width: 100%; }
-.v2-prio-window { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; flex: 1; color: var(--muted-foreground); }
-.v2-prio-window > div { display: flex; flex-wrap: wrap; gap: 5px 18px; min-height: 30px; align-items: center; color: var(--foreground); }
+.v2-prio-report {
+  margin: 8px 10px 4px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--title) 32%, var(--border));
+  border-inline-start: 3px solid var(--title);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--title) 8%, var(--card));
+  font-size: 12px;
+}
+.v2-prio-report-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; }
+.v2-prio-report-period { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2-prio-report-period label { color: var(--foreground); font-weight: 700; }
+.v2-prio-report select {
+  min-width: 0; max-width: 100%; min-height: 32px; padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--title) 55%, var(--border));
+  border-radius: 5px; background: var(--card); color: var(--foreground); font-weight: 600;
+}
+.v2-prio-report select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.v2-prio-report button { min-height: 32px; }
+.v2-prio-window { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 12px; margin-top: 6px; color: var(--muted-foreground); }
+.v2-prio-window > div { display: flex; flex-wrap: wrap; gap: 3px 14px; color: var(--foreground); }
 .v2-prio-window b { color: var(--title); white-space: nowrap; }
-.v2-prio-controls { display: grid; grid-template-columns: minmax(0,1fr) 340px; align-items: center; }
 .v2-prio-summary { margin: 5px 9px 5px 0; padding: 5px 9px; border: 1px solid var(--border); border-radius: 5px; background: color-mix(in srgb,var(--title) 4%,var(--card)); }
 .v2-prio-summary dl { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin: 0; }
 .v2-prio-summary dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 0; }
 .v2-prio-summary dt { color: var(--muted-foreground); font-size: 10px; line-height: 14px; white-space: nowrap; }
 .v2-prio-summary dd { margin: 0; color: var(--title); font-size: 12px; line-height: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 850px) {
-  .v2-prio-controls { grid-template-columns: 1fr; }
   .v2-prio-summary { margin: 0 7px 5px; padding: 4px 7px; }
   .v2-prio-summary dl { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
   .v2-prio-summary dl > div { display: grid; gap: 0; }
@@ -1340,11 +1353,6 @@ html[data-ui-theme="light"],
 .v2-prio-rule { width: 100%; font-size: 10px; color: var(--muted-foreground); }
 .v2-prio-check { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; cursor: pointer; }
 .v2-prio-live input[type=checkbox],.v2-prio-settings input { accent-color: var(--title); width: 15px; height: 15px; }
-.v2-prio-tabs { display: flex; gap: 4px; padding: 8px 9px 0; border-bottom: 1px solid var(--border); background: var(--header); }
-.v2-prio-tabs button { min-height: 34px; padding: 6px 18px; margin-bottom: -1px; border: 1px solid transparent; border-radius: 6px 6px 0 0; color: var(--muted-foreground); font-size: 12px; font-weight: 650; }
-.v2-prio-tabs button:hover { color: var(--title); }
-.v2-prio-tabs button[aria-selected=true] { color: var(--title); border-color: var(--border); border-bottom-color: var(--card); background: var(--card); }
-.v2-prio-tabs button:focus-visible { outline: 2px solid var(--title); outline-offset: -3px; }
 .v2-prio-live [role=tabpanel]:focus-visible { outline: 2px solid var(--title); outline-offset: -2px; }
 .v2-prio-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 3px 9px; font-size: 10px; color: var(--muted-foreground); }
 .v2-prio-request-actions { display: flex; justify-content: flex-end; padding: 9px; border-top: 1px solid var(--border); }
@@ -1487,14 +1495,12 @@ html[data-ui-theme="light"],
   .v2-prio-formulas { grid-template-columns: 1fr; }
   .v2-prio-calculation th,.v2-prio-calculation td { padding: 4px 2px; font-size: 11px; }
   .v2-prio-live { padding: 3px; }
-  .v2-prio-live .v2-prio-head { font-size: 10px; padding: 6px; gap: 5px; }
-  .v2-prio-live .v2-prio-head > button { margin-left: 0; }
-  .v2-prio-report { display: grid; grid-template-columns: 105px minmax(0,1fr); padding: 7px; gap: 8px 10px; }
-  .v2-prio-report input { width: 100%; }
-  .v2-prio-window { grid-column: 1 / -1; }
-  .v2-prio-window > div { gap: 5px 12px; }
+  .v2-prio-live .v2-prio-head { padding: 6px 8px; gap: 5px 8px; }
+  .v2-prio-report { margin-inline: 8px; padding-inline: 8px; }
+  .v2-prio-report-period { flex: 1 1 100%; }
+  .v2-prio-report-period select { flex: 1; }
+  .v2-prio-window { margin-top: 6px; }
   .v2-prio-filters { padding: 7px; gap: 3px 12px; font-size: 10px; }
-  .v2-prio-tabs { padding: 6px 7px 0; }
   .v2-prio-actions { padding: 6px; gap: 5px; align-items: start; }
   .v2-prio-actions > span { max-width: 58%; line-height: 1.5; }
   .v2-prio-live .v2-prio-table { min-width: 350px; }
@@ -7985,6 +7991,10 @@ textarea.v2-ctrl.v2-cab-area {
   background: linear-gradient(135deg, transparent 55%, var(--muted-foreground) 56% 62%, transparent 63% 74%, var(--muted-foreground) 75% 81%, transparent 82%);
 }
 
+.v2-float-resize.is-two-axis {
+  cursor: nwse-resize;
+}
+
 .v2-accent {
   color: var(--primary);
 }
@@ -11414,6 +11424,13 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   padding: 1px 2px 2px;
 }
 
+.v2-opt-cell > .v2-opt-merged-measure {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: var(--opt-letter, 10px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 .v2-opt-face b {
   z-index: 1;
   font-size: var(--opt-letter, 10px);
@@ -14238,10 +14255,6 @@ img.v2-people-ava {
 
 /* No scrollable strip above the sticky roster header. Other floats keep their padding. */
 .v2-roster-float.is-compact .v2-float-body { padding-top: 0; }
-.v2-roster-controls { padding-top: 6px; margin-bottom: 6px; }
-.v2-roster-controls .v2-prio-tabs { gap: 4px; padding: 0; border-bottom: 0; background: transparent; }
-.v2-roster-controls .v2-prio-tabs button { min-height: 24px; padding: 3px 10px; margin-bottom: 0; border: 1px solid color-mix(in srgb, var(--muted-foreground) 50%, var(--border)); border-radius: 4px; font-size: 10px; line-height: 16px; }
-.v2-roster-controls .v2-prio-tabs button[aria-selected=true] { border-color: var(--title); background: color-mix(in srgb, var(--title) 10%, var(--card)); }
 .v2-roster-help { display: inline-flex; }
 .v2-roster-info { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted-foreground); background: transparent; font: 600 12px/1 Georgia, serif; cursor: help; touch-action: manipulation; }
 .v2-roster-info:hover, .v2-roster-info:focus-visible { color: var(--title); border-color: var(--title); }
@@ -14284,7 +14297,7 @@ img.v2-people-ava {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 5px 4px 6px;
+  padding: 3px 4px;
   border-bottom: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
   background: color-mix(in srgb, var(--muted) 42%, var(--card));
   color: var(--muted-foreground);
@@ -14295,6 +14308,10 @@ img.v2-people-ava {
   text-align: center;
   vertical-align: middle;
   white-space: nowrap;
+}
+
+.v2-people-table thead th {
+  height: 28px;
 }
 
 .v2-people-table th:first-child,
@@ -14331,10 +14348,10 @@ img.v2-people-ava {
   letter-spacing: 0;
 }
 
-.v2-people-table th.v2-people-limit span,
-.v2-people-table th.v2-people-limit small,
-.v2-people-table th.v2-people-dead-total span,
-.v2-people-table th.v2-people-dead-total small,
+.v2-people-table th.v2-people-limit > span,
+.v2-people-table th.v2-people-limit > small,
+.v2-people-table th.v2-people-dead-total > span,
+.v2-people-table th.v2-people-dead-total > small,
 .v2-people-num small {
   display: block;
 }
@@ -14363,6 +14380,7 @@ img.v2-people-ava {
   color: var(--foreground);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
@@ -14386,7 +14404,7 @@ img.v2-people-ava {
 }
 
 .v2-people-table td {
-  padding: 3px 4px;
+  padding: 2px 4px;
   border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
   vertical-align: middle;
 }
@@ -14397,7 +14415,18 @@ img.v2-people-ava {
 }
 
 .v2-people-row {
+  height: 33px;
   cursor: pointer;
+}
+
+.v2-people-table .v2-mark-chip {
+  display: flex;
+  margin-inline: auto;
+}
+
+.v2-people-table td.v2-people-message {
+  padding: 4px;
+  text-align: start;
 }
 
 .v2-people-row:hover td,
@@ -14420,28 +14449,6 @@ img.v2-people-ava {
 .v2-people-row.is-vip:hover td,
 .v2-people-row.is-vip:focus-visible td {
   background: color-mix(in srgb, #d4a017 28%, transparent);
-}
-
-.v2-people-historical-head td {
-  padding: 9px 6px 5px;
-  border-top: 2px solid color-mix(in srgb, var(--warning) 42%, var(--border));
-  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
-  background: color-mix(in srgb, var(--warning) 7%, var(--card));
-  color: var(--muted-foreground);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-}
-
-.v2-people-row.is-historical td {
-  background: color-mix(in srgb, var(--muted) 28%, transparent);
-  color: var(--muted-foreground);
-}
-
-.v2-people-row.is-historical:hover td,
-.v2-people-row.is-historical:focus-visible td {
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
 }
 
 .v2-people-rank {
@@ -16566,70 +16573,36 @@ html[data-ui-theme="light"], .v2-palette-sample.is-light { --schedule-nitro: #24
 .v2-user-profile-action:focus .v2-user-profile-hint { display: block; }
 
 /* Independent priority slices: tournament kind and limit group. */
-.v2-prio-slices { display: grid; gap: 8px; padding: 12px 10px; border-block: 1px solid var(--border); background: var(--header); }
-.v2-prio-tabs button[aria-pressed=true] { color: var(--title); border-color: var(--border); background: var(--card); }
-.v2-prio-tabs button:disabled { opacity: .4; cursor: not-allowed; }
-.v2-roster-controls { flex-wrap: wrap; }
-.v2-prio-table.is-core-only { min-width: 280px; }
-.v2-prio-table.is-core-only .is-num, .v2-prio-table.is-core-only .is-period, .v2-prio-table.is-core-only .is-total { display: none; }
+.v2-prio-live .v2-prio-table.is-core-only { min-width: 0; }
+.v2-prio-live .v2-prio-table.is-core-only .is-core { width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.v2-prio-live .is-vip .is-core { font-weight: 700; color: var(--title); }
 
 /* Each labelled row is one mutually exclusive segmented control. */
-.v2-prio-switch { display: grid; grid-template-columns: 120px minmax(0, 240px); align-items: center; gap: 12px; min-width: 0; }
-.v2-prio-switch-label { color: var(--muted-foreground); font-size: 12px; line-height: 1.3; }
-.v2-prio-switch .v2-prio-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--muted-foreground) 8%, var(--background)); }
-.v2-prio-switch .v2-prio-tabs button { min-height: 30px; margin: 0; padding: 5px 10px; border: 1px solid transparent; border-radius: 5px; font-size: 12px; line-height: 18px; transition: background-color .15s, border-color .15s; }
-.v2-prio-switch .v2-prio-tabs button[aria-selected=true],
-.v2-prio-switch .v2-prio-tabs button[aria-pressed=true] { color: var(--title); border-color: color-mix(in srgb, var(--title) 40%, var(--border)); background: color-mix(in srgb, var(--title) 12%, var(--card)); font-weight: 700; box-shadow: 0 1px 2px #00000012; }
-.v2-prio-switch .v2-prio-tabs button:hover:not(:disabled):not([aria-selected=true]):not([aria-pressed=true]) { background: color-mix(in srgb, var(--muted-foreground) 10%, transparent); }
-.v2-prio-switch .v2-prio-tabs button:disabled { opacity: .38; }
-.v2-roster-controls { display: grid; grid-template-columns: minmax(0, 82px) max-content; gap: 2px 4px; padding: 3px 0; margin-bottom: 3px; }
-.v2-roster-controls .v2-prio-switch { grid-column: 1 / -1; grid-template-columns: subgrid; gap: 4px; }
-.v2-roster-controls .v2-prio-switch-label { font-size: 10px; }
-.v2-roster-controls .v2-prio-tabs { grid-template-columns: repeat(2, max-content); justify-self: start; gap: 1px; padding: 1px; border-radius: 5px; }
-.v2-roster-controls .v2-prio-tabs button { min-height: 24px; padding: 2px 6px; border-radius: 3px; font-size: 11px; line-height: 18px; white-space: nowrap; }
-@media (max-width: 480px) {
-  .v2-prio-slices .v2-prio-switch { grid-template-columns: 104px minmax(0, 1fr); gap: 8px; }
-  .v2-prio-switch-label { font-size: 11px; }
-}
-
-/* Separate ranking selection, player filters and display preferences. */
-.v2-prio-live .v2-prio-controls { grid-template-columns: 320px minmax(0, 1fr) 185px; align-items: stretch; gap: 0; padding: 7px 10px; border-bottom: 1px solid var(--border); }
-.v2-prio-control-group { min-width: 0; }
-.v2-prio-control-group + .v2-prio-control-group { border-left: 1px solid var(--border); margin-left: 14px; padding-left: 14px; }
-.v2-prio-control-group h2 { margin: 0 0 5px; color: var(--foreground); font-size: 12px; line-height: 16px; font-weight: 650; }
-.v2-prio-controls .v2-prio-slices { gap: 4px; padding: 0; border: 0; background: transparent; }
-.v2-prio-controls .v2-prio-tabs { padding: 2px; border-radius: 6px; }
-.v2-prio-controls .v2-prio-tabs button { min-height: 24px; padding: 2px 8px; font-size: 11px; }
-.v2-prio-controls .v2-prio-switch-label, .v2-prio-role-field > span { font-size: 11px; }
-.v2-prio-controls .v2-prio-switch { grid-template-columns: 100px minmax(0, 1fr); gap: 10px; }
-.v2-prio-live .v2-prio-controls .v2-prio-filters { display: block; padding-top: 0; padding-bottom: 0; padding-right: 0; }
-.v2-prio-checkboxes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
-.v2-prio-role-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
-.v2-prio-role-field > span { color: var(--muted-foreground); font-size: 12px; }
-.v2-prio-role-field .v2-mem-pick, .v2-prio-role-field .v2-mem-pick-btn { width: 100%; min-width: 0; }
-.v2-prio-display .v2-prio-check { min-height: 30px; font-size: 11px; }
+/* The player filters stay above the data tabs; table options stay with the table. */
+.v2-prio-global-filters, .v2-prio-matrix-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 5px 10px; border-bottom: 1px solid var(--border); }
+.v2-prio-global-filters h2 { margin: 0; font-size: 12px; line-height: 16px; font-weight: 650; }
+.v2-prio-global-filters { font-size: 12px; }
+.v2-prio-global-filters .v2-mem-pick { flex: 0 1 215px; min-width: 0; }
+.v2-prio-global-filters .v2-mem-pick-btn { width: 100%; min-width: 0; font-size: inherit; }
+.v2-prio-matrix-meta { background: var(--card); font-size: 11px; }
+.v2-prio-matrix-meta .v2-prio-status { margin-inline-start: auto; }
+.v2-prio-global-filters .v2-prio-check { min-height: 24px; }
+.v2-prio-live .v2-prio-check:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; border-radius: 3px; }
 .v2-prio-live .v2-prio-summary { margin: 0; padding: 5px 10px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--header); }
 .v2-prio-live .v2-prio-summary dl { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
 .v2-prio-live .v2-prio-summary dl > div { display: flex; justify-content: flex-start; gap: 8px; }
 .v2-prio-update-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
 .v2-prio-update-meta .v2-prio-rule { width: auto; }
-@media (max-width: 1000px) {
-  .v2-prio-live .v2-prio-controls { grid-template-columns: 300px minmax(0, 1fr); row-gap: 8px; }
-  .v2-prio-control-group.v2-prio-display { grid-column: 1 / -1; display: flex; align-items: center; gap: 20px; margin: 0; padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--border); }
-  .v2-prio-display h2 { margin: 0; }
-  .v2-prio-display .v2-prio-check { min-height: 0; }
-}
 @media (max-width: 700px) {
-  .v2-prio-live .v2-prio-controls { grid-template-columns: minmax(0, 1fr); padding: 7px; }
-  .v2-prio-control-group + .v2-prio-control-group { margin-left: 0; padding: 8px 0 0; border-left: 0; border-top: 1px solid var(--border); }
-  .v2-prio-controls .v2-prio-slices { max-width: 400px; }
   .v2-prio-live .v2-prio-summary dl { gap: 8px; }
   .v2-prio-live .v2-prio-summary dl > div { display: grid; gap: 0; }
 }
 
 @media (max-width: 700px) {
-  .v2-prio-report > label { display: grid; gap: 3px; }
-  .v2-prio-report .v2-prio-window { grid-column: 1 / -1; }
+  .v2-prio-global-filters h2 { flex-basis: 100%; }
+  .v2-prio-global-filters .v2-mem-pick { flex: 1 1 135px; }
+  .v2-prio-global-filters, .v2-prio-matrix-meta { gap: 4px 10px; padding-inline: 8px; }
+  .v2-prio-matrix-meta .v2-prio-status { margin-inline-start: 0; }
 }
 
 /* Capacity closure is a visual band only. The underlying cells keep hit testing. */
@@ -16665,9 +16638,18 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-locked-editor .v2-palette-actions { margin-top: 14px; }
 @media (max-width: 600px) { .v2-locked-texts, .v2-locked-previews { grid-template-columns: 1fr; } }
 
-.v2-prio-active-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; font-size: 12px; }
-.v2-prio-active-selection > [data-testid] { font-weight: 600; }
-.v2-roster-active-period { margin: 3px 0 6px; font-size: 11px; }
+.v2-prio-active-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.v2-prio-active-selection > [data-testid] { color: var(--muted-foreground); }
+.v2-roster-active-period {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  font-size: 9px;
+  line-height: 1.05;
+  color: var(--muted-foreground);
+}
+.v2-roster-active-period strong { color: var(--foreground); font-size: 10px; font-weight: 650; }
 
 /* Compact presence rows; the secondary group is collapsed by default. */
 .v2-online-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
@@ -16685,3 +16667,140 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-boot .v2-boot-copy { max-width: 360px; }
 .v2-boot .v2-ctrl { padding: 6px 10px; height: auto; flex-shrink: 0; }
 @media (max-width: 600px) { .v2-auth-notice, .v2-boot:has(button) { flex-wrap: wrap; } }
+
+.v2-user-card { display: grid; gap: 5px; }
+.v2-user-card-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 5px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--title) 30%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--title) 10%, var(--card));
+}
+.v2-user-identity { align-self: center; min-width: 0; }
+.v2-user-card-hero h3 {
+  font-size: 19px;
+  min-height: 1.2em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.v2-user-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  align-items: end;
+  justify-content: space-between;
+  gap: 5px;
+}
+.v2-user-card-hero .v2-user-profile-action { margin: 0; }
+.v2-user-card-hero .v2-user-profile-hint { right: 0; left: auto; max-width: min(220px, 65vw); }
+.v2-user-accounts,
+.v2-user-account-details {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 11px;
+}
+.v2-user-account-details {
+  padding: 5px 8px;
+  border-top: 1px solid var(--border);
+}
+.v2-user-accounts > div,
+.v2-user-account-details > div {
+  display: grid;
+  gap: 7px;
+  align-items: baseline;
+}
+.v2-user-accounts > div { grid-template-columns: 58px minmax(0, 1fr); }
+.v2-user-account-details > div { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+:is(.v2-user-accounts, .v2-user-account-details) dt { color: var(--muted-foreground); }
+:is(.v2-user-accounts, .v2-user-account-details) dd { min-height: 1.2em; margin: 0; overflow-wrap: anywhere; }
+.v2-user-accounts dd { font-size: 12px; font-weight: 600; }
+.v2-user-section { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.v2-user-section h4 { margin: 0 0 4px; font-size: 12px; color: var(--foreground); }
+.v2-user-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+}
+.v2-user-metrics > div { min-width: 0; padding: 4px 6px; border-radius: 5px; background: var(--muted); }
+.v2-user-metrics dt { color: var(--muted-foreground); font-size: 10px; }
+.v2-user-metrics dd { margin: 2px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-user-limits { width: 100%; margin-top: 4px; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.v2-user-limits :is(th, td) { padding: 4px 5px; border-bottom: 1px solid var(--border); text-align: right; }
+.v2-user-limits thead th { color: var(--muted-foreground); font-weight: 500; }
+.v2-user-limits tr > :first-child { text-align: left; }
+.v2-user-limits tbody tr:last-child > * { border-bottom: 0; }
+
+.v2-roster-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding-top: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted-foreground) 45%, var(--border));
+}
+.v2-roster-tabs { display: flex; gap: 2px; }
+.v2-roster-tabs button {
+  margin-bottom: -1px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--muted-foreground) 45%, var(--border));
+  border-radius: 5px 5px 0 0;
+  background: color-mix(in srgb, var(--foreground) 7%, var(--card));
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.v2-roster-tabs button:is([aria-pressed="false"], [aria-selected="false"]):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 13%, var(--card));
+}
+.v2-roster-tabs button:is([aria-pressed="true"], [aria-selected="true"]) {
+  border-color: var(--title);
+  border-bottom-color: var(--card);
+  background: linear-gradient(color-mix(in srgb, var(--title) 18%, var(--card)), var(--card));
+  box-shadow: inset 0 2px var(--title);
+}
+.v2-roster-tabs button:focus-visible {
+  position: relative;
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.v2-prio-limit-tabs {
+  padding: 6px 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted-foreground) 45%, var(--border));
+}
+.v2-prio-limit-tabs button { min-width: 66px; min-height: 26px; touch-action: manipulation; }
+.v2-prio-limit-tabs button:disabled { opacity: .5; cursor: not-allowed; }
+.v2-roster-dead-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  margin-inline-start: auto;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.v2-roster-dead-toggle input { width: 12px; height: 12px; margin: 0; accent-color: var(--primary); }
+
+.v2-people-table .v2-roster-core-divider th {
+  position: static;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: var(--card);
+  text-align: left;
+}
+.v2-roster-core-divider .v2-role-divider {
+  width: 100%;
+  min-height: 18px;
+  grid-template-columns: 12px auto 10px 1fr;
+}
+.v2-roster-core-divider button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }

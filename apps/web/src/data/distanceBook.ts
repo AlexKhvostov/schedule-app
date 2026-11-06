@@ -8,13 +8,13 @@ export type DistanceIdFilter = "all" | "set" | "missing";
 export type DistancePresenceFilter = "all" | "with" | "without";
 export type DistanceCell = { id: string; hands: number };
 export type DistanceSlice = {
-  id: string; key: string; variant: DistanceVariant; part: number; comment: string | null;
+  id: string; key: string; distanceId?: string; gameNick?: string; variant: DistanceVariant; part: number; comment: string | null;
   source: "import" | "historical" | "manual" | "legacy"; createdAt: string; updatedAt: string;
   createdBy: string | null; updatedBy: string | null;
   byLimit: Record<string, DistanceCell>; total: number;
 };
 export type DistancePersonRow = {
-  key: string; playerId: string; nick: string; discordNick: string; gameNick: string;
+  key: string; playerId: string; distanceIds?: string[]; nick: string; discordNick: string; gameNick: string;
   discordId: string | null; memberId: string | null; avatarUrl: string | null; onGuild: boolean;
   redParty: boolean; hasActiveProfile: boolean; orphan: boolean; slices: DistanceSlice[];
   at: Record<DistanceVariant, Record<string, number>>; nitroTotal: number; regularTotal: number;
@@ -23,7 +23,7 @@ export type DistancePersonRow = {
 export type DistanceBook = { monthStart: string; roomSlug: string; months: string[]; limits: string[]; people: DistancePersonRow[]; rowCount: number; error: string | null };
 
 type PeopleFilterStatus = { present: boolean; roles: unknown; has_active_profile: boolean };
-type SnapshotPerson = PeopleFilterStatus & { member_id: string; distance_ext_id: string | null; discord_id: string | null; discord_nick: string; avatar_url: string | null; game_nick: string };
+type SnapshotPerson = PeopleFilterStatus & { member_id: string; distance_ext_id: string | null; distance_ids?: string[]; discord_id: string | null; discord_nick: string; avatar_url: string | null; game_nick: string };
 type SnapshotEntry = PeopleFilterStatus & { id: string; member_id: string | null; profile_member_id: string | null; avatar_url?: string | null; discord_nick?: string | null; distance_ext_id: string; discord_id: string | null; game_nick: string | null; variant_id: DistanceVariant; part: number; comment: string | null; source: DistanceSlice["source"]; created_at: string; updated_at: string; created_by_name: string | null; updated_by_name: string | null; values: { limit_id: string; tournaments: number }[] };
 
 function emptyAt(): Record<DistanceVariant, Record<string, number>> { return { nitro: {}, regular: {} }; }
@@ -112,7 +112,7 @@ export async function loadDistanceBook(monthStart: string, roomSlug = "winamax")
   const people = new Map<string, DistancePersonRow>();
   for (const row of snapshot.people ?? []) {
     const discordNick = String(row.discord_nick ?? "").trim(); const gameNick = String(row.game_nick ?? "").trim(); const playerId = String(row.distance_ext_id ?? "").trim();
-    people.set(row.member_id, { key: `member:${row.member_id}`, playerId, nick: discordNick || gameNick || playerId || row.member_id,
+    people.set(row.member_id, { key: `member:${row.member_id}`, playerId, distanceIds: row.distance_ids ?? (playerId ? [playerId] : []), nick: discordNick || gameNick || playerId || row.member_id,
       discordNick, gameNick, discordId: row.discord_id ? String(row.discord_id) : null, memberId: row.member_id,
       avatarUrl: row.avatar_url ?? null, onGuild: Boolean(row.present), redParty: Boolean(row.present) && roleHasId(row.roles, roleId), hasActiveProfile: Boolean(row.has_active_profile), orphan: false,
       slices: [], at: emptyAt(), nitroTotal: 0, regularTotal: 0, total: 0, updatedAt: null });
@@ -138,7 +138,7 @@ export async function loadDistanceBook(monthStart: string, roomSlug = "winamax")
       const hands = Number(value.tournaments) || 0; byLimit[value.limit_id] = { id: `${row.id}:${value.limit_id}`, hands };
       person.at[row.variant_id][value.limit_id] = (person.at[row.variant_id][value.limit_id] ?? 0) + hands; total += hands;
     }
-    person.slices.push({ id: row.id, key: row.id, variant: row.variant_id, part: Number(row.part) || 1, comment: row.comment,
+    person.slices.push({ id: row.id, key: row.id, distanceId: row.distance_ext_id, gameNick: row.game_nick ?? "", variant: row.variant_id, part: Number(row.part) || 1, comment: row.comment,
       source: row.source, createdAt: row.created_at, updatedAt: row.updated_at, createdBy: row.created_by_name, updatedBy: row.updated_by_name, byLimit, total });
     if (row.variant_id === "nitro") person.nitroTotal += total; else person.regularTotal += total;
     person.total += total;
@@ -158,7 +158,7 @@ export async function createDistanceEntry(input: { memberId: string; roomSlug: s
     if (!person) return { error: "member-not-found" };
     const id = `demo-entry-${Date.now()}`; const now = new Date().toISOString();
     const byLimit = Object.fromEntries(Object.entries(input.values).filter(([, value]) => value > 0).map(([limit, hands]) => [limit, { id: `${id}:${limit}`, hands }]));
-    person.playerId = input.distanceExtId; person.slices.push({ id, key: id, variant: input.variant, part: input.part,
+    person.playerId = input.distanceExtId; person.slices.push({ id, key: id, distanceId: input.distanceExtId, variant: input.variant, part: input.part,
       comment: input.comment.trim() || null, source: "manual", createdAt: now, updatedAt: now, createdBy: "you", updatedBy: "you",
       byLimit, total: Object.values(input.values).reduce((sum, value) => sum + Math.max(0, value), 0) });
     refreshDemoPerson(person); book.rowCount += 1; notifyPriorityDistanceChanged(); return { error: null };
@@ -200,7 +200,7 @@ export function filterDistancePeople(people: DistancePersonRow[], filters: {
     if (filters.id === "set" && !person.playerId || filters.id === "missing" && person.playerId) return false;
     const present = person.slices.some((slice) => filters.variants.includes(slice.variant));
     if (filters.presence === "with" && !present || filters.presence === "without" && present) return false;
-    return !q || `${person.nick} ${person.discordNick} ${person.gameNick} ${person.playerId} ${person.discordId ?? ""}`.toLocaleLowerCase().includes(q);
+    return !q || `${person.nick} ${person.discordNick} ${person.gameNick} ${person.playerId} ${(person.distanceIds ?? []).join(" ")} ${person.slices.map((slice) => `${slice.distanceId ?? ""} ${slice.gameNick ?? ""}`).join(" ")} ${person.discordId ?? ""}`.toLocaleLowerCase().includes(q);
   });
 }
 export function sortDistancePeople(people: DistancePersonRow[], sort: DistanceSort, variants: DistanceVariant[], locale: string) {
@@ -231,8 +231,8 @@ export function distanceBookCsv(input: { monthStart: string; roomTitle: string; 
   for (const person of input.people) {
     const slices = person.slices.filter((row) => input.variants.includes(row.variant)); const rows: (DistanceSlice | null)[] = slices.length ? slices : [null];
     for (const slice of rows) {
-      const values: (string | number)[] = [input.monthStart, input.roomTitle, csvId(person.playerId), csvId(person.discordId), person.discordNick,
-        person.gameNick, slice?.variant ?? "", slice?.part ?? "", slice?.comment ?? "", slice?.createdAt ?? "", slice?.updatedAt ?? "",
+      const values: (string | number)[] = [input.monthStart, input.roomTitle, csvId(slice?.distanceId ?? person.playerId), csvId(person.discordId), person.discordNick,
+        slice?.gameNick ?? person.gameNick, slice?.variant ?? "", slice?.part ?? "", slice?.comment ?? "", slice?.createdAt ?? "", slice?.updatedAt ?? "",
         ...input.limits.map((limit) => slice?.byLimit[limit]?.hands ?? 0), slice?.total ?? 0];
       lines.push(values.map(csvValue).join(";"));
     }

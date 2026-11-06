@@ -430,7 +430,7 @@ export function V2Cabinet({ session, onSent, onLogout }: Props) {
   const guildNick = discord?.nick || mine?.discordGuildNick || "";
   const discordName = discord?.globalName || mine?.discordDisplay || "";
   const discordUser = discord?.username || mine?.discord || "";
-  const discordNick = discord ? personLabel(discord) : guildNick || discordName || discordUser || session.nick;
+  const discordNick = discord ? personLabel(discord) : discordName || discordUser || session.nick;
   const discordAva = discord?.avatarUrl || mine?.avatar;
   const discordJoined = discord?.joinedAt || mine?.joinedAt || null;
   const discordLetters = discordNick.replace(/[^a-zA-Zа-яА-Я0-9]/g, "").slice(0, 2).toUpperCase() || letters;

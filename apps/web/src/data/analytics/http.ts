@@ -19,7 +19,8 @@ export function createAnalyticsRequest(fetcher: typeof fetch = fetch, timeoutMs 
     const controller = new AbortController();
     const abort = () => controller.abort(signal.reason);
     signal.addEventListener("abort", abort, { once: true });
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
       const response = await fetcher(url, { method: write?.method ?? "GET", body: write?.body === undefined ? undefined : JSON.stringify(write.body), signal: controller.signal, credentials: "omit", cache: "no-store", redirect: "error", headers: { Accept: "application/json", ...(write?.body === undefined ? {} : { "Content-Type": "application/json" }) } });
       if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "access-denied" : "analytics-unavailable");
@@ -27,18 +28,22 @@ export function createAnalyticsRequest(fetcher: typeof fetch = fetch, timeoutMs 
       const data: unknown = await response.json();
       controller.signal.throwIfAborted();
       return data;
+    } catch (error) {
+      if (timedOut && !signal.aborted) throw new Error("analytics-timeout");
+      throw error;
     } finally { clearTimeout(timer); signal.removeEventListener("abort", abort); }
   };
 }
-export function createHttpSources(fetcher: typeof fetch = fetch, timeoutMs = 30_000): { points: PointsSource; monthly: MonthlySource } {
+export function createHttpSources(fetcher: typeof fetch = fetch, timeoutMs?: number): { points: PointsSource; monthly: MonthlySource } {
   const get = createAnalyticsRequest(fetcher, timeoutMs);
+  const getMonthly = createAnalyticsRequest(fetcher, timeoutMs ?? 90_000);
   return {
     points: { heatmap: (p,s) => get("/api/points/heatmap",p,s), timeline: (p,s) => get("/api/points",p,s) },
-    monthly: { heatmap: (p,s) => get("/api/heatmap",p,s), speed: async (p,s) => {
-      const [report, registry] = await Promise.all([get("/api/speed",p,s), get("/api/regs",new URLSearchParams(),s)]);
+    monthly: { heatmap: (p,s) => getMonthly("/api/heatmap",p,s), speed: async (p,s) => {
+      const [report, registry] = await Promise.all([getMonthly("/api/speed",p,s), get("/api/regs",new URLSearchParams(),s)]);
       s.throwIfAborted();
       return restoreRegSides(report, registry);
-    }, cell: (p,s) => get("/api/heatmap/cell",p,s) },
+    }, cell: (p,s) => getMonthly("/api/heatmap/cell",p,s) },
   };
 }
 export async function getPointsSource(mode: AnalyticsMode): Promise<PointsSource> {

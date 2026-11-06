@@ -4,7 +4,7 @@ import { realtimeFixture } from "./realtimeFixture";
 
 export async function fixture(page: Page, allow = true) {
   const people = ["Self", "Recipient", "Third"].map((name, index) => ({
-    id: `member-${index}`, member_id: `member-${index}`, public_code: name, discord_guild_nick: name,
+    id: `member-${index}`, member_id: `member-${index}`, public_code: name, discord_global_name: name, discord_guild_nick: name,
     access_status: "active", mark_tag: ["AA", "BB", "CC"][index], mark_bg: "#468ec6", mark_fg: "#ffffff", tables: 1,
   }));
   const user = { id: "auth-self", aud: "authenticated", role: "authenticated", app_metadata: {}, user_metadata: {} };

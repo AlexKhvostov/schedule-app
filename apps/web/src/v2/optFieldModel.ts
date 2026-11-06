@@ -1,3 +1,4 @@
+import { publicDiscordName, showNick } from "./schedulePresentation";
 import { formatDayLabel } from "../schedule/formatDate";
 import { formatVariantLimit } from "../schedule/capacity";
 import type { SchedulePlayer } from "../data/players";
@@ -136,12 +137,6 @@ export function hiddenSelfHalves(
   return hidden;
 }
 
-function visibleNick(value?: string | null) {
-  const text = value?.trim() ?? "";
-  if (!text || /^RP-[0-9A-Fa-f]{6}$/i.test(text)) return "";
-  return text;
-}
-
 export function writeSeat(item: Occupancy[number][number] | undefined, level: number, next: Mark | null) {
   const seats = seatsOf(item, Math.max(level + 1, 2));
   const out = seats.slice();
@@ -151,13 +146,10 @@ export function writeSeat(item: Occupancy[number][number] | undefined, level: nu
 
 export function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
   const discord =
-    visibleNick(mark.guildNick) ||
-    visibleNick(mark.globalName) ||
-    visibleNick(mark.username) ||
-    visibleNick(mark.discord) ||
+    publicDiscordName(mark.globalName, mark.username, mark.guildNick ? "" : mark.discord) ||
     mark.t.trim() ||
     "—";
-  const username = visibleNick(mark.username);
+  const username = showNick(mark.username);
   return {
     key: mark.memberId || mark.discord || mark.t || "mark",
     memberId: mark.memberId,
@@ -167,7 +159,7 @@ export function packOwner(mark: Mark): Omit<OverwritePerson, "slots"> {
     avatarUrl: mark.avatarUrl,
     discord,
     username: username && username.toLowerCase() !== discord.replace(/^@/, "").toLowerCase() ? username : "",
-    room: visibleNick(mark.room),
+    room: showNick(mark.room),
   };
 }
 

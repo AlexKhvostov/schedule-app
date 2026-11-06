@@ -17,8 +17,8 @@ begin
   insert into members (auth_user_id,public_code,access_status,mark_tag)
     values (actor_auth,'RP-DBKROOT','active','DR') returning id into actor;
   insert into member_roles (member_id,role_id) values (actor,'root');
-  insert into members (public_code,access_status,mark_tag) values ('RP-DBKACTIVE','active','DA') returning id into active_player;
-  insert into members (public_code,access_status,mark_tag) values ('RP-DBKBLOCK','blocked','DB') returning id into blocked_player;
+  insert into members (public_code,access_status,mark_tag,distance_ext_id) values ('RP-DBKACTIVE','active','DA','990002') returning id into active_player;
+  insert into members (public_code,access_status,mark_tag,distance_ext_id) values ('RP-DBKBLOCK','blocked','DB','990003') returning id into blocked_player;
   insert into member_roles (member_id,role_id) values (active_player,'member'),(blocked_player,'member');
   insert into profiles (member_id) values (active_player),(blocked_player) on conflict (member_id) do nothing;
   select required_discord_role_id into role_id from club_settings where id;
@@ -28,7 +28,7 @@ begin
     ('990000000000000002','ActiveRP',jsonb_build_array(jsonb_build_object('id',role_id)),true),
     ('990000000000000003','BlockedRP',jsonb_build_array(jsonb_build_object('id',role_id)),true),
     ('990000000000000004','LeftRP',jsonb_build_array(jsonb_build_object('id',role_id)),false);
-  update discord_members set avatar_url='https://cdn.discordapp.com/embed/avatars/0.png',guild_nick='CurrentHistoryNick'
+  update discord_members set avatar_url='https://cdn.discordapp.com/embed/avatars/0.png',guild_nick='CurrentHistoryNick', global_name='Public History'
     where discord_id='990000000000000001';
   insert into identities (member_id,provider,provider_uid,guild_present,discord_roles) values
     (active_player,'discord','990000000000000002',true,jsonb_build_array(jsonb_build_object('id',role_id))),
@@ -45,10 +45,8 @@ begin
   snapshot := admin_distance_book(month,'winamax');
   if snapshot->>'people_filters_version' <> '1' then raise exception 'missing filter contract'; end if;
   select value into entry from jsonb_array_elements(snapshot->'entries') where value->>'distance_ext_id'='990001';
-  if not (entry->>'present')::boolean or not (entry->'roles') @> jsonb_build_array(jsonb_build_object('id',role_id))
-    or (entry->>'has_active_profile')::boolean then raise exception 'historical RP without profile classified incorrectly'; end if;
-  if entry->>'avatar_url' <> 'https://cdn.discordapp.com/embed/avatars/0.png' or entry->>'discord_nick' <> 'CurrentHistoryNick' then
-    raise exception 'historical Discord avatar or nickname lost'; end if;
+  if (entry->>'present')::boolean or (entry->>'has_active_profile')::boolean or entry->>'profile_member_id' is not null then
+    raise exception 'unassigned history inherited Discord ownership'; end if;
   select value into entry from jsonb_array_elements(snapshot->'entries') where value->>'distance_ext_id'='990002';
   if not (entry->>'has_active_profile')::boolean or entry->>'profile_member_id' <> active_player::text then
     raise exception 'active profile not linked through Discord identity'; end if;
