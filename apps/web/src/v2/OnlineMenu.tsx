@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { V2Float } from "./V2Float";
 import { centerPos, useWindowPos } from "./windowPos";
@@ -18,6 +18,8 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
   const [members, setMembers] = useState<OnlineMember[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [showEdits, setShowEdits] = useState(false);
+  const [showAway, setShowAway] = useState(false);
+  const awayListId = useId();
 
   useEffect(() => {
     if (!live || !memberId) return;
@@ -87,11 +89,32 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
   };
   const source = live ? members : [demo];
   const rows = source ? sortOnlineMembers(source, i18n.language) : null;
+  const present = rows?.filter(row => row.online) ?? [];
+  const away = rows?.filter(row => !row.online) ?? [];
   const relative = new Intl.RelativeTimeFormat(i18n.language, { numeric: "auto" });
   const ago = (minutes: number) => {
     const time = presenceTime(minutes);
     return minutes <= 0 ? t("online.justNow") : relative.format(time.amount, time.unit);
   };
+
+  const memberList = (group: OnlineMember[], label: string) => <ul aria-label={label}>{group.map(row => {
+    const schedule = row.edit_variant && row.edit_limit
+      ? `${row.edit_variant === "nitro" ? "N" : "E"}${row.edit_limit}` : "";
+    const status = t(row.online ? "online.connected" : "online.away");
+    return <li key={row.member_id} data-presence-member={row.member_id}>
+      <PersonAvatar label={row.nick} src={row.avatar_url} size="sm" />
+      <div className="v2-online-member">
+        <div className="v2-online-member-line">
+          <span className={`v2-online-dot${row.online ? " is-active" : ""}`} role="img" aria-label={status} title={status} />
+          <strong title={row.nick}>{row.nick}</strong>
+          <span className="v2-online-activity" title={t("online.presenceHelp")} aria-label={t("online.activity", { time: ago(row.activity_minutes) })}>{ago(row.activity_minutes)}</span>
+        </div>
+        {showEdits && row.edit_minutes !== null && <p className="v2-online-edit-detail">{t(schedule ? "online.editedSchedule" : "online.edited", {
+          time: ago(row.edit_minutes), schedule,
+        })}</p>}
+      </div>
+    </li>;
+  })}</ul>;
 
   return (
     <>
@@ -123,30 +146,17 @@ export function OnlineMenu({ memberId, nick, avatarUrl }: { memberId?: string; n
           : !rows ? <p role="status">{t("priorities.loading")}</p>
           : <section className="v2-online-group">
             <div className="v2-online-summary">
-              <h3>{t("online.present")} · {rows.filter(row => row.online).length}</h3>
-              <span>{t("online.total", { count: rows.length })}</span>
+              <h3 title={t("online.presenceHelp")}>{t("online.present")} · {present.length}</h3>
+              <label className="v2-online-edits-toggle" title={t("online.showEdits")}><input type="checkbox" aria-label={t("online.showEdits")} checked={showEdits} onChange={event => setShowEdits(event.target.checked)} />{t("online.editsShort")}</label>
             </div>
-            <p className="v2-online-order">{t("online.order")}</p>
-            <label className="v2-online-edits-toggle"><input type="checkbox" checked={showEdits} onChange={event => setShowEdits(event.target.checked)} />{t("online.showEdits")}</label>
-            {rows.length ? <ul aria-label={t("online.listLabel")}>{rows.map(row => {
-              const schedule = row.edit_variant && row.edit_limit
-                ? `${row.edit_variant === "nitro" ? "N" : "E"}${row.edit_limit}` : "";
-              return <li key={row.member_id} data-presence-member={row.member_id}>
-                <PersonAvatar label={row.nick} src={row.avatar_url} size="sm" />
-                <div className="v2-online-member">
-                  <div className="v2-online-member-line">
-                    <strong title={row.nick}>{row.nick}</strong>
-                    <span className="v2-online-activity" aria-label={t("online.activity", { time: ago(row.activity_minutes) })}>{ago(row.activity_minutes)}</span>
-                  </div>
-                  <span className="v2-online-presence" title={t("online.presenceHelp")}>
-                    <span aria-hidden className={`v2-online-dot${row.online ? " is-active" : ""}`} />{t(row.online ? "online.connected" : "online.away")}
-                  </span>
-                  {showEdits && row.edit_minutes !== null && <p className="v2-online-edit-detail">{t(schedule ? "online.editedSchedule" : "online.edited", {
-                    time: ago(row.edit_minutes), schedule,
-                  })}</p>}
-                </div>
-              </li>;
-            })}</ul> : <p>{t("online.emptyVisitors")}</p>}
+            {present.length ? memberList(present, t("online.present")) : <p className="v2-online-empty">{t("online.empty")}</p>}
+            {away.length > 0 && <>
+              <button type="button" className="v2-online-away-toggle" aria-expanded={showAway} aria-controls={awayListId} onClick={() => setShowAway(value => !value)} title={t("online.recentHelp")}>
+                <i className={`fa-solid fa-chevron-${showAway ? "down" : "right"}`} aria-hidden />
+                <span>{t("online.away")} · {away.length}</span>
+              </button>
+              <div id={awayListId} hidden={!showAway}>{memberList(away, t("online.away"))}</div>
+            </>}
           </section>}
 
       </V2Float>}

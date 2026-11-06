@@ -6,7 +6,7 @@ import type { ScheduleSnapshot, SnapshotRequest } from "../../data/scheduleSnaps
 import type { Mark } from "../../schedule/marks";
 
 type PendingEdit = { key: string; edits: GridEdit[]; optimistic: boolean };
-export type ScheduleHealth = { connected: boolean; verified: boolean; hidden: boolean; lastChecked: number | null; uncertain: boolean };
+export type ScheduleHealth = { authReady: boolean; connected: boolean; verified: boolean; hidden: boolean; lastChecked: number | null; uncertain: boolean };
 export type MonthSnapshot = { health: ScheduleHealth; context?: ScheduleContext; grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean; progress?: MonthLoadProgress };
 
 /** One instance per month. Old requests can only settle their own instance. */
@@ -24,12 +24,12 @@ export class ScheduleMonthState {
 
   constructor(initial: MonthGridStore, private variants: readonly ScheduleVariant[], private protectFreshness = false) {
     this.base = initial;
-    this.snapshot = { grids: initial, ready: false, loading: true, error: false, health: { connected: !protectFreshness, verified: !protectFreshness, hidden: false, lastChecked: null, uncertain: false } };
+    this.snapshot = { grids: initial, ready: false, loading: true, error: false, health: { authReady: true, connected: !protectFreshness, verified: !protectFreshness, hidden: false, lastChecked: null, uncertain: false } };
   }
 
   get canEdit() {
     const { ready, error, health } = this.snapshot;
-    return ready && (!this.protectFreshness || (!error && health.connected && health.verified && !health.hidden && !health.uncertain
+    return ready && (!this.protectFreshness || (!error && health.authReady && health.connected && health.verified && !health.hidden && !health.uncertain
       && health.lastChecked !== null && Date.now() - health.lastChecked < 60000));
   }
 

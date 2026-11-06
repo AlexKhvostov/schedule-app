@@ -15,7 +15,6 @@ export async function fixture(page: Page, allow = true) {
   await page.clock.setFixedTime(new Date("2026-11-05T08:00:00Z"));
   await page.addInitScript(({ user, token }) => {
     localStorage.setItem("sb-schedule-fixture-auth-token", JSON.stringify({ access_token: token, refresh_token: "fixture", expires_at: 2208988800, expires_in: 3600, token_type: "bearer", user }));
-    localStorage.setItem("schedule-sync-intro-v1", "1");
     localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits: ["50", "100"], kinds: ["nitro"], hidePastDays: false }));
   }, { user, token });
   await page.route("https://schedule-fixture.supabase.co/**", async route => {
@@ -61,6 +60,7 @@ export async function fixture(page: Page, allow = true) {
   await page.goto("/");
   await expect(page.locator(".v2-opt-sheet")).toBeVisible({ timeout: 25_000 });
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
+  await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).not.toBeVisible();
   await page.getByTitle("Редактирование", { exact: true }).click();
   return state;
 }

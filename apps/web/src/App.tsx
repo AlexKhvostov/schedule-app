@@ -1,7 +1,10 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./i18n";
+import { useTranslation } from "react-i18next";
+import { LiveEntryRecovery } from "./data/liveEntryRecovery";
+import { AuthAvailability } from "./v2/authAvailability";
 import { findInvite } from "./v2/invites";
 import { clearSession, readSession, roleFor, takeInviteToken, writeSession, type Session } from "./v2/session";
 import { cursorFromPrefs } from "./v2/prefs";
@@ -42,6 +45,10 @@ function bootLocalSession(): Session | null {
 
 export function App() {
   const live = liveAuthReady();
+  const { t } = useTranslation();
+  const recovery = useRef<LiveEntryRecovery | null>(null);
+  const [authState, setAuthState] = useState({ unavailable: false, checking: false });
+  const retryAuth = () => { void recovery.current?.check(); };
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<Session | null>(() => (live ? null : bootLocalSession()));
   const [gate, setGate] = useState<Extract<Awaited<ReturnType<typeof loadLiveEntry>>, { kind: "gate" }> | null>(null);
@@ -57,42 +64,45 @@ export function App() {
       setBooting(false);
       return;
     }
-    const apply = async () => {
-      const entry = await loadLiveEntry();
-      if (entry.kind === "member") {
-        writeSession(entry.session);
-        setSession(entry.session);
-        setGate(null);
-      } else if (entry.kind === "gate") {
-        clearSession();
-        setSession(null);
-        setGate(entry);
-      } else {
-        clearSession();
-        setSession(null);
-        setGate(null);
+    let previous: Awaited<ReturnType<typeof loadLiveEntry>> | null = null;
+    const controller = new LiveEntryRecovery(loadLiveEntry, state => {
+      setAuthState({ unavailable: state.unavailable, checking: state.checking });
+      if (state.entry && state.entry !== previous) {
+        previous = state.entry;
+        const entry = state.entry;
+        if (entry.kind === "member") {
+          writeSession(entry.session); setSession(entry.session); setGate(null);
+        } else {
+          clearSession(); setSession(null); setGate(entry.kind === "gate" ? entry : null);
+        }
       }
-      setBooting(false);
-    };
-    void apply();
-    const { data } = db.auth.onAuthStateChange((event) => {
-      // INITIAL_SESSION and TOKEN_REFRESHED are already covered by the first
-      // apply and must not repeat the application/Discord access checks.
-      if (event === "SIGNED_IN" || event === "USER_UPDATED") void apply();
-      if (event === "SIGNED_OUT") {
-        clearSession();
-        setSession(null);
-        setGate(null);
-        setBooting(false);
-      }
+      if (state.entry || state.unavailable) setBooting(false);
     });
+    recovery.current = controller;
+    void controller.check();
+    // Defer Supabase calls outside the auth callback's session lock.
+    let authEvent: ReturnType<typeof setTimeout> | undefined;
+    const { data } = db.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "USER_UPDATED" || (event === "TOKEN_REFRESHED" && controller.state.unavailable)) {
+        clearTimeout(authEvent); authEvent = setTimeout(() => void controller.check(), 0);
+      }
+      if (event === "SIGNED_OUT") { clearTimeout(authEvent); controller.signedOut(); }
+    });
+    const resume = () => {
+      if (document.visibilityState === "visible" && controller.state.unavailable) void controller.check();
+    };
+    window.addEventListener("online", resume); window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
     return () => {
-      data.subscription.unsubscribe();
+      controller.stop(); clearTimeout(authEvent); data.subscription.unsubscribe();
+      window.removeEventListener("online", resume); window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+      if (recovery.current === controller) recovery.current = null;
     };
   }, [live]);
 
-  if (!hydrated || booting) {
-    return <V2BootScreen languageReady={hydrated} />;
+  if (!hydrated || booting || (authState.unavailable && !session && !gate)) {
+    return <V2BootScreen languageReady={hydrated} unavailable={authState.unavailable} retrying={authState.checking} onRetry={retryAuth} />;
   }
 
   if (gate) {
@@ -105,6 +115,7 @@ export function App() {
         reason={gate.reason}
         onRequested={() => setGate({ ...gate, requestStatus: "open" })}
         onLogout={() => {
+          recovery.current?.signedOut();
           void signOutLive();
           setGate(null);
         }}
@@ -117,6 +128,11 @@ export function App() {
   }
 
   return (
+    <AuthAvailability.Provider value={{ unavailable: authState.unavailable, retry: retryAuth }}>
+      {authState.unavailable && <div className="v2-auth-notice" role="status">
+        <span>{t("login.temporarilyUnavailable")}</span>
+        <button type="button" disabled={authState.checking} onClick={retryAuth}>{t(authState.checking ? "login.checking" : "login.retry")}</button>
+      </div>}
     <Suspense fallback={<V2BootScreen />}>
       <V2Shell
         session={session}
@@ -124,6 +140,7 @@ export function App() {
         onCursorChange={setCursor}
         onSession={setSession}
         onLogout={() => {
+          recovery.current?.signedOut();
           void signOutLive();
           clearSession();
           disableDevSandbox();
@@ -131,5 +148,6 @@ export function App() {
         }}
       />
     </Suspense>
+    </AuthAvailability.Provider>
   );
 }

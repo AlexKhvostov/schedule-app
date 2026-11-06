@@ -126,7 +126,7 @@ export function useScheduleBrush({ memberId, mayActAs, editByButton, canEdit, li
           },
           member.id,
         );
-      });
+      }).catch(() => { /* Keep the already loaded brush when profile refresh is unavailable. */ });
       return;
     }
     const row = memberOfSession(loadMembers(), { memberId, nick: sessionNick });

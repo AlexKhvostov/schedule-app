@@ -7,10 +7,10 @@ function row(id: string, activity: number, online: boolean, edit = 0): OnlineMem
     edit_minutes: edit, edit_variant: "nitro", edit_limit: "50" };
 }
 describe("presence list", () => {
-  it("orders visible activity globally, even when an idle open page has the most recent edit", () => {
-    const rows = [row("ten-hours", 600, true, 0), row("hour", 60, false, 800), row("quarter", 15, true, 900)];
-    expect(sortOnlineMembers(rows, "ru").map(row => row.member_id)).toEqual(["quarter", "hour", "ten-hours"]);
-    expect(rows.map(row => row.member_id)).toEqual(["ten-hours", "hour", "quarter"]);
+  it("groups open pages first, ordering each group by activity independent of edits", () => {
+    const rows = [row("ten-hours", 600, true, 0), row("hour", 60, false, 800), row("quarter", 15, true, 900), row("yesterday", 1200, false, 0)];
+    expect(sortOnlineMembers(rows, "ru").map(row => row.member_id)).toEqual(["quarter", "ten-hours", "hour", "yesterday"]);
+    expect(rows.map(row => row.member_id)).toEqual(["ten-hours", "hour", "quarter", "yesterday"]);
   });
   it("uses a deterministic tie break and preserves every person", () => {
     const rows = [row("Борис", 5, true), row("Алексей", 5, false), row("Анна", 5, true)];

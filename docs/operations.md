@@ -334,3 +334,13 @@ Dashboard6ноября: добавлен `e2e/dashboard-ui.spec.ts` — клав
 Production-регрессия: собрать apps/web с NEXT_DIST_DIR=.next-e2e-production, NEXT_PUBLIC_SUPABASE_URL=https://schedule-fixture.supabase.co, NEXT_PUBLIC_SUPABASE_ANON_KEY=fixture-public-key; затем `npx playwright test --config=playwright.analytics-production.config.ts --workers=1`. Синтетические HTTP-перехваты проверяют рабочий default-live, CSP, графики и отзыв/отсутствие доступа. Проверка включена в web CI после Demo E2E. Настоящих записей в PHP она не делает.
 
 Общий выпуск6ноября завершён: b6e6b66, Production7589323195 Ready, CI42139582958 —4/4success. Миграция20261106002512 в Working, проверка прав с rollback, настоящих назначений dashboard0. Отдельный PHP deploy не нужен: используется существующий HTTPS endpoint. Откат клиента на593fb83 возможен без удаления записи каталога; скрывает новую аналитику и возвращает прежнюю логику актуальности/присутствия. [Отчёт](../memory/tasks/2026-11-06-combined-release.md).
+
+
+Проверка компактного присутствия6 ноября2026: presence.live.ts проверяет обе темы, группы online/offline, сортировку внутри групп, сворачивание мышью и клавиатурой, строки не выше30px,320px, длинные/пустые списки и переход человека между группами после обновления. Данные синтетические, запросы не уходят в Working. Миграция не требуется.
+
+
+### Диагностика и проверка временных отказов — 6 ноября 2026
+
+При HTML/JS200 и Auth504/медленных RPC проверять Supabase → Observability → Database: Memory usage/Swap, Memory commitment, CPU/IOwait, IOPS и соединения за тот же интервал, что API Gateway/Auth/Postgres logs. Большое резервирование памяти не равно фактически использованной RAM. Не объяснять сбой только количеством HTTP-запросов или общим ACTIVE_HEALTHY. В инциденте6 ноября установлены5xx/задержки25–27с, постоянная подкачка~513МБ при RAM~432МБ, SEVERE commitment и пики IOwait; дефицит памяти вероятен, конкретный процесс/запрос не доказан. Настройки/тариф/перезапуск не менялись. [Замеры](../memory/tasks/2026-11-06-auth-resilience.md).
+
+Регрессия: `e2e/auth-recovery.live.ts` и `e2e/schedule-sync.live.ts` входят в `playwright.live.config.ts`; синтетическая среда перехватывает запросы, не пишет в Working. Проверяются видимость меток при Auth503/ошибке снимка, запрет записи, ручное восстановление, первый вход с retry, настоящий logout, отсутствие автокарточки и возврат из фона. При параллельных задачах нужны отдельные NEXT_DIST_DIR, порт и outputDir, чтобы сборки не перезаписывали друг друга. Для этих изменений миграция не требуется.

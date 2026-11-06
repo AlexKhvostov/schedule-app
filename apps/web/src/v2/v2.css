@@ -16508,18 +16508,17 @@ button.v2-home-action:hover { transform: translateY(-2px); border-color: color-m
 
 
 .v2-float.v2-online-dialog {
-  max-height: min(65dvh, 24rem);
   background: color-mix(in srgb, var(--card) 92%, var(--foreground));
   border-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
 }
-.v2-online-group + .v2-online-group { margin-top: 0.5rem; }
+.v2-online-dialog > .v2-float-body { max-height: min(55dvh, 20rem); overflow-y: auto; }
 .v2-online-group h3 { font-size: 0.7rem; font-weight: 650; }
 .v2-online-group li {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: 2px 0;
+  min-height: 28px;
 }
 .v2-online-group li .v2-ava {
   width: 22px;
@@ -16528,20 +16527,19 @@ button.v2-home-action:hover { transform: translateY(-2px); border-color: color-m
   font-size: 0.55rem;
 }
 .v2-online-member { flex: 1; min-width: 0; }
-.v2-online-member-line { display: flex; align-items: baseline; gap: 0.35rem; }
-.v2-online-member-line strong { font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-online-member-line { display: flex; align-items: center; gap: 5px; min-height: 22px; }
+.v2-online-member-line strong { flex: 1; min-width: 0; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2-online-activity { flex: none; white-space: nowrap; }
 .v2-online-group p, .v2-online-activity { color: var(--muted-foreground); font-size: 0.68rem; line-height: 1.25; }
 .v2-online-dot {
   display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-inline-end: 0.35rem;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+  background: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
 }
 .v2-online-dot.is-active { background: var(--success); }
-.v2-online-dot.is-idle { background: var(--warning); }
 
 /* Stable tournament identity; digits continue to inherit the limit palette. */
 html, .v2-palette-sample.is-dark { --schedule-nitro: #68b5ff; --schedule-regular: #f3ce62; }
@@ -16671,11 +16669,19 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-prio-active-selection > [data-testid] { font-weight: 600; }
 .v2-roster-active-period { margin: 3px 0 6px; font-size: 11px; }
 
-/* Presence is a separate label; only last interaction orders the list. */
-.v2-online-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.v2-online-summary > span, .v2-online-presence { color: var(--muted-foreground); font-size: 0.65rem; }
-.v2-online-order { margin: 5px 0; }
-.v2-online-edits-toggle { display: flex; align-items: center; gap: 6px; min-height: 30px; font-size: 0.7rem; color: var(--muted-foreground); cursor: pointer; }
-.v2-online-member-line { justify-content: space-between; }
-.v2-online-presence { display: inline-flex; align-items: center; gap: 4px; }
-.v2-online-group .v2-online-edit-detail { margin-top: 4px; padding-left: 7px; border-left: 2px solid var(--border); }
+/* Compact presence rows; the secondary group is collapsed by default. */
+.v2-online-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
+.v2-online-edits-toggle { display: flex; align-items: center; gap: 5px; min-height: 26px; font-size: 0.68rem; color: var(--muted-foreground); cursor: pointer; }
+.v2-online-away-toggle { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px; margin-top: 4px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.7rem; text-align: left; cursor: pointer; }
+.v2-online-away-toggle:hover { color: var(--foreground); }
+.v2-online-away-toggle > i { width: 8px; font-size: 0.55rem; }
+.v2-online-group .v2-online-empty { margin: 4px 0 6px; }
+.v2-online-group .v2-online-edit-detail { margin-top: 2px; padding-left: 11px; }
+
+/* Auth outages keep the mounted schedule visible and distinguish retry from sign-in. */
+.v2-auth-notice { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 12px; font-size: 12px; color: var(--foreground); background: var(--card); border-bottom: 1px solid var(--border); }
+.v2-auth-notice button { text-decoration: underline; flex-shrink: 0; cursor: pointer; }
+.v2-auth-notice button:disabled { opacity: .6; cursor: wait; }
+.v2-boot .v2-boot-copy { max-width: 360px; }
+.v2-boot .v2-ctrl { padding: 6px 10px; height: auto; flex-shrink: 0; }
+@media (max-width: 600px) { .v2-auth-notice, .v2-boot:has(button) { flex-wrap: wrap; } }

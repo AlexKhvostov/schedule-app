@@ -86,3 +86,20 @@ it("expires editing permission even if browser timers have been suspended", asyn
   vi.setSystemTime(Date.now() + 60001);
   expect(state.canEdit).toBe(false);
 });
+
+it("a healthy schedule response cannot bypass an unavailable auth check", async () => {
+  const { state, sync } = start(); await vi.advanceTimersByTimeAsync(0);
+  expect(state.canEdit).toBe(true);
+  sync.requireRefresh({ authReady: false });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(state.snapshot.ready).toBe(true);
+  expect(state.snapshot.health.verified).toBe(true);
+  expect(state.canEdit).toBe(false);
+  const write = vi.fn(async () => undefined);
+  expect(await state.edit("nitro:50", [], write)).toBe("schedule-stale");
+  expect(write).not.toHaveBeenCalled();
+  sync.requireRefresh({ authReady: true });
+  expect(state.canEdit).toBe(false);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(state.canEdit).toBe(true);
+});

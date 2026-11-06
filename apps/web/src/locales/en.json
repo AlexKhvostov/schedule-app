@@ -42,6 +42,8 @@
     "scope": "Only you see this preview. Saving updates colors and slot tint for the whole club; label colors also update in the calendar and JPEG. Resetting colors also needs to be saved."
   },
   "online": {
+    "editsShort": "Edits",
+    "recentHelp": "Seen in the last 24 hours. Most recent activity first within each group.",
     "total": "Total: {{count}}",
     "order": "Last 24 hours · most recent activity first",
     "showEdits": "Show latest edits",
@@ -65,6 +67,10 @@
     "sandbox": "sandbox"
   },
   "login": {
+    "connectionError": "The server is temporarily unavailable. We could not verify your sign-in. We will retry automatically, or you can retry now.",
+    "temporarilyUnavailable": "We could not verify your sign-in. You can view the last schedule; editing is temporarily disabled.",
+    "retry": "Retry verification",
+
     "brand": "Red Party",
     "kicker": "schedule",
     "title": "Sign in",
@@ -423,7 +429,7 @@
       "checkingDescription": "Checking marks and settings. Editing will be available after the update.",
       "uncertainDescription": "The save has not been confirmed. Waiting for the server; new edits are paused. If you reload the page, check whether your mark was saved.",
       "recovered": "Schedule updated. Please try your action again.",
-      "paused": "Updates paused. Editing is temporarily unavailable.",
+      "paused": "Updates are paused. The last loaded schedule remains visible; editing is disabled. Select the freshness indicator to reconnect.",
       "checked": "Last full check: {{time}}",
       "refresh": "Refresh data",
       "reconnect": "Reconnect",

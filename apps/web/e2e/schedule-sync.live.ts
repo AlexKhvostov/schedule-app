@@ -18,13 +18,15 @@ test("lost live channel blocks writes despite working HTTP and reconnect does no
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("Восстанавливаем…");
   await freeCell(page).click();
   const dialog = page.getByRole("dialog", { name: "Актуальность расписания" });
+  await expect(dialog).not.toBeVisible();
+  await page.getByTestId("schedule-sync-status").click();
   await expect(dialog).toContainText("Ставить и снимать метки пока нельзя");
   expect(state.writes).toHaveLength(0);
   await page.screenshot({ path: "playwright-report/sync-disconnected.png" });
   state.network.online = true;
   await dialog.getByRole("button", { name: "Переподключить", exact: true }).click();
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
-  await expect(dialog).toContainText("Повторите действие");
+  await expect(dialog).toContainText("Расписание обновляется автоматически");
   expect(state.writes).toHaveLength(0);
   await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
   await freeCell(page).click();
@@ -45,7 +47,7 @@ test("return from background waits for a new snapshot, preserves editing mode an
   await expect.poll(() => state.snapshotReads).toBeGreaterThan(reads);
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("Проверяем…");
   await cell.click();
-  await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).toContainText("Проверяем метки и настройки");
+  await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).not.toBeVisible();
   expect(state.writes).toHaveLength(0);
   release();
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");

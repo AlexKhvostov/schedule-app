@@ -1,4 +1,5 @@
 import { getSupabase } from "./client";
+import { isConfirmedAuthLoss } from "./authFailure";
 import { isLiveData } from "./config";
 import type { AppRole, AuthVia, Session } from "../v2/session";
 
@@ -65,14 +66,19 @@ function takeFreshDiscordLogin() {
   return fresh;
 }
 
-async function checkDiscordSnapshot(user: Parameters<typeof discordIdOf>[0]): Promise<DiscordCheck | null> {
+async function checkDiscordSnapshot(user: Parameters<typeof discordIdOf>[0], signal: AbortSignal): Promise<DiscordCheck | null> {
   const db = getSupabase();
   const discordId = discordIdOf(user);
   if (!db || !discordId) return null;
-  const [{ data: member }, { data: settings }] = await Promise.all([
-    db.from("discord_members").select("present,roles").eq("discord_id", discordId).maybeSingle(),
-    db.from("club_settings").select("required_discord_role_id").eq("id", true).maybeSingle(),
+  const [memberResult, settingsResult] = await Promise.all([
+    db.from("discord_members").select("present,roles").eq("discord_id", discordId).abortSignal(signal).maybeSingle(),
+    db.from("club_settings").select("required_discord_role_id").eq("id", true).abortSignal(signal).maybeSingle(),
   ]);
+  signal.throwIfAborted();
+  if (memberResult.error) throw memberResult.error;
+  if (settingsResult.error) throw settingsResult.error;
+  const member = memberResult.data, settings = settingsResult.data;
+  if (!settings) throw new Error("missing-club-settings");
   const roles = Array.isArray(member?.roles) ? member.roles : [];
   const requiredRoleId = settings?.required_discord_role_id;
   return {
@@ -117,21 +123,27 @@ export async function sendPasswordReset(email: string) {
   return { error: error?.message ?? null };
 }
 
-async function loadLiveMemberForAuthUser(authUserId: string): Promise<LiveMember | null> {
+async function loadLiveMemberForAuthUser(authUserId: string, signal = new AbortController().signal): Promise<LiveMember | null> {
   const db = getSupabase();
   if (!db) return null;
-  const { data: member } = await db
+  const { data: member, error: memberError } = await db
     .from("members")
     .select("id, public_code, access_status, mark_tag, mark_bg, mark_fg, tables")
     .eq("auth_user_id", authUserId)
-    .maybeSingle();
+    .abortSignal(signal).maybeSingle();
+  signal.throwIfAborted();
+  if (memberError) throw memberError;
   if (!member) return null;
-  const { data: ident } = await db
+  const { data: ident, error: identError } = await db
     .from("identities")
     .select("provider, provider_uid, username, display_name, guild_nick, avatar_url")
     .eq("member_id", member.id)
-    .maybeSingle();
-  const { data: context } = await db.rpc("member_access_context");
+    .abortSignal(signal).maybeSingle();
+  if (identError) throw identError;
+  const { data: context, error: contextError } = await db.rpc("member_access_context").abortSignal(signal);
+  signal.throwIfAborted();
+  if (contextError) throw contextError;
+  if (!context || !Array.isArray(context.permissions)) throw new Error("missing-access-context");
   const accessContext = (context ?? {}) as {
     permissions?: string[];
     isRoot?: boolean;
@@ -140,13 +152,15 @@ async function loadLiveMemberForAuthUser(authUserId: string): Promise<LiveMember
   };
   const permissions = Array.isArray(accessContext.permissions) ? accessContext.permissions : [];
   const isRoot = Boolean(accessContext.isRoot);
-  const { data: discord } = ident?.provider_uid
+  const { data: discord, error: discordError } = ident?.provider_uid
     ? await db
         .from("discord_members")
         .select("guild_nick, global_name, username, avatar_url")
         .eq("discord_id", ident.provider_uid)
-        .maybeSingle()
-    : { data: null };
+        .abortSignal(signal).maybeSingle()
+    : { data: null, error: null };
+  signal.throwIfAborted();
+  if (discordError) throw discordError;
   const nick =
     discord?.guild_nick ||
     discord?.global_name ||
@@ -210,28 +224,35 @@ export type LiveEntry =
     }
   | { kind: "none" };
 
-export async function loadLiveEntry(): Promise<LiveEntry> {
+export async function loadLiveEntry(signal = new AbortController().signal): Promise<LiveEntry> {
   const db = getSupabase();
   if (!db) return { kind: "none" };
   // A signed-out visitor can be detected locally; no remote auth check is needed.
-  const { data: stored } = await db.auth.getSession();
+  const { data: stored, error: storedError } = await db.auth.getSession();
+  signal.throwIfAborted();
+  if (storedError) { if (isConfirmedAuthLoss(storedError)) return { kind: "none" }; throw storedError; }
   if (!stored.session) return { kind: "none" };
-  const { data: auth } = await db.auth.getUser();
+  const { data: auth, error: authError } = await db.auth.getUser();
+  signal.throwIfAborted();
+  if (authError) { if (isConfirmedAuthLoss(authError)) return { kind: "none" }; throw authError; }
   if (!auth.user) return { kind: "none" };
-  const snapshot = () => checkDiscordSnapshot(auth.user);
+  const snapshot = () => checkDiscordSnapshot(auth.user, signal);
   const check = takeFreshDiscordLogin()
     ? await checkMyDiscordMember().then((result) => (result?.error ? snapshot() : result))
     : await snapshot();
-  let member = await loadLiveMemberForAuthUser(auth.user.id);
+  let member = await loadLiveMemberForAuthUser(auth.user.id, signal);
   if (!member && check?.present && check.hasRequiredRole) {
-    await db.rpc("self_create_profile");
-    member = await loadLiveMemberForAuthUser(auth.user.id);
+    signal.throwIfAborted();
+    const { error } = await db.rpc("self_create_profile").abortSignal(signal);
+    // A disabled self-registration policy still leads to the normal request gate.
+    if (error && !(error.code === "42501" && error.message === "self-create-disabled")) throw error;
+    member = await loadLiveMemberForAuthUser(auth.user.id, signal);
   }
   if (member?.access === "active") return { kind: "member", session: liveToSession(member) };
   const meta = auth.user.user_metadata ?? {};
   const nick = String(meta.full_name || meta.custom_claims || meta.user_name || meta.name || auth.user.email || "user");
   const requestKind = member ? "restore" : "join";
-  const { data: req } = await db
+  const { data: req, error: requestError } = await db
     .from("club_join_requests")
     .select("id,status")
     .in("status", ["open", "dismissed"])
@@ -239,7 +260,9 @@ export async function loadLiveEntry(): Promise<LiveEntry> {
     .eq("auth_user_id", auth.user.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .abortSignal(signal).maybeSingle();
+  signal.throwIfAborted();
+  if (requestError) throw requestError;
   return {
     kind: "gate",
     nick,

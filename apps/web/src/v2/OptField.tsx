@@ -23,6 +23,7 @@ export type { OverwriteAsk, OverwritePerson, OverwriteSlot } from "./optFieldMod
 export const OptField = memo(function OptField({
   year,
   monthIndex,
+  initialScrollReady = true,
   me,
   self,
   showTables,
@@ -62,6 +63,7 @@ export const OptField = memo(function OptField({
   const [cet, setCet] = useState<CetStamp>(() => readCet());
   const daysRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   const days = useMemo(() => {
     const visible = new Set(visibleMonthDays(year, monthIndex, displayRange, cet));
     return daysInMonth(year, monthIndex, i18n.language).filter((day) => visible.has(day.d));
@@ -129,38 +131,29 @@ export const OptField = memo(function OptField({
   }, []);
 
   useLayoutEffect(() => {
+    // Wait for the first complete month. Later snapshots, filters and clock ticks
+    // must never take over the position chosen by the person filling the schedule.
+    if (!initialScrollReady || initialScrollDone.current) return;
+    initialScrollDone.current = true;
     const now = readCet();
     if (now.year !== year || now.monthIndex !== monthIndex) return;
-    const pinToday = () => {
-      const scroller = daysRef.current;
-      const header = rootRef.current?.querySelector(".v2-opt-hours") as HTMLElement | null;
-      const row = todayRef.current;
-      if (!scroller || !row || !header) return;
-      const blocks = [...scroller.querySelectorAll<HTMLElement>(".v2-opt-block")];
-      const idx = blocks.indexOf(row);
-      if (idx < 0) return;
-      const target = hidePastDays ? row : idx >= 2 ? blocks[idx - 2] : blocks[0];
-      const delta = target.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
-      if (Math.abs(delta) > 0.5) scroller.scrollTop = Math.max(0, scroller.scrollTop + delta);
-      const nowLine = scroller.querySelector<HTMLElement>(".v2-opt-now");
-      if (nowLine && scroller.scrollWidth > scroller.clientWidth + 8) {
-        const mid = scroller.clientWidth * 0.42;
-        const dx = nowLine.getBoundingClientRect().left - scroller.getBoundingClientRect().left - mid;
-        scroller.scrollLeft = Math.max(0, scroller.scrollLeft + dx);
-      }
-    };
-    let alive = true;
-    const run = () => {
-      if (alive) pinToday();
-    };
-    const frame = requestAnimationFrame(run);
-    const timers = [40, 120, 280, 600].map((ms) => window.setTimeout(run, ms));
-    return () => {
-      alive = false;
-      cancelAnimationFrame(frame);
-      timers.forEach((id) => window.clearTimeout(id));
-    };
-  }, [year, monthIndex, days.length, limits, capacity, hidePastDays]);
+    const scroller = daysRef.current;
+    const header = rootRef.current?.querySelector(".v2-opt-hours") as HTMLElement | null;
+    const row = todayRef.current;
+    if (!scroller || !row || !header) return;
+    const blocks = [...scroller.querySelectorAll<HTMLElement>(".v2-opt-block")];
+    const idx = blocks.indexOf(row);
+    if (idx < 0) return;
+    const target = hidePastDays ? row : idx >= 2 ? blocks[idx - 2] : blocks[0];
+    const delta = target.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+    if (Math.abs(delta) > 0.5) scroller.scrollTop = Math.max(0, scroller.scrollTop + delta);
+    const nowLine = scroller.querySelector<HTMLElement>(".v2-opt-now");
+    if (nowLine && scroller.scrollWidth > scroller.clientWidth + 8) {
+      const mid = scroller.clientWidth * 0.42;
+      const dx = nowLine.getBoundingClientRect().left - scroller.getBoundingClientRect().left - mid;
+      scroller.scrollLeft = Math.max(0, scroller.scrollLeft + dx);
+    }
+  }, [initialScrollReady, year, monthIndex, hidePastDays]);
 
   const q = markQuery(focus);
 

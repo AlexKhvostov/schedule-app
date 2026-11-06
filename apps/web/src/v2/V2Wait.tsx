@@ -47,7 +47,7 @@ export function V2Wait({ session, onCabinet, onSession }: Props) {
         onSession(next);
       }
     };
-    const id = window.setInterval(() => void tick(), 8000);
+    const id = window.setInterval(() => void tick().catch(() => { /* Retry on the next interval without clearing the session. */ }), 8000);
     return () => window.clearInterval(id);
   }, [onSession]);
   return (

@@ -1,3 +1,4 @@
+import { useAuthAvailability } from "../authAvailability";
 import { readWithDeadline } from "../../data/readDeadline";
 import { loadScheduleContext } from "../../data/scheduleContext";
 import { subscribeScheduleSettings } from "../../data/scheduleSettings";
@@ -20,6 +21,7 @@ export function useScheduleMonth({ year, monthIndex, t }: {
   year: number; monthIndex: number; selfId?: string; actingId?: string;
   actingRef?: MutableRefObject<string | undefined>; t: TFunction;
 }) {
+  const auth = useAuthAvailability();
   const controller = useMemo(() => new ScheduleMonthState(
     Object.fromEntries(CALENDAR_VARIANTS.flatMap((variant) => LIMIT_OPTIONS.map((limit) => [
       monthGridKey(variant, limit), emptyMonth(year, monthIndex),
@@ -118,6 +120,12 @@ export function useScheduleMonth({ year, monthIndex, t }: {
     };
   }, [controller, year, monthIndex, t]);
 
+  useEffect(() => {
+    if (!isLiveData() || controller.snapshot.health.authReady === !auth.unavailable) return;
+    controller.invalidateHealth({ authReady: !auth.unavailable });
+    syncRef.current?.requireRefresh();
+  }, [auth.unavailable, controller]);
+
   const setGridStore = useCallback((update: SetStateAction<MonthGridStore>) => controller.updateLocal(update), [controller]);
   const gridStoreRef = useRef(snapshot.grids);
   gridStoreRef.current = snapshot.grids;
@@ -127,7 +135,7 @@ export function useScheduleMonth({ year, monthIndex, t }: {
     busyRemote: undefined,
     requestedLimits: [...LIMIT_OPTIONS], fetchKey: LIMIT_OPTIONS.join("|"), loadStamp: `${year}-${monthIndex}`,
     gridLoading: isLiveData() && !snapshot.ready, gridLoadError: snapshot.error && !snapshot.ready,
-    gridLoadProgress: snapshot.progress, retryLoad: () => retryRef.current(),
-    health: snapshot.health, context: snapshot.context, syncBusy: snapshot.loading, syncError: snapshot.error, canWrite: !isLiveData() || controller.canEdit,
+    gridLoadProgress: snapshot.progress, retryLoad: () => { if (auth.unavailable) auth.retry(); retryRef.current(); },
+    health: snapshot.health, context: snapshot.context, syncBusy: snapshot.loading, syncError: snapshot.error || auth.unavailable, canWrite: !isLiveData() || (!auth.unavailable && controller.canEdit),
   };
 }

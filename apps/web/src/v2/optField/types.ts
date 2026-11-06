@@ -15,6 +15,7 @@ import type { SchedulePairRow } from "../variantSchedule";
 export type OptFieldProps = {
   year: number;
   monthIndex: number;
+  initialScrollReady?: boolean;
   me: Mark;
   self?: Mark;
   showTables: boolean;

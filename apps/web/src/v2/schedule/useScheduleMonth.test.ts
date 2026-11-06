@@ -20,6 +20,7 @@ vi.mock("react", () => ({
 vi.mock("../../data/scheduleContext", () => ({ loadScheduleContext: vi.fn(async () => ({})) }));
 vi.mock("../../data/scheduleSettings", () => ({ subscribeScheduleSettings: () => vi.fn() }));
 vi.mock("../../data/deadTime", () => ({ subscribeDeadTimeIntervals: () => vi.fn() }));
+vi.mock("../authAvailability", () => ({ useAuthAvailability: () => ({ unavailable: false, retry: vi.fn() }) }));
 vi.mock("../../data/config", () => ({ isLiveData: () => true }));
 vi.mock("../../data/slots", () => ({
   monthGridKey: (variant: string, limit: string) => `${variant}:${limit}`,
