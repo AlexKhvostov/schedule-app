@@ -49,3 +49,8 @@
 .ranking .regActions { width:164px; min-width:164px; }
 .registryNotice { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; padding:5px 10px; font-size:11px; color:var(--muted-foreground); }
 .registryNotice[role="alert"] { color:var(--destructive); }
+
+/* Match the heatmap canvas and its two label columns; Speed keeps its standalone layout. */
+.alignedHours { padding-left:0; padding-right:0; }
+.alignedHours .hourInner { min-width:0; padding:0 8px; }
+.alignedHours .hourLegend { padding-left:10px; padding-right:10px; }

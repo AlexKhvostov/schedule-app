@@ -1,18 +1,21 @@
-import { useId, useState } from "react";
+import { useId, useState, type Ref, type UIEventHandler } from "react";
 import { useTranslation } from "react-i18next";
 import { useChartWidth } from "./useChartWidth";
+import type { HourGridGeometry } from "./useHourGridAlignment";
 import styles from "../monthly.module.css";
 
-export function HourlyChart({ title, values, comparison, onSelect, variant = "bar" }: {
+export function HourlyChart({ title, values, comparison, onSelect, variant = "bar", align, scrollRef, onScroll }: {
   title: string; values: (number | null)[]; comparison?: (number | null)[];
   onSelect?: (hour: number) => void; variant?: "bar" | "line";
+  align?: HourGridGeometry; scrollRef?: Ref<HTMLDivElement>; onScroll?: UIEventHandler<HTMLDivElement>;
 }) {
   const { t } = useTranslation("analytics");
   const id = useId();
-  const { ref, width } = useChartWidth();
+  const { ref, width: measuredWidth } = useChartWidth();
+  const width = align?.width ?? measuredWidth;
   const [selected, setSelected] = useState<number | null>(null);
   const max = Math.max(1, ...values.map(v => v ?? 0), ...(comparison ?? []).map(v => v ?? 0));
-  const left = 44, right = 12, bottom = 136, top = 12;
+  const left = align?.left ?? 44, right = align ? width - align.right : 12, bottom = 136, top = 12;
   const step = (width - left - right) / 24;
   const x = (hour: number) => left + (hour + .5) * step;
   const y = (value: number) => bottom - value / max * (bottom - top);
@@ -25,8 +28,8 @@ export function HourlyChart({ title, values, comparison, onSelect, variant = "ba
       return `${command}${x(hour)},${y(value)}`;
     }).join(" ");
   };
-  return <div className={styles.hourChart}>
-    <div className={styles.hourScroll}><div className={styles.hourInner}>
+  return <div className={`${styles.hourChart} ${align ? styles.alignedHours : ""}`}>
+    <div ref={scrollRef} onScroll={onScroll} className={styles.hourScroll} data-testid="hour-chart-scroll" style={align ? { width: align.viewport || undefined } : undefined}><div className={styles.hourInner} style={align ? { width: align.width + 16 } : undefined}>
       <svg ref={ref} viewBox={`0 0 ${width} 160`} role="img" aria-labelledby={id}>
         <title id={id}>{title}</title>
         {[0, .5, 1].map(fraction => <g key={fraction}>
@@ -37,13 +40,13 @@ export function HourlyChart({ title, values, comparison, onSelect, variant = "ba
           {value !== null && (variant === "bar"
             ? <rect x={x(hour) - step * .28} y={y(value)} width={step * .56} height={Math.max(1, bottom - y(value))} rx={2} fill="var(--primary)" opacity={selected === null || selected === hour ? .85 : .5} />
             : <circle cx={x(hour)} cy={y(value)} r={selected === hour ? 4 : 2} fill="var(--primary)" />)}
-          <text x={x(hour)} y={154} fontSize="11" textAnchor="middle" fill="var(--muted-foreground)">{hour}</text>
+          <text data-hour={hour} x={x(hour)} y={154} fontSize="11" textAnchor="middle" fill="var(--muted-foreground)">{hour}</text>
         </g>)}
         {variant === "line" && <path d={line(values)} fill="none" stroke="var(--primary)" strokeWidth={2} />}
         {comparison && <path d={line(comparison)} fill="none" stroke="var(--analytics-warm)" strokeWidth={2} />}
         {selected !== null && <line x1={x(selected)} x2={x(selected)} y1={top} y2={bottom} stroke="var(--foreground)" opacity=".35" strokeDasharray="3 4" />}
       </svg>
-      <div className={styles.hourTargets}>{values.map((value, hour) => <button key={hour} type="button"
+      <div className={styles.hourTargets} style={align ? { left: left + 8, right: right + 8 } : undefined}>{values.map((value, hour) => <button key={hour} type="button"
         aria-label={`${String(hour).padStart(2, "0")}:00 · ${value ?? "—"}${comparison ? ` · ${comparison[hour] ?? "—"}` : ""}`}
         title={`${String(hour).padStart(2, "0")}:00 · ${value ?? "—"}`}
         onFocus={() => setSelected(hour)} onMouseEnter={() => setSelected(hour)}

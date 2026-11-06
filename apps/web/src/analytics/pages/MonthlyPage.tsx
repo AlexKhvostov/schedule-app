@@ -7,6 +7,7 @@ import { MonthlyFilterBar } from "../filters/MonthlyFilterBar";
 import { MonthHeatmap } from "../widgets/MonthHeatmap";
 import { SpeedRanking } from "../widgets/SpeedRanking";
 import { DensityDetail } from "../widgets/DensityDetail";
+import { useHourGridAlignment } from "../charts/useHourGridAlignment";
 import { HourlyChart } from "../charts/HourlyChart";
 import { AnalyticsPanel } from "../ui/AnalyticsPanel";
 import { profileMetrics } from "../model/monthly";
@@ -17,11 +18,12 @@ import monthly from "../monthly.module.css";
 
 function MonthWidgets({report,query,onPlayer}:{report:MonthReport;query:MonthlyQuery;onPlayer:(name:string)=>void}){
   const {t}=useTranslation("analytics"),[selection,setSelection]=useState<CellSelection|null>(null);const profile=report.mode==="player",metrics=profileMetrics(report);
+  const { geometry, mapScroll, plotScroll, sync } = useHourGridAlignment();
   const format=(v:number|null)=>v===null?"—":Math.round(v*10)/10;
   return <>
     <div className={monthly.kpis}>{profile?<><strong>{report.player}</strong>{(["maxPoints","maxSpeed","avgSpeed"] as const).map(key=><span key={key}>{t(`monthly.${key}`)} <b>{format(metrics[key])}</b></span>)}</>:<><span>{t("monthly.playerCount",{count:report.playerCount})}</span><span>Σ <b>{report.total??"—"}</b></span></>}</div>
-    <MonthHeatmap report={report} onCell={profile?undefined:setSelection} />
-    <AnalyticsPanel title={t(profile?"blocks.hourlySpeed.title":"blocks.hourTotals.title")} description={t(profile?"monthly.profileSpeedNote":"monthly.hourSumNote")}><HourlyChart title={t(profile?"points.speed":"blocks.hourTotals.title")} variant={profile?"line":"bar"} values={profile?metrics.hourly:report.byHour} onSelect={profile?undefined:hour=>setSelection({day:null,hour})} /></AnalyticsPanel>
+    <MonthHeatmap scrollRef={mapScroll} onScroll={sync} report={report} onCell={profile?undefined:setSelection} />
+    <AnalyticsPanel title={t(profile?"blocks.hourlySpeed.title":"blocks.hourTotals.title")} description={t(profile?"monthly.profileSpeedNote":"monthly.hourSumNote")}><HourlyChart align={geometry} scrollRef={plotScroll} onScroll={sync} title={t(profile?"points.speed":"blocks.hourTotals.title")} variant={profile?"line":"bar"} values={profile?metrics.hourly:report.byHour} onSelect={profile?undefined:hour=>setSelection({day:null,hour})} /></AnalyticsPanel>
     {selection&&<DensityDetail key={`${selection.day}:${selection.hour}`} query={query} selection={selection} onClose={()=>setSelection(null)} onPlayer={onPlayer} />}
   </>;
 }
