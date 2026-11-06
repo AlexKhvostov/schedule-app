@@ -2,7 +2,7 @@
 
 ## Root-журнал (локальная миграция, 7 ноября 2026)
 
-[Миграция root_logs](../supabase/migrations/20261106214620_root_logs.sql) добавляет две RPC с пустым search_path, явной проверкой auth.uid()/is_root(), без EXECUTE для PUBLIC/anon:
+[Миграция root_logs](../supabase/migrations/20261106225025_root_logs.sql) добавляет две RPC с пустым search_path, явной проверкой auth.uid()/is_root(), без EXECUTE для PUBLIC/anon:
 
 - `root_logs(source, person, role, from, to, action, limit, before_at, before_id)` читает существующие occupancy_events или member_distance_id_audit. Максимум 200 записей, keyset-переход по `(at,id)` без OFFSET. Даты включительны в Europe/Minsk, UUID и bigint курсоры сравниваются в родных типах. Поиск подстроки по текущим именам/Discord/ID, `%` не является шаблоном. Автор и участник фильтруются независимо. LEFT JOIN сохраняет события удалённых карточек; старые FK occupancy_events уже могли стать NULL — восстановить автора по ним нельзя. Email/телефон/прочие частные поля не возвращаются.
 - `root_logs_cleanup(months, cutoff, confirm)` принимает только 2/3 месяца. Предпросмотр возвращает границу и количество. Подтверждение требует ту же допустимую границу, не старее 15 минут, и удаляет только occupancy_events с `at < cutoff`, до 5000 строк, с SKIP LOCKED. Возвращает удалённое/оставшееся количество. История ID, факты дистанций и само расписание не затрагиваются. Операция транзакционная; при неоднозначном сетевом результате пользователь заново получает подсчёт.
