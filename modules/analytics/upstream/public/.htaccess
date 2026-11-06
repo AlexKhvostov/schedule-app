@@ -1,0 +1,32 @@
+# Hostland / XAMPP subdirectory deploy
+# RewriteBase must match the public URL path (e.g. /dashboard/)
+# Фронт ходит в api/index.php/... напрямую — rewrite тут запасной.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /dashboard/
+
+    # Never rewrite static assets (Hostland sometimes fails -f on them)
+    RewriteRule ^assets/ - [L]
+    RewriteRule \.(?:js|css|map|ico|png|jpe?g|gif|svg|webp|woff2?)$ - [L]
+
+    # Block direct .env
+    RewriteRule ^\.env$ - [F,L]
+
+    # Уже front controller — не трогаем
+    RewriteRule ^api/index\.php(?:/.*)?$ - [L]
+
+    # Короткие URL (если rewrite работает): /api/home → PHP
+    RewriteRule ^health$ api/index.php [L,QSA]
+    RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+
+    # SPA: НЕ перехватывать /api и /health (иначе HTML 200 вместо JSON)
+    RewriteCond %{REQUEST_URI} !/api/
+    RewriteCond %{REQUEST_URI} !/health$
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+DirectoryIndex index.html
+Options -Indexes

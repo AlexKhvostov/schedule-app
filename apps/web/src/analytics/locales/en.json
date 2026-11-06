@@ -1,0 +1,300 @@
+{
+  "title": "Dashboard",
+  "navigation": "Analytics section",
+  "timezone": "Analytics time · Europe/Madrid",
+  "preparing": "In development",
+  "notConnected": "Data is not connected yet. Reports and regular-player lists will become available as each section is ready.",
+  "comingLater": "Coming to this section",
+  "groups": {
+    "analysis": "Analytics",
+    "players": "Our and other players",
+    "overview": "Overview"
+  },
+  "sections": {
+    "points": {
+      "title": "Daily points",
+      "description": "Player points by hour and their changes throughout the selected day."
+    },
+    "profile": {
+      "title": "Player profile",
+      "description": "Player metrics, activity and speed for the month."
+    },
+    "speed": {
+      "title": "Speed",
+      "description": "Compare players by the speed of earning points and playing hours."
+    },
+    "density": {
+      "title": "Density",
+      "description": "Point gains across the days and hours of the month."
+    },
+    "regs": {
+    "saved": "Change saved and verified.",
+      "title": "Regulars",
+      "description": "One list of our and other regular players across all analytics sections."
+    },
+    "overview": {
+      "title": "Day overview",
+      "description": "Field metrics and hourly volume for each separate stake."
+    },
+    "players": {
+      "title": "Players",
+      "description": "Players, stakes and activity during the selected period."
+    },
+    "yearly": {
+      "title": "Yearly activity",
+      "description": "A data collection calendar showing activity and interruptions."
+    }
+  },
+  "blocks": {
+    "pointsMap": {
+      "title": "Points heatmap",
+      "description": "Players by row and hours by column: points, gains and collection gaps."
+    },
+    "pointsChart": {
+      "title": "Points chart",
+      "description": "Lines for the same players and day, with zoom and a legend."
+    },
+    "playerSummary": {
+      "title": "Player metrics",
+      "description": "Points and speed for the selected player, keeping stakes separate."
+    },
+    "playerMonth": {
+      "title": "Monthly activity",
+      "description": "A day-by-hour map, hourly speed and a player note."
+    },
+    "speedRanking": {
+      "title": "Speed ranking",
+      "description": "Maximum and average speed, best hour and regular-player status."
+    },
+    "hourlySpeed": {
+      "title": "Speed by hour",
+      "description": "Compare the selected top players with the full selection."
+    },
+    "densityMap": {
+      "title": "Density heatmap",
+      "description": "Hourly point gains throughout the month for the selected audience."
+    },
+    "hourTotals": {
+      "title": "Hourly totals",
+      "description": "Monthly totals with details of the players in a selected hour."
+    },
+    "ourRegs": {
+      "title": "Our regulars",
+      "description": "Add, remove and move our players between lists once data is connected."
+    },
+    "otherRegs": {
+      "title": "Other regulars",
+      "description": "One list of other players, accessible from analytics charts and tables."
+    },
+    "daySummary": {
+      "title": "Day metrics",
+      "description": "Total points, player counts and peak volume hours."
+    },
+    "limitCharts": {
+      "title": "Charts by stake",
+      "description": "Four separate volume charts with comparisons to averages."
+    },
+    "playersList": {
+      "title": "Player list",
+      "description": "Search, period metrics and links to player profiles."
+    },
+    "yearCalendar": {
+      "title": "Activity calendar",
+      "description": "Days with data, collection gaps and links to each day’s overview."
+    }
+  },
+  "filters": {
+    "title": "Filters",
+    "bothWidgets": "Heatmap and chart · Europe/Madrid",
+    "day": "Day (Spain)",
+    "previousDay": "Previous day",
+    "nextDay": "Next day",
+    "today": "Today in Spain",
+    "limit": "Stake",
+    "singleLimit": "One limit",
+    "segment": "Player group",
+    "segmentHint": "Not ours includes other regulars and unlisted players.",
+    "players": "Players",
+    "playersPlaceholder": "Names separated by commas or new lines",
+    "playersHint": "Optional. Names intersect with the selected group. Up to 100 names.",
+    "apply": "Apply",
+    "reset": "Reset",
+    "refresh": "Refresh",
+    "current": "Showing selection",
+    "applied": "Filters applied",
+    "dirty": "Changes pending — press Apply",
+    "invalid": "Check the date and list: up to 100 names, each at most 100 characters.",
+    "selectedPlayers": "Names: {{count}}",
+    "anyPlayers": "All names",
+    "collapse": "Collapse fields",
+    "expand": "Expand fields",
+    "suggestions": "Matching players",
+    "searching": "Searching players…",
+    "searchError": "Suggestions unavailable. You can enter a name manually.",
+    "noSuggestions": "No matches",
+    "searchHint": "Type at least two characters · click or use arrow keys and Enter. Separate multiple names with commas, then select Apply."
+  },
+  "segments": {
+    "all": "Everyone",
+    "regs": "All regulars",
+    "ours": "Our regulars",
+    "theirs": "Other regulars",
+    "not_ours": "Not ours",
+    "not_theirs": "Not other regulars",
+    "nonregs": "Not in the regulars list"
+  },
+  "sort": {
+    "points": "By points",
+    "speed": "By speed",
+    "name": "By name"
+  },
+  "cell": {
+    "future": "Future hour",
+    "down": "Collection interruption",
+    "downShort": "gap",
+    "stale": "Previous day remainder",
+    "empty": "No player data",
+    "observed": "Samples available",
+    "carried": "Carried value"
+  },
+  "points": {
+    "demo": "Demo · synthetic data. Live API is not connected yet.",
+    "unconfigured": "Live data is not connected yet. It requires a protected PHP API. Demo figures are not substituted here.",
+    "top": "Show",
+    "all": "Everyone",
+    "sort": "Sort",
+    "controlsHint": "One player selection for the heatmap and lines. Changes immediately use the applied filters.",
+    "count": "{{count}} of {{total}} players",
+    "heatmapNote": "Player × hour · cumulative points and gain between hours · Σ is the day total",
+    "heatmapScroll": "Points heatmap with horizontal scrolling",
+    "player": "Player",
+    "points": "Points",
+    "gain": "Hourly gain",
+    "speed": "Speed, pts/h",
+    "speedHint": "Speed within an hour and gain between hours are different metrics. Server calculations are preserved.",
+    "gainLegend": "Colour indicates point gain",
+    "noSampleLegend": "No value / future hour",
+    "cellHint": "Select a cell for details",
+    "close": "Close details",
+    "timelineNote": "Hover the chart or choose a time below · 6-minute samples · ES time",
+    "chartError": "The chart could not be loaded. The heatmap matches the current filters.",
+    "retry": "Retry loading",
+    "missingSeries": "No chart samples for: {{names}}. The player selection was not expanded.",
+    "zoomFrom": "Hours from",
+    "zoomTo": "Hours to",
+    "resetChart": "Full day / all lines",
+    "chartDescription": "Cumulative player points throughout the day. Exact values are available below for the selected time.",
+    "noVisibleLines": "No visible lines. Enable a player in the legend.",
+    "visiblePlayers": "Player line visibility",
+    "inspectTime": "Values at",
+    "speedValue": "{{value}} pts/h over approximately 30 min",
+    "loading": "Loading the selected day…",
+    "error": "Could not load the selected data. Please try again.",
+    "empty": "No players match these filters",
+    "emptyHint": "Check the date and the intersection of names and group. Demo dates start in 2020.",
+    "showSpeed": "Speed",
+    "carryNote": "Between samples, the line holds the last known value.",
+    "colorLegend": "Fill: gain · points: grey → white, glow from 200 · Δ: mint scale · Σ: blue scale",
+    "resizeHeight": "Resize chart height",
+    "resizeHint": "Drag up or down · double-click to reset. Keyboard: ↑/↓."
+  },
+  "clock": {
+    "title": "Spain time",
+    "reset": "Midnight ES — a new day"
+  },
+  "monthly": {
+    "month": "Month ES",
+    "player": "Player",
+    "playerPlaceholder": "Exact player nickname",
+    "choosePlayer": "Choose a player and press Apply",
+    "invalid": "Check the month and player list",
+    "loading": "Loading the selected month…",
+    "day": "Day",
+    "grid": "Day and hour heatmap",
+    "gridHint": "Cell — details · ES time",
+    "densityNote": "Day × hour · total gain · Σ — daily total",
+    "profileNote": "Day × hour · points and gain · Σ — daily maximum",
+    "profileSpeedNote": "Hourly average across observed cells, including zero speed",
+    "hourSumNote": "Sum across the month · click an hour for details",
+    "maxPoints": "Max points",
+    "maxSpeed": "Max pts/h",
+    "avgSpeed": "Avg pts/h",
+    "playerCount": "Players: {{count}}",
+    "speedNote": "Monthly max / avg · best sample below the maximum",
+    "speedDefinition": "Only speed > 0 and samples > 20 minutes. Max is the maximum; Avg is the mean of these samples.",
+    "hourSpeedNote": "Bars — selected top · line — all matching players · samples > 20 minutes",
+    "topHint": "Top affects the table and bars. The line includes all matching players.",
+    "reg": "Regular",
+    "minutes": "min",
+    "unit": "pts/h",
+    "topBars": "Top · bars",
+    "allLine": "All matching · line",
+    "clickHour": "Click an hour for details",
+    "inspectHour": "Hover or select an hour",
+    "cellDay": "Gain during this hour of the day",
+    "cellMonth": "Sum for this hour across the month",
+    "more": "Show {{count}} more",
+    "less": "Show less",
+    "fullMonth": "Full month",
+    "compactMonth": "Compact view"
+  },
+  "source": {
+    "label": "Data",
+    "demo": "Demo",
+    "live": "Live data",
+    "unconfigured": "Not connected",
+    "liveHint": "Real PHP API data · local preview"
+  },
+  "regs": {
+    "open": "Open regular lists",
+    "countHint": "Number of our / other regulars",
+    "description": "Ours — RP club. Others — strong regulars. Arrows move players between lists.",
+    "addNames": "Add player names",
+    "placeholder": "Nick1, Nick2, Nick3",
+    "destination": "List",
+    "toOurs": "To ours",
+    "toTheirs": "To others",
+    "add": "Add",
+    "saving": "Saving…",
+    "addHint": "Separate by commas, semicolons or new lines. Existing names are skipped.",
+    "invalid": "Enter 1–100 names, no longer than 80 characters each.",
+    "loading": "Loading regulars…",
+    "verifying": "Saving and verifying the server result…",
+    "writeError": "The change could not be confirmed. Refresh before retrying: it may already have been saved.",
+    "readError": "Could not load the list. Click Refresh.",
+    "added": "Added: {{count}} · already listed: {{skipped}}",
+    "moved": "Player moved. Save verified.",
+    "removed": "Player removed from the list. Save verified.",
+    "search": "Search lists",
+    "moveTheirs": "Move {{name}} to others",
+    "moveOurs": "Move {{name}} to ours",
+    "removeName": "Remove {{name}} from regulars",
+    "removeQuestion": "Remove from regulars?",
+    "confirmRemove": "Remove",
+    "cancel": "Cancel",
+    "noMatches": "No matches",
+    "empty": "Empty list",
+    "fromTop": "Add to regulars ({{count}})",
+    "oursShort": "Ours",
+    "theirsShort": "Others",
+    "countSummary": "Ours: {{ours}} · others: {{theirs}}",
+    "badge": {
+      "ours": "Red Party · our player",
+      "theirs": "Other regular"
+    },
+    "quickTitle": "Heatmap players ({{count}})",
+    "quickHint": "Players on the heatmap when opened · add individually",
+    "quickSaved": "{{name}} → {{side}}. Save verified.",
+    "checkingSide": "Checking list…",
+    "notListed": "Not listed as a regular",
+    "quickOurs": "Add {{name}} to ours",
+    "quickTheirs": "Add {{name}} to others",
+    "inOurs": "In ours",
+    "inTheirs": "In others",
+    "actions": "Actions",
+    "quickRemove": "Remove from list",
+    "quickRemoveName": "Remove {{name}} from list",
+    "confirmRemoveName": "Confirm removal of {{name}}",
+    "quickRemoved": "{{name}} removed from the list. Save verified."
+  }
+}

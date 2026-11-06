@@ -116,9 +116,16 @@ for (const theme of ["dark", "light"]) {
     await expect(page.locator(".v2-opt-frame")).toHaveText("N100: 03:00 – 03:30");
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(216, 222, 233)" : "rgb(52, 59, 70)");
     expect(await frame.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(n50Background);
-    await e50.locator('[data-slot][data-half="6"]').first().hover();
-    await expect(page.locator(".v2-opt-frame")).toBeVisible();
-    await expect(page.locator(".v2-opt-frame")).toHaveText("E50: 03:00 – 03:30");
+    // Scrolling to a row intentionally hides the floating hint. Re-enter after
+    // the browser delivers a delayed scroll event instead of racing that event.
+    const regularCell = e50.locator('[data-slot][data-half="6"]').first();
+    await regularCell.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      await page.mouse.move(0, 0);
+      await regularCell.hover();
+      await expect(frame).toBeVisible({ timeout: 500 });
+      await expect(frame).toHaveText("E50: 03:00 – 03:30", { timeout: 500 });
+    }).toPass({ timeout: 7000 });
     await expect(frameLimit).toHaveCSS("font-style", "italic");
     await expect(frameLimit).toHaveCSS("color", theme === "dark" ? "rgb(102, 204, 255)" : "rgb(18, 107, 68)");
     await expect(frameTime).toHaveCSS("font-style", "normal");

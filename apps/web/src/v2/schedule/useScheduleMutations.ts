@@ -32,9 +32,10 @@ type Options = {
   filterLimits: ScheduleFilterLimits;
   t: TFunction;
   language: string;
+  onSyncBlocked?: () => void;
 };
 
-export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language }: Options) {
+export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language, onSyncBlocked }: Options) {
   const { controller } = month;
   const current = useRef(controller);
   current.current = controller;
@@ -49,6 +50,10 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     overwritePending.current = false;
     setMissingPlayPair(null);
   }, [controller]);
+
+  useEffect(() => {
+    if (isLiveData() && !controller.canEdit) setOverwriteAsk(null);
+  }, [controller, month.canWrite]);
 
   const placementAllowed = useCallback((variant: ScheduleVariant, limit: string, edits: GridEdit[]) => {
     const access = brushAccessRef.current;
@@ -76,6 +81,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   }, [accessRef, selectedPlayPairsRef, brushAccessRef, actingRef, filterLimits, t]);
 
   const showWriteError = (error: string, variant: ScheduleVariant, limit: string, target: PlacementTarget) => {
+    if (error === "schedule-stale") { onSyncBlocked?.(); return; }
     if (error.includes("schedule-player-limit-not-selected")) setMissingPlayPair({ variant, limit, ...target });
     else showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess")
       : error.includes("schedule-conflict") ? t("schedule.toastConflict") : t("schedule.toastSaveError"));
@@ -94,6 +100,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   };
 
   const onGridChange = (variant: ScheduleVariant, limit: string, next: Occupancy) => {
+    if (isLiveData() && !controller.canEdit) { onSyncBlocked?.(); return; }
     const key = monthGridKey(variant, limit);
     const previous = controller.snapshot.grids[key] ?? [];
     const edits = gridEdits(previous, next);
@@ -116,6 +123,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   };
 
   const confirmOverwrite = (action: "wipe" | "empty" = "wipe") => {
+    if (isLiveData() && !controller.canEdit) { setOverwriteAsk(null); onSyncBlocked?.(); return; }
     const ask = overwriteAsk;
     if (!ask || overwritePending.current || ask.year !== year || ask.monthIndex !== monthIndex) return;
     const chosen = action === "empty" ? ask.empty : ask.next;

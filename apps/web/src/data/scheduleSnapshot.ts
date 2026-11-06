@@ -1,3 +1,4 @@
+import type { ScheduleContext } from "./scheduleContext";
 import { getSupabase } from "./client";
 import { markFromScheduleRow, type MonthScheduleRow, type ScheduleVariant } from "./slots";
 import type { Mark } from "../schedule/marks";
@@ -6,7 +7,7 @@ export type ScheduleTarget = { date: string; kind_id: string };
 export type ScheduleKind = { id: string; variant_id: ScheduleVariant; limit_id: string };
 export type CompactSlot = { kind_id: string; day: number; half: number; level: number; member_id: string; tables: number };
 export type ScheduleSnapshot = {
-  year: number; month: number; kinds: ScheduleKind[]; slots: CompactSlot[]; members: Record<string, Mark>;
+  year: number; month: number; kinds: ScheduleKind[]; slots: CompactSlot[]; members: Record<string, Mark>; context?: ScheduleContext;
 };
 export type SnapshotRequest = { targets: ScheduleTarget[] | null; directoryOnly?: boolean };
 
@@ -31,12 +32,13 @@ export function decodeScheduleSnapshot(data: unknown, year: number, month: numbe
   return { year, month, kinds: raw.kinds, slots: raw.slots, members };
 }
 
-export async function loadScheduleSnapshot(year: number, monthIndex: number, request: SnapshotRequest): Promise<ScheduleSnapshot> {
+export async function loadScheduleSnapshot(year: number, monthIndex: number, request: SnapshotRequest, signal?: AbortSignal): Promise<ScheduleSnapshot> {
   const db = getSupabase();
   if (!db) throw new Error("not-configured");
-  const { data, error } = await db.rpc("load_schedule_snapshot", {
+  const query = db.rpc("load_schedule_snapshot", {
     p_year: year, p_month: monthIndex + 1, p_targets: request.targets, p_directory_only: request.directoryOnly ?? false,
   });
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
   if (error) throw new Error(error.message);
   return decodeScheduleSnapshot(data, year, monthIndex + 1, request.directoryOnly);
 }
@@ -50,5 +52,5 @@ export function subscribeScheduleChanges(onSlots: (target: ScheduleTarget) => vo
     })
     .on("broadcast", { event: "directory" }, onDirectory)
     .subscribe((status) => onStatus(status === "SUBSCRIBED"));
-  return () => { void db.removeChannel(channel); };
+  return () => db.removeChannel(channel);
 }

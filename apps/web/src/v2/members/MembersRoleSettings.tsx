@@ -96,7 +96,7 @@ export function MembersRoleSettings() {
     setDraggingId(roleId);
   };
 
-  const permissionTitle = new Map(permissions.map((permission) => [permission.code, permission.title]));
+  const permissionTitle = new Map(permissions.map((permission) => [permission.code, permission.code === "dashboard" ? t("admin.people.dashboardAccess") : permission.title]));
 
   return (
     <>
@@ -203,7 +203,7 @@ export function MembersRoleSettings() {
                           onChange={(event) => void changePermission(editingRole, permission.code, event.target.checked)}
                         />
                         <i className={`fa-solid ${checked ? "fa-square-check" : "fa-square"}`} />
-                        <span>{permission.title}</span>
+                        <span>{permissionTitle.get(permission.code)}</span>
                       </label>
                     );
                   })}

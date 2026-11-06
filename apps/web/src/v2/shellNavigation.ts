@@ -4,6 +4,7 @@ export type ShellPage =
   | "wait"
   | "schedule"
   | "priorities"
+  | "dashboard"
   | "cabinet"
   | "admin-people"
   | "admin-distance"
@@ -21,6 +22,10 @@ type NavigationContext = {
   access: Access;
 };
 
+export function canAccessDashboard(context: NavigationContext): boolean {
+  return context.access === "active" && permissionCheck(context)("dashboard");
+}
+
 function permissionCheck({ isRoot, permissions = [] }: NavigationContext) {
   const allowed = new Set(permissions);
   return (permission: string) => isRoot || allowed.has(permission);
@@ -31,6 +36,7 @@ export function defaultShellPage(context: NavigationContext): ShellPage {
   if (context.access === "active" && can("schedule")) return "schedule";
   if (can("profile")) return "cabinet";
   if (context.access === "active" && can("priorities")) return "priorities";
+  if (canAccessDashboard(context)) return "dashboard";
   if (can("admin.people")) return "admin-people";
   if (can("schedule.manage")) return "admin-schedule";
   if (context.isRoot) return "admin-root";
@@ -39,6 +45,7 @@ export function defaultShellPage(context: NavigationContext): ShellPage {
 
 export function resolveShellPage(context: NavigationContext, hash: string): ShellPage {
   const can = permissionCheck(context);
+  if (canAccessDashboard(context) && (hash === "#dashboard" || hash.startsWith("#dashboard/"))) return "dashboard";
   if (context.isRoot && hash === "#blocks") return "blocks";
   if (context.isRoot && hash === "#uikit") return "uikit";
   if (context.isRoot && hash === "#guild") return "guild";

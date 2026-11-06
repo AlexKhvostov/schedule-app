@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { defaultShellPage, resolveShellPage } from "./shellNavigation";
 
 describe("shell navigation", () => {
+  it("requires the Dashboard role permission independently from schedule and admin", () => {
+    for (const hash of ["#dashboard", "#dashboard/regs", "#dashboard/points"]) {
+      expect(resolveShellPage({ isRoot: false, permissions: ["profile", "dashboard"], access: "active" }, hash)).toBe("dashboard");
+      expect(resolveShellPage({ isRoot: false, permissions: ["profile", "admin.people"], access: "active" }, hash)).toBe("cabinet");
+      expect(resolveShellPage({ isRoot: false, permissions: ["schedule"], access: "active" }, hash)).toBe("schedule");
+      expect(resolveShellPage({ isRoot: true, permissions: [], access: "active" }, hash)).toBe("dashboard");
+      for (const access of ["pending", "profile"] as const) {
+        expect(resolveShellPage({ isRoot: false, permissions: ["profile", "dashboard"], access }, hash)).toBe("cabinet");
+        expect(resolveShellPage({ isRoot: true, permissions: ["dashboard"], access }, hash)).not.toBe("dashboard");
+      }
+    }
+    expect(resolveShellPage({ isRoot: false, permissions: ["profile", "dashboard"], access: "active" }, "#dashboard-other")).toBe("cabinet");
+    expect(defaultShellPage({ isRoot: false, permissions: ["dashboard"], access: "active" })).toBe("dashboard");
+  });
   it("resolves API administration only for root", () => {
     expect(resolveShellPage({ isRoot: true, access: "active" }, "#root-api")).toBe("root-api");
     expect(resolveShellPage({ isRoot: false, permissions: ["admin.people"], access: "active" }, "#root-api")).toBe("admin-people");

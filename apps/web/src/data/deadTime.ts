@@ -139,16 +139,17 @@ function saveDemoDeadTimeIntervals(intervals: DeadTimeInterval[]) {
   window.dispatchEvent(new Event(DEMO_DEAD_TIME_EVENT));
 }
 
-export async function loadDeadTimeIntervals() {
+export async function loadDeadTimeIntervals(signal?: AbortSignal) {
   if (isDevSandboxEnabled()) return loadDemoDeadTimeIntervals();
   const db = getSupabase();
   if (!db) return [];
-  const { data, error } = await db
+  const query = db
     .from("schedule_dead_intervals")
     .select("id, variant_id, limit_id, start_half, end_half")
     .order("variant_id")
     .order("limit_id")
     .order("start_half");
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
   if (error) throw error;
   return deadTimeIntervalsFromRows(data);
 }

@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ScheduleVariant } from "../../data/slots";
 import { monthShort, monthTitle } from "../../schedule/formatDate";
@@ -9,6 +9,7 @@ import type { useScheduleBrush } from "./useScheduleBrush";
 import type { useScheduleToolbar } from "./useScheduleToolbar";
 
 type Props = {
+  syncStatus?: ReactNode;
   controls: ReturnType<typeof useScheduleToolbar>;
   brush: Pick<ReturnType<typeof useScheduleBrush>, "me" | "tablePresets" | "tablePresetOwnerId" | "selectTablePreset" | "loadTablePresetsForPlayer" | "actPlayers" | "selfId" | "actingId" | "applyActAs">;
   filters: {
@@ -40,7 +41,7 @@ type Props = {
   tools: { key: string; icon: string; title: string; on: boolean; run: () => void }[];
 };
 
-export function ScheduleToolbar({ controls, brush, filters, display, tools }: Props) {
+export function ScheduleToolbar({ controls, brush, filters, display, tools, syncStatus }: Props) {
   const { t, i18n } = useTranslation();
   const { limitsOpen, setLimitsOpen, kindOpen, setKindOpen, monthOpen, setMonthOpen, pickYear, setPickYear, focus, setFocus, toolsOpen, setToolsOpen, searchOpen, setSearchOpen, limitsRef, kindRef, monthRef, toolsRef, searchRef } = controls;
   const { me, tablePresets, tablePresetOwnerId, selectTablePreset, loadTablePresetsForPlayer, actPlayers, selfId, actingId, applyActAs } = brush;
@@ -262,6 +263,7 @@ export function ScheduleToolbar({ controls, brush, filters, display, tools }: Pr
           ))}
         </datalist>
       </div>
+      {syncStatus}
       {!touchLayout ? <BarMark
         me={me}
         tables={me.tables}

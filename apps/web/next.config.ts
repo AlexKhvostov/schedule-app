@@ -9,7 +9,7 @@ if (process.env.VERCEL_ENV === "production" && missingProductionEnv.length) {
 
 const localDevelopmentConnections =
   process.env.NODE_ENV === "development"
-    ? " http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*"
+    ? " http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://dashboard.redparty.ru"
     : "";
 
 const contentSecurityPolicy = [

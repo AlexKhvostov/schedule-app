@@ -36,6 +36,9 @@
 
 ## Будущие функции
 
+- [analytics-dashboard.md](analytics-dashboard.md) — исследование отдельного Dashboard, безопасная копия Vue/PHP и требования к закрытому доступу; живой локальный источник и управление регами подключены; production ждёт серверной защиты.
+- [analytics-dashboard-plan.md](analytics-dashboard-plan.md) — перенос интерфейса на React при прежних PHP/MySQL: четыре компактных экрана, условные цвета, живой dev-источник и управление регами; проверки и серверный этап защиты.
+
 - [product-improvements.md](product-improvements.md) — рабочий backlog доработок по итогам пользовательского тестирования; не описывает уже реализованное состояние.
 - [product-improvements-plan.md](product-improvements-plan.md) — исполняемый план backlog: задачи, зависимости, статусы, приёмка и проверки.
 - [fill-queue.md](fill-queue.md) — проект автоматической очереди заполнения. Пока не реализовывать без отдельного решения.

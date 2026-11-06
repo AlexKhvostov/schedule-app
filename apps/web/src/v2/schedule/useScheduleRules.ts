@@ -1,3 +1,5 @@
+import type { ScheduleContext } from "../../data/scheduleContext";
+import { isLiveData } from "../../data/config";
 import type { TFunction } from "i18next";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useEffect, useState } from "react";
@@ -8,7 +10,8 @@ import { LIMIT_OPTIONS } from "../../schedule/capacity";
 import { showV2Toast } from "../V2Toast";
 import { loadPrefs, savePrefs } from "../prefs";
 
-export function useScheduleRules({ kindsRef, setLimits, t }: {
+export function useScheduleRules({ kindsRef, setLimits, t, context }: {
+  context?: ScheduleContext;
   kindsRef: MutableRefObject<ScheduleVariant[]>;
   setLimits: Dispatch<SetStateAction<string[]>>;
   t: TFunction;
@@ -32,9 +35,10 @@ export function useScheduleRules({ kindsRef, setLimits, t }: {
   });
 
   useEffect(() => {
+    if (isLiveData() && !context) return;
     let live = true;
     const apply = () => {
-      void loadScheduleSettings().then((next) => {
+      void (context ? Promise.resolve(context.settings) : loadScheduleSettings()).then((next) => {
         if (!live) return;
         setAllowOverwrite(next.allowOverwriteMarks);
         setAllowActAs(next.allowActAs);
@@ -53,17 +57,18 @@ export function useScheduleRules({ kindsRef, setLimits, t }: {
       });
     };
     apply();
-    const off = subscribeScheduleSettings(apply);
+    const off = isLiveData() ? () => {} : subscribeScheduleSettings(apply);
     return () => {
       live = false;
       off();
     };
-  }, []);
+  }, [context, kindsRef, setLimits]);
 
   useEffect(() => {
+    if (isLiveData() && !context) return;
     let live = true;
     const apply = () => {
-      void loadDeadTimeIntervals()
+      void (context ? Promise.resolve(context.deadTimeIntervals) : loadDeadTimeIntervals())
         .then((next) => {
           if (live) setDeadTimeIntervals(next);
         })
@@ -74,12 +79,13 @@ export function useScheduleRules({ kindsRef, setLimits, t }: {
         });
     };
     apply();
-    const off = subscribeDeadTimeIntervals(apply);
+    const off = isLiveData() ? () => {} : subscribeDeadTimeIntervals(apply);
     return () => {
       live = false;
       off();
     };
-  }, [t]);
+  }, [context, t]);
 
+  if (context) return { ...context.settings, deadTimeIntervals: context.deadTimeIntervals, allowOverwrite: context.settings.allowOverwriteMarks };
   return { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits };
 }

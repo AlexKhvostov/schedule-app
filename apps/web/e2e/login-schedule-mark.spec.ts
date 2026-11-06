@@ -1247,13 +1247,13 @@ test("active members can move the Online panel and keep using the schedule", asy
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  const online = page.locator(".v2-top-end").getByRole("button", { name: "Онлайн" });
-  const dialog = page.getByRole("dialog", { name: "Онлайн" });
+  const online = page.locator(".v2-top-end").getByRole("button", { name: "На сайте" });
+  const dialog = page.getByRole("dialog", { name: "На сайте" });
   await expect(dialog).toHaveCount(0);
   await online.click();
   await expect(dialog).toContainText("На сайте · 1");
   await expect(dialog).toContainText("Только что");
-  const heading = dialog.getByRole("heading", { name: "Онлайн" });
+  const heading = dialog.getByRole("heading", { name: "На сайте", exact: true });
   const before = (await dialog.boundingBox())!;
   const header = (await heading.boundingBox())!;
   await page.mouse.move(header.x + 10, header.y + 5);

@@ -1,3 +1,4 @@
+import type { ScheduleContext } from "../../data/scheduleContext";
 import type { MonthGridStore, MonthLoadProgress, MultiMonthGridsResult, ScheduleVariant } from "../../data/slots";
 import { applyGridEdits, type GridEdit } from "../../schedule/gridEdits";
 import { mergeScheduleSnapshot } from "../../schedule/mergeScheduleSnapshot";
@@ -5,7 +6,8 @@ import type { ScheduleSnapshot, SnapshotRequest } from "../../data/scheduleSnaps
 import type { Mark } from "../../schedule/marks";
 
 type PendingEdit = { key: string; edits: GridEdit[]; optimistic: boolean };
-export type MonthSnapshot = { grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean; progress?: MonthLoadProgress };
+export type ScheduleHealth = { connected: boolean; verified: boolean; hidden: boolean; lastChecked: number | null; uncertain: boolean };
+export type MonthSnapshot = { health: ScheduleHealth; context?: ScheduleContext; grids: MonthGridStore; ready: boolean; loading: boolean; error: boolean; progress?: MonthLoadProgress };
 
 /** One instance per month. Old requests can only settle their own instance. */
 export class ScheduleMonthState {
@@ -20,9 +22,21 @@ export class ScheduleMonthState {
   kinds: ScheduleSnapshot["kinds"] = [];
   snapshot: MonthSnapshot;
 
-  constructor(initial: MonthGridStore, private variants: readonly ScheduleVariant[]) {
+  constructor(initial: MonthGridStore, private variants: readonly ScheduleVariant[], private protectFreshness = false) {
     this.base = initial;
-    this.snapshot = { grids: initial, ready: false, loading: true, error: false };
+    this.snapshot = { grids: initial, ready: false, loading: true, error: false, health: { connected: !protectFreshness, verified: !protectFreshness, hidden: false, lastChecked: null, uncertain: false } };
+  }
+
+  get canEdit() {
+    const { ready, error, health } = this.snapshot;
+    return ready && (!this.protectFreshness || (!error && health.connected && health.verified && !health.hidden && !health.uncertain
+      && health.lastChecked !== null && Date.now() - health.lastChecked < 60000));
+  }
+
+  invalidateHealth(update: Partial<ScheduleHealth> = {}) {
+    ++this.generation;
+    this.snapshot = { ...this.snapshot, health: { ...this.snapshot.health, verified: false, ...update } };
+    this.emit();
   }
 
   get pendingCount() { return this.pending.length; }
@@ -37,14 +51,18 @@ export class ScheduleMonthState {
     this.base = mergeScheduleSnapshot(this.base, data, request);
     this.directory = request.targets === null && !request.directoryOnly ? data.members : { ...this.directory, ...data.members };
     this.kinds = data.kinds;
-    this.snapshot = { ...this.snapshot, ready: true, loading: false, error: false };
+    const full = request.targets === null && !request.directoryOnly;
+    this.snapshot = { ...this.snapshot, ready: true, loading: false, error: false,
+      context: full ? data.context ?? this.snapshot.context : this.snapshot.context,
+      health: full ? { ...this.snapshot.health, verified: true, lastChecked: Date.now() } : this.snapshot.health };
+
     this.emit();
     return true;
   }
 
   failLoad(generation: number) {
     if (generation !== this.generation) return;
-    this.snapshot = { ...this.snapshot, loading: false, error: true };
+    this.snapshot = { ...this.snapshot, loading: false, error: true, health: { ...this.snapshot.health, verified: false } };
     this.emit();
   }
 
@@ -63,7 +81,7 @@ export class ScheduleMonthState {
 
   replaceLocal(grids: MonthGridStore) {
     this.base = grids;
-    this.snapshot = { grids, ready: true, loading: false, error: false };
+    this.snapshot = { ...this.snapshot, grids, ready: true, loading: false, error: false };
     this.emit();
   }
 
@@ -100,6 +118,7 @@ export class ScheduleMonthState {
   }
 
   edit(key: string, edits: GridEdit[], write: () => Promise<string | undefined>, optimistic = true) {
+    if (this.protectFreshness && !this.canEdit) return Promise.resolve("schedule-stale");
     const operation = { key, edits, optimistic };
     this.pending.push(operation);
     ++this.generation; // A read started before this gesture cannot undo it.
@@ -107,8 +126,17 @@ export class ScheduleMonthState {
     this.editListeners.forEach((listener) => listener(key, edits));
     const task = this.tail.then(async () => {
       let error: string | undefined;
-      try { error = await write(); }
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      try {
+        if (this.protectFreshness && !this.canEdit) error = "schedule-stale";
+        else {
+          watchdog = setTimeout(() => this.invalidateHealth({ uncertain: true }), 20000);
+          error = await write();
+        }
+      }
       catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
+      finally { clearTimeout(watchdog); }
+      if (this.snapshot.health.uncertain || (error && this.protectFreshness)) this.invalidateHealth({ uncertain: false });
       if (!error) this.base = { ...this.base, [key]: applyGridEdits(this.base[key] ?? [], edits) };
       this.pending = this.pending.filter((item) => item !== operation);
       this.emit();

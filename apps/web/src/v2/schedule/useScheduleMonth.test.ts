@@ -17,6 +17,9 @@ vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useEffect: (effect: () => void | (() => void)) => { harness.effects.push(effect); },
 }));
+vi.mock("../../data/scheduleContext", () => ({ loadScheduleContext: vi.fn(async () => ({})) }));
+vi.mock("../../data/scheduleSettings", () => ({ subscribeScheduleSettings: () => vi.fn() }));
+vi.mock("../../data/deadTime", () => ({ subscribeDeadTimeIntervals: () => vi.fn() }));
 vi.mock("../../data/config", () => ({ isLiveData: () => true }));
 vi.mock("../../data/slots", () => ({
   monthGridKey: (variant: string, limit: string) => `${variant}:${limit}`,
@@ -48,7 +51,7 @@ describe("schedule realtime reconciliation", () => {
     const month = StartHarness();
     expect(month.controller.snapshot.ready).toBe(false);
     await vi.advanceTimersByTimeAsync(0);
-    expect(harness.load).toHaveBeenCalledExactlyOnceWith(2026, 9, { targets: null });
+    expect(harness.load).toHaveBeenCalledExactlyOnceWith(2026, 9, { targets: null }, expect.any(AbortSignal));
     expect(month.controller.snapshot.ready).toBe(true);
   });
 

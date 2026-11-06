@@ -6,17 +6,18 @@ function arr(hours: number[] | null | undefined): HourCaps {
   return normalizeHours(hours ?? undefined);
 }
 
-export async function loadCapacityLive(variant: "nitro" | "regular"): Promise<CapacityMap | null> {
+export async function loadCapacityLive(variant: "nitro" | "regular", signal?: AbortSignal): Promise<CapacityMap | null> {
   const db = getSupabase();
   if (!db) return null;
-  const kinds = await loadKinds();
+  const kinds = await loadKinds(signal);
   const wanted = kinds.filter((row) => row.variantId === variant);
   if (LIMIT_OPTIONS.some(limit => !wanted.some(kind => kind.limitId === limit))) throw new Error("capacity-kinds-unavailable");
   const ids = wanted.map((row) => row.id);
-  const [{ data: flags, error: flagsError }, { data: rules, error: rulesError }] = await Promise.all([
+  const queries = [
     db.from("capacity_flags").select("kind_id, equalize, week_on, month_on").in("kind_id", ids),
     db.from("capacity_rules").select("kind_id, layer, day_of_month, weekday, hours").in("kind_id", ids),
-  ]);
+  ] as const;
+  const [{ data: flags, error: flagsError }, { data: rules, error: rulesError }] = await Promise.all([signal ? queries[0].abortSignal(signal) : queries[0], signal ? queries[1].abortSignal(signal) : queries[1]]);
   if (flagsError || rulesError) throw new Error("capacity-load-failed");
   const next = defaultCapacity();
   for (const kind of wanted) {

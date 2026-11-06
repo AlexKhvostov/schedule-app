@@ -1,0 +1,20 @@
+.dialog { position:fixed; inset:0; margin:auto; padding:0; width:min(520px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); overflow:hidden; border:1px solid var(--input); border-radius:14px; background:var(--card); color:var(--foreground); font-size:13px; box-shadow:0 24px 90px #0009; }
+.dialog::backdrop { background:rgb(3 8 16 / 70%); backdrop-filter:blur(3px); }
+.frame { display:flex; flex-direction:column; max-height:calc(100dvh - 34px); }
+.header { display:flex; flex:none; align-items:center; justify-content:space-between; gap:16px; padding:15px 18px; border-bottom:1px solid var(--border); background:var(--muted); }
+.header h2 { margin:0; min-width:0; overflow-wrap:anywhere; font-size:16px; font-weight:650; line-height:1.4; }
+.dialog button { color:var(--foreground); background:var(--muted); border:1px solid var(--input); border-radius:6px; min-height:32px; padding:5px 10px; font:inherit; cursor:pointer; }
+.dialog button:hover { border-color:var(--primary); background:var(--analytics-total); }
+.dialog button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.header button { flex:none; width:34px; height:34px; padding:0; font-size:24px; line-height:1; }
+.body { padding:16px 18px 20px; overflow:auto; overscroll-behavior:contain; line-height:1.55; }
+.body p { margin:0 0 12px; color:var(--muted-foreground); }
+.body p:last-child { margin-bottom:0; }
+.body dl { margin:16px 0; padding:12px; background:var(--background); border:1px solid var(--border); border-radius:8px; }
+.body dd { color:var(--analytics-green-ink,var(--foreground)); font-weight:650; }
+@media(max-width:520px) { .dialog { width:calc(100vw - 24px); max-height:calc(100dvh - 24px); } .frame { max-height:calc(100dvh - 26px); } .header { padding:12px 14px; } .body { padding:14px; } }
+
+.wide { width:min(860px,calc(100vw - 32px)); }
+@media(max-width:520px) { .wide { width:calc(100vw - 24px); } }
+
+.compact .header { padding:9px 12px; }.compact .header h2 { font-size:14px; }.compact .header button { width:28px; height:28px; min-height:28px; font-size:22px; }.compact .body { padding:10px 12px; }

@@ -20,10 +20,11 @@ import { CompactMenu, CompactMenuGroup, CompactMenuItem } from "@/components/ui/
 import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
-import { defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
+import { canAccessDashboard, defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
 import "./v2.css";
 import { ClubLimitPaletteProvider } from "./ClubLimitPalette";
 
+const Dashboard = lazy(() => import("../analytics").then((module) => ({ default: module.Dashboard })));
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
 const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
 const V2Admin = lazy(() => import("./V2Admin").then((module) => ({ default: module.V2Admin })));
@@ -87,6 +88,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const can = (permission: string) => isRoot || menuPermissions.includes(permission);
   const canGrid = session.access === "active" && can("schedule");
   const canProfile = can("profile");
+  const canDashboard = canAccessDashboard({ isRoot, permissions: menuPermissions, access: session.access });
   const canPriorities = session.access === "active" && (can("priorities") || can("schedule"));
   const canPeople = can("admin.people");
   const canScheduleAdmin = can("schedule.manage");
@@ -126,6 +128,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
     const hashes: Record<string, string> = {
       schedule: "schedule",
       priorities: "priorities",
+      dashboard: "dashboard/points",
       cabinet: "cabinet",
       uikit: "uikit",
       blocks: "blocks",
@@ -145,6 +148,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const pages: StaffItem[] = [
     ...(canGrid ? [{ key: "schedule" as const, label: t("nav.schedule"), icon: "fa-calendar-days" }] : []),
     ...(canPriorities ? [{ key: "priorities" as const, label: t("nav.priorities"), icon: "fa-ranking-star" }] : []),
+    ...(canDashboard ? [{ key: "dashboard" as const, label: t("nav.dashboard"), icon: "fa-chart-simple" }] : []),
   ];
   const brandTarget = defaultShellPage(navigationContext);
   const brandLabel = brandTarget === "schedule" ? t("nav.schedule") : brandTarget === "cabinet" ? t("nav.cabinet") : t("nav.menu");
@@ -172,10 +176,11 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
     if (page === "cabinet" && !canProfile) setPage(fallback);
     if (page === "schedule" && !canGrid) setPage(fallback);
     if (page === "priorities" && !canPriorities) setPage(fallback);
+    if (page === "dashboard" && !canDashboard) setPage(fallback);
     if ((page === "admin-people" || page === "admin-distance") && !canPeople) setPage(fallback);
     if (page === "admin-schedule" && !canScheduleAdmin) setPage(fallback);
     if (page === "root-api" && !navigationContext.isRoot) setPage(fallback);
-  }, [navigationContext, session.access, page, canProfile, canGrid, canPriorities, canPeople, canScheduleAdmin]);
+  }, [navigationContext, session.access, page, canProfile, canGrid, canPriorities, canDashboard, canPeople, canScheduleAdmin]);
 
   useEffect(() => {
     const sync = () => setPage(resolveShellPage(navigationContext, window.location.hash));
@@ -242,7 +247,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
         className={`v2-root is-kit-base theme-${theme} flex min-h-0 flex-col overflow-hidden`}
         style={(slotTheme ? slotThemeVars(slotTheme) : undefined) as CSSProperties | undefined}
       >
-        <header className="v2-top">
+        <header className={`v2-top${canDashboard ? " has-dashboard" : ""}`}>
           <div className="v2-top-start">
             <button
               type="button"
@@ -260,6 +265,8 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
                   key={item.key}
                   type="button"
                   className={`v2-nav-link${page === item.key ? " is-on" : ""}`}
+                  aria-label={item.label}
+                  title={item.label}
                   onClick={() => goPage(item.key)}
                 >
                   <i className={`fa-solid ${item.icon}`} />
@@ -411,6 +418,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
         </header>
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
           <Suspense fallback={<div className="min-h-0 flex-1" aria-busy="true" />}>
+          {canDashboard && page === "dashboard" && <Dashboard key={session.memberId ?? session.nick} />}
           {page === "wait" && <V2Wait session={session} onSession={onSession} onCabinet={() => goPage(canProfile ? "cabinet" : brandTarget)} />}
           {canProfile && page === "cabinet" && (
             <div className="v2-cab-stage min-h-0 flex-1 overflow-auto">

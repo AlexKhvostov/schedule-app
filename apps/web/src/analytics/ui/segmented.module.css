@@ -1,0 +1,10 @@
+.group { display:flex; align-items:center; gap:8px; border:0; padding:0; margin:0; min-width:0; }
+.group legend { float:left; padding:0; margin-right:8px; color:var(--muted-foreground); font-size:11px; line-height:30px; }
+.options { display:flex; gap:4px; flex-wrap:wrap; }
+.options label { position:relative; cursor:pointer; }
+.options input { position:absolute; opacity:0; width:1px; height:1px; }
+.options span { display:flex; align-items:center; min-height:30px; padding:4px 9px; border:1px solid var(--border); border-radius:5px; font-size:12px; color:var(--muted-foreground); background:var(--background); }
+.options input:checked+span { color:var(--foreground); border-color:var(--primary); background:var(--analytics-total); }
+.options input:focus-visible+span { outline:2px solid var(--ring); outline-offset:2px; }
+.options label:hover span { color:var(--foreground); border-color:var(--primary); }
+@media(max-width:520px) { .group { flex-wrap:wrap; } .options span { padding-inline:8px; min-height:34px; } }

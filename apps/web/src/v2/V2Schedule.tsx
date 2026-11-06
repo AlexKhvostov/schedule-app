@@ -37,6 +37,7 @@ import {
 } from "./myShifts";
 import { loadPrefs, savePrefs } from "./prefs";
 import { rosterTableWidth, ScheduleRoster } from "./schedule/ScheduleRoster";
+import { ScheduleSyncStatus, ScheduleSyncNotice } from "./schedule/ScheduleSyncStatus";
 import { ScheduleToolbar } from "./schedule/ScheduleToolbar";
 import { ScheduleLoading } from "./schedule/ScheduleLoading";
 import { ScheduleViewSettings } from "./schedule/ScheduleViewSettings";
@@ -69,7 +70,7 @@ type Props = {
   onKindChange?: (kind: "nitro" | "regular") => void;
 };
 
-export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = "theme", memberId, highlightPreferencesKey, canActAs = false, canManagePeople = false, onKindChange }: Props) {
+export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, hourLoad, skin = "theme", memberId, highlightPreferencesKey, canActAs = false, canManagePeople = false, onKindChange }: Props) {
   const { t, i18n } = useTranslation();
   const isKit = skin === "theme";
   const year = cursor.getFullYear();
@@ -107,16 +108,19 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
   const [userPos, setUserPos] = useWindowPos("user-card", () => centerPos(360, 320));
   const [front, setFront] = useState<"fill" | "people" | "hours" | "calendar" | "settings" | "user">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
-  const { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits } = useScheduleRules({ kindsRef, setLimits, t });
+  const month = useScheduleMonth({ year, monthIndex, t });
+  const capacity = month.context?.capacity ?? initialCapacity;
+  const [syncPrompt, setSyncPrompt] = useState<{ x: number; y: number } | null>(null);
+  const explainBlocked = useCallback((point?: { x: number; y: number }) => setSyncPrompt(point ?? { x: window.innerWidth / 2, y: 100 }), []);
+  const { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits } = useScheduleRules({ kindsRef, setLimits, t, context: month.context });
   const brush = useScheduleBrush({
     memberId, mayActAs: canActAs || allowActAs, editByButton, canEdit, limitMarks,
   });
   const { selfMark, me, actingId, actingRef, selfId, selfIdRef, accessRef, selectedPlayPairsRef, brushAccessRef, players, tablePresets, tablePresetOwnerId, actPlayers, applyActAs, loadTablePresetsForPlayer, selectTablePreset } = brush;
-  const month = useScheduleMonth({ year, monthIndex, selfId, actingId, actingRef, t });
   const { setGridStore, busyRemote, requestedLimits, fetchKey, gridLoading, shownGridStore } = month;
 
   const { overwriteAsk, setOverwriteAsk, overwriteBusy, missingPlayPair, setMissingPlayPair, onGridChange, confirmOverwrite } = useScheduleMutations({
-    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language: i18n.language,
+    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language: i18n.language, onSyncBlocked: explainBlocked,
   });
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const mayActAs = canActAs || allowActAs;
@@ -447,8 +451,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
         filters={{ year, monthIndex, onCursorChange, shiftMonth, limits, kinds, filterOptionLimits, toggleLimit, toggleKind, fieldMarks }}
         display={{ editGlow, editPulse, touchLayout, mayActAs, paintOn, countTables, editByButton, canEdit, toggleEdit, isKit, busyHint, setBusyHint }}
         tools={tools}
+        syncStatus={<ScheduleSyncStatus month={month} prompt={syncPrompt} onClose={() => setSyncPrompt(null)} />}
       />
 
+      <ScheduleSyncNotice month={month} onOpen={() => explainBlocked()} />
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div className="v2-sched-field" inert={gridLoading} aria-busy={gridLoading} style={gridLoading ? { visibility: "hidden" } : undefined}>
@@ -465,7 +471,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity, hourLoad, skin = 
               displayRange={displayRange}
               workHours={workHours}
               showTip={showTip}
-              canEdit={paintOn && !gridLoading}
+              canEdit={paintOn && !gridLoading && month.canWrite}
+              onEditBlocked={paintOn && !month.canWrite ? explainBlocked : undefined}
               quietEdit={!editGlow || !editPulse}
               focus={focus}
               kinds={kinds}

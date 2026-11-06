@@ -178,3 +178,17 @@ describe("schedule mutation orchestration", () => {
     expect(mocks.notify).not.toHaveBeenCalled();
   });
 });
+
+
+it("blocks a mark and an already-open overwrite confirmation when freshness is lost", async () => {
+  const before = foreignAsk();
+  const month = new ScheduleMonthState({ "nitro:50": before }, ["nitro"], true);
+  month.replaceLocal({ "nitro:50": before });
+  const blocked = vi.fn();
+  const actions = StartMutations(month, { current: "self" }, { onSyncBlocked: blocked });
+  actions.onGridChange("nitro", "50", patchSeat(before, 20, 3, 0, self));
+  actions.confirmOverwrite();
+  expect(blocked).toHaveBeenCalledTimes(2);
+  expect(mocks.atomic).not.toHaveBeenCalled();
+  expect(month.pendingCount).toBe(0);
+});

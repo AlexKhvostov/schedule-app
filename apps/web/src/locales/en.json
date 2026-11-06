@@ -42,7 +42,15 @@
     "scope": "Only you see this preview. Saving updates colors and slot tint for the whole club; label colors also update in the calendar and JPEG. Resetting colors also needs to be saved."
   },
   "online": {
-    "title": "Online",
+    "total": "Total: {{count}}",
+    "order": "Last 24 hours · most recent activity first",
+    "showEdits": "Show latest edits",
+    "listLabel": "Members by latest activity",
+    "connected": "Page open",
+    "away": "Away",
+    "presenceHelp": "The time on the right is the last interaction: a click or typing. An open page may be in the background.",
+    "emptyVisitors": "No visits in the last 24 hours.",
+    "title": "On site",
     "present": "On site",
     "recent": "Recently seen",
     "justNow": "Just now",
@@ -110,6 +118,7 @@
     }
   },
   "nav": {
+    "dashboard": "Dashboard",
     "home": "Home",
     "schedule": "Schedule",
     "archive": "Archive",
@@ -398,6 +407,30 @@
     "coverage100": "100 · 100%"
   },
   "schedule": {
+    "sync": {
+      "title": "Schedule freshness",
+      "label": "Schedule: {{status}}",
+      "current": "Up to date",
+      "checking": "Checking…",
+      "reconnecting": "Reconnecting…",
+      "error": "Updates paused",
+      "uncertain": "Checking save",
+      "demo": "Demo",
+      "demoDescription": "Local demo data. No server connection is used.",
+      "automatic": "The schedule updates automatically. Your usual editing permissions apply.",
+      "intro": "The schedule updates automatically. A warning will appear here if the connection is lost.",
+      "blocked": "We cannot verify the schedule is up to date. Adding and removing marks is temporarily unavailable. We are reconnecting automatically.",
+      "checkingDescription": "Checking marks and settings. Editing will be available after the update.",
+      "uncertainDescription": "The save has not been confirmed. Waiting for the server; new edits are paused. If you reload the page, check whether your mark was saved.",
+      "recovered": "Schedule updated. Please try your action again.",
+      "paused": "Updates paused. Editing is temporarily unavailable.",
+      "checked": "Last full check: {{time}}",
+      "refresh": "Refresh data",
+      "reconnect": "Reconnect",
+      "reload": "Reload page",
+      "details": "Details",
+      "close": "Close"
+    },
     "openProfile": "Open profile",
     "profileAdminsOnly": "Available to administrators only",
     "profileLoading": "Loading profile…",
@@ -1328,6 +1361,7 @@
       "tabRoles": "Roles",
       "tabDiscord": "Discord members",
       "tabSettings": "Settings",
+      "dashboardAccess": "Dashboard",
       "roleSettingsTitle": "Roles and access",
       "roleSettingsLead": "Role order, service sections, and individual schedule limits.",
       "roleListLead": "Drag a role to reorder it; select the row to edit access.",

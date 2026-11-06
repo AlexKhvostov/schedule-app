@@ -1,0 +1,21 @@
+# Secrets and private runtime state must never accompany the imported source.
+.env*
+!.env.example
+node_modules/
+dist/
+hostland-upload/
+runtime/
+backups/
+dumps/
+*.log
+*.csv
+*.tsv
+*.sqlite*
+*.db
+*.pem
+*.key
+upstream/api/cache/*
+!upstream/api/cache/.htaccess
+!upstream/api/cache/.gitkeep
+# The old reference includes embedded credentials and private screenshots.
+upstream/ref/

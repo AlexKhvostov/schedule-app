@@ -1,0 +1,24 @@
+{
+  "name": "maxwin-analytics-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "apexcharts": "^6.6.1",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "vue3-apexcharts": "^1.11.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^6.2.0"
+  }
+}

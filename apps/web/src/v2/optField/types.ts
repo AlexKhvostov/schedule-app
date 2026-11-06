@@ -26,6 +26,7 @@ export type OptFieldProps = {
   workHours?: number[];
   showTip: boolean;
   canEdit: boolean;
+  onEditBlocked?: (point: TipPoint) => void;
   quietEdit?: boolean;
   focus: string;
   kinds: ScheduleVariant[];

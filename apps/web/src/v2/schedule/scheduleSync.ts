@@ -1,3 +1,4 @@
+import { readWithDeadline } from "../../data/readDeadline";
 import type { ScheduleSnapshot, ScheduleTarget, SnapshotRequest } from "../../data/scheduleSnapshot";
 import { monthGridKey } from "../../data/slots";
 import { ScheduleMonthState } from "./scheduleMonthState";
@@ -9,6 +10,7 @@ export class ScheduleSync {
   private directory = false;
   private running = false;
   private stopped = false;
+  private abort?: AbortController;
   private timer?: ReturnType<typeof setTimeout>;
   private previousPending = 0;
   private failures = 0;
@@ -16,7 +18,7 @@ export class ScheduleSync {
   private offEdits: () => void;
 
   constructor(private state: ScheduleMonthState, private year: number, private month: number,
-    private load: (request: SnapshotRequest) => Promise<ScheduleSnapshot>, private onError: () => void) {
+    private load: (request: SnapshotRequest, signal: AbortSignal) => Promise<ScheduleSnapshot>, private onError: () => void) {
     this.offState = state.subscribe(() => {
       const pending = state.pendingCount;
       if (this.previousPending && !pending) this.schedule();
@@ -27,6 +29,11 @@ export class ScheduleSync {
       if (!kind) return this.refresh();
       edits.forEach((edit) => this.invalidate({ kind_id: kind.id, date: `${year}-${String(month).padStart(2, "0")}-${String(edit.dayIdx + 1).padStart(2, "0")}` }));
     });
+  }
+
+  requireRefresh(update: Parameters<ScheduleMonthState["invalidateHealth"]>[0] = {}) {
+    this.state.invalidateHealth(update); this.full = true; this.abort?.abort();
+    clearTimeout(this.timer); this.timer = undefined; this.schedule(0);
   }
 
   refresh() { this.full = true; this.schedule(0); }
@@ -40,7 +47,7 @@ export class ScheduleSync {
 
   private schedule(delay = 100) {
     // Do not restart the timer: continuous edits must not postpone updates indefinitely.
-    if (this.stopped || this.running || this.timer !== undefined || this.state.pendingCount) return;
+    if (this.stopped || this.state.snapshot.health.hidden || this.running || this.timer !== undefined || this.state.pendingCount) return;
     this.timer = setTimeout(() => { this.timer = undefined; void this.pull(); }, delay);
   }
 
@@ -52,33 +59,36 @@ export class ScheduleSync {
 
   private async pull() {
     if (this.stopped || this.running || this.state.pendingCount || (!this.full && !this.directory && !this.targets.size)) return;
-    const full = this.full || !this.state.snapshot.ready;
+    const full = this.full || !this.state.snapshot.ready || !this.state.snapshot.health.verified;
     const request: SnapshotRequest = full ? { targets: null } : this.targets.size ? { targets: [...this.targets.values()] } : { targets: null, directoryOnly: true };
     if (full) { this.full = false; this.targets.clear(); this.directory = false; }
     else if (request.directoryOnly) this.directory = false;
     else this.targets.clear();
     this.running = true;
+    this.abort = new AbortController();
     const generation = this.state.startLoad();
     this.state.reportProgress(generation, { completedPages: 0, totalPages: 1 });
     let failed = false;
     try {
-      const data = await this.load(request);
+      const data = await readWithDeadline(signal => this.load(request, signal), 15000, this.abort.signal);
       if (this.stopped) return;
       if (!this.state.acceptSnapshot(generation, data, request)) this.requeue(request);
       this.failures = 0;
     } catch {
       if (this.stopped) return;
-      this.requeue(request);
+      if (this.abort?.signal.aborted) { this.requeue(request); return; }
+      this.full = true;
       this.state.failLoad(generation);
       if (!this.failures++) this.onError();
       failed = true;
     } finally {
       this.running = false;
-      if (!this.stopped && (this.full || this.directory || this.targets.size) && (!failed || this.state.snapshot.ready)) {
+      this.abort = undefined;
+      if (!this.stopped && (this.full || this.directory || this.targets.size)) {
         this.schedule(failed ? Math.min(15000, 1000 * 2 ** Math.min(this.failures, 4)) : 50);
       }
     }
   }
 
-  stop() { this.stopped = true; clearTimeout(this.timer); this.offState(); this.offEdits(); }
+  stop() { this.stopped = true; this.abort?.abort(); clearTimeout(this.timer); this.offState(); this.offEdits(); }
 }

@@ -1,0 +1,381 @@
+{
+  "importedAt": "2026-11-05T16:26:53+03:00",
+  "source": "D:/_P_R_O_J_E_C_T/RedParty/winamaxScraper/v2/analytics",
+  "status": "source-only, not integrated, not authorized for deployment",
+  "excluded": [
+    ".env and other real environment files",
+    "ref/ (legacy, embedded credentials, player screenshot)",
+    "hostland-upload/",
+    "app/dist/",
+    "node_modules/",
+    "api/cache/ except .htaccess and .gitkeep"
+  ],
+  "files": [
+    {
+      "path": "api/.htaccess",
+      "sourceSha256": "bf90b26fef8c37657200001edc52e55b49b421821773ffe0b0677e7ef5e7aa8a",
+      "copiedSha256": "bf90b26fef8c37657200001edc52e55b49b421821773ffe0b0677e7ef5e7aa8a",
+      "transformation": null
+    },
+    {
+      "path": "api/bootstrap.php",
+      "sourceSha256": "2500f5efc34b52caf84a379cd6c3e4cefcf51a89116a02e59e63807581eaa0a9",
+      "copiedSha256": "2500f5efc34b52caf84a379cd6c3e4cefcf51a89116a02e59e63807581eaa0a9",
+      "transformation": null
+    },
+    {
+      "path": "api/cache/.gitkeep",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "copiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "transformation": null
+    },
+    {
+      "path": "api/cache/.htaccess",
+      "sourceSha256": "fa28d421a28ed9b6f4b997d5119c2b8adbacff6e2dd119a179b71230f9664934",
+      "copiedSha256": "fa28d421a28ed9b6f4b997d5119c2b8adbacff6e2dd119a179b71230f9664934",
+      "transformation": null
+    },
+    {
+      "path": "api/config/downtime.json",
+      "sourceSha256": "241a0dd4346b7c566efbbf43dabf67199c7602ef302151d3b4048161d0e33a67",
+      "copiedSha256": "241a0dd4346b7c566efbbf43dabf67199c7602ef302151d3b4048161d0e33a67",
+      "transformation": null
+    },
+    {
+      "path": "api/index.php",
+      "sourceSha256": "8d144ccb123bdd31ef838217481536b6850de5781861bbf3f110698af0208ea2",
+      "copiedSha256": "8d144ccb123bdd31ef838217481536b6850de5781861bbf3f110698af0208ea2",
+      "transformation": null
+    },
+    {
+      "path": "api/router-dev.php",
+      "sourceSha256": "0e56cb3fc2ee1fbf23a732c016b52be85f3563113064338efa4cfc232b6228a2",
+      "copiedSha256": "0e56cb3fc2ee1fbf23a732c016b52be85f3563113064338efa4cfc232b6228a2",
+      "transformation": null
+    },
+    {
+      "path": "api/routes/admin.php",
+      "sourceSha256": "16ee8abc46b7e7deb54566d427c88a95b9ca793fd61d9a8e720b592cd33f063a",
+      "copiedSha256": "16ee8abc46b7e7deb54566d427c88a95b9ca793fd61d9a8e720b592cd33f063a",
+      "transformation": null
+    },
+    {
+      "path": "api/routes/notes.php",
+      "sourceSha256": "4f77f6c865b18dd0989396bb46bd6b9edb9632571203627266fc3b87d5ac59a5",
+      "copiedSha256": "4f77f6c865b18dd0989396bb46bd6b9edb9632571203627266fc3b87d5ac59a5",
+      "transformation": null
+    },
+    {
+      "path": "api/routes/regs.php",
+      "sourceSha256": "8edb54347e10dc9b4796cd595bed0043ec3f90c564270975d4b02153a18f8fe8",
+      "copiedSha256": "8edb54347e10dc9b4796cd595bed0043ec3f90c564270975d4b02153a18f8fe8",
+      "transformation": null
+    },
+    {
+      "path": "api/routes/reports.php",
+      "sourceSha256": "c25c5cadc0ce416652e1329d4218a8da92ea178cd0f8b2f323f460caadd975bb",
+      "copiedSha256": "c25c5cadc0ce416652e1329d4218a8da92ea178cd0f8b2f323f460caadd975bb",
+      "transformation": null
+    },
+    {
+      "path": "api/serve.js",
+      "sourceSha256": "c66a0714d7c18e4bf4502cc6e88423c39070161daa087a601ae88b1803cdf17c",
+      "copiedSha256": "c66a0714d7c18e4bf4502cc6e88423c39070161daa087a601ae88b1803cdf17c",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_hour_slice.sql",
+      "sourceSha256": "15eae9ffa90b989ef61e082696be909f20ebaae182f64154672e8ca3f5d9c8ae",
+      "copiedSha256": "15eae9ffa90b989ef61e082696be909f20ebaae182f64154672e8ca3f5d9c8ae",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_player_hour.sql",
+      "sourceSha256": "9818589bdde4a806e3b4fff7800116e3f057ec1b78d4aaddb97697b022359d2a",
+      "copiedSha256": "9818589bdde4a806e3b4fff7800116e3f057ec1b78d4aaddb97697b022359d2a",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_player_hour_day.sql",
+      "sourceSha256": "f080d5cf867bc7701b23c884a40ce2b4066e59aaae35b4c4c7b323688c14fd88",
+      "copiedSha256": "f080d5cf867bc7701b23c884a40ce2b4066e59aaae35b4c4c7b323688c14fd88",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_player_notes.sql",
+      "sourceSha256": "b6b7fb3192283bdf92bf3177bc68e57e19ebddf6b8b8d4830718ef741f559ada",
+      "copiedSha256": "b6b7fb3192283bdf92bf3177bc68e57e19ebddf6b8b8d4830718ef741f559ada",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_regs.sql",
+      "sourceSha256": "b22cfbc198b998aaf3e90bcc0913ab26bda3357f4be0aa21d73616f62c9b329d",
+      "copiedSha256": "b22cfbc198b998aaf3e90bcc0913ab26bda3357f4be0aa21d73616f62c9b329d",
+      "transformation": null
+    },
+    {
+      "path": "api/sql/analytics_scrape_hour.sql",
+      "sourceSha256": "1d6ba22a885d80c49dcd5224e00ca19e8f475aac0fb0f4a559b94475a6e86986",
+      "copiedSha256": "1d6ba22a885d80c49dcd5224e00ca19e8f475aac0fb0f4a559b94475a6e86986",
+      "transformation": null
+    },
+    {
+      "path": "app/index.html",
+      "sourceSha256": "ec393436db6a3031ed1efddb8e01c65082e90488b5fb83128a3535645fe059d1",
+      "copiedSha256": "ec393436db6a3031ed1efddb8e01c65082e90488b5fb83128a3535645fe059d1",
+      "transformation": null
+    },
+    {
+      "path": "app/package-lock.json",
+      "sourceSha256": "bbde25558714af0e24a4650405fef3e690b2e57878587a619c36a2799ec5ebc0",
+      "copiedSha256": "bbde25558714af0e24a4650405fef3e690b2e57878587a619c36a2799ec5ebc0",
+      "transformation": null
+    },
+    {
+      "path": "app/package.json",
+      "sourceSha256": "5f3870b5a3f3eb13c5ba5d29838c63e6b272861a6bd2687cd35d7307bf07a91a",
+      "copiedSha256": "5f3870b5a3f3eb13c5ba5d29838c63e6b272861a6bd2687cd35d7307bf07a91a",
+      "transformation": null
+    },
+    {
+      "path": "app/src/api.js",
+      "sourceSha256": "f3b7addc6b4bcd938ac9111dde259c2ba4b4f68f4f9c3a8cef1cec37c60bf92e",
+      "copiedSha256": "f3b7addc6b4bcd938ac9111dde259c2ba4b4f68f4f9c3a8cef1cec37c60bf92e",
+      "transformation": null
+    },
+    {
+      "path": "app/src/App.vue",
+      "sourceSha256": "51363a0e99e8377d62a895c4a7760a2a5dc4f0d0df4c07e0dff27337fe5cb94a",
+      "copiedSha256": "51363a0e99e8377d62a895c4a7760a2a5dc4f0d0df4c07e0dff27337fe5cb94a",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/AppChart.vue",
+      "sourceSha256": "e12ff082164f888d570b4ee16a4633de1f0164b887ad2e88699ee80a354c37b4",
+      "copiedSha256": "e12ff082164f888d570b4ee16a4633de1f0164b887ad2e88699ee80a354c37b4",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/FilterBar.vue",
+      "sourceSha256": "e3b640c7b0d1becb531a9ee99eee8cc4f70abe006491782f559bac7728b3f4e6",
+      "copiedSha256": "e3b640c7b0d1becb531a9ee99eee8cc4f70abe006491782f559bac7728b3f4e6",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/HeatmapCellLabel.vue",
+      "sourceSha256": "632a9f7ca674ebc598376bd8af0a800f701191baafa82a97ae5e8ca7163f2842",
+      "copiedSha256": "632a9f7ca674ebc598376bd8af0a800f701191baafa82a97ae5e8ca7163f2842",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/HeatmapFloatTip.vue",
+      "sourceSha256": "a6fda46dd75a427742d9df3df2cafc18ea70d196971b2329942bf0bdfeaaa5b8",
+      "copiedSha256": "a6fda46dd75a427742d9df3df2cafc18ea70d196971b2329942bf0bdfeaaa5b8",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/InfoTip.vue",
+      "sourceSha256": "3955293fbd4f1bb75b3dbf4f883855ac561dd737255d85b3e1e2ffc430c261ab",
+      "copiedSha256": "3955293fbd4f1bb75b3dbf4f883855ac561dd737255d85b3e1e2ffc430c261ab",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/LoadingBox.vue",
+      "sourceSha256": "5bf51ccda2f1415de88cb9b06b16717b1faac572661ef283af94bc50b998c0f9",
+      "copiedSha256": "5bf51ccda2f1415de88cb9b06b16717b1faac572661ef283af94bc50b998c0f9",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/MonthHeatmapGrid.vue",
+      "sourceSha256": "1e70feaf5ce80f8ac30771ca74df0d3246c84f01b227779280c0e95545ffe1be",
+      "copiedSha256": "1e70feaf5ce80f8ac30771ca74df0d3246c84f01b227779280c0e95545ffe1be",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/RegsDrawer.vue",
+      "sourceSha256": "d015489ce9e4724aa2db7981ce1f27aeb03edb5a6a9d82b0f6ec815735023d77",
+      "copiedSha256": "d015489ce9e4724aa2db7981ce1f27aeb03edb5a6a9d82b0f6ec815735023d77",
+      "transformation": null
+    },
+    {
+      "path": "app/src/components/SpainClock.vue",
+      "sourceSha256": "4f326a49eb73689fbf0b843c5068782e45c491e23f4142603b89f76d9353d88b",
+      "copiedSha256": "4f326a49eb73689fbf0b843c5068782e45c491e23f4142603b89f76d9353d88b",
+      "transformation": null
+    },
+    {
+      "path": "app/src/main.js",
+      "sourceSha256": "9de732f72bf598e948a6f720e67bcc78d93df67c400b4685899706a0e8e6405a",
+      "copiedSha256": "9de732f72bf598e948a6f720e67bcc78d93df67c400b4685899706a0e8e6405a",
+      "transformation": null
+    },
+    {
+      "path": "app/src/router.js",
+      "sourceSha256": "5d98b61be880ca32ffd200e81803df06e3f02f4abb3199a3004b152fa52a74b6",
+      "copiedSha256": "5d98b61be880ca32ffd200e81803df06e3f02f4abb3199a3004b152fa52a74b6",
+      "transformation": null
+    },
+    {
+      "path": "app/src/stores/filters.js",
+      "sourceSha256": "11d091f5a8be5b673cb0324cb0e521261dba6c5c4373291770943d575319fa86",
+      "copiedSha256": "11d091f5a8be5b673cb0324cb0e521261dba6c5c4373291770943d575319fa86",
+      "transformation": null
+    },
+    {
+      "path": "app/src/stores/regs.js",
+      "sourceSha256": "cc4f2d9a8bbd0e723b766bec46a6d2eba24e9a1f354a499656f40a036bd304a3",
+      "copiedSha256": "cc4f2d9a8bbd0e723b766bec46a6d2eba24e9a1f354a499656f40a036bd304a3",
+      "transformation": null
+    },
+    {
+      "path": "app/src/styles.css",
+      "sourceSha256": "edd60daaf4a2cc3f36c51bce70468da0e38b9ca2f17c46a4f7f57a5ee450d2ea",
+      "copiedSha256": "edd60daaf4a2cc3f36c51bce70468da0e38b9ca2f17c46a4f7f57a5ee450d2ea",
+      "transformation": null
+    },
+    {
+      "path": "app/src/utils/heatmapTextStyle.js",
+      "sourceSha256": "b1a933102b1a0087d0e40e719694b0cb616542b1431c6c68cd09cf1add154165",
+      "copiedSha256": "b1a933102b1a0087d0e40e719694b0cb616542b1431c6c68cd09cf1add154165",
+      "transformation": null
+    },
+    {
+      "path": "app/src/utils/metrika.js",
+      "sourceSha256": "5725b50b9283e75258c6b9971efc4e2e80f59c2edea5bcb7efca9ee776de6e02",
+      "copiedSha256": "5725b50b9283e75258c6b9971efc4e2e80f59c2edea5bcb7efca9ee776de6e02",
+      "transformation": null
+    },
+    {
+      "path": "app/src/utils/spainTime.js",
+      "sourceSha256": "a11359642987bc2aad941da252bd8af2e17a1a3c24685320b71645c0b2add6c1",
+      "copiedSha256": "a11359642987bc2aad941da252bd8af2e17a1a3c24685320b71645c0b2add6c1",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/AdminView.vue",
+      "sourceSha256": "19756f633ca58b0481dd2c7e572891cfdd31406a3746358c27b04eabc41a1fe9",
+      "copiedSha256": "19756f633ca58b0481dd2c7e572891cfdd31406a3746358c27b04eabc41a1fe9",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/HeatmapView.vue",
+      "sourceSha256": "d2609aa619d0f933610981962c48fed76c4908fe3e644cc024dec14d4c9d7793",
+      "copiedSha256": "d2609aa619d0f933610981962c48fed76c4908fe3e644cc024dec14d4c9d7793",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/HomeView.vue",
+      "sourceSha256": "161a3f0880f81f001d05b36066174cefd35ec0a70d8c62a19e101bdb90f636c2",
+      "copiedSha256": "161a3f0880f81f001d05b36066174cefd35ec0a70d8c62a19e101bdb90f636c2",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/PlayersView.vue",
+      "sourceSha256": "c59e0f3240efe3fc2f3edecf163f62badb6244d5ec25e1193d4042524b019344",
+      "copiedSha256": "c59e0f3240efe3fc2f3edecf163f62badb6244d5ec25e1193d4042524b019344",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/PlayerView.vue",
+      "sourceSha256": "3926acdef4cd6c8647af594d22941fca0d6506eb8c5652c3e8f3f1dd95ae3b34",
+      "copiedSha256": "3926acdef4cd6c8647af594d22941fca0d6506eb8c5652c3e8f3f1dd95ae3b34",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/PointsView.vue",
+      "sourceSha256": "1efa1291c6dd299546f2553fdf8a35d510e9d21213d9e35f93d8c07991afa43f",
+      "copiedSha256": "1efa1291c6dd299546f2553fdf8a35d510e9d21213d9e35f93d8c07991afa43f",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/ProfileHubView.vue",
+      "sourceSha256": "6a787ee7feb1e771bf3215fe838f6085cc3b11d05ce4518942f548ee16d63832",
+      "copiedSha256": "6a787ee7feb1e771bf3215fe838f6085cc3b11d05ce4518942f548ee16d63832",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/SpeedView.vue",
+      "sourceSha256": "3e9a6063847ea17329ee004350403d26f76eed3e26ea0ac77f7456cb34def963",
+      "copiedSha256": "3e9a6063847ea17329ee004350403d26f76eed3e26ea0ac77f7456cb34def963",
+      "transformation": null
+    },
+    {
+      "path": "app/src/views/YearlyView.vue",
+      "sourceSha256": "c280cac57922220ae8ca23aa55bb3961d4d8dee84ea5712340c01e7035c1f3b0",
+      "copiedSha256": "c280cac57922220ae8ca23aa55bb3961d4d8dee84ea5712340c01e7035c1f3b0",
+      "transformation": null
+    },
+    {
+      "path": "app/vite.config.js",
+      "sourceSha256": "e93327c91afcda84a9334f4ea90ed08fb67e414c41c6eada5bbf783fcc55e95a",
+      "copiedSha256": "e93327c91afcda84a9334f4ea90ed08fb67e414c41c6eada5bbf783fcc55e95a",
+      "transformation": null
+    },
+    {
+      "path": "deploy-hostland.js",
+      "sourceSha256": "e606f37618ac5513f613642b3947a240ec28a92409af6ccba437dbb8342b989f",
+      "copiedSha256": "e606f37618ac5513f613642b3947a240ec28a92409af6ccba437dbb8342b989f",
+      "transformation": null
+    },
+    {
+      "path": "deploy-xampp.js",
+      "sourceSha256": "8364864d24df9bde7c80d72cfef99e11151633e75939d1ee2e7fa8f32ce37237",
+      "copiedSha256": "8364864d24df9bde7c80d72cfef99e11151633e75939d1ee2e7fa8f32ce37237",
+      "transformation": null
+    },
+    {
+      "path": "docs/AGGREGATES_AND_CACHE.md",
+      "sourceSha256": "8f5ef8ed6fdeccc18aa4aac3893146010c6cef0d734d88352d7bbf31de67d281",
+      "copiedSha256": "b12a7aa1e743d41a9435bc35254e4ec35c3c4bd7e11cfceb8fd84666b28bbd03",
+      "transformation": "Broken external DATA_POINTS_MAX link points to module dependency notes"
+    },
+    {
+      "path": "docs/POINTS_DENSITY.md",
+      "sourceSha256": "3eac3a55f35107fc3fb3d509ad84337b9281fd011936d85ef949d6e303183b52",
+      "copiedSha256": "3eac3a55f35107fc3fb3d509ad84337b9281fd011936d85ef949d6e303183b52",
+      "transformation": null
+    },
+    {
+      "path": "docs/TIMEZONE.md",
+      "sourceSha256": "901c99a05db9365c01d37d97d1094c1f8665475172e074fe0d22b6210a20d1a3",
+      "copiedSha256": "901c99a05db9365c01d37d97d1094c1f8665475172e074fe0d22b6210a20d1a3",
+      "transformation": null
+    },
+    {
+      "path": "php-local.ini",
+      "sourceSha256": "f6ad0e0db920405c27d314eef1097407275dccbc4d96be26b2908b04483ba7d2",
+      "copiedSha256": "f6ad0e0db920405c27d314eef1097407275dccbc4d96be26b2908b04483ba7d2",
+      "transformation": null
+    },
+    {
+      "path": "public/.htaccess",
+      "sourceSha256": "5e18e202174fd703052420bad43b6bdde7f1f98b7f415eb82a64e3a86fee39a8",
+      "copiedSha256": "5e18e202174fd703052420bad43b6bdde7f1f98b7f415eb82a64e3a86fee39a8",
+      "transformation": null
+    },
+    {
+      "path": "README.md",
+      "sourceSha256": "305e60c55b4e32346356fc1add53064d92cf9e67c1394fc088ee7b3d0b5a1394",
+      "copiedSha256": "2c0dc1243ae7302eb2acc0ad4b705039677d6dd50e843d7abac3b2204276fe0f",
+      "transformation": "External PHP_SECURITY link points to module dependency notes"
+    },
+    {
+      "path": "scripts/rebuild-player-hour.cjs",
+      "sourceSha256": "53e754b51eea2c98900d3bf4736bee2f106b181e14ed02019b72cc8f0dbeaa70",
+      "copiedSha256": "53e754b51eea2c98900d3bf4736bee2f106b181e14ed02019b72cc8f0dbeaa70",
+      "transformation": null
+    },
+    {
+      "path": "scripts/rebuild-status-panel.cjs",
+      "sourceSha256": "5e8fa173ed3708e1f9ff50a6e5517756dc3d76c868d40e9be379a72c071ab13b",
+      "copiedSha256": "5e8fa173ed3708e1f9ff50a6e5517756dc3d76c868d40e9be379a72c071ab13b",
+      "transformation": null
+    },
+    {
+      "path": ".env.example",
+      "sourceSha256": null,
+      "copiedSha256": "4e613032169998182b388e0ff7bc14b5f6efdd63ba2596c9f3cb9f8b1f822621",
+      "transformation": "Generated empty credentials template; no working values or default passwords"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { realtimeFixture } from "./realtimeFixture";
 import { expect, test, type Page } from "@playwright/test";
 import { LIMIT_OPTIONS } from "../src/schedule/capacity";
 
@@ -16,9 +17,10 @@ async function fixture(page: Page, failSecondPage = false) {
   await page.clock.setFixedTime(new Date("2026-11-04T08:00:00Z"));
   await page.addInitScript(({ user, token }) => {
     localStorage.setItem("sb-schedule-fixture-auth-token", JSON.stringify({ access_token: token, refresh_token: "fixture", token_type: "bearer", expires_at: 2208988800, expires_in: 3600, user }));
+    localStorage.setItem("schedule-sync-intro-v1", "1");
     localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits: ["50", "100"], kinds: ["nitro"], hidePastDays: false }));
   }, { user, token });
-  await page.routeWebSocket("wss://schedule-fixture.supabase.co/**", (socket) => socket.close());
+  await realtimeFixture(page);
   await page.route("https://schedule-fixture.supabase.co/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -51,6 +53,7 @@ async function fixture(page: Page, failSecondPage = false) {
       const identity = { member_id: member.id, provider: "email", username: "fixture" };
       return reply(single ? identity : [identity]);
     }
+    if (path.endsWith("/schedule_settings")) return reply({ edit_by_button: true });
     if (path.endsWith("/schedule_kinds")) return reply(["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant === "nitro" ? "n" : "e"}${limit}`, limit_id: limit, variant_id: variant }))));
     return reply(single ? null : []);
   });

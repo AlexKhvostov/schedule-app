@@ -1,0 +1,20 @@
+export const analyticsLimits = ["16-25", "50", "100", "250"] as const;
+export const audienceSegments = ["all", "regs", "ours", "theirs", "not_ours", "not_theirs", "nonregs"] as const;
+export const topOptions = ["10", "50", "100", "all"] as const;
+export const sortOptions = ["points", "speed", "name"] as const;
+export type AnalyticsLimit = typeof analyticsLimits[number];
+export type AudienceSegment = typeof audienceSegments[number];
+export type PointsFilters = { day: string; limit: AnalyticsLimit; players: string[]; segment: AudienceSegment };
+export type PointsControls = { top: typeof topOptions[number]; sort: typeof sortOptions[number] };
+export type PointsQuery = PointsFilters & PointsControls;
+export type HourCell = {
+  hour: number; carry: number | null; delta: number | null; speed: number | null;
+  empty: boolean; serverDown: boolean; stale: boolean; hasSnapshot: boolean;
+};
+export type PointsPlayer = { name: string; dayMax: number; maxSpeed: number; hours: HourCell[] };
+export type PointsHeatmap = { day: string; limit: AnalyticsLimit; players: PointsPlayer[]; total: number; downtime: number[] };
+export type RawPoint = { at: string; points: number; limit: AnalyticsLimit };
+export type PlayerSeries = { name: string; points: RawPoint[] };
+export type TimelinePoint = { minute: number; value: number | null };
+export type TimelineSeries = { name: string; values: TimelinePoint[] };
+export type PointsReport = { heatmap: PointsHeatmap; series: PlayerSeries[]; timelineError: boolean; missingPlayers: string[] };

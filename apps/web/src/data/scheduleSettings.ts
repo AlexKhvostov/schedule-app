@@ -115,15 +115,16 @@ export function toggleScheduleFilterLimit(
   return { ...current, [variant]: next };
 }
 
-export async function loadScheduleSettings(): Promise<ClubGridSettings> {
+export async function loadScheduleSettings(options?: { strict?: boolean; signal?: AbortSignal }): Promise<ClubGridSettings> {
   if (isDevSandboxEnabled()) return loadDemoScheduleSettings();
   const db = getSupabase();
   if (!db) return copySettings(EMPTY);
-  const { data } = await db
+  const query = db
     .from("schedule_settings")
     .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button, merge_adjacent_slots, filter_limits_nitro, filter_limits_regular")
-    .eq("id", true)
-    .maybeSingle();
+    .eq("id", true);
+  const { data, error } = await (options?.signal ? query.abortSignal(options.signal) : query).maybeSingle();
+  if (options?.strict && (error || !data)) throw new Error(error?.message ?? "schedule-settings-unavailable");
   return clubGridSettingsFromRow(data);
 }
 

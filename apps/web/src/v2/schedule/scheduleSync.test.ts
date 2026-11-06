@@ -53,7 +53,7 @@ describe("compact schedule reconciliation", () => {
     for (let n = 0; n < 30; n++) sync.invalidate(target);
     sync.invalidate({ ...target, date: "2026-12-04" });
     await vi.advanceTimersByTimeAsync(100);
-    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: [target] });
+    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: [target] }, expect.any(AbortSignal));
   });
 
   it("keeps an event received during an in-flight read for the next read", async () => {
@@ -80,7 +80,7 @@ describe("compact schedule reconciliation", () => {
     expect(load).not.toHaveBeenCalled();
     resolve(); await task;
     await vi.advanceTimersByTimeAsync(100);
-    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: [target] });
+    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: [target] }, expect.any(AbortSignal));
   });
 
   it("retries a failed patch without clearing visible marks", async () => {
@@ -118,7 +118,7 @@ describe("compact schedule reconciliation", () => {
     const { sync, state, load } = start();
     sync.invalidate(target); sync.refresh();
     await vi.advanceTimersByTimeAsync(100);
-    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: null });
+    expect(load).toHaveBeenCalledExactlyOnceWith({ targets: null }, expect.any(AbortSignal));
     let resolve!: (value: ScheduleSnapshot) => void;
     load.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     sync.invalidate(target); await vi.advanceTimersByTimeAsync(100);

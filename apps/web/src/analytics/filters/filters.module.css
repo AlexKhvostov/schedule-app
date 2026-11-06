@@ -1,0 +1,43 @@
+.bar { border:1px solid var(--border); background:var(--card); border-radius:10px; padding:9px 10px; }
+.bar header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:8px; }
+.bar h2 { margin:0; font-size:13px; font-weight:650; }
+.bar header span,.summary { color:var(--muted-foreground); font-size:11px; }
+.fields { display:grid; grid-template-columns:minmax(180px,1fr) minmax(230px,1.15fr) minmax(150px,.85fr) minmax(160px,1fr); gap:8px; }
+.field { display:flex; min-width:0; flex-direction:column; gap:6px; padding:8px; margin:0; border:1px solid var(--border); border-radius:7px; background:var(--background); color:var(--muted-foreground); font-size:11px; }
+.field:focus-within { border-color:var(--analytics-green); box-shadow:0 0 0 1px color-mix(in srgb,var(--analytics-green) 25%,transparent); }
+.field input,.field select,.field textarea { min-width:0; width:100%; height:32px; padding:5px 8px; color:var(--foreground); background:var(--card); border:1px solid var(--input); border-radius:5px; font:inherit; font-size:12px; color-scheme:inherit; }
+.field textarea { resize:vertical; min-height:32px; max-height:120px; }
+.dateRow { display:flex; gap:4px; } .dateRow input { flex:1; width:0; }
+.bar button { border:1px solid var(--input); border-radius:5px; background:var(--background); color:var(--foreground); min-height:30px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+.bar button:hover:not(:disabled) { border-color:var(--primary); background:var(--muted); }
+.dateRow button { padding:0 7px; font-size:19px; }
+.bar button:disabled { opacity:.45; cursor:default; }
+.bar .textButton { min-height:0; padding:0; border:0; background:none; color:var(--title); font-size:10px; }
+.footer { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-top:8px; }
+.actions { display:flex; flex-wrap:wrap; gap:6px; }
+.bar .primary { background:var(--analytics-apply); color:#fff; border-color:var(--analytics-apply); font-weight:600; }
+.bar .primary:hover:not(:disabled) { background:color-mix(in srgb,var(--analytics-apply) 85%,#fff); border-color:var(--analytics-green); }
+.summary { padding:0; margin:0; overflow-wrap:anywhere; line-height:1.4; }
+.bar :is(button,input,textarea,select):focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.bar header button { margin-left:auto; font-size:11px; min-height:24px; padding:2px 8px; }
+.field small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.footer p[role="status"] { flex-basis:100%; margin:0; color:var(--muted-foreground); font-size:11px; }
+.fieldHeading { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.choices { display:flex; gap:4px; min-width:0; }
+.choices label { position:relative; flex:1; min-width:0; cursor:pointer; }
+.choices input { position:absolute; opacity:0; width:1px; height:1px; }
+.choices span { display:flex; align-items:center; justify-content:center; min-height:32px; padding:3px 5px; border:1px solid var(--input); border-radius:5px; color:var(--foreground); font-size:12px; white-space:nowrap; background:var(--card); }
+.choices input:checked+span { color:var(--analytics-green-ink); border-color:var(--analytics-green); background:var(--analytics-green-bg); font-weight:650; }
+.choices input:focus-visible+span { outline:2px solid var(--ring); outline-offset:2px; }
+@media(max-width:1190px) { .fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) { .fields { grid-template-columns:minmax(0,1fr); } .bar header span { display:none; } }
+
+.footer { border-top:1px solid var(--border); padding-top:7px; gap:4px 10px; } .footer p[role="status"] { font-size:10px; }
+
+.playerSearch { position:relative; min-width:0; }
+.playerSearch textarea { display:block; }
+.suggestions { position:absolute; z-index:80; top:calc(100% + 4px); left:0; right:0; background:var(--card); border:1px solid var(--input); border-radius:6px; box-shadow:0 7px 20px #0004; max-height:210px; overflow:auto; overscroll-behavior:contain; color:var(--foreground); }
+.suggestions ul { list-style:none; margin:0; padding:3px; }
+.suggestions li { padding:6px 8px; border-radius:3px; font-size:12px; cursor:pointer; overflow-wrap:anywhere; }
+.suggestions li[aria-selected=true] { color:var(--title); background:var(--analytics-total); outline:1px solid var(--input); outline-offset:-1px; }
+.suggestions p { margin:0; padding:7px 10px; font-size:11px; color:var(--muted-foreground); }

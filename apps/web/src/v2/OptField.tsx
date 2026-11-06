@@ -33,6 +33,7 @@ export const OptField = memo(function OptField({
   workHours = DEFAULT_WORK_HOURS,
   showTip,
   canEdit,
+  onEditBlocked,
   quietEdit,
   focus,
   kinds,
@@ -75,7 +76,7 @@ export const OptField = memo(function OptField({
   );
   const visibleSlotCount = visibleHalves.length;
   const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu, onPointerOver, onPointerLeave } = useOptFieldPointer({
-    year, monthIndex, me, self, capacity, grids, onGridChange, dimPast, canEdit, skin, busy, canRemoveForeign, onOverwriteAsk, onForeignKept, workHours,
+    year, monthIndex, me, self, capacity, grids, onGridChange, dimPast, canEdit, onEditBlocked, skin, busy, canRemoveForeign, onOverwriteAsk, onForeignKept, workHours,
   }, rootRef, tipApi);
   const { onTouchStart, onTouchMove, onTouchEnd } = useOptFieldZoom({
     daysRef, tipApi, cellWidth, zoomEnabled, onCellWidthChange, onFitWidthChange, visibleSlotCount,

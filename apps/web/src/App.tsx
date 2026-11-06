@@ -6,8 +6,8 @@ import { findInvite } from "./v2/invites";
 import { clearSession, readSession, roleFor, takeInviteToken, writeSession, type Session } from "./v2/session";
 import { cursorFromPrefs } from "./v2/prefs";
 import { loadMembers } from "./schedule/members";
-import { V2Login } from "./v2/V2Login";
-import { V2JoinGate } from "./v2/V2JoinGate";
+
+
 import { V2BootScreen } from "./v2/V2BootScreen";
 import { liveAuthReady, loadLiveEntry, signOutLive } from "./data/auth";
 import { getSupabase } from "./data/client";
@@ -15,6 +15,8 @@ import { disableDevSandbox } from "./data/config";
 import "./v2/theme";
 import "./v2/v2.css";
 
+const V2Login = lazy(() => import("./v2/V2Login").then(module => ({ default: module.V2Login })));
+const V2JoinGate = lazy(() => import("./v2/V2JoinGate").then(module => ({ default: module.V2JoinGate })));
 const V2Shell = lazy(() => import("./v2/V2Shell").then((module) => ({ default: module.V2Shell })));
 
 function bootLocalSession(): Session | null {
@@ -95,7 +97,7 @@ export function App() {
 
   if (gate) {
     return (
-      <V2JoinGate
+      <Suspense fallback={<V2BootScreen />}><V2JoinGate
         nick={gate.nick}
         requestStatus={gate.requestStatus}
         requestKind={gate.requestKind}
@@ -106,12 +108,12 @@ export function App() {
           void signOutLive();
           setGate(null);
         }}
-      />
+      /></Suspense>
     );
   }
 
   if (!session) {
-    return <V2Login onEnter={setSession} />;
+    return <Suspense fallback={<V2BootScreen />}><V2Login onEnter={setSession} /></Suspense>;
   }
 
   return (

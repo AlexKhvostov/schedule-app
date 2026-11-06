@@ -1,5 +1,5 @@
 import type { MutableRefObject, RefObject } from "react";
-import { useCallback, useRef, type MouseEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent } from "react";
 import { monthGridKey } from "../../data/slots";
 import { hoursOf, weekdayOf } from "../../schedule/capacity";
 import { isPastSlot, readCet } from "../../schedule/cet";
@@ -15,9 +15,9 @@ import {
   type OverwritePerson
 } from "../optFieldModel";
 
-type Options = Pick<OptFieldProps, "year" | "monthIndex" | "me" | "self" | "capacity" | "grids" | "onGridChange" | "dimPast" | "canEdit" | "skin" | "busy" | "canRemoveForeign" | "onOverwriteAsk" | "onForeignKept" | "workHours"> & { workHours: number[]; canRemoveForeign: boolean };
+type Options = Pick<OptFieldProps, "year" | "monthIndex" | "me" | "self" | "capacity" | "grids" | "onGridChange" | "dimPast" | "canEdit" | "onEditBlocked" | "skin" | "busy" | "canRemoveForeign" | "onOverwriteAsk" | "onForeignKept" | "workHours"> & { workHours: number[]; canRemoveForeign: boolean };
 
-export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids, onGridChange, dimPast, canEdit, skin, busy, canRemoveForeign, onOverwriteAsk, onForeignKept, workHours }: Options, rootRef: RefObject<HTMLElement | null>, tipApi: MutableRefObject<TipApi>) {
+export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids, onGridChange, dimPast, canEdit, onEditBlocked, skin, busy, canRemoveForeign, onOverwriteAsk, onForeignKept, workHours }: Options, rootRef: RefObject<HTMLElement | null>, tipApi: MutableRefObject<TipApi>) {
   const propsRef = useRef({
     year,
     monthIndex,
@@ -28,6 +28,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     onGridChange,
     dimPast,
     canEdit,
+    onEditBlocked,
     skin,
     busy,
     canRemoveForeign,
@@ -46,6 +47,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     onGridChange,
     dimPast,
     canEdit,
+    onEditBlocked,
     skin,
     busy,
     canRemoveForeign,
@@ -65,9 +67,21 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     foreign: boolean;
   } | null>(null);
 
+  useEffect(() => {
+    const cancel = () => {
+      dragRef.current = null;
+      hidePick(rootRef.current);
+      if (rootRef.current) applyNav(rootRef.current, null);
+    };
+    if (!canEdit) cancel();
+    const onHidden = () => { if (document.visibilityState !== "visible") cancel(); };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => document.removeEventListener("visibilitychange", onHidden);
+  }, [canEdit, rootRef]);
+
   const applyRange = (origin: SlotHit, endHalf: number, mode: "place" | "remove") => {
     const p = propsRef.current;
-    if (!p.canEdit) return;
+    if (!p.canEdit) { p.onEditBlocked?.({ x: origin.x, y: origin.y }); return; }
     const now = readCet();
     const grid = p.grids[monthGridKey(origin.variant, origin.limit)];
     if (!grid?.[origin.dayIdx]) return;
@@ -245,6 +259,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     const mark = seats[hit.level];
     const own = isSelfSeat(mark, p.self ?? p.me);
     let mode: "place" | "remove" | "look" = "look";
+    if (!past && p.onEditBlocked) { p.onEditBlocked({ x: event.clientX, y: event.clientY }); return; }
     if (p.canEdit && !past) {
       if (own) mode = "remove";
       else if (mark && p.canRemoveForeign) mode = "remove";

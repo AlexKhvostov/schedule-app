@@ -352,3 +352,7 @@ erDiagram
 ## Исправление чтения прав чужой кисти — 5 ноября 2026
 
 [20261105112048_schedule_act_as_access.sql](../supabase/migrations/20261105112048_schedule_act_as_access.sql) заменяет только `effective_schedule_access(uuid[])`: помимо self/admin.people разрешает минимальное чтение пар вида/лимита активному автору с `schedule`, когда `schedule_settings.allow_act_as=true`. Пары получателя по-прежнему вычисляет `member_has_schedule_limit`; анонимный вызов запрещён, `search_path` пустой, ссылки на объекты квалифицированы. RPC записи и триггеры не меняются. `schedule_act_as.sql` проверяет обычного автора, настройку вкл/выкл, self/admin, блокировки, пустую метку, игровые/клубные лимиты, закрытое/занятое место, прошлое и отдельный запрет чужого удаления. Пока только локально; [результат](../memory/tasks/2026-11-05-act-as-fix.md).
+
+## Право Dashboard — локальная миграция 6 ноября 2026
+
+[20261106002512_dashboard_role_permission.sql](../supabase/migrations/20261106002512_dashboard_role_permission.sql) добавляет `dashboard` в app_permissions (module, sort35). Назначения существующим Discord-ролям не добавляются. Права вычисляются прежним member_access_context, запись назначений защищена прежней RLS для is_staff. Новых функций, таблиц и прав на данные аналитики нет. [SQL-контракт](../supabase/tests/dashboard_access.sql) проверяет выдачу/отзыв, root, блокировку, потерю Discord-роли и запрет самоназначения; только локальный тестовый стенд, Working не изменён.

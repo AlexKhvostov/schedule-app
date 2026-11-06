@@ -4139,6 +4139,28 @@ i.v2-staff-ico {
   }
 }
 
+/* Reserve real space for the third primary navigation action. */
+@media (max-width: 1180px) {
+  .v2-top.has-dashboard { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 8px; }
+  .v2-top.has-dashboard .v2-clock { justify-self: center; }
+}
+
+@media (max-width: 980px) {
+  .v2-top.has-dashboard .v2-nav-link span,
+  .v2-top.has-dashboard .v2-staff-hit span { display: none; }
+  .v2-top.has-dashboard .v2-nav-link,
+  .v2-top.has-dashboard .v2-staff-hit { padding: 0 8px; }
+}
+
+@media (max-width: 380px) {
+  .v2-top.has-dashboard { padding-inline: 8px; column-gap: 4px; }
+  .v2-top.has-dashboard .v2-top-start,
+  .v2-top.has-dashboard .v2-top-end { gap: 6px; }
+  .v2-top.has-dashboard .v2-clock { gap: 3px; padding-inline: 4px; }
+  .v2-top.has-dashboard .v2-clock-time { font-size: 14px; }
+  .v2-top.has-dashboard .v2-clock-tag { font-size: 8px; letter-spacing: 0; }
+}
+
 @media (max-width: 720px) {
   .v2-nav-link span,
   .v2-staff-hit span {
@@ -16648,3 +16670,12 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-prio-active-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; font-size: 12px; }
 .v2-prio-active-selection > [data-testid] { font-weight: 600; }
 .v2-roster-active-period { margin: 3px 0 6px; font-size: 11px; }
+
+/* Presence is a separate label; only last interaction orders the list. */
+.v2-online-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.v2-online-summary > span, .v2-online-presence { color: var(--muted-foreground); font-size: 0.65rem; }
+.v2-online-order { margin: 5px 0; }
+.v2-online-edits-toggle { display: flex; align-items: center; gap: 6px; min-height: 30px; font-size: 0.7rem; color: var(--muted-foreground); cursor: pointer; }
+.v2-online-member-line { justify-content: space-between; }
+.v2-online-presence { display: inline-flex; align-items: center; gap: 4px; }
+.v2-online-group .v2-online-edit-detail { margin-top: 4px; padding-left: 7px; border-left: 2px solid var(--border); }
