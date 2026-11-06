@@ -2,6 +2,11 @@ import { getSupabase } from "./client";
 import { isLiveData } from "./config";
 import { notifyPriorityDistanceChanged } from "./priorityRefresh";
 import { formatHands, type DistanceVariant } from "./distanceDump";
+import { LIMIT_OPTIONS } from "../schedule/capacity";
+
+export function distanceBookLimits(limits: readonly string[] = []) {
+  return [...new Set<string>([...LIMIT_OPTIONS, ...limits])].sort((a, b) => Number(a) - Number(b));
+}
 
 export type DistanceSort = "total" | "discord" | "game" | "distanceId" | "updated";
 export type DistanceIdFilter = "all" | "set" | "missing";
@@ -80,7 +85,7 @@ export function demoDistanceBook(monthStart: string, roomSlug = "winamax"): Dist
     }
     refreshDemoPerson(person);
   }
-  const book = { monthStart, roomSlug, months: [monthStart], limits: ["10", "25", "50", "100"], people: demoPeople, rowCount: 3, error: null };
+  const book = { monthStart, roomSlug, months: [monthStart], limits: distanceBookLimits(), people: demoPeople, rowCount: 3, error: null };
   demoBooks.set(key, book); return book;
 }
 
@@ -150,7 +155,7 @@ export async function loadDistanceBook(monthStart: string, roomSlug = "winamax")
     person.slices.sort((a, b) => a.variant.localeCompare(b.variant) || a.part - b.part);
     person.nick = person.discordNick || person.gameNick || person.playerId || person.nick;
   }
-  return { monthStart, roomSlug, months: (snapshot.months ?? []).map(String), limits: (snapshot.limits ?? []).map(String),
+  return { monthStart, roomSlug, months: (snapshot.months ?? []).map(String), limits: distanceBookLimits((snapshot.limits ?? []).map(String)),
     people: sortDistancePeople([...people.values()], "total", ["nitro", "regular"], "ru"), rowCount: (snapshot.entries ?? []).length, error: null };
 }
 
@@ -225,6 +230,10 @@ function csvValue(value: string | number) {
   return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 function csvId(value: string | null) { const text = String(value ?? "").trim(); return text && /^\d+$/.test(text) ? `="${text}"` : text; }
+export function distanceBookCsvFilename(roomSlug: string, monthStart: string, downloadedAt = new Date()) {
+  const stamp = downloadedAt.toISOString().replace(/:/g, "-");
+  return `distance-control-${roomSlug}-${monthStart.slice(0, 7)}_${stamp}.csv`;
+}
 export function distanceBookCsv(input: { monthStart: string; roomTitle: string; people: DistancePersonRow[]; limits: string[]; variants: DistanceVariant[];
   labels: Record<"month" | "room" | "distanceId" | "discordId" | "discordNick" | "gameNick" | "variant" | "part" | "comment" | "created" | "updated" | "total", string> }) {
   const header = [input.labels.month, input.labels.room, input.labels.distanceId, input.labels.discordId, input.labels.discordNick,

@@ -7,6 +7,7 @@ import { defaultCapacity, loadCapacity, saveCapacity, type VariantCapacityMap } 
 import { ClubHourLoadProvider, useClubHourLoad } from "./ClubHourLoad";
 import { isLiveData, supabaseUrl } from "../data/config";
 import { priorityFiltersStorageKey } from "./priorityFilterPrefs";
+import { distanceFiltersStorageKey } from "./distanceFilterPrefs";
 import { slotHighlightStorageKey } from "./slotHighlightPrefs";
 import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
@@ -79,6 +80,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const { t, i18n } = useTranslation();
   const nick = session.nick;
   const priorityPreferencesKey = priorityFiltersStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo");
+  const distancePreferencesKey = distanceFiltersStorageKey(session.memberId, isLiveData() ? supabaseUrl() : "demo");
   const permissions = session.permissions ?? [];
   const isRoot = session.role === "root";
   const menuPermissions = useMemo(
@@ -469,7 +471,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
           {isRoot && page === "root-api" && <div className="min-h-0 flex-1 overflow-auto"><ApiAdmin /></div>}
           {canPeople && page === "admin-distance" && (
             <div className="min-h-0 flex-1 overflow-auto">
-              <V2DistanceBook />
+              <V2DistanceBook key={distancePreferencesKey ?? nick} preferencesKey={distancePreferencesKey} />
             </div>
           )}
           {isRoot && page === "root-distance" && (

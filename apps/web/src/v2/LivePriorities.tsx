@@ -9,8 +9,17 @@ import { catalogRoles, RolePick } from "./RolePills";
 import { PersonAvatar } from "./PersonAvatar";
 import { PriorityCalculation, PrioritySnapshotRows, priorityMonthLabel as ml, priorityNumber as num, priorityPoints as points } from "./PriorityCalculation";
 import { closePriorityRequest, deletePriorityRequest, getPriorityRequest, listPriorityRequests, loadPriorityRequestAuthors, loadPriorityFilterRoles, loadPriorities, submitPriorityRequest, type PriorityRequestDetail, type PriorityRequestSummary } from "../data/priorities";
-import { currentPriorityPeriod, filterPriorities, isPriorityPreliminary, listHighPriorityParticipants, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityFilters, type PrioritySource } from "../schedule/priorities";
+import { currentPriorityPeriod, filterPriorities, listHighPriorityParticipants, priorityMonths, priorityToday, rankPriorities, shiftPriorityMonth, type CalculatedPriority, type PriorityFilters, type PrioritySource } from "../schedule/priorities";
 import { PriorityTabLabel, priorityTabs, type PriorityTab } from "./PriorityTabLabel";
+
+function PriorityPersonIdentity({ nick, gameNick, avatarUrl, detail }: {
+  nick: string; gameNick?: string; avatarUrl: string | null; detail?: string;
+}) {
+  return <><PersonAvatar label={nick} src={avatarUrl} size="sm" /><span className="v2-prio-person-text">
+    <span className="v2-prio-person-names"><span className="v2-prio-discord" title={nick}>{nick}</span>{gameNick && <><span aria-hidden="true">·</span><span className="v2-prio-game" title={gameNick}>{gameNick}</span></>}</span>
+    {detail && <small title={detail}>{detail}</small>}
+  </span></>;
+}
 
 function PriorityTooltip({ row, cell, anchor }: { row: CalculatedPriority; cell: number; anchor: HTMLElement }) {
   const ref = useRef<HTMLElement>(null);
@@ -147,10 +156,10 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   }, [requestList, canManage, canManageDemo, requestIds, t]);
   const periods = [...new Set([...Array.from({ length: 16 }, (_, i) => shiftPriorityMonth(currentPriorityPeriod(today), 3 - i * 3)), source?.activePeriod, period].filter((p): p is string => Boolean(p)))].sort().reverse();
   const summary = {
-    players: visible.length,
+    players: high ? visibleParticipants.length : visible.length,
     points: visible.reduce((sum, row) => sum + row.total, 0),
-    vip: visible.filter((row) => row.vip > 0 && !row.excluded).length,
-    excluded: visible.filter((row) => row.excluded).length,
+    vip: high ? (vipOn ? visibleParticipants.filter((row) => row.core !== null && !row.excluded).length : 0) : visible.filter((row) => row.vip > 0 && !row.excluded).length,
+    excluded: high ? visibleParticipants.filter((row) => row.excluded).length : visible.filter((row) => row.excluded).length,
   };
   const errorText = (code: string) => t(code === "priority-active-conflict" ? "priorities.activeConflict" : code === "priority-stale" ? "priorities.stale" : code === "priority-vip-exclusion-conflict" ? "priorities.vipConflict" : "priorities.operationError", { reason: code });
   const run = async (operation: () => Promise<{ error: string | null }>, onSuccess?: () => void) => {
@@ -193,14 +202,23 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
                 const revision = source.activeRevision;
                 if (revision !== undefined) void run(() => setActivePriority(period, revision, canManageDemo), () => setChosenPeriod(""));
               }}>{t("priorities.useForSorting")}</Button>}
+            {canManage && <Button size="sm" variant="outline" disabled={!current || busy || composing}
+              onClick={() => void run(() => loadPriorities(period, canManageDemo, kind, group, !high))}>
+              <i className="fa-solid fa-rotate-right" aria-hidden="true" />{t("priorities.refreshShort")}
+            </Button>}
           </div>}
         </div>
+        <div className="v2-prio-report-details">
         {period && <div className="v2-prio-window" id="priority-calculation-months">
           <span>{t("priorities.calculationMonths")}</span>
           <div>{[0, 3].map((i) => <span key={i}>
             {monthFormat.formatRange(new Date(months[i]), new Date(months[i + 2]))} <b>×{num(i === 0 ? 0.5 : 1, i18n.language)}</b>
           </span>)}</div>
         </div>}
+        {current?.calculatedAt && <time className="v2-prio-update-meta" dateTime={current.calculatedAt}>
+          {t("priorities.calculatedAt", { date: new Date(current.calculatedAt).toLocaleString(i18n.language, { timeZone: "Europe/Minsk", dateStyle: "short", timeStyle: "short" }) })}
+        </time>}
+        </div>
       </div>
       <section className="v2-prio-global-filters" aria-labelledby="priority-filters-heading">
         <h2 id="priority-filters-heading">{t("priorities.groups.filters")}</h2>
@@ -222,20 +240,16 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
         }}><PriorityTabLabel tab={key} /></button>)}
       </div>
       {priorityTabs.map((key) => <div key={key} id={`priority-panel-${key}`} role="tabpanel" aria-labelledby={`priority-tab-${key}`} hidden={tab !== key} tabIndex={0}>{tab === key && <>
-      <div className="v2-prio-matrix-meta">
-        <span className={`v2-prio-status${current && !high && !isPriorityPreliminary(current) ? " is-final" : ""}`}>{t(high ? "priorities.coreOnly" : current && !isPriorityPreliminary(current) ? "priorities.calculated" : "priorities.preliminary")}</span>
-      </div>
-      {!high && <><aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${t(`priorities.kinds.${kind}`)}`}>
-        <dl>{(["players", "points", "vip", "excluded"] as const).map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? (key === "points" ? points : num)(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
+      <aside className="v2-prio-summary" aria-label={`${t("priorities.summary.title")} · ${high ? "250–500" : t(`priorities.kinds.${kind}`)}`}
+        title={high ? t("priorities.combinedParticipants") : t("priorities.sliceDistanceHint", { kind: t(`priorities.kinds.${kind}`) })}>
+        <dl>{(["players", "points", "vip", "excluded"] as const).filter((key) => !high || key !== "points").map((key) => <div key={key} data-metric={key}><dt>{t(`priorities.summary.${key}`)}</dt><dd>{current ? (key === "points" ? points : num)(summary[key], i18n.language) : "—"}</dd></div>)}</dl>
       </aside>
-      <div className="v2-prio-actions"><div className="v2-prio-update-meta"><span>{current?.calculatedAt && t("priorities.calculatedAt", { date: new Date(current.calculatedAt).toLocaleString(i18n.language, { timeZone: "Europe/Minsk" }) })}</span><span className="v2-prio-rule">{t("priorities.finalRule", { n: current?.lastMonthEntries ?? 0 })}</span></div>{canManage && <Button size="sm" variant="outline" disabled={busy || composing} onClick={() => void run(() => loadPriorities(period, canManageDemo, kind, group, true))}>{t("priorities.refresh")}</Button>}</div></>}
-      <div className="v2-prio-actions"><span>{t("priorities.count", { n: high ? visibleParticipants.length : visible.length })}</span><span>{high ? t("priorities.combinedParticipants") : t("priorities.sliceDistanceHint", { kind: t(`priorities.kinds.${kind}`) })}</span></div>
       {loading && <p className="v2-muted">{t("priorities.loading")}</p>}
       {error && <div role="alert" className="v2-prio-error"><p>{t("priorities.loadError", { reason: error })}</p><Button size="sm" onClick={() => void refresh()}>{t("priorities.retry")}</Button></div>}
       {high && current && <div className="v2-prio-scroll"><table className="v2-prio-table is-core-only">
         <thead><tr><th scope="col" className="is-nick">{t("priorities.col.nick")}</th>{vipOn && <th scope="col" className="is-core" translate="no">Core</th>}</tr></thead>
         <tbody>{visibleParticipants.map((row) => <tr key={row.memberId} data-member={row.memberId} className={row.excluded ? "is-excluded" : vipOn && row.core ? "is-vip" : ""}>
-          <td className="is-nick"><div className="v2-prio-person"><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}{row.gameNick && <small>{row.gameNick}</small>}{row.excluded && <small>{t("priorities.excluded")}</small>}</span></div></td>
+          <td className="is-nick"><div className="v2-prio-person"><PriorityPersonIdentity {...row} detail={row.excluded ? t("priorities.excluded") : undefined} /></div></td>
           {vipOn && <td className="is-core">{row.core === null ? "—" : num(row.core, i18n.language)}</td>}
         </tr>)}</tbody></table>{!visibleParticipants.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}
       {!high && <>{current && <div className="v2-prio-scroll"><table className={`v2-prio-table${composing ? " is-selecting" : ""}`}>
@@ -245,7 +259,7 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
         <tbody>{visible.map((row) => <tr key={row.memberId} data-member={row.memberId} className={`${row.vip > 0 ? "is-vip" : ""}${row.excluded ? " is-excluded" : ""}`}>
           {composing && <td className="is-select"><input type="checkbox" aria-label={t("priorities.selectPerson", { nick: row.nick })} checked={selected.includes(row.memberId)} disabled={busy} onChange={(e) => toggleSelected(row.memberId, e.target.checked)} /></td>}
           <td className="is-rank"><span title={row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : undefined}>{row.rank ?? "—"}</span></td>
-          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PersonAvatar label={row.nick} src={row.avatarUrl} size="sm" /><span>{row.nick}{row.gameNick && <small>{row.gameNick}</small>}<small>{row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : ""}</small></span></button></td>
+          <td className="is-nick"><button type="button" className="v2-prio-person" onClick={() => setInspect({ row })}><PriorityPersonIdentity {...row} detail={row.excluded ? t("priorities.excluded") : row.vip > 0 ? t("priorities.coreBadge", { n: row.vip }) : undefined} /></button></td>
           {row.distanceCells.map((value, i) => <td key={i} className={`is-num is-period-${i < 2 ? "old" : "new"}${!value ? " is-zero" : ""}`}><button type="button" aria-label={t("priorities.inspectCell", { nick: row.nick, limit: i % 2 ? 100 : 50, period: i < 2 ? t("priorities.older") : t("priorities.newer") })} onClick={() => { setHover(null); setInspect({ row, cell: i }); }} onMouseEnter={(e) => { if (matchMedia("(hover: hover)").matches) setHover({ row, cell: i, anchor: e.currentTarget }); }} onMouseLeave={() => setHover(null)} onFocus={(e) => setHover({ row, cell: i, anchor: e.currentTarget })} onBlur={() => setHover(null)}>{num(value, i18n.language)}</button></td>)}
           <td className="is-num is-total"><button type="button" aria-label={t("priorities.inspectTotal", { nick: row.nick })} onClick={() => setInspect({ row })}>{points(row.total, i18n.language)}</button></td>
         </tr>)}</tbody></table>{!visible.length && <p className="v2-muted">{t("priorities.empty")}</p>}</div>}

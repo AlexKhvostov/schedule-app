@@ -1,47 +1,47 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
 import { CompactField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatLimit } from "../schedule/capacity";
 import {
-  createDistanceEntry, currentMonthStart, distanceBookCsv, filterDistancePeople, formatHands, loadDistanceBook, loadDistanceMonths,
+  currentMonthStart, distanceBookCsv, distanceBookCsvFilename, filterDistancePeople, formatHands, loadDistanceBook, loadDistanceMonths,
   loadDistanceRooms, monthInputValue, monthStartFromInput, personHands, personTotal, sortDistancePeople,
-  updateDistanceEntry, type DistanceBook, type DistanceIdFilter, type DistancePersonRow,
+  type DistanceBook, type DistanceIdFilter, type DistancePersonRow,
   type DistancePresenceFilter, type DistanceSlice, type DistanceSort,
 } from "../data/distanceBook";
 import { downloadTextFile, type DistanceVariant } from "../data/distanceDump";
 import { PersonChip } from "./PersonAvatar";
-import { showV2Toast } from "./V2Toast";
+import { DistanceEntryDialog, type DistanceEditor as Editor } from "./DistanceEntryDialog";
+import { loadDistanceFilters, saveDistanceFilters } from "./distanceFilterPrefs";
 
-type Editor = { person: DistancePersonRow; slice: DistanceSlice | null };
 type RoomOption = { slug: string; title: string };
 
-function stamp(value: string | null, locale: string) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString(locale.startsWith("en") ? "en-GB" : "ru-RU", { dateStyle: "short", timeStyle: "short" });
-}
 function HandsView({ value, locale, tone }: { value: number; locale: string; tone?: "nitro" | "total" }) {
   return <td className={`is-num${value === 0 ? " is-zero" : ""}${tone === "nitro" ? " is-nitro" : ""}${tone === "total" ? " is-total" : ""}`}>{value ? formatHands(value, locale) : "—"}</td>;
 }
 
-export function V2DistanceBook() {
+export function V2DistanceBook({ preferencesKey = null }: { preferencesKey?: string | null }) {
   const { t, i18n } = useTranslation(); const locale = i18n.language;
-  const [monthStart, setMonthStart] = useState(""); const [roomSlug, setRoomSlug] = useState("winamax");
+  const [saved] = useState(() => loadDistanceFilters(preferencesKey));
+  const [monthStart, setMonthStart] = useState(saved.monthStart); const [roomSlug, setRoomSlug] = useState(saved.roomSlug);
   const [rooms, setRooms] = useState<RoomOption[]>([{ slug: "winamax", title: "Winamax" }]);
   const [book, setBook] = useState<DistanceBook | null>(null); const [busy, setBusy] = useState(true);
-  const [query, setQuery] = useState(""); const [showNitro, setShowNitro] = useState(true); const [showRegular, setShowRegular] = useState(true);
-  const [onlyRedParty, setOnlyRedParty] = useState(false); const [sort, setSort] = useState<DistanceSort>("total");
-  const [onlyActiveProfiles, setOnlyActiveProfiles] = useState(false);
-  const [idFilter, setIdFilter] = useState<DistanceIdFilter>("all"); const [presenceFilter, setPresenceFilter] = useState<DistancePresenceFilter>("all");
+  const [query, setQuery] = useState(saved.query); const [showNitro, setShowNitro] = useState(saved.showNitro); const [showRegular, setShowRegular] = useState(saved.showRegular);
+  const [onlyRedParty, setOnlyRedParty] = useState(saved.onlyRedParty); const [sort, setSort] = useState<DistanceSort>(saved.sort);
+  const [onlyActiveProfiles, setOnlyActiveProfiles] = useState(saved.onlyActiveProfiles);
+  const [idFilter, setIdFilter] = useState<DistanceIdFilter>(saved.idFilter); const [presenceFilter, setPresenceFilter] = useState<DistancePresenceFilter>(saved.presenceFilter);
+  const [hiddenLimits, setHiddenLimits] = useState(saved.hiddenLimits);
   const [openKey, setOpenKey] = useState<string | null>(null); const [editor, setEditor] = useState<Editor | null>(null);
   const currentEditor = useRef(editor);
   currentEditor.current = editor;
   const requestId = useRef(0);
   const selection = useRef({ monthStart, roomSlug });
   selection.current = { monthStart, roomSlug };
+  useEffect(() => {
+    saveDistanceFilters(preferencesKey, { monthStart, roomSlug, query, showNitro, showRegular, onlyRedParty, onlyActiveProfiles, idFilter, presenceFilter, sort, hiddenLimits });
+  }, [preferencesKey, monthStart, roomSlug, query, showNitro, showRegular, onlyRedParty, onlyActiveProfiles, idFilter, presenceFilter, sort, hiddenLimits]);
 
   const variants = useMemo(() => [showNitro ? "nitro" : null, showRegular ? "regular" : null].filter(Boolean) as DistanceVariant[], [showNitro, showRegular]);
   const reload = useCallback(async () => {
@@ -53,7 +53,7 @@ export function V2DistanceBook() {
     catch (error) { if (active()) setBook({ monthStart, roomSlug, months: [], limits: [], people: [], rowCount: 0, error: error instanceof Error ? error.message : "load failed" }); }
     finally { if (active()) setBusy(false); }
   }, [monthStart, roomSlug]);
-  useEffect(() => { let live = true; void Promise.all([loadDistanceMonths(), loadDistanceRooms()]).then(([months, roomRows]) => { if (!live) return; setRooms(roomRows.length ? roomRows : [{ slug: "winamax", title: "Winamax" }]); setMonthStart(months[0] || currentMonthStart()); }); return () => { live = false; }; }, []);
+  useEffect(() => { let live = true; void Promise.all([loadDistanceMonths(), loadDistanceRooms()]).then(([months, roomRows]) => { if (!live) return; const options = roomRows.length ? roomRows : [{ slug: "winamax", title: "Winamax" }]; setRooms(options); setRoomSlug((current) => options.some((room) => room.slug === current) ? current : options[0].slug); setMonthStart((current) => current || months[0] || currentMonthStart()); }); return () => { live = false; }; }, []);
   useEffect(() => { setOpenKey(null); setEditor(null); void reload(); return () => { ++requestId.current; }; }, [reload]);
 
   useEffect(() => {
@@ -73,21 +73,22 @@ export function V2DistanceBook() {
     });
     return sortDistancePeople(filtered, sort, variants, locale);
   }, [shownBook, onlyRedParty, onlyActiveProfiles, idFilter, presenceFilter, variants, query, sort, locale]);
-  const limits = shownBook?.limits ?? [];
+  const allLimits = shownBook?.limits ?? [];
+  const limits = allLimits.filter((limit) => !hiddenLimits.includes(limit));
   const sums = useMemo(() => {
-    const byLimit: Record<string, number> = {}; for (const limit of limits) byLimit[limit] = 0;
+    const byLimit: Record<string, number> = {}; for (const limit of allLimits) byLimit[limit] = 0;
     let nitro = 0; let regular = 0; let records = 0; let without = 0;
     for (const person of people) {
       const slices = person.slices.filter((slice) => variants.includes(slice.variant)); records += slices.length; if (!slices.length) without += 1;
       if (showNitro) nitro += person.nitroTotal; if (showRegular) regular += person.regularTotal;
-      for (const limit of limits) byLimit[limit] += personHands(person, variants, limit);
+      for (const limit of allLimits) byLimit[limit] += personHands(person, variants, limit);
     }
     return { byLimit, nitro, regular, total: nitro + regular, records, without };
-  }, [people, limits, variants, showNitro, showRegular]);
+  }, [people, allLimits, variants, showNitro, showRegular]);
   const roomTitle = rooms.find((room) => room.slug === roomSlug)?.title ?? roomSlug;
   const onDownload = () => {
     if (!ready || !people.length) return;
-    downloadTextFile(`distance-control-${roomSlug}-${monthStart.slice(0, 7)}.csv`, distanceBookCsv({ monthStart, roomTitle, people, limits, variants,
+    downloadTextFile(distanceBookCsvFilename(roomSlug, monthStart), distanceBookCsv({ monthStart, roomTitle, people, limits: allLimits, variants,
       labels: { month: t("admin.distanceBook.csv.month"), room: t("admin.distanceBook.csv.room"), distanceId: t("admin.distanceBook.csv.distanceId"),
         discordId: t("admin.distanceBook.csv.discordId"), discordNick: t("admin.distanceBook.csv.discordNick"), gameNick: t("admin.distanceBook.csv.gameNick"),
         variant: t("admin.distanceBook.csv.variant"), part: t("admin.distanceBook.csv.part"), comment: t("admin.distanceBook.csv.comment"),
@@ -100,10 +101,17 @@ export function V2DistanceBook() {
 
   return <div className="v2-people-pad">
     <div className="v2-people-bar"><div><span className="v2-admin-kicker">{t("nav.club")}</span><h2>{t("nav.adminDistance")}</h2></div>
-      <button type="button" className="v2-dist-download" disabled={!ready || !people.length} onClick={onDownload}><i className="fa-solid fa-download" aria-hidden />{t("admin.distanceBook.download")}</button></div>
+      <button type="button" className="v2-dist-download" title={t("admin.distanceBook.downloadHint", { people: people.length, rows: sums.records + sums.without })} disabled={!ready || !people.length} onClick={onDownload}><i className="fa-solid fa-download" aria-hidden />{t("admin.distanceBook.download")}</button></div>
     <p className="v2-dbook-lead">{t("admin.distanceBook.lead")}</p>
     <section className="v2-dbook-panel is-filters" aria-labelledby="distance-filters-title">
-    <h3 className="v2-dbook-panel-title" id="distance-filters-title">{t("admin.distanceBook.filtersTitle")}</h3>
+    <div className="v2-dbook-filter-heading"><h3 className="v2-dbook-panel-title" id="distance-filters-title">{t("admin.distanceBook.filtersTitle")}</h3>
+      <details className="v2-dbook-limit-picker" onKeyDown={(event) => { if (event.key === "Escape") event.currentTarget.open = false; }}><summary>{t("admin.distanceBook.visibleLimits", { shown: limits.length, total: allLimits.length })}</summary>
+        <div className="v2-dbook-limit-options" role="group" aria-label={t("admin.distanceBook.limitColumns")}>
+          <p>{t("admin.distanceBook.limitColumnsHint")}</p><div>{allLimits.map((limit) => <label key={limit}><input type="checkbox" checked={!hiddenLimits.includes(limit)} onChange={(e) => setHiddenLimits((current) => e.target.checked ? current.filter((value) => value !== limit) : [...current, limit])} />{formatLimit(limit)}</label>)}</div>
+          <button type="button" onClick={() => setHiddenLimits([])}>{t("admin.distanceBook.showAllLimits")}</button>
+        </div>
+      </details>
+    </div>
     <div className="v2-dbook-tools">
       <fieldset className="v2-dbook-filter-group"><legend>{t("admin.distanceBook.groups.period")}</legend><div className="v2-dbook-filter-fields">
       <CompactField label={t("admin.distanceBook.room")}><NativeSelect value={roomSlug} onChange={(e) => setRoomSlug(e.target.value)}>{rooms.map((room) => <option key={room.slug} value={room.slug}>{room.title}</option>)}</NativeSelect></CompactField>
@@ -132,7 +140,7 @@ export function V2DistanceBook() {
     <div className="v2-club-scroll v2-dist-scroll v2-dbook-scroll"><table className="v2-dist-table v2-dbook-table" style={{ "--distance-columns": limits.length + 1 } as CSSProperties}><colgroup><col className="is-nick" /><col className="is-distance-id" /><col className="is-kind" />{limits.map((limit) => <col key={limit} className="is-num" />)}<col className="is-num is-total" /><col className="is-act" /></colgroup><thead><tr><th className="is-nick">{t("admin.distance.colNick")}</th><th className="is-distance-id" title={t("admin.distanceBook.distanceId")} aria-label={t("admin.distanceBook.distanceId")}>{t("admin.people.colDist")}</th><th className="is-kind">{t("admin.distanceBook.colKind")}</th>{limits.map((limit) => <th key={limit} className="is-num" title={formatLimit(limit)}>{formatLimit(limit)}</th>)}<th className="is-num is-total">{t("admin.distance.colTotal")}</th><th className="is-act" /></tr></thead>
       {people.length ? people.map((person) => <PersonBlock key={person.key} person={person} open={openKey === person.key} slices={person.slices.filter((slice) => variants.includes(slice.variant))} limits={limits} variants={variants} locale={locale} onToggle={() => setOpenKey(openKey === person.key ? null : person.key)} onAdd={() => person.memberId && setEditor({ person, slice: null })} onEdit={(slice) => setEditor({ person, slice })} />) : <tbody><tr><td colSpan={limits.length + 5} className="v2-muted">{busy ? t("admin.distanceBook.loading") : t("admin.distanceBook.empty")}</td></tr></tbody>}
       {people.length ? <tfoot><tr><td className="is-nick">{t("admin.distance.colSum")}</td><td className="is-distance-id" /><td className="is-kind">{t("admin.distanceBook.kindAll")}</td>{limits.map((limit) => <HandsView key={limit} value={sums.byLimit[limit] ?? 0} locale={locale} />)}<HandsView value={sums.total} locale={locale} tone="total" /><td className="is-act" /></tr></tfoot> : null}</table></div>
-    {editor && ready ? <DistanceEntryDialog editor={editor} limits={limits} rooms={rooms} defaultMonth={monthStart} defaultRoom={roomSlug} locale={locale} onClose={() => setEditor(null)} onSaved={async () => { if (currentEditor.current !== editor) return; setEditor(null); await reload(); }} /> : null}
+    {editor && ready ? <DistanceEntryDialog editor={editor} limits={allLimits} rooms={rooms} defaultMonth={monthStart} defaultRoom={roomSlug} locale={locale} onClose={() => setEditor(null)} onSaved={async () => { if (currentEditor.current !== editor) return; setEditor(null); await reload(); }} /> : null}
   </div>;
 }
 
@@ -140,33 +148,4 @@ function PersonBlock({ person, open, slices, limits, variants, locale, onToggle,
   const { t } = useTranslation(); const total = personTotal(person, variants);
   return <tbody className={`v2-dbook-group${open ? " is-open" : ""}`}><tr className={`v2-dbook-person${open ? " is-open" : ""}`} onClick={onToggle}><td className="is-nick"><button type="button" className="v2-dbook-fold" aria-expanded={open}><i className={`fa-solid fa-angle-${open ? "down" : "right"}`} /><PersonChip src={person.avatarUrl} name={person.nick} sub={person.gameNick || person.discordId || ""} size="sm" />{slices.length > 1 ? <span className="v2-dbook-recs">{slices.length}</span> : null}</button></td><td className="is-distance-id" title={person.distanceIds?.join(", ") || person.playerId || t("admin.distanceBook.idMissing")}><span className={`v2-distance-id${person.playerId ? "" : " is-missing"}`}>{person.distanceIds?.join(", ") || person.playerId || t("admin.distanceBook.idMissing")}</span></td><td className="is-kind is-summary" title={t("admin.distanceBook.summaryHint")}>{t("admin.distanceBook.rowSummary")}</td>{limits.map((limit) => <HandsView key={limit} value={personHands(person, variants, limit)} locale={locale} />)}<HandsView value={total} locale={locale} tone="total" /><td className="is-act">{person.memberId ? <button type="button" className="v2-dbook-ico" title={t("admin.distanceBook.add")} onClick={(e) => { e.stopPropagation(); onAdd(); }}><i className="fa-solid fa-plus" /></button> : null}</td></tr>
     {open ? slices.length ? <>{slices.map((slice, index) => <tr key={slice.id} className={`v2-dbook-leaf is-editable${index === 0 ? " is-first" : ""}${index === slices.length - 1 ? " is-last" : ""}`} onClick={(e) => e.stopPropagation()}><td className="is-nick"><span className="v2-dbook-leaf-nick"><i /><span>{t("admin.distanceBook.entryPartN", { n: slice.part })}<small>{t(`admin.distance.filter.${slice.variant}`)}{slice.comment ? ` · ${slice.comment}` : ""}</small></span></span></td><td className="is-distance-id" title={(slice.distanceId ?? person.playerId) || t("admin.distanceBook.idMissing")}><span className="v2-distance-id">{(slice.distanceId ?? person.playerId) || "—"}</span></td><td className={`is-kind is-${slice.variant}`}>{t(`admin.distance.filter.${slice.variant}`)}</td>{limits.map((limit) => <HandsView key={limit} value={slice.byLimit[limit]?.hands ?? 0} locale={locale} />)}<HandsView value={slice.total} locale={locale} tone="total" /><td className="is-act"><button type="button" className="v2-dbook-edit" title={t("admin.distanceBook.edit")} aria-label={t("admin.distanceBook.edit")} onClick={() => onEdit(slice)}><i className="fa-solid fa-pen" /><span>{t("admin.distanceBook.editShort")}</span></button></td></tr>)}{person.memberId ? <tr className="v2-dbook-add-row"><td colSpan={limits.length + 5}><button type="button" onClick={onAdd}><i className="fa-solid fa-plus" /> {t("admin.distanceBook.add")}</button></td></tr> : null}</> : <tr className="v2-dbook-leaf is-first is-last"><td colSpan={limits.length + 5} className="v2-muted"><span>{t("admin.distanceBook.noSlices")}</span>{person.memberId ? <button type="button" className="v2-dist-download is-tools" onClick={onAdd}><i className="fa-solid fa-plus" />{t("admin.distanceBook.add")}</button> : null}</td></tr> : null}</tbody>;
-}
-
-function DistanceEntryDialog({ editor, limits, rooms, defaultMonth, defaultRoom, locale, onClose, onSaved }: { editor: Editor; limits: string[]; rooms: RoomOption[]; defaultMonth: string; defaultRoom: string; locale: string; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation(); const editing = Boolean(editor.slice); const person = editor.person;
-  const initialVariant = editor.slice?.variant ?? "nitro"; const nextPart = Math.max(0, ...person.slices.filter((s) => s.variant === initialVariant).map((s) => s.part)) + 1;
-  const [room, setRoom] = useState(defaultRoom); const [month, setMonth] = useState(defaultMonth); const [variant, setVariant] = useState<DistanceVariant>(initialVariant);
-  const [part, setPart] = useState(editor.slice?.part ?? nextPart); const [distanceId, setDistanceId] = useState(editor.slice?.distanceId ?? person.playerId); const [comment, setComment] = useState(editor.slice?.comment ?? "");
-  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(limits.map((limit) => [limit, String(editor.slice?.byLimit[limit]?.hands ?? 0)])));
-  const [saving, setSaving] = useState(false); const total = Object.values(values).reduce((sum, value) => sum + (Math.max(0, Math.round(Number(value))) || 0), 0);
-  const distanceIdValid = /^\d{1,12}$/.test(distanceId.trim()); const canSave = !saving && total > 0 && distanceIdValid;
-  const validation = !distanceIdValid ? t("admin.distanceBook.validationId") : total <= 0 ? t("admin.distanceBook.validationValues") : "";
-  useEffect(() => {
-    if (!editing) setPart(Math.max(0, ...person.slices.filter((slice) => slice.variant === variant && (slice.distanceId ?? person.playerId) === distanceId).map((slice) => slice.part)) + 1);
-  }, [editing, person.slices, person.playerId, variant, distanceId]);
-  const save = async () => {
-    if ((!editing && !person.memberId) || saving || total <= 0 || !/^\d{1,12}$/.test(distanceId.trim())) return;
-    setSaving(true); const numeric = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Math.max(0, Math.round(Number(value))) || 0]));
-    const result = editor.slice ? await updateDistanceEntry({ entryId: editor.slice.id, comment, values: numeric }) : await createDistanceEntry({ memberId: person.memberId!, roomSlug: room, monthStart: month, variant, part, comment, distanceExtId: distanceId.trim(), values: numeric });
-    setSaving(false); if (result.error) { showV2Toast("err", t("admin.distanceBook.saveErr")); return; } showV2Toast("ok", t("admin.saved")); onSaved();
-  };
-  return <Dialog className="v2-distance-dialog" open title={editing ? t("admin.distanceBook.modalEdit") : t("admin.distanceBook.modalAdd")} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>{t("admin.people.cancel")}</Button><Button disabled={!canSave} onClick={() => void save()}>{saving ? "…" : t("admin.distanceBook.save")}</Button></>}>
-    <div className="v2-distance-editor"><div className="v2-distance-editor-person"><PersonChip src={person.avatarUrl} name={person.nick} sub={person.gameNick || t("admin.distanceBook.noRoomNick")} size="sm" /><dl><div><dt>{t("admin.distanceBook.discordId")}</dt><dd>{person.discordId || "—"}</dd></div><div><dt>{t("admin.distanceBook.distanceId")}</dt><dd>{person.playerId || t("admin.distanceBook.idMissing")}</dd></div></dl></div>
-      <div className="v2-distance-editor-grid"><CompactField label={t("admin.distanceBook.room")}><NativeSelect value={room} disabled={editing} onChange={(e) => setRoom(e.target.value)}>{rooms.map((item) => <option key={item.slug} value={item.slug}>{item.title}</option>)}</NativeSelect></CompactField><CompactField label={t("admin.distanceBook.month")}><Input type="month" value={monthInputValue(month)} disabled={editing} onChange={(e) => setMonth(monthStartFromInput(e.target.value))} /></CompactField><CompactField label={t("admin.distanceBook.variant")}><NativeSelect value={variant} disabled={editing} onChange={(e) => setVariant(e.target.value as DistanceVariant)}><option value="nitro">Nitro</option><option value="regular">Regular</option></NativeSelect></CompactField><CompactField label={t("admin.distanceBook.part")}><Input type="number" min={1} value={part} disabled={editing} onChange={(e) => setPart(Math.max(1, Number(e.target.value) || 1))} /></CompactField><CompactField label={t("admin.distanceBook.distanceId")}>{!editing && (person.distanceIds?.length ?? 0) > 1 ? <NativeSelect value={distanceId} onChange={(e) => setDistanceId(e.target.value)}>{person.distanceIds!.map((id) => <option key={id} value={id}>{id}</option>)}</NativeSelect> : <Input value={distanceId} disabled={editing || Boolean(person.playerId)} onChange={(e) => setDistanceId(e.target.value.replace(/\D/g, "").slice(0, 12))} />}</CompactField></div>
-      <CompactField label={t("admin.distanceBook.comment")}><Input value={comment} placeholder={t("admin.distanceBook.commentHint")} onChange={(e) => setComment(e.target.value)} /></CompactField>
-      <div className="v2-distance-editor-values"><b>{t("admin.distanceBook.values")}</b><div>{limits.map((limit) => <CompactField key={limit} label={formatLimit(limit)}><Input type="number" min={0} step={1} value={values[limit] ?? "0"} onChange={(e) => setValues((prev) => ({ ...prev, [limit]: e.target.value }))} /></CompactField>)}</div><p>{t("admin.distanceBook.modalTotal")}: <b>{formatHands(total, locale)}</b></p></div>
-      {validation ? <p className="v2-distance-editor-validation" role="status"><i className="fa-solid fa-circle-info" aria-hidden />{validation}</p> : null}
-      {editing && editor.slice ? <div className="v2-distance-editor-audit"><span>{t(`admin.distanceBook.source.${editor.slice.source}`)}</span><span>{t("admin.distanceBook.created")}: {stamp(editor.slice.createdAt, locale)}{editor.slice.createdBy ? ` · ${editor.slice.createdBy}` : ""}</span><span>{t("admin.distanceBook.updated")}: {stamp(editor.slice.updatedAt, locale)}{editor.slice.updatedBy ? ` · ${editor.slice.updatedBy}` : ""}</span></div> : null}
-    </div>
-  </Dialog>;
 }

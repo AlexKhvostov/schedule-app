@@ -228,6 +228,7 @@
     "noCore": "No Core assigned",
     "calculatedAt": "Updated: {{date}}",
     "refresh": "Refresh priority",
+    "refreshShort": "Refresh",
 
     "regularShort": "Regular",
     "distanceGames": "Tournaments",
@@ -1267,6 +1268,28 @@
       }
     },
     "distanceBook": {
+      "editor": {
+        "variant": "Kind",
+        "blocked": "Unavailable",
+        "partLoading": "Checking entries for the selected period…",
+        "partLoadError": "Could not check parts for this period. Select the period again; your input is still in the form.",
+        "monthError": "Select a month",
+        "partError": "Part must be a whole number starting from 1",
+        "numberError": "Check the highlighted fields: use whole numbers from 0 to 2,147,483,647.",
+        "was": "Previously: {{total}}",
+        "saving": "Saving…",
+        "context": "Entry settings",
+        "editHint": "Change tournament counts or the comment. The participant, period and variant stay the same.",
+        "addHint": "Choose the period and tournament variant, then enter the distance for each limit.",
+        "partHint": "Part is a portion of the monthly distance. Use the next part for an additional submission; it is suggested automatically for the current period.",
+        "filled": "{{filled}} of {{total}} filled",
+        "valuesHint": "Tournament count for each limit. An empty field means 0. Pasted numbers may contain spaces.",
+        "saveError": "Could not save the entry. Your input is still in the form. Check the connection, distance ID and part number, then try again.",
+        "details": "Help and entry details",
+        "sourceLabel": "Source",
+        "primaryId": "{{id}} · primary",
+        "previousId": "{{id}} · additional"
+      },
       "filtersTitle": "Filters",
       "summaryTitle": "Overview",
       "groups": {
@@ -1285,6 +1308,11 @@
       "filterMetadataError": "Could not load current roles and member statuses. Please try again later.",
       "lead": "Active club members and historical entries for the selected month. Role and profile filters are independent. Expand a member to add a part or edit an entry.",
       "download": "Download CSV",
+      "downloadHint": "CSV with the current filters: {{people}} people, {{rows}} rows. Each Nitro/Regular entry and part is a separate row. The filename includes the UTC download time.",
+      "visibleLimits": "Limits: {{shown}}/{{total}}",
+      "limitColumns": "Visible limits",
+      "limitColumnsHint": "Only columns are hidden. Totals and CSV include all limits. Your choices and filters are saved for you in this browser.",
+      "showAllLimits": "Show all limits",
       "csv": {
         "month": "Month",
         "room": "Poker room",

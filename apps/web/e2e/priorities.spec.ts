@@ -11,6 +11,52 @@ async function enter(page: Page) {
   await expect(page.locator(".v2-prio-table tbody tr")).not.toHaveCount(0);
 }
 
+for (const theme of ["dark", "light"]) {
+  test(`priority participants stay compact with inline Discord and Winamax names in ${theme}`, async ({ page }, testInfo) => {
+    await page.addInitScript(value => localStorage.setItem("v2-ui-theme", value), theme);
+    await enter(page);
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const name of ["N50-100", "E50-100", "250-500"]) {
+        await page.getByRole("tab", { name, exact: true }).click();
+        const row = page.locator('.v2-prio-table tr[data-member="RP-104"]');
+        await expect(row.locator(".v2-prio-discord")).toHaveText("polar");
+        await expect(row.locator(".v2-prio-game")).toHaveText("PolarWin");
+        const report = page.locator(".v2-prio-report");
+        await expect(report.getByRole("button", { name: "Обновить", exact: true })).toBeVisible();
+        await expect(report.locator("time.v2-prio-update-meta")).toBeVisible();
+        await expect(page.locator(".v2-prio-status")).toHaveCount(0);
+        const summary = (await page.locator(".v2-prio-summary").boundingBox())!;
+        const table = (await page.locator(".v2-prio-scroll").boundingBox())!;
+        expect(summary.height).toBeLessThanOrEqual(width === 1280 ? 29 : 48);
+        expect(Math.abs(table.y - summary.y - summary.height)).toBeLessThanOrEqual(1);
+        if (width === 1280 && name === "N50-100") {
+          const before = await report.locator("time").getAttribute("datetime");
+          await report.getByRole("button", { name: "Обновить", exact: true }).click();
+          await expect(report.locator("time")).not.toHaveAttribute("datetime", before!);
+        }
+        const sizes = await page.locator(".v2-prio-table tbody tr").evaluateAll(rows => rows.map(row => {
+          const names = row.querySelector(".v2-prio-person-names")!;
+          const detail = row.querySelector(".v2-prio-person small");
+          return {
+            height: row.getBoundingClientRect().height,
+            avatar: row.querySelector(".v2-ava")!.getBoundingClientRect().height,
+            inline: [...names.children].every(label => Math.abs(label.getBoundingClientRect().top - names.firstElementChild!.getBoundingClientRect().top) < 1),
+            detailBelow: !detail || detail.getBoundingClientRect().top >= names.getBoundingClientRect().bottom - 1,
+          };
+        }));
+        for (const size of sizes) {
+          expect(size.height).toBeLessThanOrEqual(29);
+          expect(size.avatar).toBeLessThanOrEqual(18);
+          expect(size.inline).toBe(true);
+          expect(size.detailBelow).toBe(true);
+        }
+        if (width === 1280 && name === "N50-100") await page.screenshot({ path: testInfo.outputPath(`priority-compact-${theme}.png`) });
+      }
+    }
+  });
+}
+
 // Match the actual rendered columns, including row/column spans in the header.
 async function expectCalculationColumns(table: ReturnType<Page["locator"]>) {
   const geometry = await table.evaluate((node) => {
@@ -53,7 +99,7 @@ test("distance ranking ignores Core badges and keeps kind filters", async ({ pag
   expect(values).toEqual([3614, 366, 1828, 192, 4385]);
   await expect(page.locator(".v2-prio-table th.is-total")).toContainText("Очки рейтинга");
   await expect(page.locator(".v2-prio-table th.is-total small")).toHaveText("Дистанция × коэф.");
-  await expect(page.locator(".v2-prio-actions").filter({ hasText: "Дистанция только" })).toContainText("Nitro");
+  await expect(page.locator(".v2-prio-summary")).toHaveAttribute("title", /Дистанция только Nitro/);
   for (const value of await page.locator(".v2-prio-table tbody td.is-total").allTextContents()) expect(value).toMatch(/,\d$/);
   await expect(page.locator('tr[data-member="RP-912"] td.is-total')).toHaveText("0,0");
   await expect(page.locator('tr[data-member="RP-912"] td.is-num').first()).toHaveText("0");
@@ -238,7 +284,7 @@ test("compact summary follows the visible kind, filters and Core display", async
   await checkSummary();
   const filters = await page.locator(".v2-prio-global-filters").boundingBox();
   const summary = await page.locator(".v2-prio-summary").boundingBox();
-  const controls = await page.locator(".v2-prio-matrix-meta").boundingBox();
+  const controls = await page.locator(".v2-prio-limit-tabs").boundingBox();
   expect(summary!.y).toBeGreaterThanOrEqual(controls!.y + controls!.height);
   expect(summary!.y).toBeGreaterThanOrEqual(filters!.y + filters!.height);
   expect(controls!.height).toBeLessThanOrEqual(105);
@@ -252,7 +298,7 @@ test("compact summary follows the visible kind, filters and Core display", async
   await checkSummary();
   await expect(page.locator('[data-metric="vip"] dd')).toHaveText("0");
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(() => page.locator(".v2-prio-matrix-meta").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
+  await expect.poll(() => page.locator(".v2-prio-summary").evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("priority-summary-mobile.png") });
 });
 

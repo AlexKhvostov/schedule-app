@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDistanceEntry, demoDistanceBook, distanceBookCsv, filterDistancePeople, sortDistancePeople, updateDistanceEntry, type DistancePersonRow } from "./distanceBook";
+import { createDistanceEntry, demoDistanceBook, distanceBookLimits, distanceBookCsv, distanceBookCsvFilename, filterDistancePeople, sortDistancePeople, updateDistanceEntry, type DistancePersonRow } from "./distanceBook";
 
 function person(patch: Partial<DistancePersonRow> = {}): DistancePersonRow {
   return {
@@ -16,6 +16,31 @@ const labels = { month: "Month", room: "Room", distanceId: "Distance ID", discor
   gameNick: "Room nick", variant: "Kind", part: "Part", comment: "Comment", created: "Created", updated: "Updated", total: "Total" };
 
 describe("distanceBookCsv", () => {
+  it("distinguishes successive downloads of the same month by UTC time", () => {
+    expect(distanceBookCsvFilename("winamax", "2026-10-01", new Date("2026-11-06T20:45:12.123+03:00")))
+      .toBe("distance-control-winamax-2026-10_2026-11-06T17-45-12.123Z.csv");
+  });
+
+  it("keeps every part and distance ID, all limits and zero cards under the selected variants", () => {
+    const first = person().slices[0];
+    const member = person({ playerId: "211", distanceIds: ["211", "900"], slices: [
+      { ...first, distanceId: "211" },
+      { ...first, id: "part2", distanceId: "211", part: 2, byLimit: { "250": { id: "v2", hands: 123456 } }, total: 123456 },
+      { ...first, id: "secondary", distanceId: "900", variant: "regular", byLimit: { "500": { id: "v3", hands: 9 } }, total: 9 },
+    ] });
+    const empty = person({ key: "empty", playerId: "000", slices: [] });
+    const exportRows = (variants: ("nitro" | "regular")[]) => distanceBookCsv({ monthStart: "2026-10-01", roomTitle: "Winamax",
+      people: [member, empty], limits: ["25", "250", "500"], variants, labels }).trim().split("\r\n").slice(1).map((line) => line.split(";"));
+    const rows = exportRows(["nitro", "regular"]);
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => [row[2], row[6], row[7]])).toEqual([
+      ['"=""211"""', "nitro", "1"], ['"=""211"""', "nitro", "2"],
+      ['"=""900"""', "regular", "1"], ['"=""000"""', "", ""],
+    ]);
+    expect([11, 12, 13, 14].map((index) => rows.reduce((sum, row) => sum + Number(row[index]), 0))).toEqual([120, 123456, 9, 123585]);
+    expect(exportRows(["nitro"]).map((row) => row[14])).toEqual(["120", "123456", "0"]);
+  });
+
   it("exports exact text IDs and the selected slices", () => {
     const csv = distanceBookCsv({ monthStart: "2026-08-01", roomTitle: "Winamax", people: [person()], limits: ["25"], variants: ["nitro"], labels });
     expect(csv).toContain('"=""101"""');
@@ -71,5 +96,16 @@ describe("demo distance book", () => {
     expect((await updateDistanceEntry({ entryId, comment: "fixed", values: { "10": 150 } })).error).toBeNull();
     expect(nina?.slices[0]?.comment).toBe("fixed");
     expect(nina?.total).toBe(150);
+  });
+});
+
+
+describe("distance limit catalog", () => {
+  it("includes all limits even with no player settings or partial server data", () => {
+    const expected = ["0.25", "0.50", "1", "2", "5", "10", "25", "50", "100", "250", "500"];
+    expect(distanceBookLimits()).toEqual(expected);
+    expect(distanceBookLimits(["10", "25"])).toEqual(expected);
+    expect(demoDistanceBook("2030-01-01").limits).toEqual(expected);
+    expect(distanceBookLimits(["500", "1000"])).toEqual([...expected, "1000"]);
   });
 });
