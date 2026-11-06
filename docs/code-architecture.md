@@ -202,7 +202,7 @@ Dashboard6ноября: локальные CSS-токены в `.root` и overri
 
 ### Источник и окна Dashboard — 6 ноября 2026
 
-`src/data/analytics/http.ts` создаёт read-only источники PointsSource/MonthlySource для legacy PHP routes через `index.php?__route=...`: GET, HTTPS, omit credentials, no-store, запрет redirect, timeout30с и отмена. Парсеры/формулы прежние. `AnalyticsSourceContext` содержит только mode; hooks включают его в ключ запроса, отменяют предыдущую загрузку и не показывают старый результат другого источника. UI не делает fetch. Доступный в development переключатель выбирает Demo/live, production всегда unconfigured. CSP разрешает конкретный origin только в development.
+`src/data/analytics/http.ts` создаёт read-only источники PointsSource/MonthlySource для legacy PHP routes через `index.php?__route=...`: GET, HTTPS, omit credentials, no-store, запрет redirect, timeout30с и отмена. Парсеры/формулы прежние. `AnalyticsSourceContext` содержит только mode; hooks включают его в ключ запроса, отменяют предыдущую загрузку и не показывают старый результат другого источника. UI не делает fetch. Доступный в development переключатель выбирает Demo/live, production всегда live, независимо от sessionStorage. CSP разрешает конкретный HTTPS origin dashboard.redparty.ru в обеих средах. Серверная авторизация PHP отложена по прямому решению о выпуске6ноября.
 
 `ui/DetailDialog` и отдельный CSS Module отвечают за native dialog, центрирование `fixed/inset:0/margin:auto`, шапку/закрытие и прокрутку тела. Сохраняются modal focus trap, Escape и возврат фокуса, фон закрывает только при клике за границей окна. Область применения — детали аналитики, без глобальных стилей расписания.
 
@@ -221,7 +221,7 @@ Dashboard6ноября: локальные CSS-токены в `.root` и overri
 
 ### Подсказки и символы игроков
 
-`data/analytics/playerSearch.ts` валидирует GET /api/players/search, отделяет Demo-каталог и запрещает production-источник. `model/playerSuggestions.ts` выделяет/заменяет только текущий фрагмент списка под курсором; `usePlayerSuggestions` выполняет debounce250мс, отменяет старые запросы и не возвращает результат другого query/source. `PlayersFilter` общий для textarea списка и одиночного input профиля, с listbox и клавиатурой; reducers и поток draft→apply сохранены.
+`data/analytics/playerSearch.ts` валидирует GET /api/players/search, отделяет Demo-каталог; live-поиск работает в development и production. `model/playerSuggestions.ts` выделяет/заменяет только текущий фрагмент списка под курсором; `usePlayerSuggestions` выполняет debounce250мс, отменяет старые запросы и не возвращает результат другого query/source. `PlayersFilter` общий для textarea списка и одиночного input профиля, с listbox и клавиатурой; reducers и поток draft→apply сохранены.
 
 `useRegistry.sides` — нормализованная карта подтверждённых сторон для всех UI-потребителей. `RegSymbol` — общий SVG-красный бриллиант/синий контурный кристалл; `RegBadge` добавляет пояснение у ника. `QuickRegsPanel` получает снимок имён из готовой Points heatmap и использует тот же mutate/read-back, что RegsPanel. Общий DetailDialog поддерживает compact и wide; меню вызывает wide менеджер, кнопка карты — compact таблицу. Прямой маршрут regs сохранён для ссылок; дублирующих пунктов UI нет.
 
