@@ -1,0 +1,73 @@
+import { expect, test, type Page } from "@playwright/test";
+async function enter(page: Page) {
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Демо/ }).click();
+  await page.getByRole("button", { name: "Войти для проверки" }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.goto("/#root-logs");
+  await expect(page.getByRole("heading", { name: "Журнал действий" })).toBeVisible();
+}
+test("Root browses pages, filters people and confirms cleanup only in Demo", async ({ page }) => {
+  let networkCalls = 0;
+  page.on("request", (r) => { if (r.url().includes("supabase.co")) networkCalls++; });
+  await enter(page);
+  await expect(page.locator(".root-logs tbody tr")).toHaveCount(50);
+  const first = await page.locator(".root-logs tbody tr").first().innerText();
+  await page.getByRole("button", { name: "Следующая страница" }).click();
+  await expect(page.locator(".root-logs tbody tr").first()).not.toHaveText(first);
+  await page.getByRole("button", { name: "Следующая страница" }).click();
+  await expect(page.locator(".root-logs tbody tr")).toHaveCount(26);
+  await expect(page.getByRole("button", { name: "Следующая страница" })).toBeDisabled();
+  await page.getByLabel("Человек", { exact: true }).fill("Александр");
+  await page.getByRole("button", { name: "Показать", exact: true }).click();
+  await expect(page.locator(".root-logs tbody tr")).toHaveCount(50);
+  await page.getByLabel("Искать человека как").selectOption("member");
+  await page.getByRole("button", { name: "Показать", exact: true }).click();
+  await expect(page.getByText("По этим фильтрам событий нет")).toBeVisible();
+  await page.getByRole("button", { name: "Сбросить", exact: true }).click();
+  await page.getByLabel("Журнал", { exact: true }).selectOption("distance");
+  await page.getByRole("button", { name: "Показать", exact: true }).click();
+  await expect(page.locator(".root-logs tbody tr")).toHaveCount(1);
+  await expect(page.locator(".root-log-change")).toHaveText("901 → 902, 901");
+  await page.getByText("Хранение и очистка", { exact: true }).click();
+  await page.getByRole("button", { name: "Проверить перед очисткой" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Найдено: 2");
+  await expect(dialog.getByRole("button", { name: "Удалить старые события" })).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await page.getByLabel("Удалить события старше").selectOption("3");
+  await page.getByRole("button", { name: "Проверить перед очисткой" }).click();
+  await expect(dialog).toContainText("Найдено: 1");
+  await dialog.getByRole("button", { name: "Удалить старые события" }).click();
+  await expect(page.getByText("Удалено: 1. Осталось старых событий: 0.")).toBeVisible();
+  await expect(page.locator(".root-logs tbody tr")).toHaveCount(1); // ID history is untouched.
+  await page.getByRole("button", { name: "Проверить перед очисткой" }).click();
+  await expect(dialog).toContainText("Найдено: 0");
+  await expect(dialog.getByRole("button", { name: "Удалить старые события" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  expect(networkCalls).toBe(0);
+});
+test("logs remain compact on narrow screens and translate to English", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enter(page);
+  await expect.poll(() => page.locator(".root-logs").evaluate((el) => el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await expect(page.getByRole("button", { name: "Следующая страница" })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath("root-logs-mobile.png") });
+  await page.setViewportSize({ width: 1360, height: 900 });
+  await expect.poll(() => page.locator(".root-logs tbody tr").first().evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(29);
+  await page.screenshot({ path: info.outputPath("root-logs-desktop.png") });
+  await page.evaluate(() => { localStorage.setItem("lang", "en"); localStorage.setItem("v2-ui-theme", "light"); });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Activity log" })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("root-logs-light-en.png") });
+  await page.getByText("Retention and cleanup", { exact: true }).click();
+  await page.getByRole("button", { name: "Preview cleanup" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Deletion is permanent");
+});
+test("non-root cannot open logs by URL", async ({ page }) => {
+  await enter(page);
+  await page.evaluate(() => { const session = JSON.parse(sessionStorage.getItem("v2-session")!); session.role="member"; sessionStorage.setItem("v2-session", JSON.stringify(session)); });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Журнал действий" })).toHaveCount(0);
+});

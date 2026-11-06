@@ -1,0 +1,44 @@
+.root-logs { display: flex; flex-direction: column; height: 100%; min-height: 480px; max-width: 1440px; margin: auto; padding: 12px; color: var(--foreground); font-size: 12px; }
+.root-logs > :not(.root-logs-table) { flex-shrink: 0; }
+.root-logs > header, .root-logs > footer, .root-logs-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.root-logs h1 { font-size: 18px; font-weight: 700; }
+.root-logs p, .root-logs-caption { color: var(--muted-foreground); }
+.root-logs .v2-ctrl, .root-logs input, .root-logs select { height: 24px; min-height: 24px; padding: 1px 6px; font-size: 12px; border-radius: 6px; }
+.root-logs input, .root-logs select { background: var(--background); color: var(--foreground); border: 1px solid var(--border); min-width: 0; width: 100%; }
+.root-logs-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 6px; margin: 8px 0 5px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.root-logs-filters label { display: grid; gap: 2px; font-size: 11px; color: var(--muted-foreground); }
+.root-logs-search { flex: 1 1 200px; }
+.root-logs-caption { font-size: 11px; margin: 8px 0; flex-wrap: wrap; }
+.root-logs-table { flex: 1; min-height: 140px; border: 1px solid var(--border); border-radius: 10px; overflow: auto; background: var(--card); }
+.root-logs table { width: 100%; border-collapse: collapse; text-align: left; min-width: 960px; }
+.root-logs th { position: sticky; top: 0; z-index: 1; background: var(--muted); font-size: 11px; font-weight: 600; color: var(--muted-foreground); }
+.root-logs th, .root-logs td { padding: 4px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; height: 28px; }
+.root-logs tbody tr:last-child td { border-bottom: 0; }
+.root-logs tbody tr:hover { background: color-mix(in srgb, var(--primary) 4%, var(--card)); }
+.root-log-person { display: flex; align-items: baseline; gap: 5px; max-width: 240px; white-space: nowrap; overflow: hidden; }
+.root-log-person strong { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.root-log-person span { color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.root-log-detail { white-space: nowrap; }
+.root-log-person strong, .root-log-person span, .root-log-person small, .root-log-detail > strong, .root-log-detail > span, .root-log-detail > small { display: inline; line-height: 18px; }
+.root-log-person small, .root-log-detail small { font-size: 11px; color: var(--muted-foreground); }
+.root-log-person span, .root-log-detail span { font-size: 12px; }
+.root-log-time { font-variant-numeric: tabular-nums; white-space: nowrap; width: 138px; font-size: 11px; }
+.root-log-detail > * + *::before { content: " · "; color: var(--muted-foreground); }
+.root-log-detail strong { font-weight: 500; }
+.root-log-badge { display: inline-block; border-radius: 4px; padding: 1px 4px; background: var(--muted); font-size: 11px; white-space: nowrap; }
+.root-log-badge.is-place { color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, transparent); }
+.root-log-badge.is-remove { color: var(--destructive); background: color-mix(in srgb, var(--destructive) 8%, transparent); }
+.root-logs-empty { text-align: center; padding: 28px 12px; }
+.root-logs > footer { padding: 5px 0; color: var(--muted-foreground); }
+.root-logs > footer > div, .root-logs-retention > div, .root-logs-dialog > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.root-logs-retention { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 7px; }
+.root-logs-retention summary { cursor: pointer; font-weight: 600; }
+.root-logs-retention p { margin: 8px 0; max-width: 850px; }
+.root-logs-retention select { width: auto; }
+.root-logs-dialog { margin: auto; width: min(420px, calc(100vw - 24px)); padding: 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); }
+.root-logs-dialog::backdrop { background: #0008; }
+.root-logs-dialog h2 { font-size: 17px; font-weight: 650; }
+.root-logs-dialog p { margin: 10px 0; }
+.root-logs-dialog > div { justify-content: flex-end; margin-top: 16px; }
+.root-logs [role=alert], .root-logs .root-logs-danger { color: var(--destructive); }
+@media (max-width: 600px) { .root-logs { padding: 10px; } .root-logs-filters { padding: 8px; } .root-logs-filters label { flex: 1 1 135px; } .root-logs-filters .root-logs-search { flex-basis: 100%; } .root-logs-caption { gap: 3px; } }

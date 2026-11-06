@@ -29,6 +29,7 @@ const Dashboard = lazy(() => import("../analytics").then((module) => ({ default:
 const V2Schedule = lazy(() => import("./V2Schedule").then((module) => ({ default: module.V2Schedule })));
 const V2Priorities = lazy(() => import("./V2Priorities").then((module) => ({ default: module.V2Priorities })));
 const V2Admin = lazy(() => import("./V2Admin").then((module) => ({ default: module.V2Admin })));
+const RootLogs = lazy(() => import("./logs/RootLogs").then((module) => ({ default: module.RootLogs })));
 const ApiAdmin = lazy(() => import("./api/ApiAdmin").then((module) => ({ default: module.ApiAdmin })));
 const V2Distances = lazy(() => import("./V2Distances").then((module) => ({ default: module.V2Distances })));
 const V2DistanceBook = lazy(() => import("./V2DistanceBook").then((module) => ({ default: module.V2DistanceBook })));
@@ -141,6 +142,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
       "admin-schedule": "admin-schedule",
       "admin-root": "admin-root",
       "root-api": "root-api",
+      "root-logs": "root-logs",
     };
     const nextHash = hashes[key];
     if (nextHash) window.location.hash = nextHash;
@@ -163,6 +165,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const rootItems: StaffItem[] = isRoot
     ? [
         { key: "admin-root", label: t("nav.root"), icon: "fa-key", hint: t("nav.adminRootHint") },
+        { key: "root-logs", label: t("nav.logs"), icon: "fa-list-ul", hint: t("nav.logsHint") },
         { key: "root-api", label: t("nav.api"), icon: "fa-plug", hint: t("nav.apiHint") },
         { key: "root-distance", label: t("nav.rootImport"), icon: "fa-file-csv", hint: t("nav.rootImportHint") },
         { key: "uikit", label: t("nav.uikit"), icon: "fa-swatchbook" },
@@ -181,7 +184,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
     if (page === "dashboard" && !canDashboard) setPage(fallback);
     if ((page === "admin-people" || page === "admin-distance") && !canPeople) setPage(fallback);
     if (page === "admin-schedule" && !canScheduleAdmin) setPage(fallback);
-    if (page === "root-api" && !navigationContext.isRoot) setPage(fallback);
+    if ((page === "root-api" || page === "root-logs") && !navigationContext.isRoot) setPage(fallback);
   }, [navigationContext, session.access, page, canProfile, canGrid, canPriorities, canDashboard, canPeople, canScheduleAdmin]);
 
   useEffect(() => {
@@ -468,6 +471,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
           )}
           {canPriorities && page === "priorities" && <V2Priorities key={priorityPreferencesKey ?? nick} preferencesKey={priorityPreferencesKey} canManageDemo={canPeople || isRoot} author={nick} />}
           {isRoot && page === "guild" && <V2Guild />}
+          {isRoot && page === "root-logs" && <div className="min-h-0 flex-1 overflow-auto"><RootLogs /></div>}
           {isRoot && page === "root-api" && <div className="min-h-0 flex-1 overflow-auto"><ApiAdmin /></div>}
           {canPeople && page === "admin-distance" && (
             <div className="min-h-0 flex-1 overflow-auto">

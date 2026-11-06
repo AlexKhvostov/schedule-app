@@ -1,5 +1,14 @@
 # База schedule-app
 
+## Root-журнал (локальная миграция, 7 ноября 2026)
+
+[Миграция root_logs](../supabase/migrations/20261106214620_root_logs.sql) добавляет две RPC с пустым search_path, явной проверкой auth.uid()/is_root(), без EXECUTE для PUBLIC/anon:
+
+- `root_logs(source, person, role, from, to, action, limit, before_at, before_id)` читает существующие occupancy_events или member_distance_id_audit. Максимум 200 записей, keyset-переход по `(at,id)` без OFFSET. Даты включительны в Europe/Minsk, UUID и bigint курсоры сравниваются в родных типах. Поиск подстроки по текущим именам/Discord/ID, `%` не является шаблоном. Автор и участник фильтруются независимо. LEFT JOIN сохраняет события удалённых карточек; старые FK occupancy_events уже могли стать NULL — восстановить автора по ним нельзя. Email/телефон/прочие частные поля не возвращаются.
+- `root_logs_cleanup(months, cutoff, confirm)` принимает только 2/3 месяца. Предпросмотр возвращает границу и количество. Подтверждение требует ту же допустимую границу, не старее 15 минут, и удаляет только occupancy_events с `at < cutoff`, до 5000 строк, с SKIP LOCKED. Возвращает удалённое/оставшееся количество. История ID, факты дистанций и само расписание не затрагиваются. Операция транзакционная; при неоднозначном сетевом результате пользователь заново получает подсчёт.
+
+У occupancy_events узкий индекс по at заменён `(at DESC,id DESC)`, совместимым с автоматической очисткой; у member_distance_id_audit добавлен такой же индекс. Существующие actor/member индексы сохраняются. Прежний cron `occupancy-events-prune` и функция хранения 2 месяца не меняются. [SQL-контракт](../supabase/tests/root_logs.sql) проверяет права, даты, курсоры одинакового времени, поиск, удалённые карточки, строгую границу и размер порции очистки.
+
 Доработка5 ноября2026, миграция применена к Working перед тестовым выпуском: миграция [20261105102935](../supabase/migrations/20261105102935_active_priority_selection.sql) добавляет закрытую RLS-таблицу priority_settings(id=true, active_period=2026-08-01, revision=0). set_active_priority(date,bigint) — admin.people/root и auth.uid, проверка даты и ожидаемого счётчика под FOR UPDATE; load_priority_view(date,text,text,boolean) — прежние права чтения, null выбирает активный период и возвращает activePeriod/activeRevision/canActivate; load_active_month_roster(text,text,text[],text,text) — schedule, период определяется сервером. Чтения удерживают FOR SHARE настройки и переиспользуют существующие RPC/кэш, прямые права на таблицу отсутствуют. Старые функции сохранены. Контракт: [active_priority.sql](../supabase/tests/active_priority.sql).
 
 ## Оформление закрытой ёмкости — 5 ноября 2026
