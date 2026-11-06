@@ -645,3 +645,5 @@ Vitest завершал отдельные workers с Windows EPERM; тесты 
 
 
 2026-11-06 22:09 Europe/Minsk. Завершён локальный редактор дистанций:416px, матрица3×4, все11лимитов, поля60×24px, ошибка без потери ввода, корректный part для выбранного периода/ID.394unit; общийDemo149PASS/2skip, финальные8Demo+2syntheticLive PASS, IAB, types/lint/build/bundle259.4PASS. Без push/deploy и серверных изменений. [Отчёт](../memory/tasks/2026-11-06-distance-repair-editor.md).
+
+2026-11-06 22:26 Europe/Minsk — объединены и опубликованы изменения обоих чатов: редактор дистанций3×4,11лимитов, фильтры/CSV/компактная таблица и приоритеты. Код add943b, Vercel Production7608674270 success. Авторизованный IAB и CSV прошли:211/283 видны с RedParty, CSV201строка/11лимитов, все суммы совпали; реальные данные и роли при выпуске не менялись. CI42277695084: все4job success; выпуск проверен. [Отчёт](../memory/tasks/2026-11-06-distance-editor-release.md).
