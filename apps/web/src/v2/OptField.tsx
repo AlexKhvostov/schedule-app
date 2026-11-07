@@ -176,8 +176,7 @@ export const OptField = memo(function OptField({
           ["--opt-work-gap-w" as string]: `${Math.max(12, cellWidth * 0.6)}px`,
           ["--opt-grid-template" as string]: workGridTemplate,
           ["--opt-row-pad" as string]: `${Math.max(1, cellWidth * 0.2)}px`,
-          ["--opt-lane-gap" as string]: `${Math.max(0.6, cellWidth * 0.2)}px`,
-          ["--opt-track-pad-y" as string]: `${Math.max(0.5, cellWidth * 0.1)}px`,
+          ["--opt-track-pad-y" as string]: `${Math.max(0.5, cellWidth * 0.05)}px`,
           ...(skin === "theme" ? {} : lookToVars(slotLook)),
         } as CSSProperties
       }

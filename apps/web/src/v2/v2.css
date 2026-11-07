@@ -9668,11 +9668,18 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-nl-w: 26px;
   --opt-nl-gap: 4px;
   --opt-row-pad: 4px;
+  /* At 100% zoom, visible slot gaps are 2 / 6 / 10 / 14px:
+     same limit / next limit / next tournament kind / next day. */
+  --opt-lane-gap: 0px;
+  --opt-limit-gap: 4px;
+  --opt-kind-gap: 8px;
+  --opt-day-gap: 6px;
+  --opt-day-pad-y: 2px;
   --opt-pad-l: 2px;
   --opt-pad-r: 2px;
   --opt-cell-w: 20px;
   --opt-cell-h: 20px;
-  --opt-lane-h: calc(var(--opt-cell-h) + 4px);
+  --opt-lane-h: calc(var(--opt-cell-h) + 2 * var(--opt-track-pad-y, 2px));
   --opt-frame-pad: 3px;
   --opt-sheet: var(--background);
   --opt-head: var(--slot-hours, var(--day));
@@ -9688,7 +9695,7 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-day-border: 1px;
   --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
   --slot-open-stroke: color-mix(in srgb, var(--foreground) 38%, transparent);
-  --opt-day-frame: color-mix(in srgb, var(--foreground) 36%, var(--slot-day, var(--card)));
+  --opt-day-frame: color-mix(in srgb, var(--foreground) 44%, var(--slot-day, var(--card)));
   background: var(--background);
   color: var(--opt-ink);
 }
@@ -10132,7 +10139,8 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-sticky: var(--slot-day, var(--card));
   position: relative;
   z-index: 0;
-  margin-top: 5px;
+  margin-top: var(--opt-day-gap);
+  padding-block: var(--opt-day-pad-y);
   overflow: visible;
   border-radius: 8px;
   background: var(--slot-day, var(--card));
@@ -10226,7 +10234,7 @@ textarea.v2-ctrl.v2-cab-area {
   min-width: 0;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 3px;
+  gap: 0;
 }
 
 .v2-opt-kind,
@@ -10257,12 +10265,6 @@ textarea.v2-ctrl.v2-cab-area {
   font-weight: 650;
   line-height: 1.05;
   pointer-events: none;
-}
-
-.v2-opt-kind + .v2-opt-kind,
-.v2-opt-gutter-kind + .v2-opt-gutter-kind {
-  padding-top: 3px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
 }
 
 .v2-opt-hours .v2-opt-gutter-nls,
@@ -10300,7 +10302,7 @@ textarea.v2-ctrl.v2-cab-area {
   overflow: visible;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 3px;
+  gap: 0;
 }
 
 .v2-opt-day {
@@ -10311,7 +10313,7 @@ textarea.v2-ctrl.v2-cab-area {
   gap: 1px;
   min-width: 0;
   margin: 1px 0;
-  padding: 3px 0;
+  padding: 1px 0;
   border-radius: 6px;
   background: var(--slot-date, var(--day));
   line-height: 1.05;
@@ -10424,6 +10426,26 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt.is-overview .v2-opt-lane-number { display: none; }
+
+/* Overview rows can be shorter than a label. Name the group once rather than
+   stacking the same text on every miniature lane; editing zoom restores it. */
+.v2-opt.is-overview .v2-opt-gutter-limit > .v2-opt-nl .v2-limit-chip {
+  visibility: hidden;
+}
+
+.v2-opt.is-overview .v2-opt-gutter-limit > .v2-opt-nl:first-child .v2-limit-chip {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: auto;
+  transform: translateY(-50%);
+  visibility: visible;
+}
+
+.v2-opt.is-overview .v2-opt-limit-label {
+  font-size: clamp(6px, calc(var(--opt-cell-h) + 3px), 9px);
+  line-height: 1;
+}
 
 .v2-opt-lane-number {
   font-size: 7px;
@@ -10860,18 +10882,20 @@ textarea.v2-ctrl.v2-cab-area {
   display: flex;
   flex-direction: column;
   gap: var(--opt-lane-gap, 3px);
-  padding-block: 3px;
+  padding-block: 0;
 }
 .v2-opt-limit { overflow: clip; }
 .v2-opt-limit + .v2-opt-limit,
 .v2-opt-gutter-limit + .v2-opt-gutter-limit {
-  padding-top: 6px;
-  border-top: 1px dashed color-mix(in srgb, var(--foreground) 14%, transparent);
+  margin-top: calc(var(--opt-limit-gap) / 2);
+  padding-top: calc(var(--opt-limit-gap) / 2 - 1px);
+  border-top: 1px dashed color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 .v2-opt-kind + .v2-opt-kind,
 .v2-opt-gutter-kind + .v2-opt-gutter-kind {
-  padding-top: 6px;
-  border-top: 1px solid color-mix(in srgb, var(--foreground) 24%, transparent);
+  margin-top: calc(var(--opt-kind-gap) / 2);
+  padding-top: calc(var(--opt-kind-gap) / 2 - 1px);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 30%, transparent);
 }
 .v2-hour-load-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
 .v2-hour-load-tools .v2-ctrl { min-height: 30px; padding-inline: 12px; }
@@ -11640,9 +11664,9 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
   --opt-sticky: var(--slot-day, var(--card));
   width: max-content;
   max-width: none;
-  padding: var(--opt-row-pad) var(--opt-row-pad) var(--opt-row-pad) 0;
+  padding: var(--opt-day-pad-y) var(--opt-row-pad) var(--opt-day-pad-y) 0;
   background: var(--slot-day, var(--card));
-  margin-top: 8px;
+  margin-top: var(--opt-day-gap);
   border: var(--opt-day-border) solid var(--opt-day-frame);
   box-shadow: none;
 }
@@ -11659,8 +11683,8 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 .v2-opt.is-kit .v2-opt-block > .v2-opt-gutter::before {
   content: "";
   position: absolute;
-  inset: calc(-1 * (var(--opt-row-pad) + var(--opt-day-border))) 0
-    calc(-1 * (var(--opt-row-pad) + var(--opt-day-border))) calc(-1 * var(--opt-day-border));
+  inset: calc(-1 * (var(--opt-day-pad-y) + var(--opt-day-border))) 0
+    calc(-1 * (var(--opt-day-pad-y) + var(--opt-day-border))) calc(-1 * var(--opt-day-border));
   z-index: 3;
   border: var(--opt-day-border) solid var(--opt-day-frame);
   border-right: 0;
