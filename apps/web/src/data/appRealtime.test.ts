@@ -89,3 +89,26 @@ it("shows reconnect only after the transport opens and online only after channel
   db.realtime.stateChangeCallbacks.open.forEach(([,fn]) => fn()); expect(app.getAppConnection()).toBe("connecting");
   channels[0].status("SUBSCRIBED"); expect(app.getAppConnection()).toBe("online");
 });
+
+it("accepts optional profile details, bounds strings and rejects unsafe avatar URLs", async () => {
+  setup(); const {connectedMembers} = await import("./appRealtime");
+  expect(connectedMembers({tabs:[
+    {member_id:"a",nick:" Discord ",profile_name:" Name ",avatar_url:"https://cdn.discordapp.com/avatar.png"},
+    {member_id:"b",nick:"Legacy",avatar_url:"javascript:alert(1)"},
+    {member_id:"c",nick:"Long",profile_name:"x".repeat(200),avatar_url:"data:image/png;base64,abc"},
+    {member_id:"d",nick:"Credentials",avatar_url:"https://user:pass@example.com/a.png"},
+  ]})).toEqual([
+    {member_id:"d",nick:"Credentials"},
+    {member_id:"a",nick:"Discord",profile_name:"Name",avatar_url:"https://cdn.discordapp.com/avatar.png"},
+    {member_id:"b",nick:"Legacy"},
+    {member_id:"c",nick:"Long",profile_name:"x".repeat(100)},
+  ]);
+});
+
+it("publishes profile details through the existing Presence channel without unrelated fields", async () => {
+  const {channels,db} = setup(); const app = await import("./appRealtime");
+  cleanup.push(app.publishAppPresence({member_id:"a",nick:"PublicDiscord",profile_name:"Profile Name",avatar_url:"https://example.test/avatar.png"}));
+  await app.getAppAccount(); channels[0].status("SUBSCRIBED");
+  expect(channels[0].track).toHaveBeenCalledExactlyOnceWith({member_id:"a",nick:"PublicDiscord",profile_name:"Profile Name",avatar_url:"https://example.test/avatar.png"});
+  expect(db.channel).toHaveBeenCalledOnce();
+});

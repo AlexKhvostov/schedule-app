@@ -3,17 +3,29 @@ import { getSupabase } from "./client";
 
 export type AppConnection = "connecting" | "online" | "offline";
 export type AppChange = { domain: "slots" | "config" | "directory" | "priorities" | "access"; target?: { date: string; kind_id: string } };
-export type ConnectedMember = { member_id: string; nick: string };
+export type ConnectedMember = { member_id: string; nick: string; profile_name?: string; avatar_url?: string };
+
+function presenceMember(value: unknown): ConnectedMember | null {
+  const row = value as Partial<ConnectedMember> | null;
+  if (!row || typeof row.member_id !== "string" || !row.member_id || row.member_id.length > 128
+    || typeof row.nick !== "string" || !row.nick.trim()) return null;
+  const member: ConnectedMember = { member_id: row.member_id, nick: row.nick.trim().slice(0, 100) };
+  if (typeof row.profile_name === "string" && row.profile_name.trim()) member.profile_name = row.profile_name.trim().slice(0, 100);
+  if (typeof row.avatar_url === "string" && row.avatar_url.length <= 2048) {
+    try {
+      const url = new URL(row.avatar_url);
+      if (["https:", "http:"].includes(url.protocol) && !url.username && !url.password) member.avatar_url = url.href;
+    } catch { /* Invalid optional avatars fall back to initials. */ }
+  }
+  return member;
+}
 
 /** Presence is presentation-only; never use a client-published identity for access checks. */
 export function connectedMembers(state: Record<string, unknown[]>): ConnectedMember[] {
   const people = new Map<string, ConnectedMember>();
   for (const entries of Object.values(state)) for (const value of entries) {
-    const row = value as Partial<ConnectedMember> | null;
-    if (row && typeof row.member_id === "string" && row.member_id.length <= 128 && row.member_id
-      && typeof row.nick === "string" && row.nick.trim()) {
-      people.set(row.member_id, { member_id: row.member_id, nick: row.nick.trim().slice(0, 100) });
-    }
+    const member = presenceMember(value);
+    if (member) people.set(member.member_id, member);
   }
   return [...people.values()].sort((a, b) => a.nick.localeCompare(b.nick) || a.member_id.localeCompare(b.member_id));
 }
@@ -153,7 +165,9 @@ export function subscribeAppPresence(listener: (people: ConnectedMember[]) => vo
 }
 export function publishAppPresence(member: ConnectedMember) {
   const token = Symbol("presence-owner");
-  presence = { token, member: { member_id: member.member_id, nick: member.nick.slice(0, 100) } };
+  const payload = presenceMember(member);
+  if (!payload) return () => {};
+  presence = { token, member: payload };
   ensureStarted();
   if (connection === "online") void channel?.track(presence.member);
   return () => {

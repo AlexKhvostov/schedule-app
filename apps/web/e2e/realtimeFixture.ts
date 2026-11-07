@@ -5,16 +5,19 @@ export async function realtimeFixture(page: Page) {
   const sockets = new Set<WebSocketRoute>();
   const joined = new Map<WebSocketRoute, Map<string, string>>();
   let members: Record<string, { metas: Record<string, unknown>[] }> = {};
+  let presenceRevision = 0;
   const state = {
     online: true,
+    tracked: [] as Record<string, unknown>[],
     disconnect: () => { state.online = false; sockets.forEach(socket => socket.close()); sockets.clear(); joined.clear(); },
     broadcast: (event: string, payload: Record<string, unknown> = {}) => {
       for (const [socket, topics] of joined) for (const [topic, joinRef] of topics) {
         if (topic === "realtime:app:changes") socket.send(JSON.stringify([joinRef, null, topic, "broadcast", { event, payload }]));
       }
     },
-    presence: (rows: { member_id: string; nick: string }[]) => {
-      members = Object.fromEntries(rows.map((row, index) => [`connection-${index}`, { metas: [{ ...row, phx_ref: `ref-${index}` }] }]));
+    presence: (rows: { member_id: string; nick: string; profile_name?: string; avatar_url?: string }[]) => {
+      ++presenceRevision;
+      members = Object.fromEntries(rows.map((row, index) => [`connection-${index}`, { metas: [{ ...row, phx_ref: `ref-${presenceRevision}-${index}` }] }]));
       for (const [socket, topics] of joined) for (const [topic, joinRef] of topics) {
         if (topic === "realtime:app:changes") socket.send(JSON.stringify([joinRef, null, topic, "presence_state", members]));
       }
@@ -35,6 +38,7 @@ export async function realtimeFixture(page: Page) {
         } }]));
         if (event === "phx_join") socket.send(JSON.stringify([joinRef, null, topic, "presence_state", members]));
       } else if (event === "presence") {
+        if (payload?.event === "track") state.tracked.push(payload.payload);
         socket.send(JSON.stringify([joinRef, ref, topic, "phx_reply", { status: "ok", response: {} }]));
       }
     });

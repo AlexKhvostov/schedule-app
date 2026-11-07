@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isLiveData } from "../../data/config";
@@ -35,11 +35,19 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
   }, 160); };
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    const rect = button.current?.getBoundingClientRect();
-    const point = { x: rect?.left ?? 12, y: rect?.bottom ?? 90 };
-    setPosition({ x: Math.max(8, Math.min(point.x, window.innerWidth - 316)), y: Math.max(8, Math.min(point.y + 8, window.innerHeight - 270)) });
+    const place = () => {
+      const rect = button.current?.getBoundingClientRect();
+      const width = panel.current?.offsetWidth ?? 344;
+      const height = panel.current?.offsetHeight ?? 300;
+      setPosition({ x: Math.max(8, Math.min((rect?.right ?? width + 8) - width, window.innerWidth - width - 8)),
+        y: Math.max(8, Math.min((rect?.bottom ?? 82) + 8, window.innerHeight - height - 8)) });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    if (panel.current) observer.observe(panel.current);
+    window.addEventListener("resize", place);
     const dismiss = (event: globalThis.PointerEvent) => {
       if (!panel.current?.contains(event.target as Node) && !button.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -50,11 +58,17 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
       }
     };
     document.addEventListener("pointerdown", dismiss); document.addEventListener("keydown", escape);
-    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+    return () => { observer.disconnect(); window.removeEventListener("resize", place); document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
   }, [open]);
 
   const description = !isLiveData() ? "demoDescription" : month.health.uncertain ? "uncertainDescription"
-    : month.syncError ? "paused" : connection === "online" ? "connectedDescription" : connection === "connecting" ? "connectingDescription" : "offlineDescription";
+    : month.syncError ? "pausedDescription" : connection === "online" ? "connectedDescription" : connection === "connecting" ? "connectingDescription" : "offlineDescription";
+  const attention = month.health.uncertain || !!month.syncError;
+  const tone = attention ? "attention" : status;
+  const headline = !isLiveData() ? "demo" : month.health.uncertain ? "savePendingTitle" : month.syncError ? "pausedTitle"
+    : connection === "online" ? "onlineTitle" : connection === "connecting" ? "connectingTitle" : "offlineTitle";
+  const icon = attention ? "fa-exclamation" : connection === "online" ? "fa-check" : connection === "connecting" ? "fa-link" : "fa-plug";
+  const updatedAt = month.health.lastUpdated === null ? null : new Date(month.health.lastUpdated);
   return <>
     <button ref={button} type="button" className={`v2-ctrl v2-sync-status is-${status}`} data-testid="schedule-sync-status"
       aria-label={t("schedule.sync.label", { status: t(`schedule.sync.${status}`) })} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
@@ -63,14 +77,20 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
       }} onBlur={leave} onClick={reveal}>
       <i aria-hidden="true" className="fa-solid fa-circle" /><span>{t(`schedule.sync.${status}`)}</span>
     </button>
-    {open && createPortal(<div id={id} ref={panel} className="v2-sync-card" role="dialog" aria-label={t("schedule.sync.title")} style={{ left: position.x, top: position.y }}
+    {open && createPortal(<div id={id} ref={panel} className={`v2-sync-card is-${tone}`} role="dialog" aria-label={t("schedule.sync.title")} style={{ left: position.x, top: position.y }}
       onMouseEnter={reveal} onMouseLeave={leave} onFocusCapture={reveal} onBlurCapture={leave}>
-      <div className="v2-sync-heading"><strong>{t("schedule.sync.title")}</strong><button type="button" aria-label={t("schedule.sync.close")} onClick={close}>×</button></div>
-      <p role="status">{t(`schedule.sync.${description}`)}</p>
-      {busy && <small role="status">{t("schedule.sync.checking")}</small>}
-      <small>{month.health.lastUpdated === null ? t("schedule.sync.neverUpdated") : t("schedule.sync.updated", {
-        time: new Date(month.health.lastUpdated).toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      })}</small>
+      <div className="v2-sync-heading"><span>{t("schedule.sync.title")}</span><button type="button" aria-label={t("schedule.sync.close")} onClick={close}><i className="fa-solid fa-xmark" aria-hidden="true" /></button></div>
+      <div className="v2-sync-summary">
+        <span className="v2-sync-emblem" aria-hidden="true"><i className={`fa-solid ${icon}`} /></span>
+        <div><strong className="v2-sync-title">{t(`schedule.sync.${headline}`)}</strong><span className={`v2-sync-connection is-${status}`}><span aria-hidden="true" />{t(`schedule.sync.${status}`)}</span></div>
+      </div>
+      <p className="v2-sync-description" role="status">{t(`schedule.sync.${description}`)}</p>
+      <div className="v2-sync-timestamp">
+        <i className="fa-regular fa-clock" aria-hidden="true" />
+        <div><span>{t("schedule.sync.lastUpdate")}</span><small>{updatedAt ? updatedAt.toLocaleDateString(i18n.language, { day: "numeric", month: "long" }) : t("schedule.sync.neverUpdated")}</small></div>
+        {updatedAt && <time dateTime={updatedAt.toISOString()}>{updatedAt.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>}
+      </div>
+      {busy && <div className="v2-sync-progress" role="status"><i className="fa-solid fa-arrows-rotate" aria-hidden="true" />{t("schedule.sync.checking")}</div>}
       {isLiveData() && <div className="v2-sync-actions">
         {month.health.uncertain ? <button type="button" className="v2-ctrl" disabled={checkingWrite} onClick={() => {
           setCheckingWrite(true);
@@ -78,8 +98,8 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
             if (error) showV2Toast("err", t(error === "schedule-write-unknown" ? "schedule.sync.uncertainDescription"
               : error.includes("schedule-conflict") ? "schedule.toastConflict" : "schedule.toastSaveError"));
           }).finally(() => setCheckingWrite(false));
-        }}>{t("schedule.sync.retryWrite")}</button>
-          : <button type="button" className="v2-ctrl" disabled={busy} onClick={() => month.retryLoad()}>{t("schedule.sync.refresh")}</button>}
+        }}><i className={`fa-solid fa-arrows-rotate${checkingWrite ? " is-spinning" : ""}`} aria-hidden="true" />{t("schedule.sync.retryWrite")}</button>
+          : <button type="button" className="v2-ctrl" disabled={busy} onClick={() => month.retryLoad()}><i className={`fa-solid fa-arrows-rotate${busy ? " is-spinning" : ""}`} aria-hidden="true" />{t("schedule.sync.refresh")}</button>}
         {month.syncError && !month.health.uncertain && <button type="button" className="v2-sync-reload" onClick={() => window.location.reload()}>{t("schedule.sync.reload")}</button>}
       </div>}
     </div>, document.body)}

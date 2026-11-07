@@ -273,9 +273,12 @@ test("compact summary follows the visible kind, filters and Core display", async
   await enter(page);
   const number = (value: string) => Number(value.replace(/[^\d,.-]/g, "").replace(",", "."));
   const checkSummary = async () => {
+    const summary = page.locator(".v2-prio-summary");
+    // Switching a kind loads its source asynchronously. Capture row totals only
+    // after the new source is accepted, rather than freezing the loading row count.
+    await expect(summary.locator('[data-metric="players"] dd')).toHaveText(/^\d+$/);
     const rows = page.locator(".v2-prio-table tbody tr");
     const points = (await rows.locator("td.is-total").allTextContents()).reduce((sum, value) => sum + number(value), 0);
-    const summary = page.locator(".v2-prio-summary");
     await expect(summary.locator('[data-metric="players"] dd')).toHaveText(String(await rows.count()));
     expect(number(await summary.locator('[data-metric="points"] dd').innerText())).toBe(points);
     await expect(summary.locator('[data-metric="vip"] dd')).toHaveText(String(await rows.filter({ has: page.locator(".is-nick small", { hasText: /Core/ }) }).count()));

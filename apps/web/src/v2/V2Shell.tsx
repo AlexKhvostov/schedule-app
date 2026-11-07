@@ -116,8 +116,11 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   const [adminVariant, setAdminVariant] = useState<"nitro" | "regular">(() => (typeof window === "undefined" ? "nitro" : loadPrefs().kinds[0]));
   const { map: hourLoad } = useClubHourLoad();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
-  const demoAvatar = !isLiveData() ? memberOfSession(loadMembers(), session)?.avatar : "";
-  const avatarUrl = session.avatarUrl || demoAvatar || null;
+  const demoMember = !isLiveData() ? memberOfSession(loadMembers(), session) : undefined;
+  const avatarUrl = session.avatarUrl || demoMember?.avatar || null;
+  const [presenceProfile, setPresenceProfile] = useState<{ memberId?: string; name?: string | null }>({});
+  const presenceName = isLiveData() ? (presenceProfile.memberId === session.memberId ? presenceProfile.name : undefined) : demoMember?.name;
+  const presenceNick = isLiveData() ? nick : demoMember?.discordDisplay || demoMember?.discord || nick;
 
   const menuRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -197,10 +200,13 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   useEffect(() => {
     if (isLiveData()) {
       if (!session.memberId) return;
+      let alive = true;
       void loadMyCabinet(session.memberId).then((card) => {
+        if (!alive) return;
         if (card) savePlayerUtc(card.extraUtc);
+        setPresenceProfile({ memberId: session.memberId, name: card?.displayName });
       });
-      return;
+      return () => { alive = false; };
     }
     const mine = memberOfSession(loadMembers(), session);
     savePlayerUtc(mine?.extraUtc ?? 3);
@@ -289,7 +295,7 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
           <V2HeaderClock />
           <div className="v2-top-end">
-            {session.access === "active" && <OnlineMenu key={session.memberId ?? session.nick} memberId={session.memberId} nick={nick} avatarUrl={avatarUrl} />}
+            {session.access === "active" && <OnlineMenu key={session.memberId ?? session.nick} memberId={session.memberId} nick={presenceNick} profileName={presenceName} avatarUrl={avatarUrl} />}
             {isAdmin ? (
               <div className="v2-staff" ref={adminRef}>
                 <button

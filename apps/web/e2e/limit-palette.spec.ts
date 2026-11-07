@@ -20,7 +20,9 @@ const rootColor = (page: Page) => page.locator("html").evaluate((node) => getCom
 test("club colors save, persist across players and reset; Regular stays italic", async ({ page, context }) => {
   await enter(page);
   const editor = await openEditor(page);
-  await expect(page.locator(".v2-admin-page > section").last()).toHaveClass(/v2-limit-palette/);
+  const settingsCards = page.locator(".v2-admin-page > section");
+  await expect(settingsCards.nth(-2)).toHaveClass(/v2-limit-palette/);
+  await expect(settingsCards.last()).toHaveAttribute("data-testid", "schedule-sync-settings");
   expect(await rootColor(page)).toBe("#5ba8ff");
   await editor.getByLabel("Цвет 50 · Тёмная тема", { exact: true }).fill("#66ccff");
   await expect(editor.getByRole("button", { name: "Сохранить цвета и фон", exact: true })).toBeEnabled();

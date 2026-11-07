@@ -73,7 +73,7 @@ test("configuration error retains the grid and exposes recovery on a narrow scre
   await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
   await expect(page.locator(".v2-sync-notice")).not.toBeVisible({ timeout: 20000 });
   await page.getByTestId("schedule-sync-status").hover();
-  await expect(dialog).toContainText("Подключение к обновлениям работает");
+  await expect(dialog).toContainText("изменения будут появляться автоматически");
   expect(state.writes).toHaveLength(0);
 });
 
@@ -85,7 +85,7 @@ test("details fit an English interface and manual refresh keeps permissions", as
   await expect(status).toHaveText("online");
   await status.hover();
   const dialog = page.getByRole("dialog", { name: "Schedule freshness" });
-  await expect(dialog).toContainText("Last data update:");
+  await expect(dialog).toContainText("Last data update");
   await page.screenshot({ path: test.info().outputPath("sync-light-en.png") });
   const before = state.snapshotReads;
   await dialog.getByRole("button", { name: "Refresh data", exact: true }).click();
