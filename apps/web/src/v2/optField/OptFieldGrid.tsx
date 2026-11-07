@@ -381,8 +381,10 @@ export const OptBody = memo(function OptBody({
                       return (
                         <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}
                           style={{ "--slot-limit-tone": limitTone(rowInfo.limit) } as CSSProperties}>
-                          {chips}
-                          {disabled}
+                          <div className="v2-opt-limit-surface">
+                            {chips}
+                            {disabled}
+                          </div>
                         </div>
                       );
                     })}

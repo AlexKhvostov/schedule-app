@@ -48,7 +48,7 @@ for (const theme of ["dark", "light"]) {
     }));
     for (const gaps of spacing) expect(Math.abs(gaps.above - gaps.below)).toBeLessThan(0.05);
     expect(spacing).toEqual([{ above: 2.5, below: 2.5 }, { above: 4, below: 4 }]);
-    const joins = await day.evaluate(el => [
+    const readJoins = async () => day.evaluate(el => [
       ['.v2-opt-gutter-limit[data-pair="nitro:100"]', '.v2-opt-lanes .v2-opt-limit[data-pair="nitro:100"]'],
       ['.v2-opt-gutter-kind[data-variant="regular"]', '.v2-opt-lanes .v2-opt-kind[data-variant="regular"]'],
     ].map(([labelSelector, trackSelector]) => {
@@ -56,16 +56,50 @@ for (const theme of ["dark", "light"]) {
       const track = el.querySelector(trackSelector)!;
       const a = label.getBoundingClientRect(), b = track.getBoundingClientRect();
       const line = getComputedStyle(label, '::before');
-      return { horizontal: b.left - (a.right - parseFloat(line.right)), vertical: b.top - a.top,
-        height: line.height, events: line.pointerEvents };
+      const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+      const shift = line.transform === 'none' ? 0 : new DOMMatrixReadOnly(line.transform).m42;
+      const paintedTop = a.top + (parseFloat(getComputedStyle(label).borderTopWidth) + parseFloat(line.top) + shift) * zoom;
+      return { horizontal: b.left - (a.right - parseFloat(line.right) * zoom), vertical: b.top - paintedTop,
+        thickness: line.borderTopWidth, trackThickness: getComputedStyle(track).borderTopWidth, events: line.pointerEvents };
     }));
+    const joins = await readJoins();
     for (const join of joins) {
       expect(Math.abs(join.horizontal)).toBeLessThan(1);
       expect(Math.abs(join.vertical)).toBeLessThan(1);
+      expect(join.thickness).toBe(join.trackThickness);
       expect(join.events).toBe('none');
     }
-    expect(joins.map(join => join.height)).toEqual(['1px', '2px']);
-    expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["1px","none","-3px","-1px"]);
+    expect(joins.map(join => join.thickness)).toEqual(['1px', '2px']);
+    const frameAlignment = async () => day.evaluate(el => {
+      const gutter = el.querySelector('.v2-opt-gutter')!;
+      const d = el.getBoundingClientRect(), g = gutter.getBoundingClientRect();
+      const line = getComputedStyle(gutter, '::before');
+      const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+      const px = (value: string) => parseFloat(value) * zoom;
+      return { top: g.top + px(line.top) - px(line.outlineWidth) - d.top,
+        bottom: g.bottom - px(line.bottom) + px(line.outlineWidth) - d.bottom,
+        left: g.left + px(line.left) - px(line.outlineWidth) - d.left,
+        events: line.pointerEvents };
+    });
+    const aligned = await frameAlignment();
+    for (const edge of [aligned.top, aligned.bottom, aligned.left]) expect(Math.abs(edge)).toBeLessThan(0.05);
+    expect(aligned.events).toBe('none');
+    await page.mouse.move(0, 0);
+    const restingBorder = await day.evaluate(el => getComputedStyle(el).borderTopColor);
+    const restingBox = await day.boundingBox();
+    const restingBackground = await day.evaluate(el => getComputedStyle(el).backgroundColor);
+    await day.locator('[data-slot]').first().hover();
+    await expect(day).toHaveClass(/is-hot/);
+    const activeBorder = await day.evaluate(el => getComputedStyle(el).borderTopColor);
+    expect(activeBorder).not.toBe(restingBorder);
+    expect(await gutter.evaluate(el => getComputedStyle(el, '::before').outlineColor)).toBe(activeBorder);
+    await expect(day).toHaveCSS('background-color', restingBackground);
+    await expect(day).toHaveCSS('box-shadow', 'none');
+    await expect(day).toHaveCSS('border-top-width', '1px');
+    expect(await day.boundingBox()).toEqual(restingBox);
+    await page.screenshot({path:test.info().outputPath(`day-hover-${theme}.png`)});
+    await page.mouse.move(0, 0);
+    await expect(day).toHaveCSS('border-top-color', restingBorder);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/final-${theme}.png`),clip:{x:sb!.x,y:sb!.y,width:480,height:620}});
     // Force horizontal scrolling in a desktop container without changing zoom.
     await sheet.evaluate(el=>{el.style.maxWidth="320px";el.scrollLeft=120});
@@ -73,10 +107,22 @@ for (const theme of ["dark", "light"]) {
     const [ss,sg,sh]=await Promise.all([sheet.boundingBox(),gutter.boundingBox(),head.boundingBox()]);
     expect(Math.abs(sg!.x-sh!.x)).toBeLessThan(1);
     const edge=sg!.x-1-ss!.x;
-    expect(edge).toBeGreaterThanOrEqual(4);
+    expect(edge).toBeGreaterThanOrEqual(3);
     expect(edge).toBeLessThanOrEqual(6);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/scroll-${theme}.png`),clip:{x:ss!.x,y:ss!.y,width:330,height:620}});
     await sheet.evaluate(el=>{el.style.maxWidth="";el.scrollLeft=0});
+    // Fractional zoom rounds a 1px border: align with its actual width, not a nominal offset.
+    for (const zoom of [1.25, 1.5, 2]) {
+      await page.evaluate(value => { document.documentElement.style.zoom = String(value); }, zoom);
+      const alignment = await frameAlignment();
+      for (const edge of [alignment.top, alignment.bottom, alignment.left]) expect(Math.abs(edge)).toBeLessThan(0.05);
+      for (const join of await readJoins()) {
+        expect(Math.abs(join.horizontal)).toBeLessThan(0.05);
+        expect(Math.abs(join.vertical)).toBeLessThan(0.05);
+        expect(join.thickness).toBe(join.trackThickness);
+      }
+    }
+    await page.evaluate(() => { document.documentElement.style.removeProperty('zoom'); });
     await page.setViewportSize({width:390,height:844});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   });

@@ -38,7 +38,7 @@ test("shared limit label spans the group after capacity reduction with marks abo
 
 async function alignedRows(page: Page, count = 5) {
   const geometry = await page.locator('.v2-opt-block[data-row="7"]').evaluate(day => {
-    const labels = [...day.querySelectorAll(".v2-opt-gutter-limit > .v2-opt-nl")];
+    const labels = [...day.querySelectorAll(".v2-opt-limit-surface > .v2-opt-nl")];
     const rows = [...day.querySelectorAll(".v2-opt-lanes .v2-opt-lane")];
     return rows.map((row, i) => {
       const label = labels[i].getBoundingClientRect();
@@ -106,7 +106,11 @@ test("limit highlight stays local across slots, gaps and label, and clears on ex
 async function centeredGroupLabels(page: Page) {
   const offsets = await page.locator('.v2-opt-block[data-row="7"] .v2-opt-gutter-limit').evaluateAll(groups => groups.map(group => {
     const label = group.querySelector('.v2-opt-limit-label')!.getBoundingClientRect();
-    const box = group.getBoundingClientRect();
+    const box = group.querySelector('.v2-opt-limit-surface')!.getBoundingClientRect();
+    const rows = group.querySelectorAll('.v2-opt-nl');
+    const first = rows[0].getBoundingClientRect();
+    const last = rows[rows.length - 1].getBoundingClientRect();
+    if (Math.abs(box.top - first.top) > 0.05 || Math.abs(box.bottom - last.bottom) > 0.05) return Infinity;
     return Math.abs((label.top + label.bottom) / 2 - (box.top + box.bottom) / 2);
   }));
   for (const offset of offsets) expect(offset).toBeLessThan(1);
@@ -202,9 +206,9 @@ for (const theme of ["dark", "light"]) {
     await page.mouse.move(0, 0);
     await expect(page.locator('.v2-opt-block.is-hot')).toHaveCount(0);
     const day = page.locator('.v2-opt-block[data-row="7"]');
-    const groups = day.locator('.v2-opt-gutter-limit');
+    const groups = day.locator('.v2-opt-limit-surface');
     const baseline = await groups.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
-    const otherDay = page.locator('.v2-opt-block[data-row="8"] .v2-opt-gutter-limit');
+    const otherDay = page.locator('.v2-opt-block[data-row="8"] .v2-opt-limit-surface');
     const otherBaseline = await otherDay.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
     const frame = page.locator('.v2-opt-frame');
     for (const [index, pair, label, level] of [

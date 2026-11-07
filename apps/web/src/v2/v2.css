@@ -10277,7 +10277,7 @@ textarea.v2-ctrl.v2-cab-area {
 }
 
 .v2-opt-block .v2-opt-gutter-nls > .v2-opt-nl,
-.v2-opt-block .v2-opt-gutter-limit > .v2-opt-nl {
+.v2-opt-block .v2-opt-limit-surface > .v2-opt-nl {
   flex: none;
   box-sizing: border-box;
   height: var(--opt-lane-h);
@@ -10428,26 +10428,30 @@ textarea.v2-ctrl.v2-cab-area {
   .v2-palette-labels { flex-direction: column; gap: 0; font-size: 12px; }
 }
 
-.v2-opt-gutter-limit {
+/* Keep paint and label centering inside the rows, excluding the separator padding. */
+.v2-opt-limit-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--opt-lane-gap, 3px);
   background: var(--slot-date, var(--day));
-  background-clip: content-box;
   border-radius: 4px;
 }
 
 .v2-opt-gutter-limit .v2-opt-lane-number { display: none; }
 
 /* Local group state changes only when entering or leaving a limit. */
-.v2-opt-gutter-limit.is-limit-hover {
+.v2-opt-gutter-limit.is-limit-hover > .v2-opt-limit-surface {
   background-color: color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 16%, var(--slot-date, var(--day)));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 75%, transparent);
 }
 
 /* One shared label spans the group at every zoom; row geometry stays intact. */
-.v2-opt-gutter-limit > .v2-opt-nl .v2-limit-chip {
+.v2-opt-limit-surface > .v2-opt-nl .v2-limit-chip {
   visibility: hidden;
 }
 
-.v2-opt-gutter-limit > .v2-opt-nl:first-child .v2-limit-chip {
+.v2-opt-limit-surface > .v2-opt-nl:first-child .v2-limit-chip {
   position: absolute;
   inset-inline: 0;
   top: 50%;
@@ -10927,15 +10931,16 @@ textarea.v2-ctrl.v2-cab-area {
   z-index: 1;
   left: 0;
   right: calc(-1 * var(--opt-nl-gap));
-  top: -1px;
-  height: 1px;
-  background: linear-gradient(to right, transparent, var(--opt-limit-divider) 6px);
+  top: 0;
+  height: 0;
+  /* Fractional zoom rounds borders: reuse the actual thickness instead of -1/-2px. */
+  border-top: inherit;
+  border-image: linear-gradient(to right, transparent, var(--opt-limit-divider) 6px) 1;
+  transform: translateY(-100%);
   pointer-events: none;
 }
 .v2-opt-gutter-kind + .v2-opt-gutter-kind::before {
-  top: -2px;
-  height: 2px;
-  background: linear-gradient(to right, transparent, var(--opt-kind-divider) 10px);
+  border-image: linear-gradient(to right, transparent, var(--opt-kind-divider) 10px) 1;
 }
 .v2-hour-load-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
 .v2-hour-load-tools .v2-ctrl { min-height: 30px; padding-inline: 12px; }
@@ -11720,18 +11725,28 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 
 /* Keep the timeline aligned with the physical day border. */
 .v2-opt.is-kit .v2-opt-hours { border: var(--opt-day-border) solid transparent; }
-.v2-opt.is-kit .v2-opt-gutter { left: calc(var(--opt-board-inset) + var(--opt-day-border)); }
+.v2-opt.is-kit .v2-opt-gutter { left: var(--opt-board-inset); }
 /* The sticky column retains the left edge when the rest of the day scrolls away. */
 .v2-opt.is-kit .v2-opt-block > .v2-opt-gutter::before {
   content: "";
   position: absolute;
-  inset: calc(-1 * (var(--opt-day-pad-y) + var(--opt-day-border))) 0
-    calc(-1 * (var(--opt-day-pad-y) + var(--opt-day-border))) calc(-1 * var(--opt-day-border));
-  z-index: 3;
-  border: var(--opt-day-border) solid var(--opt-day-frame);
-  border-right: 0;
-  border-radius: 8px 0 0 8px;
+  inset: calc(-1 * var(--opt-day-pad-y)) 0;
+  z-index: -1;
+  border: 0;
+  outline: var(--opt-day-border) solid var(--opt-day-frame);
+  outline-offset: 0;
+  border-radius: 7px 0 0 7px;
+  background: var(--opt-sticky);
+  clip-path: inset(calc(-1 * var(--opt-day-border)) 0 calc(-1 * var(--opt-day-border)) calc(-1 * var(--opt-day-border)));
   pointer-events: none;
+}
+
+/* Tint only the two border surfaces; do not change inherited month/day variables. */
+.v2-opt.is-kit .v2-opt-block.is-hot {
+  border-color: color-mix(in srgb, var(--ring) 55%, var(--opt-day-frame));
+}
+.v2-opt.is-kit .v2-opt-block.is-hot > .v2-opt-gutter::before {
+  outline-color: color-mix(in srgb, var(--ring) 55%, var(--opt-day-frame));
 }
 
 .v2-opt.is-kit .v2-opt-block.is-picking {
