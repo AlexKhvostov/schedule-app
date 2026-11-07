@@ -18,8 +18,8 @@
 .v2-person-identity .v2-ava.is-sm { width: var(--identity-avatar); height: var(--identity-avatar); min-width: var(--identity-avatar); flex: 0 0 var(--identity-avatar); font-size: 8px; }
 .v2-person-identity-text { flex: 1; min-width: 0; overflow: hidden; }
 .v2-person-identity-heading { display: flex; align-items: baseline; gap: 5px; min-width: 0; line-height: var(--identity-name-line); }
-.v2-person-identity-name, .v2-person-identity-discord, .v2-person-identity-winamax { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2-person-identity-name { flex: 0 1 auto; min-width: 0; color: var(--foreground); font-size: var(--identity-name-size); line-height: var(--identity-name-line); font-weight: 650; }
-.v2-person-identity-heading[data-has-discord] .v2-person-identity-name { flex-shrink: 0; max-width: 50%; }
-.v2-person-identity-discord { flex: 1 1 auto; min-width: 0; }
-.v2-person-identity-discord, .v2-person-identity-winamax { color: var(--muted-foreground); font-size: var(--identity-detail-size); line-height: var(--identity-detail-line); font-weight: 400; }
+.v2-person-identity-primary, .v2-person-identity-secondary, .v2-person-identity-winamax { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-person-identity-primary { flex: 0 1 auto; min-width: 0; color: var(--foreground); font-size: var(--identity-name-size); line-height: var(--identity-name-line); font-weight: 650; }
+.v2-person-identity-heading[data-has-secondary] .v2-person-identity-primary { flex-shrink: 0; max-width: 50%; }
+.v2-person-identity-secondary { flex: 1 1 auto; min-width: 0; }
+.v2-person-identity-secondary, .v2-person-identity-winamax { color: var(--muted-foreground); font-size: var(--identity-detail-size); line-height: var(--identity-detail-line); font-weight: 400; }

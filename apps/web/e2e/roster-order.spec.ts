@@ -61,9 +61,9 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
     return { stacked, smaller, sameHeight: before === after };
   });
   expect(layout).toEqual({ stacked: true, smaller: true, sameHeight: true });
-  await expect(active.nth(2).locator(".v2-person-identity-name")).toHaveText("Алексей");
+  await expect(active.nth(2).locator(".v2-person-identity-secondary")).toHaveText("Алексей");
   await expect(active.nth(2).locator('.v2-person-identity[data-density="dense"]')).toHaveCount(1);
-  await expect(active.nth(2).locator(".v2-person-identity-discord")).toHaveText("polar");
+  await expect(active.nth(2).locator(".v2-person-identity-primary")).toHaveText("polar");
   await expect(active.nth(2).locator(".v2-person-identity-winamax")).toHaveText("PolarWin");
   await expect(table.locator("thead")).toContainText("N50");
   await expect(table.locator("thead")).toContainText("N100");
@@ -244,8 +244,8 @@ test("three queues keep their own players when the schedule shows only 250 and 5
   await expect.poll(panelWidth).toBe(expandedWidth);
   const alex = table.locator('[data-member="RP-502"]');
   await expect(alex.locator(".v2-people-num > b")).toHaveText("0.5");
-  await expect(alex.locator(".v2-person-identity-name")).toHaveText("Александр");
-  await expect(alex.locator(".v2-person-identity-discord")).toHaveText("Public Alex");
+  await expect(alex.locator(".v2-person-identity-secondary")).toHaveText("Александр");
+  await expect(alex.locator(".v2-person-identity-primary")).toHaveText("Public Alex");
   await expect(alex.locator(".v2-person-identity-winamax")).toHaveText("AlexK");
   await alex.click();
   const card = page.locator(".v2-user-card");

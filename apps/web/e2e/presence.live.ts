@@ -14,8 +14,8 @@ for (const theme of ["dark", "light"]) test(`Presence shows connected people onc
   const dialog = page.getByRole("dialog", { name: "На сайте", exact: true });
   await expect(dialog.locator("li")).toHaveCount(2);
   await expect(dialog.locator('.v2-person-identity[data-density="compact"]')).toHaveCount(2);
-  await expect(dialog.locator("li strong")).toHaveText(["Алексей", "Борис"]);
-  await expect(dialog.locator(".v2-person-identity-discord")).toHaveText(["AlexPoker", "Борис с очень длинным ником для мобильного экрана"]);
+  await expect(dialog.locator("li strong")).toHaveText(["AlexPoker", "Борис с очень длинным ником для мобильного экрана"]);
+  await expect(dialog.locator(".v2-person-identity-secondary")).toHaveText(["Алексей", "Борис"]);
   await expect(dialog.locator(".v2-person-identity-winamax")).toHaveText(["AlexWinamax", "ОченьДлинныйWinamaxДляПроверкиУзкогоСписка"]);
   await expect(dialog.locator("li .v2-ava")).toHaveCount(2);
   expect(await dialog.locator("li strong").first().evaluate(el => getComputedStyle(el).fontSize)).toBe("12px");
@@ -24,7 +24,7 @@ for (const theme of ["dark", "light"]) test(`Presence shows connected people onc
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(320);
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  expect(await dialog.locator(".v2-person-identity-name").nth(1).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await dialog.locator(".v2-person-identity-secondary").nth(1).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   const heading = dialog.locator(".v2-person-identity-heading").first();
   expect(await heading.evaluate(el => { const name=el.querySelector("strong")!.getBoundingClientRect(), discord=el.querySelector("small")!.getBoundingClientRect(); return discord.left >= name.right && Math.abs(discord.top-name.top) < 3; })).toBe(true);
   await dialog.screenshot({ path: test.info().outputPath(`presence-${theme}.png`) });
@@ -65,8 +65,8 @@ test("Presence reuses the loaded questionnaire name and public Discord identity"
   state.network.presence([expected]);
   await page.getByRole("button", {name:"На сайте",exact:true}).click();
   const dialog = page.getByRole("dialog",{name:"На сайте",exact:true});
-  await expect(dialog.locator("li strong")).toHaveText("Имя из анкеты");
-  await expect(dialog.locator(".v2-person-identity-discord")).toHaveText("Публичный Discord");
+  await expect(dialog.locator("li strong")).toHaveText("Публичный Discord");
+  await expect(dialog.locator(".v2-person-identity-secondary")).toHaveText("Имя из анкеты");
   await expect(dialog.locator(".v2-person-identity-winamax")).toHaveText("OwnWinamax");
   await expect(dialog.locator("li img")).toHaveAttribute("src",avatar);
   expect(await dialog.locator("li img").evaluate(el => (el as HTMLImageElement).complete && (el as HTMLImageElement).naturalWidth > 0)).toBe(true);

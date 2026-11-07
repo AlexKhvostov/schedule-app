@@ -5,8 +5,8 @@ export function personIdentityNames({ profileName, discord, winamax }: PersonIde
   const name = profileName?.trim() || "";
   const publicNick = discord?.trim() || "";
   return {
-    name: name || publicNick || "—",
-    discord: name && publicNick && name.toLocaleLowerCase() !== publicNick.toLocaleLowerCase() ? publicNick : "",
+    primary: publicNick || name || "—",
+    secondary: name && publicNick && name.toLocaleLowerCase() !== publicNick.toLocaleLowerCase() ? name : "",
     winamax: winamax?.trim() || "",
   };
 }

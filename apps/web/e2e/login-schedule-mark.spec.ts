@@ -1273,8 +1273,8 @@ test("active members can move the Online panel and keep using the schedule", asy
   await expect(dialog).toContainText("На сайте · 1");
   const connected = dialog.getByRole("list", { name: "На сайте", exact: true });
   await expect(connected.getByRole("listitem")).toHaveCount(1);
-  await expect(connected.locator("strong")).toHaveText("Ярослав");
-  await expect(connected.locator(".v2-person-identity-discord")).toHaveText("you");
+  await expect(connected.locator("strong")).toHaveText("you");
+  await expect(connected.locator(".v2-person-identity-secondary")).toHaveText("Ярослав");
   await expect(connected.locator(".v2-person-identity-winamax")).toHaveText("YouNick");
   await expect(dialog.locator("time")).toHaveCount(0);
   await expect(dialog).not.toContainText("Только что");
