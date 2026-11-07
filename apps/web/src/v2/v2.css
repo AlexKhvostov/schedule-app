@@ -9711,6 +9711,7 @@ textarea.v2-ctrl.v2-cab-area {
   position: fixed;
   inset: 0;
   z-index: 1100;
+  contain: layout;
   pointer-events: none;
 }
 
@@ -10435,30 +10436,8 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-gutter-limit .v2-opt-lane-number { display: none; }
 
-/* Reuse applyNav's existing row/lane attributes: no pointer listeners or
-   React updates, and only the current day's matching limit is emphasized. */
-.v2-opt[data-lane*="-nitro-0.25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:0.25"],
-.v2-opt[data-lane*="-nitro-0.50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:0.50"],
-.v2-opt[data-lane*="-nitro-1-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:1"],
-.v2-opt[data-lane*="-nitro-2-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:2"],
-.v2-opt[data-lane*="-nitro-5-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:5"],
-.v2-opt[data-lane*="-nitro-10-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:10"],
-.v2-opt[data-lane*="-nitro-25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:25"],
-.v2-opt[data-lane*="-regular-0.25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:0.25"],
-.v2-opt[data-lane*="-regular-0.50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:0.50"],
-.v2-opt[data-lane*="-regular-1-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:1"],
-.v2-opt[data-lane*="-regular-2-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:2"],
-.v2-opt[data-lane*="-regular-5-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:5"],
-.v2-opt[data-lane*="-regular-10-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:10"],
-.v2-opt[data-lane*="-regular-25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:25"],
-.v2-opt[data-lane*="-nitro-50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:50"],
-.v2-opt[data-lane*="-nitro-100-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:100"],
-.v2-opt[data-lane*="-nitro-250-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:250"],
-.v2-opt[data-lane*="-nitro-500-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:500"],
-.v2-opt[data-lane*="-regular-50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:50"],
-.v2-opt[data-lane*="-regular-100-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:100"],
-.v2-opt[data-lane*="-regular-250-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:250"],
-.v2-opt[data-lane*="-regular-500-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:500"] {
+/* Local group state changes only when entering or leaving a limit. */
+.v2-opt-gutter-limit.is-limit-hover {
   background-color: color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 16%, var(--slot-date, var(--day)));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 75%, transparent);
 }
@@ -10922,14 +10901,14 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-limit { overflow: clip; }
 .v2-opt-limit + .v2-opt-limit,
 .v2-opt-gutter-limit + .v2-opt-gutter-limit {
-  margin-top: calc(var(--opt-limit-gap) / 2);
-  padding-top: calc(var(--opt-limit-gap) / 2 - 1px);
+  margin-top: calc((var(--opt-limit-gap) - 1px) / 2);
+  padding-top: calc((var(--opt-limit-gap) - 1px) / 2);
   border-top: 1px solid transparent;
 }
 .v2-opt-kind + .v2-opt-kind,
 .v2-opt-gutter-kind + .v2-opt-gutter-kind {
-  margin-top: calc(var(--opt-kind-gap) / 2);
-  padding-top: calc(var(--opt-kind-gap) / 2 - 2px);
+  margin-top: calc((var(--opt-kind-gap) - 2px) / 2);
+  padding-top: calc((var(--opt-kind-gap) - 2px) / 2);
   border-top: 2px solid transparent;
 }
 
@@ -10971,6 +10950,8 @@ textarea.v2-ctrl.v2-cab-area {
 
 .v2-opt-frame {
   position: absolute;
+  left: 0;
+  top: 0;
   box-sizing: border-box;
   z-index: 12;
   width: max-content;

@@ -12,6 +12,8 @@ type NavMem = {
   merged: HTMLElement | null;
   hours: Element | null;
   frame: HTMLDivElement | null;
+  limitGroup: Element | null;
+  limitLabel: Element | null;
   col: string;
 };
 
@@ -149,7 +151,7 @@ export function hidePick(root?: HTMLElement | null) {
 export function navOf(root: HTMLElement): NavMem {
   let mem = navMem.get(root);
   if (!mem) {
-    mem = { block: null, hour: null, lane: null, cell: null, merged: null, hours: null, frame: null, col: "" };
+    mem = { block: null, hour: null, lane: null, cell: null, merged: null, hours: null, frame: null, limitGroup: null, limitLabel: null, col: "" };
     navMem.set(root, mem);
   }
   return mem;
@@ -161,6 +163,22 @@ export function hideFrame(mem: NavMem) {
   mem.col = "";
 }
 
+// One local class per group entry/exit, including its label and internal gaps.
+// Nothing on the month root changes merely to highlight a limit.
+export function applyLimitHover(root: HTMLElement, target: EventTarget | null) {
+  const mem = navOf(root);
+  const group = target instanceof Element && root.contains(target)
+    ? target.closest(".v2-opt-limit, .v2-opt-gutter-limit") : null;
+  if (mem.limitGroup === group) return;
+  mem.limitGroup = group;
+  const label = group?.classList.contains("v2-opt-gutter-limit") ? group
+    : group?.closest(".v2-opt-block")?.querySelector(`.v2-opt-gutter-limit[data-pair="${group.getAttribute("data-pair")}"]`) ?? null;
+  if (mem.limitLabel === label) return;
+  mem.limitLabel?.classList.remove("is-limit-hover");
+  label?.classList.add("is-limit-hover");
+  mem.limitLabel = label;
+}
+
 function placeFrame(
   mem: NavMem,
   hit: SlotHit,
@@ -170,12 +188,15 @@ function placeFrame(
 ) {
   const frame = mem.frame;
   if (!frame?.isConnected) return;
-  frame.dataset.mode = mode;
-  if (frame.textContent !== label) {
-    const pairLabel = formatVariantLimit(hit.variant, hit.limit);
-    const pair = document.createElement("span");
+  if (frame.dataset.mode !== mode) frame.dataset.mode = mode;
+  const pairLabel = formatVariantLimit(hit.variant, hit.limit);
+  let pair = frame.firstElementChild as HTMLElement | null;
+  let time = frame.lastElementChild;
+  if (!pair || pair.dataset.variant !== hit.variant || pair.dataset.limit !== hit.limit) {
+    pair = document.createElement("span");
     pair.className = "v2-opt-frame-limit";
     pair.dataset.variant = hit.variant;
+    pair.dataset.limit = hit.limit;
     frame.style.setProperty("--opt-frame-limit-tone", limitTone(hit.limit));
     pair.style.color = "var(--opt-frame-limit-tone)";
     const prefix = document.createElement("span");
@@ -183,26 +204,28 @@ function placeFrame(
     prefix.dataset.variant = hit.variant;
     prefix.textContent = pairLabel[0];
     pair.append(prefix, document.createTextNode(pairLabel.slice(1)));
-    const time = document.createElement("span");
+    time = document.createElement("span");
     time.className = "v2-opt-frame-time";
     time.textContent = label.slice(pairLabel.length);
     frame.replaceChildren(pair, time);
+  } else if (time?.firstChild && time.textContent !== label.slice(pairLabel.length)) {
+    time.firstChild.nodeValue = label.slice(pairLabel.length);
   }
   mem.col = String(hit.half);
-  frame.hidden = false;
+  if (frame.hidden) frame.hidden = false;
   const box = frame.getBoundingClientRect();
   const center = Math.min(window.innerWidth - box.width / 2 - 4,
     Math.max(box.width / 2 + 4, (anchor.left + anchor.right) / 2));
   // Below the target when there is no room above; keep either position on-screen.
   const bottom = anchor.top >= box.height + 9 ? anchor.top - 5 : anchor.bottom + box.height + 5;
-  frame.style.left = `${center}px`;
-  frame.style.top = `${Math.max(box.height + 4, Math.min(window.innerHeight - 4, bottom))}px`;
+  frame.style.transform = `translate(${center}px, ${Math.max(box.height + 4, Math.min(window.innerHeight - 4, bottom))}px) translate(-50%, -100%)`;
 }
 
 export function applyNav(root: HTMLElement, hit: SlotHit | null) {
   const kit = root.classList.contains("is-kit");
   const mem = navOf(root);
   if (!hit) {
+    applyLimitHover(root, null);
     hideFrame(mem);
     if (!root.dataset.row && !mem.block && !mem.hour) return;
     mem.block?.classList.remove("is-hot");
@@ -237,8 +260,12 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
     && mem.col === slot
     && mem.frame?.textContent === frameLabel
   ) {
+    applyLimitHover(root, hit.cell);
     return;
   }
+  // Read the slot geometry before changing highlight classes or hint content.
+  const anchor = hoverable ? hit.cell.getBoundingClientRect() : undefined;
+  applyLimitHover(root, hit.cell);
   const nextBlock = hit.cell.closest(".v2-opt-block");
   if (mem.block !== nextBlock) {
     mem.block?.classList.remove("is-hot");
@@ -294,11 +321,11 @@ export function applyNav(root: HTMLElement, hit: SlotHit | null) {
     mem.hour.classList.toggle("is-late", late);
     mem.hour.classList.toggle("is-early", !late);
   }
-  root.dataset.row = row;
-  root.dataset.lane = lane;
-  root.dataset.half = slot;
+  if (root.dataset.row !== row) root.dataset.row = row;
+  if (root.dataset.lane !== lane) root.dataset.lane = lane;
+  if (root.dataset.half !== slot) root.dataset.half = slot;
   if (hoverable) {
-    placeFrame(mem, hit, frameLabel);
+    placeFrame(mem, hit, frameLabel, anchor);
   }
   else hideFrame(mem);
 }

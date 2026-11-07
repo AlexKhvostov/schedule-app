@@ -37,6 +37,17 @@ for (const theme of ["dark", "light"]) {
     await expect(limit).toHaveCSS("border-top-style","solid");
     await expect(kind).toHaveCSS("border-image-source",/linear-gradient/);
     await expect(limit).toHaveCSS("border-image-source",/linear-gradient/);
+    const spacing = await day.evaluate(el => ['.v2-opt-limit + .v2-opt-limit', '.v2-opt-kind + .v2-opt-kind'].map(selector => {
+      const group = el.querySelector(selector)!;
+      const previousSlots = group.previousElementSibling!.querySelectorAll('[data-slot]');
+      const above = previousSlots[previousSlots.length - 1].getBoundingClientRect();
+      const below = group.querySelector('[data-slot]')!.getBoundingClientRect();
+      const line = group.getBoundingClientRect();
+      const thickness = parseFloat(getComputedStyle(group).borderTopWidth);
+      return { above: line.top - above.bottom, below: below.top - line.top - thickness };
+    }));
+    for (const gaps of spacing) expect(Math.abs(gaps.above - gaps.below)).toBeLessThan(0.05);
+    expect(spacing).toEqual([{ above: 2.5, below: 2.5 }, { above: 4, below: 4 }]);
     const joins = await day.evaluate(el => [
       ['.v2-opt-gutter-limit[data-pair="nitro:100"]', '.v2-opt-lanes .v2-opt-limit[data-pair="nitro:100"]'],
       ['.v2-opt-gutter-kind[data-variant="regular"]', '.v2-opt-lanes .v2-opt-kind[data-variant="regular"]'],

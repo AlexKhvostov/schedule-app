@@ -6,7 +6,7 @@ import { isPastSlot, readCet } from "../../schedule/cet";
 import { isSelfSeat } from "../../schedule/marks";
 import { levelAllowed, seatsOf } from "../../schedule/plan";
 import { clampWorkRangeHalf, workHalfSlots } from "../../schedule/workHours";
-import { applyNav, halfOnLane, hidePick, hitFromEvent, hitOnLane, showPick } from "../optField/dom";
+import { applyLimitHover, applyNav, halfOnLane, hidePick, hitFromEvent, hitOnLane, showPick } from "../optField/dom";
 import type { OptFieldProps, SlotHit, TipApi, TipPoint } from "./types";
 import {
   packOwner,
@@ -329,6 +329,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     if (!root) return;
     const hit = hitFromEvent(event.target, root);
     if (!hit) {
+      applyLimitHover(root, event.target);
       const inside = event.target instanceof Element && event.target.closest(".v2-opt-track, .v2-opt-block");
       if (!inside) applyNav(root, null);
       return;

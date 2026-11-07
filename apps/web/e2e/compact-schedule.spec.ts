@@ -53,6 +53,56 @@ async function alignedRows(page: Page, count = 5) {
   }
 }
 
+test("limit highlight stays local across slots, gaps and label, and clears on exit", async ({ page }) => {
+  await enter(page, "dark", false, true);
+  await page.mouse.move(0, 0);
+  const day = page.locator('.v2-opt-block[data-row="7"]');
+  const group = day.locator('.v2-opt-gutter-limit[data-pair="nitro:50"]');
+  const slot = day.locator('[data-slot][data-lane="7-nitro-50-0"][data-half="20"]');
+  await slot.hover();
+  await expect(group).toHaveClass(/is-limit-hover/);
+  await group.evaluate(label => {
+    const stats = { labelWrites: 0, hintRebuilds: 0 };
+    const observer = new MutationObserver(records => {
+      for (const r of records) {
+        if (r.target === label) stats.labelWrites++;
+        else stats.hintRebuilds++;
+      }
+    });
+    observer.observe(label, { attributes: true, attributeFilter: ['class', 'style'] });
+    observer.observe(document.querySelector('.v2-opt-frame')!, { childList: true, subtree: true });
+    Object.assign(window, { hoverMutationStats: stats, hoverMutationObserver: observer });
+  });
+  for (const level of [0, 1, 2]) {
+    for (const half of [21, 22, 23]) {
+      await day.locator(`[data-slot][data-lane="7-nitro-50-${level}"][data-half="${half}"]`).hover();
+    }
+  }
+  const a = (await slot.boundingBox())!;
+  const adjacent = (await day.locator('[data-slot][data-lane="7-nitro-50-0"][data-half="21"]').boundingBox())!;
+  await page.mouse.move((a.x + a.width + adjacent.x) / 2, a.y + a.height / 2);
+  await expect(group).toHaveClass(/is-limit-hover/);
+  await group.hover();
+  await expect(group).toHaveClass(/is-limit-hover/);
+  const stats = await page.evaluate(() => {
+    const state = window as typeof window & { hoverMutationStats: { labelWrites: number; hintRebuilds: number }; hoverMutationObserver: MutationObserver };
+    state.hoverMutationObserver.disconnect();
+    return state.hoverMutationStats;
+  });
+  expect(stats).toEqual({ labelWrites: 0, hintRebuilds: 0 });
+  await slot.hover();
+  await day.locator('.v2-opt-day').hover();
+  await expect(group).not.toHaveClass(/is-limit-hover/);
+  // Re-enter the exact same slot: the normal nav fast path must restore the group.
+  await slot.hover();
+  await expect(group).toHaveClass(/is-limit-hover/);
+  await day.locator('.v2-opt-gutter-limit[data-pair="nitro:100"]').hover();
+  await expect(group).not.toHaveClass(/is-limit-hover/);
+  await expect(day.locator('.v2-opt-gutter-limit.is-limit-hover')).toHaveAttribute('data-pair', 'nitro:100');
+  await page.mouse.move(0, 0);
+  await expect(page.locator('.v2-opt-gutter-limit.is-limit-hover')).toHaveCount(0);
+});
+
 async function centeredGroupLabels(page: Page) {
   const offsets = await page.locator('.v2-opt-block[data-row="7"] .v2-opt-gutter-limit').evaluateAll(groups => groups.map(group => {
     const label = group.querySelector('.v2-opt-limit-label')!.getBoundingClientRect();
