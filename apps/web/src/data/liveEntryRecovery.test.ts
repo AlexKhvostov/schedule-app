@@ -48,3 +48,24 @@ it("a successfully verified access gate replaces the previous member", async () 
   expect(recovery.state.entry).toBe(gate);
   recovery.stop();
 });
+
+it("coalesces access events and rechecks an event received during the current read", async () => {
+  let finish!: (entry: LiveEntry) => void;
+  const load = vi.fn().mockImplementationOnce(() => new Promise<LiveEntry>(resolve => { finish = resolve; })).mockResolvedValue({kind:"none"});
+  const recovery = new LiveEntryRecovery(load, vi.fn());
+  recovery.invalidate(); recovery.invalidate(); recovery.invalidate();
+  await vi.advanceTimersByTimeAsync(0); expect(load).toHaveBeenCalledTimes(1);
+  recovery.invalidate(); recovery.invalidate();
+  await vi.advanceTimersByTimeAsync(1000); expect(load).toHaveBeenCalledTimes(1);
+  finish(member); await vi.advanceTimersByTimeAsync(1);
+  expect(load).toHaveBeenCalledTimes(2); expect(recovery.state.entry).toEqual({kind:"none"});
+  recovery.stop();
+});
+
+it("cancels a queued access invalidation on logout or disposal", async () => {
+  const load = vi.fn(async () => member); const recovery = new LiveEntryRecovery(load, vi.fn());
+  recovery.invalidate(); recovery.signedOut(); await vi.advanceTimersByTimeAsync(1);
+  expect(load).not.toHaveBeenCalled();
+  recovery.invalidate(); recovery.stop(); await vi.advanceTimersByTimeAsync(1);
+  expect(load).not.toHaveBeenCalled();
+});

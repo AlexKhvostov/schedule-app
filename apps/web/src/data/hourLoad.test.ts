@@ -1,11 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { loadClubHourLoad, saveClubHourLoad } from "./hourLoad";
 import { emptyLoadRow } from "../schedule/hourLoad";
-const mock = vi.hoisted(() => ({ demo: false, single: vi.fn(), rpc: vi.fn() }));
+const mock = vi.hoisted(() => ({ demo: false, config: vi.fn(), rpc: vi.fn() }));
 vi.mock("./config", () => ({ isDevSandboxEnabled: () => mock.demo }));
-vi.mock("./client", () => ({ getSupabase: () => ({
-  from: () => ({ select: () => ({ eq: () => ({ single: mock.single }) }) }), rpc: mock.rpc,
-}) }));
+vi.mock("./client", () => ({ getSupabase: () => ({ rpc: mock.rpc }) }));
+vi.mock("./scheduleConfiguration", () => ({ loadScheduleConfiguration: mock.config, invalidateScheduleConfiguration: vi.fn(), subscribeConfigurationChanged: () => () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); mock.demo = false; });
 it("saves independent Demo pairs, rejects stale writes, and reports storage failures", async () => {
   mock.demo = true;
@@ -23,9 +22,9 @@ it("saves independent Demo pairs, rejects stale writes, and reports storage fail
   expect((await loadClubHourLoad()).error).toBeTruthy();
 });
 it("keeps server failures explicit and only writes through the guarded RPC", async () => {
-  mock.single.mockResolvedValue({ error: { message: "missing-column" } });
+  mock.config.mockRejectedValue(new Error("missing-column"));
   expect((await loadClubHourLoad()).error).toBe("missing-column");
-  mock.single.mockRejectedValue(new Error("offline"));
+  mock.config.mockRejectedValue(new Error("offline"));
   expect((await loadClubHourLoad()).error).toBeTruthy();
   mock.rpc.mockResolvedValue({ error: { message: "hour-load-conflict" } });
   const row = emptyLoadRow();

@@ -1,3 +1,5 @@
+import { createConfigurationCache } from "./scheduleConfiguration";
+import { getAppAccount, getAppAccountKey, subscribeAppAccount, subscribeAppChanges, subscribeAppConnection } from "./appRealtime";
 import { demoActivePriority } from "./activePriority";
 import { loadRoleAccess, rolesWithGrantedAccess } from "./roleAccess";
 import { getSupabase } from "./client";
@@ -79,13 +81,36 @@ export async function loadPriorities(periodStart: string | null, demoCanManage: 
   }
   return rpc<PrioritySource>("load_priority_view", { p_period_start: periodStart, p_variant: kind, p_group: group, p_refresh: refresh });
 }
+const priorityRoleCache = createConfigurationCache(async () => {
+  const result = await loadRoleAccess();
+  if (result.error) throw new Error(result.error);
+  return rolesWithGrantedAccess(result.roles).map(({ id, name, color }) => ({ id, name, color }));
+});
+let priorityRoleListeners = false;
+function initializePriorityRoleCache() {
+  if (priorityRoleListeners) return;
+  priorityRoleListeners = true;
+  subscribeAppAccount(account => { priorityRoleCache.reset(account); });
+  subscribeAppChanges(change => {
+    if (change.domain === "access" || change.domain === "directory") priorityRoleCache.invalidate();
+  });
+  subscribeAppConnection(status => {
+    if (status === "online") priorityRoleCache.invalidate();
+  });
+}
+
 export async function loadPriorityFilterRoles() {
   if (!isLiveData()) return { data: [
     { id: PRIORITY_DEFAULT_ROLE_ID, name: "RedParty", color: null },
     { id: "1208022278088949770", name: "Nitro 50+", color: null },
   ], error: null };
-  const result = await loadRoleAccess();
-  return { data: rolesWithGrantedAccess(result.roles).map(({ id, name, color }) => ({ id, name, color })), error: result.error };
+  initializePriorityRoleCache();
+  try {
+    await getAppAccount();
+    const account = getAppAccountKey();
+    if (!account) return { data: [], error: "not-signed-in" };
+    return { data: await priorityRoleCache.load(account), error: null };
+  } catch (error) { return { data: [], error: error instanceof Error ? error.message : "role-load-error" }; }
 }
 export async function listPriorityRequests(periodStart: string) {
   if (isLiveData()) return rpc<PriorityRequestSummary[]>("list_priority_requests", { p_period_start: periodStart });

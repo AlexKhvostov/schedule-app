@@ -16,10 +16,11 @@ async function enter(page: Page, session: Session) {
     localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits: ["50", "100"], kinds: ["nitro"], hidePastDays: false }));
   }, session);
   await page.goto("/");
-  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible({ timeout: 25000 });
 }
 
 test("two real sessions reconcile place, range, replacement, delete, directory and reconnect", async ({ browser, baseURL }) => {
+  test.setTimeout(120000);
   const admin = createClient(local.API_URL, local.SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const accounts: string[] = [];
   const contexts: BrowserContext[] = [];
@@ -65,16 +66,23 @@ test("two real sessions reconcile place, range, replacement, delete, directory a
       const page = await context.newPage();
       await enter(page, sessions[index]);
       if (day === 1) {
-        const loaded = page.waitForResponse((response) => response.url().endsWith("/rpc/load_schedule_snapshot")
+        const loaded = page.waitForResponse((response) => response.url().endsWith("/rpc/load_schedule_snapshot_v2")
           && response.request().postDataJSON()?.p_year === year && response.request().postDataJSON()?.p_month === month);
         await page.getByRole("button", { name: "next", exact: true }).click();
         await loaded;
         await expect(page.locator(".v2-opt-sheet")).toBeVisible();
       }
     }
+    const writer = contexts[0].pages()[0];
     const observer = contexts[1].pages()[0];
+    await expect(writer.getByTestId("schedule-sync-status")).toHaveText("онлайн");
+    await expect(observer.getByTestId("schedule-sync-status")).toHaveText("онлайн");
+    await observer.getByRole("button", { name: "На сайте", exact: true }).click();
+    await expect(observer.locator(`[data-presence-member="${memberIds[0]}"]`)).toBeVisible();
+    await expect(observer.locator(`[data-presence-member="${memberIds[1]}"]`)).toBeVisible();
+    await observer.getByRole("button", { name: "На сайте", exact: true }).click();
     const requests: { p_targets: unknown; p_directory_only: boolean }[] = [];
-    observer.on("request", (request) => { if (request.url().endsWith("/rpc/load_schedule_snapshot")) requests.push(request.postDataJSON()); });
+    observer.on("request", (request) => { if (request.url().endsWith("/rpc/load_schedule_snapshot_v2")) requests.push(request.postDataJSON()); });
     const slot = (half: number) => observer.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-d="${day}"][data-half="${half}"][data-level="0"]`);
     const delays: number[] = [];
     async function write(place: { half: number; level?: number; tables?: number }[], remove: { half: number }[] = [], owner = memberIds[0], foreign: { half: number; member_id: string }[] = []) {
@@ -114,6 +122,40 @@ test("two real sessions reconcile place, range, replacement, delete, directory a
     await write([], [12, 13, 14, 15, 17].map((half) => ({ half })), memberIds[0], [{ half: 10, member_id: memberIds[1] }]);
     await expect(slot(10)).not.toHaveClass(/is-on/);
     await expect(slot(17)).not.toHaveClass(/is-on/);
+
+    // Real UI v2 write with a deliberately lost response AFTER the DB committed.
+    // Its retry must resolve the receipt, not execute a new gesture.
+    const checkpoint = writer.waitForResponse(response => response.url().endsWith("/rpc/load_schedule_versions"));
+    await writer.getByTitle("Редактирование", { exact: true }).click(); await checkpoint;
+    const sent: Record<string, unknown>[] = [];
+    await writer.route("**/rpc/apply_schedule_edit_v2", async route => {
+      sent.push(route.request().postDataJSON());
+      if (sent.length === 1) { await route.fetch(); await route.abort("failed"); }
+      else await route.continue();
+    });
+    const writeCell = writer.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-d="${day}"][data-half="21"][data-level="0"]`);
+    await writeCell.click();
+    await expect(slot(21)).toHaveAttribute("data-mark", "QA");
+    await expect(writer.locator(".v2-sync-notice")).toContainText("Не удалось подтвердить сохранение");
+    await writer.getByTestId("schedule-sync-status").click();
+    await writer.getByRole("button", { name: "Проверить сохранение", exact: true }).click();
+    await expect(writer.locator(".v2-sync-notice")).not.toBeVisible();
+    expect(sent).toHaveLength(2); expect(sent[0]).toEqual(sent[1]);
+    expect(sql(`select count(*) from schedule_private.edit_receipts where actor_id='${memberIds[0]}' and operation_id='${sent[0].p_operation_id}';`)).toBe("1");
+    await writer.unroute("**/rpc/apply_schedule_edit_v2");
+
+    // Shared config updates an already open observer without rereading the month.
+    let configReads = 0;
+    observer.on("request", request => { if (request.url().endsWith("/rpc/load_schedule_configuration")) configReads++; });
+    const changedConfig = observer.waitForResponse(response => response.url().endsWith("/rpc/load_schedule_configuration"));
+    const enabled = await clients[0].rpc("save_schedule_sync", { p_enabled: true, p_minutes: 5, p_expected_enabled: false, p_expected_minutes: 5 });
+    if (enabled.error) throw enabled.error;
+    const configResponse = await changedConfig;
+    expect((await configResponse.json()).settings.sync_fallback_enabled).toBe(true);
+    expect(configReads).toBeGreaterThan(0);
+    const disabled = await clients[0].rpc("save_schedule_sync", { p_enabled: false, p_minutes: 5, p_expected_enabled: true, p_expected_minutes: 5 });
+    if (disabled.error) throw disabled.error;
+    await write([], [{ half: 21 }]); await expect(slot(21)).not.toHaveClass(/is-on/);
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
     // Local fixture cleanup only; never runs against a hosted endpoint.

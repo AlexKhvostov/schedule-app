@@ -14,6 +14,7 @@ import { loadMembers } from "./schedule/members";
 import { V2BootScreen } from "./v2/V2BootScreen";
 import { liveAuthReady, loadLiveEntry, signOutLive } from "./data/auth";
 import { getSupabase } from "./data/client";
+import { subscribeAppChanges } from "./data/appRealtime";
 import { disableDevSandbox } from "./data/config";
 import "./v2/theme";
 import "./v2/v2.css";
@@ -79,6 +80,9 @@ export function App() {
       if (state.entry || state.unavailable) setBooting(false);
     });
     recovery.current = controller;
+    const offChanges = subscribeAppChanges(change => {
+      if (change.domain === "access") controller.invalidate();
+    });
     void controller.check();
     // Defer Supabase calls outside the auth callback's session lock.
     let authEvent: ReturnType<typeof setTimeout> | undefined;
@@ -94,7 +98,7 @@ export function App() {
     window.addEventListener("online", resume); window.addEventListener("focus", resume);
     document.addEventListener("visibilitychange", resume);
     return () => {
-      controller.stop(); clearTimeout(authEvent); data.subscription.unsubscribe();
+      controller.stop(); offChanges(); clearTimeout(authEvent); data.subscription.unsubscribe();
       window.removeEventListener("online", resume); window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
       if (recovery.current === controller) recovery.current = null;

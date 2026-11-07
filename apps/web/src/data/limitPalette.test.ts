@@ -2,11 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LIMIT_PALETTE, normalizeLimitPalette } from "../schedule/limitPalette";
 import { loadClubLimitPalette, saveClubLimitPalette } from "./limitPalette";
 
-const mock = vi.hoisted(() => ({ demo: false, single: vi.fn(), rpc: vi.fn() }));
+const mock = vi.hoisted(() => ({ demo: false, config: vi.fn(), rpc: vi.fn() }));
 vi.mock("./config", () => ({ isDevSandboxEnabled: () => mock.demo }));
-vi.mock("./client", () => ({ getSupabase: () => ({
-  from: () => ({ select: () => ({ eq: () => ({ single: mock.single }) }) }), rpc: mock.rpc,
-}) }));
+vi.mock("./client", () => ({ getSupabase: () => ({ rpc: mock.rpc }) }));
+vi.mock("./scheduleConfiguration", () => ({ loadScheduleConfiguration: mock.config, invalidateScheduleConfiguration: vi.fn(), subscribeConfigurationChanged: () => () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); mock.demo = false; });
 
 describe("shared palette persistence", () => {
@@ -26,10 +25,10 @@ describe("shared palette persistence", () => {
     expect(mock.rpc).not.toHaveBeenCalled();
   });
   it("returns an explicit load failure instead of making fallback colors editable", async () => {
-    mock.single.mockResolvedValue({ error: { message: "missing column" } });
+    mock.config.mockRejectedValue(new Error("missing column"));
     expect((await loadClubLimitPalette()).error).toBe("missing column");
-    mock.single.mockRejectedValue(new Error("offline"));
-    expect((await loadClubLimitPalette()).error).toBe("network-error");
+    mock.config.mockRejectedValue(new Error("offline"));
+    expect((await loadClubLimitPalette()).error).toBe("offline");
   });
   it("saves palette and tint atomically in Demo and rejects a stale tint", async () => {
     mock.demo = true;
@@ -56,9 +55,9 @@ describe("shared palette persistence", () => {
     expect(mock.rpc).toHaveBeenCalledWith("save_schedule_appearance", {
       p_palette: DEFAULT_LIMIT_PALETTE, p_expected_palette: DEFAULT_LIMIT_PALETTE, p_tint: tint, p_expected_tint: expected,
     });
-    mock.single.mockResolvedValue({ data: { limit_palette: DEFAULT_LIMIT_PALETTE, slot_tint: tint }, error: null });
+    mock.config.mockResolvedValue({ settings: { limit_palette: DEFAULT_LIMIT_PALETTE, slot_tint: tint } });
     expect((await loadClubLimitPalette()).tint).toEqual(tint);
-    mock.single.mockResolvedValue({ data: { limit_palette: DEFAULT_LIMIT_PALETTE }, error: null });
+    mock.config.mockResolvedValue({ settings: { limit_palette: DEFAULT_LIMIT_PALETTE } });
     expect((await loadClubLimitPalette()).error).toBe("invalid-palette");
   });
   it("saves only via the guarded RPC and preserves failures", async () => {

@@ -94,6 +94,10 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/schedule_act_as.sql
       - name: Check compact reads and private change notifications
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/compact_schedule.sql
+      - name: Check event-driven revisions, Presence isolation and conditional writes
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/event_driven_schedule.sql
+      - name: Check concurrent v2 and legacy edits
+        run: python3 supabase/tests/event_driven_concurrency.py
       - name: Check member table preset RPC
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_table_presets.sql
       - name: Check current distance ID assignments

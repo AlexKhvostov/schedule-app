@@ -113,7 +113,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const [userPos, setUserPos] = useWindowPos("user-card", () => centerPos(360, 320));
   const [front, setFront] = useState<"fill" | "people" | "hours" | "calendar" | "settings" | "user">("fill");
   const [cetTick, setCetTick] = useState(() => readCet());
-  const month = useScheduleMonth({ year, monthIndex, t });
+  const month = useScheduleMonth({ year, monthIndex, selfId: memberId, t });
   const capacity = month.context?.capacity ?? initialCapacity;
   const { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits } = useScheduleRules({ kindsRef, setLimits, t, context: month.context });
   const brush = useScheduleBrush({
@@ -126,6 +126,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
     year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language: i18n.language,
   });
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
+  const { prepareEditing } = month;
+  useEffect(() => { if (paintOn) prepareEditing(); }, [paintOn, prepareEditing]);
   const mayActAs = canActAs || allowActAs;
   const canRemoveForeign = canActAs || allowOverwrite;
   const editGlow = touchLayout ? mobileEditOn : editByButton && canEdit;

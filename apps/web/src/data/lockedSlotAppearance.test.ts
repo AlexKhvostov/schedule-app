@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOCKED_SLOT_APPEARANCE as defaults } from "../schedule/lockedSlotAppearance";
 import { loadLockedSlotAppearance, LOCKED_APPEARANCE_KEY, saveLockedSlotAppearance } from "./lockedSlotAppearance";
 
-const mock = vi.hoisted(() => ({ demo: false, single: vi.fn(), rpc: vi.fn() }));
+const mock = vi.hoisted(() => ({ demo: false, config: vi.fn(), rpc: vi.fn() }));
 vi.mock("./config", () => ({ isDevSandboxEnabled: () => mock.demo }));
-vi.mock("./client", () => ({ getSupabase: () => ({ from: () => ({ select: () => ({ eq: () => ({ single: mock.single }) }) }), rpc: mock.rpc }) }));
+vi.mock("./client", () => ({ getSupabase: () => ({ rpc: mock.rpc }) }));
+vi.mock("./scheduleConfiguration", () => ({ loadScheduleConfiguration: mock.config, invalidateScheduleConfiguration: vi.fn(), subscribeConfigurationChanged: () => () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); mock.demo = false; });
 
 describe("club closed-slot persistence", () => {
@@ -23,9 +24,9 @@ describe("club closed-slot persistence", () => {
     expect(mock.rpc).not.toHaveBeenCalled();
   });
   it("reports unavailable/invalid loads so fallback cannot silently overwrite saved appearance", async () => {
-    mock.single.mockResolvedValue({ data: null, error: { message: "missing column" } });
+    mock.config.mockRejectedValue(new Error("missing column"));
     expect((await loadLockedSlotAppearance()).error).toBe("missing column");
-    mock.single.mockResolvedValue({ data: { locked_slot_appearance: {} }, error: null });
+    mock.config.mockResolvedValue({ settings: { locked_slot_appearance: {} } });
     expect((await loadLockedSlotAppearance()).error).toBe("invalid-locked-appearance");
   });
   it("uses only the protected appearance RPC and propagates conflicts and network errors", async () => {

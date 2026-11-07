@@ -1,3 +1,4 @@
+import { loadScheduleConfiguration, invalidateScheduleConfiguration, subscribeConfigurationChanged } from "./scheduleConfiguration";
 import { getSupabase } from "./client";
 import { isDevSandboxEnabled } from "./config";
 
@@ -143,15 +144,7 @@ export async function loadDeadTimeIntervals(signal?: AbortSignal) {
   if (isDevSandboxEnabled()) return loadDemoDeadTimeIntervals();
   const db = getSupabase();
   if (!db) return [];
-  const query = db
-    .from("schedule_dead_intervals")
-    .select("id, variant_id, limit_id, start_half, end_half")
-    .order("variant_id")
-    .order("limit_id")
-    .order("start_half");
-  const { data, error } = await (signal ? query.abortSignal(signal) : query);
-  if (error) throw error;
-  return deadTimeIntervalsFromRows(data);
+  return deadTimeIntervalsFromRows((await loadScheduleConfiguration(signal)).deadTimeIntervals);
 }
 
 export async function saveDeadTimeIntervals(intervals: DeadTimeInterval[]) {
@@ -171,6 +164,7 @@ export async function saveDeadTimeIntervals(intervals: DeadTimeInterval[]) {
       endHalf,
     })),
   });
+  if (!error) invalidateScheduleConfiguration();
   return { error: error?.message };
 }
 
@@ -187,13 +181,5 @@ export function subscribeDeadTimeIntervals(onChange: () => void) {
       window.removeEventListener("storage", onStorage);
     };
   }
-  const db = getSupabase();
-  if (!db) return () => {};
-  const channel = db
-    .channel("schedule-dead-intervals")
-    .on("postgres_changes", { event: "*", schema: "public", table: "schedule_dead_intervals" }, onChange)
-    .subscribe();
-  return () => {
-    void db.removeChannel(channel);
-  };
+  return subscribeConfigurationChanged(onChange);
 }

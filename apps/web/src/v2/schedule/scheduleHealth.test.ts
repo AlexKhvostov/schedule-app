@@ -16,14 +16,14 @@ function start() {
 }
 afterEach(() => { stops.splice(0).forEach(stop => stop()); vi.useRealTimers(); });
 
-it("requires both an established channel and a full check before editing", async () => {
+it("allows verified HTTP editing while the update channel is offline", async () => {
   const { state, sync } = start();
   expect(state.canEdit).toBe(false);
   await vi.advanceTimersByTimeAsync(0);
   expect(state.canEdit).toBe(true);
   sync.requireRefresh({ connected: false });
   await vi.advanceTimersByTimeAsync(0);
-  expect(state.canEdit).toBe(false); // Healthy HTTP alone is insufficient.
+  expect(state.canEdit).toBe(true); // The server still enforces rights and cell expectations.
   sync.requireRefresh({ connected: true });
   expect(state.canEdit).toBe(false);
   await vi.advanceTimersByTimeAsync(0);
@@ -51,7 +51,7 @@ it("times out a stuck initial read, retries and ignores its eventual response", 
   load.mockImplementationOnce(() => new Promise(resolve => { late = resolve; }));
   await vi.advanceTimersByTimeAsync(15000);
   expect(state.snapshot.error).toBe(true); expect(state.canEdit).toBe(false);
-  await vi.advanceTimersByTimeAsync(2000);
+  await vi.advanceTimersByTimeAsync(6000);
   expect(load).toHaveBeenCalledTimes(2); expect(state.canEdit).toBe(true);
   const checked = state.snapshot.health.lastChecked;
   late(data); await vi.advanceTimersByTimeAsync(10);
@@ -81,10 +81,10 @@ it("keeps an unconfirmed write pending, blocks new edits and never retries the w
   settle(); await result; expect(state.snapshot.health.verified).toBe(false);
 });
 
-it("expires editing permission even if browser timers have been suspended", async () => {
+it("does not expire a verified idle schedule solely because time passes", async () => {
   const { state } = start(); await vi.advanceTimersByTimeAsync(0);
-  vi.setSystemTime(Date.now() + 60001);
-  expect(state.canEdit).toBe(false);
+  vi.setSystemTime(Date.now() + 86400000);
+  expect(state.canEdit).toBe(true);
 });
 
 it("a healthy schedule response cannot bypass an unavailable auth check", async () => {
@@ -102,4 +102,21 @@ it("a healthy schedule response cannot bypass an unavailable auth check", async 
   expect(state.canEdit).toBe(false);
   await vi.advanceTimersByTimeAsync(0);
   expect(state.canEdit).toBe(true);
+});
+
+it("keeps an unknown save unresolved until the exact operation retry returns a definite result", async () => {
+  const {state} = start(); await vi.advanceTimersByTimeAsync(0);
+  const write = vi.fn<() => Promise<string | undefined>>()
+    .mockResolvedValueOnce("schedule-write-unknown")
+    .mockResolvedValueOnce("schedule-write-unknown")
+    .mockResolvedValueOnce(undefined);
+  expect(await state.edit("nitro:50", [], write)).toBe("schedule-write-unknown");
+  expect(state.pendingCount).toBe(1); expect(state.canEdit).toBe(false);
+  expect(state.acceptSnapshot(state.startLoad(), data, {targets:null})).toBe(false);
+  await vi.advanceTimersByTimeAsync(300000); expect(write).toHaveBeenCalledTimes(1);
+  await state.retryUncertainWrite(); expect(state.snapshot.health.uncertain).toBe(true);
+  await state.retryUncertainWrite(); expect(state.snapshot.health.uncertain).toBe(false);
+  expect(state.pendingCount).toBe(0); expect(write).toHaveBeenCalledTimes(3);
+  expect(state.canEdit).toBe(false); // A reconciliation follows a definite receipt.
+  await vi.advanceTimersByTimeAsync(100); expect(state.canEdit).toBe(true);
 });

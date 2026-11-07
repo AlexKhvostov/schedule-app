@@ -11,6 +11,7 @@ import { distanceFiltersStorageKey } from "./distanceFilterPrefs";
 import { slotHighlightStorageKey } from "./slotHighlightPrefs";
 import { loadMyCabinet } from "../data/people";
 import { loadCapacityLive, saveCapacityLive } from "../data/capacityLive";
+import { subscribeConfigurationChanged } from "../data/scheduleConfiguration";
 import { loadPrefs } from "./prefs";
 import { setAppLanguage } from "../i18n";
 import { V2Wait } from "./V2Wait";
@@ -208,15 +209,21 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
   useEffect(() => {
     if (!isLiveData()) return;
     let alive = true;
-    setCapacityError(false);
-    void Promise.all([loadCapacityLive("nitro"), loadCapacityLive("regular")]).then(([nitro, regular]) => {
-      if (!nitro || !regular) throw new Error("capacity-unavailable");
-      if (alive) {
-        setCapacity({ nitro, regular });
-        setCapacityReady(true);
-      }
-    }).catch(() => { if (alive) setCapacityError(true); });
-    return () => { alive = false; };
+    let generation = 0;
+    const reload = () => {
+      const ticket = ++generation;
+      void Promise.all([loadCapacityLive("nitro"), loadCapacityLive("regular")]).then(([nitro, regular]) => {
+        if (!nitro || !regular) throw new Error("capacity-unavailable");
+        if (alive && ticket === generation) {
+          setCapacity({ nitro, regular });
+          setCapacityReady(true);
+          setCapacityError(false);
+        }
+      }).catch(() => { if (alive && ticket === generation) setCapacityError(true); });
+    };
+    reload();
+    const off = subscribeConfigurationChanged(reload);
+    return () => { alive = false; ++generation; off(); };
   }, [capacityAttempt]);
 
   useEffect(() => {

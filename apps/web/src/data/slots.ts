@@ -1,3 +1,4 @@
+import { requestWithDeadline } from "./readDeadline";
 import { asVip, type Mark } from "../schedule/marks";
 import { emptyMonth, type Occupancy } from "../schedule/plan";
 import { getSupabase } from "./client";
@@ -485,21 +486,34 @@ export async function applyScheduleEdit(input: {
   place: OwnSlot[];
   remove: OwnSlot[];
   foreign: { date: string; half: number; level: number; memberId: string }[];
+  /** Present together for the event-driven client; legacy atomic helpers remain compatible. */
+  operationId?: string;
+  expected?: { date: string; half: number; level: number; member_id: string | null; tables: number | null }[];
 }) {
+  if (Boolean(input.operationId) !== Boolean(input.expected)) return { error: "invalid-range" };
   const db = getSupabase();
   if (!db) return { error: "not-configured" };
   const kindId = await kindIdOf(input.limit, input.variant);
   if (!kindId) return { error: "unknown-kind" };
-  const { error } = await db.rpc("apply_schedule_edit", {
-    p_kind_id: kindId,
-    p_member_id: input.memberId,
-    p_place: asSlotJson(input.year, input.monthIndex, input.place),
-    p_remove: asSlotJson(input.year, input.monthIndex, input.remove),
-    p_foreign: input.foreign.map((slot) => ({
-      date: slot.date, half: slot.half, level: slot.level, member_id: slot.memberId,
-    })),
-  });
-  return { error: error?.message };
+  try {
+    const { error, status } = await requestWithDeadline(async signal => await db.rpc(input.expected ? "apply_schedule_edit_v2" : "apply_schedule_edit", {
+      ...(input.expected ? { p_operation_id: input.operationId, p_expected: input.expected } : {}),
+      p_kind_id: kindId,
+      p_member_id: input.memberId,
+      p_place: asSlotJson(input.year, input.monthIndex, input.place),
+      p_remove: asSlotJson(input.year, input.monthIndex, input.remove),
+      p_foreign: input.foreign.map((slot) => ({
+        date: slot.date, half: slot.half, level: slot.level, member_id: slot.memberId,
+      })),
+    }).abortSignal(signal), 20000);
+    // A transport failure cannot tell whether the transaction committed. Its operation ID
+    // must be retained by the caller for safe reconciliation/retry, never replaced blindly.
+    const conflict = error && ["40001", "40P01", "23505"].includes(error.code);
+    const unknown = Boolean(input.expected && error && !conflict && (status === 0 || status >= 500 || status === 408));
+    return { error: conflict ? "schedule-conflict" : unknown ? "schedule-write-unknown" : error?.message };
+  } catch (cause) {
+    return { error: input.expected ? "schedule-write-unknown" : cause instanceof Error ? cause.message : "save-error" };
+  }
 }
 
 export function subscribeOccupancy(onChange: (change: OccupancyChange) => void) {

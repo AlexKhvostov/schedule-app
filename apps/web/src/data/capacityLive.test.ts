@@ -1,44 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LIMIT_OPTIONS, defaultCapacity } from "../schedule/capacity";
-
-const mocks = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), kinds: vi.fn() }));
-vi.mock("./client", () => ({ getSupabase: () => ({ from: mocks.from, rpc: mocks.rpc }) }));
-vi.mock("./kinds", () => ({ loadKinds: mocks.kinds }));
+import { LIMIT_OPTIONS, emptyProfile } from "../schedule/capacity";
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), config: vi.fn(), invalidate: vi.fn() }));
+vi.mock("./client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+vi.mock("./scheduleConfiguration", () => ({ loadScheduleConfiguration: mocks.config, invalidateScheduleConfiguration: mocks.invalidate }));
 import { loadCapacityLive, saveCapacityLive } from "./capacityLive";
-
-const kinds = ["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant}:${limit}`, variantId: variant, limitId: limit })));
-beforeEach(() => { vi.resetAllMocks(); mocks.kinds.mockResolvedValue(kinds); });
-
+const kinds = (["nitro", "regular"] as const).flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant}:${limit}`, variant_id: variant, limit_id: limit })));
+const fixture = () => ({ settings: {}, revision: "1", kinds, deadTimeIntervals: [], capacityFlags: [], capacityRules: [] });
+beforeEach(() => { vi.resetAllMocks(); });
 describe("live capacity", () => {
-  it("loads all 22 pairs with variant-specific ids, rules and flags", async () => {
-    const queries: string[][] = [];
-    mocks.from.mockImplementation((table: string) => ({ select: () => ({ in: (_column: string, ids: string[]) => {
-      queries.push(ids);
-      return Promise.resolve({ error: null, data: ids.map(id => table === "capacity_flags"
-        ? { kind_id: id, equalize: id.startsWith("regular"), week_on: false, month_on: true }
-        : { kind_id: id, layer: "base", hours: Array(24).fill(id.startsWith("regular") ? 4 : 2) }) });
-    } }) }));
+  it("decodes all 22 pairs from shared configuration", async () => {
+    mocks.config.mockResolvedValue({ ...fixture(), capacityFlags: kinds.map(k => ({ kind_id: k.id, equalize: k.variant_id === "regular", week_on: false, month_on: true })), capacityRules: kinds.map(k => ({ kind_id: k.id, layer: "base", hours: Array(24).fill(k.variant_id === "regular" ? 4 : 2) })) });
     const [nitro, regular] = await Promise.all([loadCapacityLive("nitro"), loadCapacityLive("regular")]);
     for (const limit of LIMIT_OPTIONS) {
       expect(nitro![limit].hours).toEqual(Array(24).fill(2));
       expect(regular![limit].hours).toEqual(Array(24).fill(4));
       expect(regular![limit]).toMatchObject({ equalize: true, weekOn: false, monthOn: true });
     }
-    expect(queries).toHaveLength(4);
-    expect(queries.every(ids => ids.length === 11 && ids.every(id => id.split(":")[0] === ids[0].split(":")[0]))).toBe(true);
   });
-
-  it.each(["capacity_flags", "capacity_rules"])("does not turn a failed %s read into default capacity", async table => {
-    mocks.from.mockImplementation((name: string) => ({ select: () => ({ in: () => Promise.resolve({ data: [], error: name === table ? { message: "offline" } : null }) }) }));
-    await expect(loadCapacityLive("regular")).rejects.toThrow("capacity-load-failed");
-  });
-
-  it("rejects a missing kind catalog and preserves save errors", async () => {
-    mocks.kinds.mockResolvedValue([]);
+  it("does not turn a failed read or missing catalog into default capacity", async () => {
+    mocks.config.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ ...fixture(), kinds: [] });
+    await expect(loadCapacityLive("regular")).rejects.toThrow("offline");
     await expect(loadCapacityLive("regular")).rejects.toThrow("capacity-kinds-unavailable");
-    mocks.rpc.mockResolvedValue({ error: { message: "forbidden" } });
-    const map = { "50": defaultCapacity()["50"] };
+  });
+  it("preserves existing empty-profile defaults when rules are absent", async () => {
+    mocks.config.mockResolvedValue(fixture());
+    const result = await loadCapacityLive("regular");
+    for (const limit of LIMIT_OPTIONS) expect(result![limit]).toEqual(emptyProfile());
+  });
+  it("invalidates only successful saves", async () => {
+    mocks.rpc.mockResolvedValueOnce({ error: { message: "forbidden" } }).mockResolvedValueOnce({ error: null });
+    const map = { "50": emptyProfile() };
     expect(await saveCapacityLive("regular", map)).toEqual({ error: "forbidden" });
+    expect(mocks.invalidate).not.toHaveBeenCalled();
+    await saveCapacityLive("regular", map);
+    expect(mocks.invalidate).toHaveBeenCalledOnce();
     expect(mocks.rpc).toHaveBeenCalledWith("save_capacity_profiles", { p_variant: "regular", p_profiles: map });
   });
 });

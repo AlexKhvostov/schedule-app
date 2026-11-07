@@ -5,7 +5,7 @@ import { emptyMonth, patchSeat } from "../../schedule/plan";
 import { gridEdits } from "../../schedule/gridEdits";
 import { ME } from "../../schedule/marks";
 import { mergeScheduleSnapshot } from "../../schedule/mergeScheduleSnapshot";
-import { decodeScheduleSnapshot, type ScheduleSnapshot } from "../../data/scheduleSnapshot";
+import { decodeScheduleSnapshot, type ScheduleSnapshot, type ScheduleVersions } from "../../data/scheduleSnapshot";
 
 const face = { ...ME, memberId: "owner", t: "AA" };
 const data = (): ScheduleSnapshot => ({ year: 2026, month: 11, kinds: [
@@ -26,6 +26,50 @@ function start() {
 afterEach(() => { cleanups.splice(0).forEach((fn) => fn()); vi.useRealTimers(); });
 
 describe("compact schedule reconciliation", () => {
+  const revision = (targets: ScheduleVersions["targets"] = []): ScheduleVersions => ({version:1,targets,config:"1",directory:"1",priorities:"1",access:"1"});
+
+  it("never advances revisions for targets or domains absent from a patch", () => {
+    const {state} = start();
+    const other = {...target,kind_id:"n100"};
+    state.revisions = revision([{...target,revision:"1"},{...other,revision:"1"}]);
+    state.acceptSnapshot(state.startLoad(), {...data(), revisions:{...revision([{...target,revision:"2"},{...other,revision:"3"}]),directory:"4",access:"5",config:"6"}}, {targets:[target]});
+    expect(state.revisions).toEqual(revision([{...target,revision:"2"},{...other,revision:"1"}]));
+  });
+
+  it("checks idle versions without reloading data or changing the last applied timestamp", async () => {
+    const {state,load} = start(); state.revisions = revision();
+    const versions = vi.fn(async () => revision());
+    const sync = new ScheduleSync(state,2026,11,load,vi.fn(),versions); cleanups.push(() => sync.stop());
+    const updated = state.snapshot.health.lastUpdated;
+    await vi.advanceTimersByTimeAsync(1000); state.invalidateHealth(); sync.checkVersions();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state.snapshot.health.verified).toBe(true); expect(state.snapshot.health.lastUpdated).toBe(updated);
+    expect(load).not.toHaveBeenCalled(); expect(versions).toHaveBeenCalledOnce();
+  });
+
+  it("repairs a missed event with an exact patch, then confirms consistency", async () => {
+    const {state,load} = start(); state.revisions = revision([{...target,revision:"1"}]);
+    const next = revision([{...target,revision:"2"}]);
+    load.mockResolvedValue({...data(),slots:[],revisions:next});
+    const versions = vi.fn(async () => next);
+    const sync = new ScheduleSync(state,2026,11,load,vi.fn(),versions); cleanups.push(() => sync.stop());
+    state.invalidateHealth(); sync.checkVersions(); await vi.advanceTimersByTimeAsync(300);
+    expect(load).toHaveBeenCalledExactlyOnceWith({targets:[{...target,revision:"2"}]},expect.any(AbortSignal));
+    expect(state.snapshot.grids["nitro:50"][3][10]).toEqual([]);
+    expect(versions).toHaveBeenCalledTimes(2); expect(state.snapshot.health.verified).toBe(true);
+  });
+
+  it("does not overlap checkpoints with each other or with patches", async () => {
+    const {state,load} = start(); state.revisions = revision();
+    let finish!: (value: ScheduleVersions) => void;
+    const versions = vi.fn(() => new Promise<ScheduleVersions>(resolve => {finish=resolve;}));
+    const sync = new ScheduleSync(state,2026,11,load,vi.fn(),versions); cleanups.push(() => sync.stop());
+    sync.checkVersions(); await vi.advanceTimersByTimeAsync(0);
+    sync.checkVersions(); sync.invalidate(target); await vi.advanceTimersByTimeAsync(1000);
+    expect(versions).toHaveBeenCalledOnce(); expect(load).not.toHaveBeenCalled();
+    finish(revision()); await vi.advanceTimersByTimeAsync(50); expect(load).toHaveBeenCalledOnce();
+  });
+
   it("replaces an emptied day without changing another day or limit", () => {
     const base = mergeScheduleSnapshot({}, data(), { targets: null });
     base["nitro:50"] = patchSeat(base["nitro:50"], 4, 10, 0, face);
@@ -90,9 +134,23 @@ describe("compact schedule reconciliation", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(state.snapshot.grids["nitro:50"][3][10][0]?.t).toBe("AA");
     expect(error).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(6000);
     expect(load).toHaveBeenCalledTimes(2);
     expect(state.snapshot.error).toBe(false);
+  });
+
+  it("a manual retry bypasses backoff without overlapping or aborting an in-flight read", async () => {
+    const {sync,load,state} = start();
+    load.mockRejectedValueOnce(new Error("unavailable")); sync.refresh();
+    await vi.advanceTimersByTimeAsync(0); expect(state.snapshot.error).toBe(true);
+    let finish!: (value: ScheduleSnapshot) => void;
+    load.mockImplementationOnce(() => new Promise(resolve => { finish=resolve; }));
+    sync.manualRefresh(); await vi.advanceTimersByTimeAsync(0); expect(load).toHaveBeenCalledTimes(2);
+    const signal = (load.mock.calls as unknown as [unknown, AbortSignal][])[1][1];
+    sync.manualRefresh(); await vi.advanceTimersByTimeAsync(1000);
+    expect(load).toHaveBeenCalledTimes(2); expect(signal.aborted).toBe(false);
+    finish(data()); await vi.advanceTimersByTimeAsync(100);
+    expect(load).toHaveBeenCalledTimes(3); expect(state.snapshot.error).toBe(false);
   });
 
   it("does not let a read started before a local edit erase that edit", async () => {

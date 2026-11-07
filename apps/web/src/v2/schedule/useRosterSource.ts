@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createRosterLoader, rosterQueryKey } from "../../data/roster";
 import { createRosterRefresh } from "../../data/rosterRefresh";
+import { subscribePriorityUpdates } from "../../data/priorityUpdates";
 import type { Mark } from "../../schedule/marks";
 import type { PriorityGroup } from "../../schedule/priorities";
 import type { RosterKind, RosterPrioritySource } from "../../schedule/rosterPriorities";
@@ -30,7 +31,7 @@ export function useRosterSource(enabled: boolean, period: string | null, kind: R
     const check = () => refresh.request();
     const changed = () => refresh.request(true);
     refresh.request();
-    const timer = window.setInterval(check, 30000);
+    const offUpdates = subscribePriorityUpdates(changed);
     window.addEventListener("focus", check);
     document.addEventListener("visibilitychange", check);
     window.addEventListener("priority-distance-changed", changed);
@@ -38,7 +39,7 @@ export function useRosterSource(enabled: boolean, period: string | null, kind: R
     const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("priority-refresh");
     if (channel) channel.onmessage = changed;
     return () => {
-      alive = false; refresh.dispose(); clearInterval(timer); channel?.close();
+      alive = false; refresh.dispose(); offUpdates(); channel?.close();
       window.removeEventListener("focus", check);
       document.removeEventListener("visibilitychange", check);
       window.removeEventListener("priority-distance-changed", changed);

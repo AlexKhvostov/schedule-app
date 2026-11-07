@@ -29,12 +29,15 @@
 | Discord и боты | [discord-now.md](discord-now.md) |
 | Внешний API: ключи, расписание, снимки/страницы и локальный запуск | [external-api/README.md](../supabase/functions/external-api/README.md) |
 | Инструкция стороннему разработчику бота | [BOT-CONNECTION.md](../supabase/functions/external-api/BOT-CONNECTION.md) |
+| Данные, подключение и событийные обновления | [schedule-data-sync.md](schedule-data-sync.md) |
 | UX расписания | [schedule-ux.md](schedule-ux.md) |
 | Живые приоритеты и заявки | [priorities.md](priorities.md) |
 | Деплой, CI, backup и откат | [operations.md](operations.md) |
 | UI-кит | [ui-kits.md](ui-kits.md) |
 
 ## Будущие функции
+
+- [schedule-reliability-review.md](schedule-reliability-review.md) — расследование сбоев входа 7 ноября, фактическая нагрузка, сравнение тарифов и предложение Broadcast + проверка версий; первичная диагностика; реализация нового клиента описана в [schedule-data-sync.md](schedule-data-sync.md).
 
 - [analytics-dashboard.md](analytics-dashboard.md) — исследование отдельного Dashboard, безопасная копия Vue/PHP и требования к закрытому доступу; живой локальный источник и управление регами подключены; production ждёт серверной защиты.
 - [analytics-dashboard-plan.md](analytics-dashboard-plan.md) — перенос интерфейса на React при прежних PHP/MySQL: четыре компактных экрана, условные цвета, живой dev-источник и управление регами; проверки и серверный этап защиты.

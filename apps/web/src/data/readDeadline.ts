@@ -1,5 +1,6 @@
-/** Bound reads even when a transport ignores abort. Late results never reach callers. */
-export async function readWithDeadline<T>(read: (signal: AbortSignal) => Promise<T>, timeout = 15000, outer?: AbortSignal): Promise<T> {
+/** Bound requests even when a transport ignores abort. Late results never reach callers.
+ * A write timeout does not imply rollback: callers must treat its outcome as unknown. */
+export async function requestWithDeadline<T>(read: (signal: AbortSignal) => Promise<T>, timeout = 15000, outer?: AbortSignal): Promise<T> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let rejectAbort!: (error: Error) => void;
@@ -15,3 +16,5 @@ export async function readWithDeadline<T>(read: (signal: AbortSignal) => Promise
     outer?.removeEventListener("abort", abort);
   }
 }
+
+export const readWithDeadline = requestWithDeadline;

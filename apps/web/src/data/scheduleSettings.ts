@@ -1,3 +1,4 @@
+import { loadScheduleConfiguration, invalidateScheduleConfiguration, subscribeConfigurationChanged } from "./scheduleConfiguration";
 import { getSupabase } from "./client";
 import { LIMIT_OPTIONS } from "../schedule/capacity";
 import { isDevSandboxEnabled } from "./config";
@@ -119,13 +120,13 @@ export async function loadScheduleSettings(options?: { strict?: boolean; signal?
   if (isDevSandboxEnabled()) return loadDemoScheduleSettings();
   const db = getSupabase();
   if (!db) return copySettings(EMPTY);
-  const query = db
-    .from("schedule_settings")
-    .select("allow_overwrite_marks, allow_act_as, count_tables, edit_by_button, merge_adjacent_slots, filter_limits_nitro, filter_limits_regular")
-    .eq("id", true);
-  const { data, error } = await (options?.signal ? query.abortSignal(options.signal) : query).maybeSingle();
-  if (options?.strict && (error || !data)) throw new Error(error?.message ?? "schedule-settings-unavailable");
-  return clubGridSettingsFromRow(data);
+  try {
+    const { settings } = await loadScheduleConfiguration(options?.signal);
+    return clubGridSettingsFromRow(settings);
+  } catch (error) {
+    if (options?.strict) throw error;
+    return copySettings(EMPTY);
+  }
 }
 
 export async function saveScheduleFilterLimits(next: ScheduleFilterLimits) {
@@ -146,6 +147,7 @@ export async function saveScheduleFilterLimits(next: ScheduleFilterLimits) {
     p_nitro: next.nitro,
     p_regular: next.regular,
   });
+  if (!error) invalidateScheduleConfiguration();
   return { error: error?.message };
 }
 
@@ -188,6 +190,7 @@ async function saveScheduleFlag(
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
   const { error } = await db.from("schedule_settings").update({ [column]: value }).eq("id", true);
+  if (!error) invalidateScheduleConfiguration();
   return { error: error?.message };
 }
 
@@ -204,13 +207,5 @@ export function subscribeScheduleSettings(onChange: () => void) {
       window.removeEventListener("storage", onStorage);
     };
   }
-  const db = getSupabase();
-  if (!db) return () => {};
-  const channel = db
-    .channel("schedule-settings")
-    .on("postgres_changes", { event: "*", schema: "public", table: "schedule_settings" }, onChange)
-    .subscribe();
-  return () => {
-    void db.removeChannel(channel);
-  };
+  return subscribeConfigurationChanged(onChange);
 }

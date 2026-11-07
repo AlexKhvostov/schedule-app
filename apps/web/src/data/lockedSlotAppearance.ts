@@ -1,3 +1,4 @@
+import { loadScheduleConfiguration, invalidateScheduleConfiguration } from "./scheduleConfiguration";
 import { getSupabase } from "./client";
 import { isDevSandboxEnabled } from "./config";
 import { isLockedSlotAppearance, normalizeLockedSlotAppearance, sameLockedSlotAppearance, type LockedSlotAppearance } from "../schedule/lockedSlotAppearance";
@@ -13,10 +14,10 @@ export async function loadLockedSlotAppearance(): Promise<{ appearance: LockedSl
     if (isDevSandboxEnabled()) return { appearance: demoAppearance() };
     const db = getSupabase();
     if (!db) return { appearance: fallback, error: "not-configured" };
-    const { data, error } = await db.from("schedule_settings").select("locked_slot_appearance").eq("id", true).single();
-    if (error || !isLockedSlotAppearance(data?.locked_slot_appearance)) return { appearance: fallback, error: error?.message ?? "invalid-locked-appearance" };
-    return { appearance: normalizeLockedSlotAppearance(data.locked_slot_appearance) };
-  } catch { return { appearance: fallback, error: "network-error" }; }
+    const { settings } = await loadScheduleConfiguration();
+    if (!isLockedSlotAppearance(settings.locked_slot_appearance)) return { appearance: fallback, error: "invalid-locked-appearance" };
+    return { appearance: normalizeLockedSlotAppearance(settings.locked_slot_appearance) };
+  } catch (error) { return { appearance: fallback, error: error instanceof Error ? error.message : "network-error" }; }
 }
 
 export async function saveLockedSlotAppearance(appearance: LockedSlotAppearance, expected: LockedSlotAppearance): Promise<{ error?: string }> {
@@ -31,6 +32,7 @@ export async function saveLockedSlotAppearance(appearance: LockedSlotAppearance,
       if (!db) return { error: "not-configured" };
       const { error } = await db.rpc("save_schedule_locked_appearance", { p_appearance: next, p_expected: normalizeLockedSlotAppearance(expected) });
       if (error) return { error: error.message };
+      invalidateScheduleConfiguration();
     }
     window.dispatchEvent(new Event("redparty:limit-palette"));
     return {};

@@ -1,5 +1,6 @@
 import { realtimeFixture } from "./realtimeFixture";
 import { expect, test, type Page } from "@playwright/test";
+import { configurationFixture, revisionsFixture } from "./configurationFixture";
 import { LIMIT_OPTIONS } from "../src/schedule/capacity";
 
 function gate() {
@@ -21,6 +22,9 @@ async function fixture(page: Page, failSecondPage = false) {
     localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits: ["50", "100"], kinds: ["nitro"], hidePastDays: false }));
   }, { user, token });
   await realtimeFixture(page);
+  const kinds = ["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant === "nitro" ? "n" : "e"}${limit}`, limit_id: limit, variant_id: variant })));
+  const configuration = configurationFixture(kinds);
+  const revisions = revisionsFixture();
   await page.route("https://schedule-fixture.supabase.co/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -28,7 +32,9 @@ async function fixture(page: Page, failSecondPage = false) {
     const reply = (body: unknown) => route.fulfill({ json: body, headers });
     if (path === "/auth/v1/user") return reply(user);
     if (path.endsWith("/rpc/member_access_context")) return reply({ isRoot: true, permissions: [], hasRequiredRole: true });
-    if (path.endsWith("/rpc/load_schedule_snapshot")) {
+    if (path.endsWith("/rpc/load_schedule_configuration")) return reply(configuration);
+    if (path.endsWith("/rpc/load_schedule_versions")) return reply(revisions);
+    if (path.endsWith("/rpc/load_schedule_snapshot_v2")) {
       requested.push(0);
       await gates[0].promise;
       if (failSecondPage) {
@@ -42,7 +48,7 @@ async function fixture(page: Page, failSecondPage = false) {
           half: local % 48, level: 0, tables: 1,
         };
       });
-      return reply({ version: 1, year: 2026, month: 11, slot_count: rows.length, slots: rows,
+      return reply({ version: 1, year: 2026, month: 11, slot_count: rows.length, slots: rows, revisions,
         kinds: [{ id: "n50", variant_id: "nitro", limit_id: "50" }, { id: "n100", variant_id: "nitro", limit_id: "100" }],
         members: [{ ...member, member_id: member.id, member_tables: 1 }],
       });
@@ -57,15 +63,15 @@ async function fixture(page: Page, failSecondPage = false) {
     if (path.endsWith("/schedule_kinds")) return reply(["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({ id: `${variant === "nitro" ? "n" : "e"}${limit}`, limit_id: limit, variant_id: variant }))));
     return reply(single ? null : []);
   });
-  return { gates, requested, recover: () => { failSecondPage = false; } };
+  return { gates, requested, configuration, recover: () => { failSecondPage = false; } };
 }
 
 test("capacity read failures hide the grid until both kinds load successfully", async ({ page }) => {
-  const { gates } = await fixture(page); gates.forEach(g => g.release());
+  const { gates, configuration } = await fixture(page); gates.forEach(g => g.release());
   let failed = true;
-  await page.route("**/rest/v1/capacity_rules?**", async route => {
+  await page.route("**/rpc/load_schedule_configuration", async route => {
     if (failed) return route.fulfill({ status: 503, json: { message: "capacity offline" } });
-    return route.fulfill({ json: [] });
+    return route.fulfill({ json: configuration });
   });
   await page.goto("/");
   const error = page.getByRole("alert").filter({ hasText: "Не удалось загрузить ёмкость" });
@@ -77,14 +83,12 @@ test("capacity read failures hide the grid until both kinds load successfully", 
 });
 
 test("Regular capacity saves only its edited limit and a rejected save retains the draft", async ({ page }) => {
-  const { gates } = await fixture(page); gates.forEach(g => g.release());
+  const { gates, configuration } = await fixture(page); gates.forEach(g => g.release());
   let failSave = true;
   const saves: { p_variant: string; p_profiles: Record<string, { hours: number[]; days: Record<string, number[]> }> }[] = [];
-  await page.route("**/rest/v1/capacity_rules?**", async route => {
-    const query = new URL(route.request().url()).searchParams.get("kind_id") ?? "";
-    const regular = query.includes("e50");
-    return route.fulfill({ json: LIMIT_OPTIONS.map(limit => ({ kind_id: `${regular ? "e" : "n"}${limit}`, layer: "base", hours: Array(24).fill(regular ? 3 : 1) })) });
-  });
+  configuration.capacityRules = ["nitro", "regular"].flatMap(variant => LIMIT_OPTIONS.map(limit => ({
+    kind_id: `${variant === "regular" ? "e" : "n"}${limit}`, layer: "base", hours: Array(24).fill(variant === "regular" ? 3 : 1),
+  })));
   await page.route("**/rpc/save_capacity_profiles", async route => {
     saves.push(route.request().postDataJSON());
     if (failSave) return route.fulfill({ status: 403, json: { message: "forbidden" } });

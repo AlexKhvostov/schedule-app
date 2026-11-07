@@ -1,6 +1,6 @@
 import { LIMIT_OPTIONS, defaultCapacity, emptyProfile, normalizeHours, type CapacityMap, type HourCaps } from "../schedule/capacity";
 import { getSupabase } from "./client";
-import { loadKinds } from "./kinds";
+import { loadScheduleConfiguration, invalidateScheduleConfiguration, type ScheduleConfiguration } from "./scheduleConfiguration";
 
 function arr(hours: number[] | null | undefined): HourCaps {
   return normalizeHours(hours ?? undefined);
@@ -9,16 +9,14 @@ function arr(hours: number[] | null | undefined): HourCaps {
 export async function loadCapacityLive(variant: "nitro" | "regular", signal?: AbortSignal): Promise<CapacityMap | null> {
   const db = getSupabase();
   if (!db) return null;
-  const kinds = await loadKinds(signal);
-  const wanted = kinds.filter((row) => row.variantId === variant);
-  if (LIMIT_OPTIONS.some(limit => !wanted.some(kind => kind.limitId === limit))) throw new Error("capacity-kinds-unavailable");
-  const ids = wanted.map((row) => row.id);
-  const queries = [
-    db.from("capacity_flags").select("kind_id, equalize, week_on, month_on").in("kind_id", ids),
-    db.from("capacity_rules").select("kind_id, layer, day_of_month, weekday, hours").in("kind_id", ids),
-  ] as const;
-  const [{ data: flags, error: flagsError }, { data: rules, error: rulesError }] = await Promise.all([signal ? queries[0].abortSignal(signal) : queries[0], signal ? queries[1].abortSignal(signal) : queries[1]]);
-  if (flagsError || rulesError) throw new Error("capacity-load-failed");
+  return capacityFromConfiguration(await loadScheduleConfiguration(signal), variant);
+}
+
+export function capacityFromConfiguration(data: ScheduleConfiguration, variant: "nitro" | "regular"): CapacityMap {
+  const wanted = data.kinds.filter(row => row.variant_id === variant);
+  if (LIMIT_OPTIONS.some(limit => !wanted.some(kind => kind.limit_id === limit))) throw new Error("capacity-kinds-unavailable");
+  const flags = data.capacityFlags;
+  const rules = data.capacityRules;
   const next = defaultCapacity();
   for (const kind of wanted) {
     const profile = emptyProfile();
@@ -35,7 +33,7 @@ export async function loadCapacityLive(variant: "nitro" | "regular", signal?: Ab
       if (rule.layer === "month" && rule.day_of_month) profile.days[String(rule.day_of_month)] = hours;
       if (rule.layer === "week" && rule.weekday != null) profile.weekdays[String(rule.weekday)] = hours;
     }
-    next[kind.limitId] = profile;
+    next[kind.limit_id] = profile;
   }
   return next;
 }
@@ -44,5 +42,6 @@ export async function saveCapacityLive(variant: "nitro" | "regular", map: Capaci
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const };
   const { error } = await db.rpc("save_capacity_profiles", { p_variant: variant, p_profiles: map });
+  if (!error) invalidateScheduleConfiguration();
   return { error: error?.message };
 }

@@ -153,7 +153,7 @@ test("existing version-one request facts render raw distances and keep the origi
   const saved = JSON.stringify([{ ...summary, detail: { ...summary, author: "Старый автор", comment: "Сохранённая заявка", snapshot: { version: 1, periodStart, today: `${periodStart.slice(0, 7)}-08`, lastMonthEntries: 20, people: [person], rankingPeople: [person], vipEnabled: true } } }]);
   await page.evaluate((value) => localStorage.setItem("v2-priority-requests-1", value), saved);
   await page.reload();
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Заявка на проверку", exact: true });
   await expect(dialog.locator(".v2-prio-saved-values")).toContainText("четыре колонки — чистые дистанции");
@@ -317,7 +317,7 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await page.getByLabel("Комментарий", { exact: true }).fill("Секретная претензия: проверьте две строки.\n\nСверьте исходные дистанции по месяцам и коэффициенты расчёта.");
   await page.getByRole("button", { name: "Отправить заявку", exact: true }).click();
   await expect(page.getByText("Заявка отправлена", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   const adminList = page.getByRole("dialog", { name: "Заявки", exact: true });
   await expect(adminList).not.toContainText("Секретная претензия");
   await expect(adminList.getByRole("columnheader", { name: "Автор", exact: true })).toBeVisible();
@@ -387,7 +387,7 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await expect(page.getByRole("dialog", { name: "Заявки", exact: true })).toContainText("Проверено, всё верно");
   await page.evaluate(() => { const s = JSON.parse(sessionStorage.getItem("v2-session")!); s.role = "member"; s.nick = "polar"; s.permissions = ["profile", "schedule"]; sessionStorage.setItem("v2-session", JSON.stringify(s)); });
   await page.reload();
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   const publicList = page.getByRole("dialog", { name: "Заявки", exact: true });
   await expect(publicList).toContainText("Alina, Boris");
   await expect(publicList).toContainText("Проверено, всё верно");
@@ -401,7 +401,7 @@ test("grouped request snapshots, public replies, private comments and admin dele
   await expect(publicList.getByRole("button", { name: "Удалить заявку" })).toHaveCount(0);
   await page.evaluate(() => { const s = JSON.parse(sessionStorage.getItem("v2-session")!); s.role = "root"; sessionStorage.setItem("v2-session", JSON.stringify(s)); });
   await page.reload();
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   await page.getByRole("button", { name: "Удалить заявку", exact: true }).click();
   await page.getByRole("dialog", { name: "Удалить заявку", exact: true }).getByRole("button", { name: "Удалить заявку", exact: true }).click();
   await expect(page.getByText("Заявок за этот период пока нет", { exact: true })).toBeVisible();
@@ -477,7 +477,7 @@ test("editing a source distance updates the current priority but keeps the submi
   await expect(editor).toBeHidden();
   await page.goto("/#priorities");
   await expect(page.locator('tr[data-member="RP-912"] td.is-total')).toHaveText("125,0");
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
   const snapshot = page.getByRole("dialog", { name: "Заявка на проверку" });
   await expect(snapshot.locator(".v2-prio-saved-values tbody tr td").last()).toHaveText("0,0");
@@ -533,7 +533,7 @@ test("optional limits and any-role filters retain vacation players and request s
   await page.getByLabel("Проверить Player 16", { exact: true }).check();
   await page.getByRole("button", { name: "Отправить заявку", exact: true }).click();
   await expect(page.getByText("Заявка отправлена", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Заявки · 1/ }).click();
+  await page.getByRole("button", { name: "Заявки", exact: true }).click();
   await page.getByRole("button", { name: "Открыть заявку", exact: true }).click();
   const saved = page.locator('.v2-prio-snapshot-table tr[data-member="demo-priority-15"]');
   await expect(saved.locator("td").first()).toHaveText(rank);

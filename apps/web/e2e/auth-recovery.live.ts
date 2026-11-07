@@ -32,12 +32,13 @@ test("temporary auth failure retains marks, blocks editing, and recovers without
   await expect(dialog).toBeVisible();
   await page.screenshot({ path: "playwright-report/auth-retained-schedule.png" });
   await page.unroute("**/auth/v1/user");
-  await dialog.getByRole("button", { name: "Переподключить", exact: true }).click();
+  await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
   await expect(page.locator(".v2-auth-notice")).not.toBeVisible({ timeout: 20000 });
-  await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
+  await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
   await expect(marked).toContainText("AA");
   expect(state.writes).toHaveLength(1);
-  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
   await cell.click(); await expect.poll(() => state.writes.length).toBe(2);
 });
 
@@ -64,13 +65,27 @@ test("failed data refresh keeps the last loaded marks visible without opening fr
   state.failSnapshot = true;
   await page.evaluate(() => { window.dispatchEvent(new Event("offline")); });
   state.network.disconnect();
-  await expect(page.getByTestId("schedule-sync-status")).not.toHaveText("Актуально");
+  await expect(page.getByTestId("schedule-sync-status")).not.toHaveText("онлайн");
   await expect(page.locator('[data-slot].is-on').first()).toContainText("AA");
   await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).not.toBeVisible();
   await page.getByTestId("schedule-sync-status").click();
   const dialog = page.getByRole("dialog", { name: "Актуальность расписания" });
-  await dialog.getByRole("button", { name: "Переподключить", exact: true }).click();
-  await expect(page.getByTestId("schedule-sync-status")).toHaveText("Нет обновлений", { timeout: 20000 });
+  await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
+  await expect(dialog).toContainText("Обновления приостановлены", { timeout: 20000 });
   await expect(page.locator('[data-slot].is-on').first()).toContainText("AA");
   expect(state.writes).toHaveLength(1);
+});
+
+
+test("access revocation closes private UI even while outside the schedule", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/#profile");
+  await expect(page.getByRole("button", { name: "На сайте", exact: true })).toBeVisible();
+  await page.route("**/rest/v1/members**", route => route.fulfill({ json: {
+    id: "member-0", public_code: "Self", access_status: "blocked", mark_tag: "AA", mark_bg: "#468ec6", mark_fg: "#fff", tables: 1,
+  } }));
+  state.network.broadcast("access");
+  await expect(page.getByText("Профиль заблокирован", { exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole("button", { name: "На сайте", exact: true })).not.toBeVisible();
+  expect(state.writes).toHaveLength(0);
 });

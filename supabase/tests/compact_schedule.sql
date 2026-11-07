@@ -33,8 +33,9 @@ begin
   if jsonb_array_length(payload->'slots')<>48 then raise exception 'slice crossed its day'; end if;
   select count(*) into before_messages from realtime.messages where topic='schedule:changes' and event='slots';
   delete from occupancy where kind_id=kid and slot_date=first_day;
-  if (select count(*) from realtime.messages where topic='schedule:changes' and event='slots')<=before_messages then
-    raise exception 'deletion did not publish coordinates';
+  -- Inserts and deletion are in one transaction: one commit notification per target.
+  if (select count(*) from realtime.messages where topic='schedule:changes' and event='slots')<>before_messages then
+    raise exception 'same transaction published duplicate coordinates';
   end if;
   if not exists(select 1 from realtime.messages msg where topic='schedule:changes' and event='slots'
     and msg.payload->>'date'=first_day::text and msg.payload->>'kind_id'=kid::text) then raise exception 'invalid notification coordinates'; end if;

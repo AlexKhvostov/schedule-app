@@ -1271,7 +1271,12 @@ test("active members can move the Online panel and keep using the schedule", asy
   await expect(dialog).toHaveCount(0);
   await online.click();
   await expect(dialog).toContainText("На сайте · 1");
-  await expect(dialog).toContainText("Только что");
+  const connected = dialog.getByRole("list", { name: "На сайте", exact: true });
+  await expect(connected.getByRole("listitem")).toHaveCount(1);
+  await expect(connected.locator("strong")).toHaveText("you");
+  await expect(dialog.locator("time")).toHaveCount(0);
+  await expect(dialog).not.toContainText("Только что");
+  await expect(dialog.getByRole("button", { name: "Показать последние правки" })).toHaveCount(0);
   const heading = dialog.getByRole("heading", { name: "На сайте", exact: true });
   const before = (await dialog.boundingBox())!;
   const header = (await heading.boundingBox())!;

@@ -28,6 +28,7 @@ import { showV2Toast } from "./V2Toast";
 import { DeadTimeEditor } from "./DeadTimeEditor";
 import { LimitPaletteEditor } from "./LimitPaletteEditor";
 import { LockedSlotEditor } from "./LockedSlotEditor";
+import { ScheduleSyncSettingsEditor } from "./ScheduleSyncSettingsEditor";
 import {
   loadScheduleSettings,
   saveActAs,
@@ -119,6 +120,8 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
   });
   const [filterLimitsSaving, setFilterLimitsSaving] = useState(false);
   const [filterLimitsSaved, setFilterLimitsSaved] = useState(false);
+  const filterDraftRef = useRef({ draft: filterLimits, baseline: savedFilterLimits });
+  filterDraftRef.current = { draft: filterLimits, baseline: savedFilterLimits };
   const [saved, setSaved] = useState(false);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const savingCapacityRef = useRef(false);
@@ -130,6 +133,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
   const paintRef = useRef<(CapRange & { cap: number }) | null>(null);
   const baselineRef = useRef<MatrixRow[]>([]);
   const profile = profileOf(capacity, limit);
+  const previousFlagsRef = useRef(profile);
   const weekLabels = useMemo(
     () => WEEK_ORDER.map((id) => ({ id, label: weekdayShort(id, i18n.language) })),
     [i18n.language],
@@ -170,9 +174,14 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
         setCountTables(next.countTables);
         setEditByButton(next.editByButton);
         setMergeAdjacentSlots(next.mergeAdjacentSlots);
-        setFilterLimits(next.filterLimits);
-        setSavedFilterLimits(next.filterLimits);
-        setFilterLimitsSaved(false);
+        const filters = filterDraftRef.current;
+        const hasDraft = filters.draft.nitro.join("|") !== filters.baseline.nitro.join("|")
+          || filters.draft.regular.join("|") !== filters.baseline.regular.join("|");
+        if (!hasDraft) {
+          setFilterLimits(next.filterLimits);
+          setSavedFilterLimits(next.filterLimits);
+          setFilterLimitsSaved(false);
+        }
       });
     };
     apply();
@@ -193,6 +202,16 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
     setWeekOn(next.weekOn);
     setMonthOn(next.monthOn);
   }, [limit, tab, variant, weekLabels, section]);
+
+  useEffect(() => {
+    const previous = previousFlagsRef.current;
+    const next = profileOf(capacity, limit);
+    // Refresh untouched switches; keep local edits when another admin saves.
+    setEqualizeDraft(current => current === previous.equalize ? next.equalize : current);
+    setWeekOn(current => current === previous.weekOn ? next.weekOn : current);
+    setMonthOn(current => current === previous.monthOn ? next.monthOn : current);
+    previousFlagsRef.current = next;
+  }, [capacity, limit]);
 
   const baseline = useMemo(() => {
     const stored = profileOf(capacity, limit);
@@ -710,6 +729,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
 
       <HourLoadEditor />
       <LimitPaletteEditor />
+      <ScheduleSyncSettingsEditor />
         </>
       ) : null}
 

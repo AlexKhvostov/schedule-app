@@ -198,10 +198,10 @@ test("schedule settings start folded except controls and retain drafts when fold
   await enter(page);
   const cards = page.locator(".v2-admin-page > section.v2-admin-card");
   const folds = cards.locator(".v2-fold-btn");
-  await expect(folds).toHaveCount(6);
+  await expect(folds).toHaveCount(7);
   await expect(folds.nth(0)).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".v2-settings-row").first()).toBeVisible();
-  for (let index=1; index<6; index++) {
+  for (let index=1; index<7; index++) {
     const fold = folds.nth(index);
     await expect(fold).toHaveAttribute("aria-expanded", "false");
     await fold.click();
@@ -214,6 +214,21 @@ test("schedule settings start folded except controls and retain drafts when fold
   await folds.nth(0).click();
   await expect(page.locator(".v2-settings-row").first()).toBeHidden();
   await folds.nth(0).click();
+
+  const safety = cards.filter({has:page.getByRole("heading",{name:"Страховочная проверка обновлений",exact:true})});
+  await safety.locator(".v2-fold-btn").click();
+  const safetyEnabled = safety.getByRole("checkbox", { name: "Включить страховочную проверку" });
+  const safetyMinutes = safety.getByRole("spinbutton", { name: "Интервал" });
+  await expect(safetyEnabled).not.toBeChecked();
+  await expect(safetyMinutes).toHaveValue("5");
+  await safetyEnabled.check();
+  await safetyMinutes.fill("10");
+  await safety.locator(".v2-fold-btn").click();
+  await safety.locator(".v2-fold-btn").click();
+  await expect(safetyEnabled).toBeChecked();
+  await expect(safetyMinutes).toHaveValue("10");
+  await expect(safety.getByRole("button", { name: "Сохранить", exact: true })).toBeEnabled();
+  await safety.locator(".v2-fold-btn").click();
 
   const deadCard = cards.filter({has:page.getByRole("heading",{name:"Мёртвое время",exact:true})});
   await deadCard.locator(".v2-fold-btn").click();
@@ -243,7 +258,7 @@ test("schedule settings start folded except controls and retain drafts when fold
   await page.getByRole("button",{name:"EN",exact:true}).click();
   await page.getByRole("button",{name:"you",exact:true}).click();
   await page.setViewportSize({width:390,height:844});
-  await expect(page.getByRole("button",{name:"Expand",exact:true})).toHaveCount(5);
+  await expect(page.getByRole("button",{name:"Expand",exact:true})).toHaveCount(6);
   await expect(page.getByRole("button",{name:"Collapse",exact:true})).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
 });

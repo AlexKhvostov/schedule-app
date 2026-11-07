@@ -87,7 +87,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
       : error.includes("schedule-conflict") ? t("schedule.toastConflict") : t("schedule.toastSaveError"));
   };
 
-  const writeEdits = async (variant: ScheduleVariant, limit: string, edits: GridEdit[], self: string, painter: string,
+  const writeEdits = async (operationId: string, variant: ScheduleVariant, limit: string, edits: GridEdit[], self: string, painter: string,
     foreign: Parameters<typeof applyScheduleEdit>[0]["foreign"] = []) => {
     const place = edits.filter((edit) => edit.after).map((edit) => ({
       day: edit.dayIdx + 1, half: edit.half, level: edit.level, tables: edit.after!.tables,
@@ -95,7 +95,11 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     const remove = edits.filter((edit) => !edit.after && (!edit.before?.memberId || edit.before.memberId === self)).map((edit) => ({
       day: edit.dayIdx + 1, half: edit.half, level: edit.level,
     }));
-    const result = await applyScheduleEdit({ memberId: place.length ? painter : self, limit, variant, year, monthIndex, place, remove, foreign });
+    const expected = edits.map(edit => ({
+      date: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(edit.dayIdx + 1).padStart(2, "0")}`,
+      half: edit.half, level: edit.level, member_id: edit.before?.memberId ?? null, tables: edit.before?.tables ?? null,
+    }));
+    const result = await applyScheduleEdit({ memberId: place.length ? painter : self, limit, variant, year, monthIndex, place, remove, foreign, operationId, expected });
     return result.error;
   };
 
@@ -115,7 +119,8 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     const painter = actingRef.current;
     if (!controller.snapshot.ready || !self || !painter) return;
     const target = placementTarget(edits, painter);
-    void controller.edit(key, edits, () => writeEdits(variant, limit, edits, self, painter)).then((error) => {
+    const operationId = crypto.randomUUID();
+    void controller.edit(key, edits, () => writeEdits(operationId, variant, limit, edits, self, painter)).then((error) => {
       if (current.current !== controller) return;
       if (error) showWriteError(error, variant, limit, target);
       else showV2Toast(edits[0].after ? "ok" : "off", t(edits[0].after ? "schedule.toastPlaced" : "schedule.toastRemoved"));
@@ -156,7 +161,8 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     }
     overwritePending.current = true;
     setOverwriteBusy(true);
-    void controller.edit(key, edits, () => writeEdits(ask.variant, ask.limit, edits, self, painter, foreign), false).then((error) => {
+    const operationId = crypto.randomUUID();
+    void controller.edit(key, edits, () => writeEdits(operationId, ask.variant, ask.limit, edits, self, painter, foreign), false).then((error) => {
       if (!error && foreign.length) void notifyMarkRemoved(language);
       if (current.current !== controller) return;
       overwritePending.current = false;

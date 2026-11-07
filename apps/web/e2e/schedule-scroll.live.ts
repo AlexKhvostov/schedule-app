@@ -10,7 +10,7 @@ async function browseLaterDays(page: Page) {
   return position(page);
 }
 
-test("initial load finds today; refresh, resume and automatic polling preserve the user's scroll", async ({ page }) => {
+test("initial load finds today; refresh, resume and Broadcast patches preserve the user's scroll", async ({ page }) => {
   test.setTimeout(70000);
   await page.setViewportSize({ width: 900, height: 720 });
   const state = await fixture(page);
@@ -21,24 +21,24 @@ test("initial load finds today; refresh, resume and automatic polling preserve t
   let reads = state.snapshotReads;
   await page.getByRole("dialog", { name: "Актуальность расписания" }).getByRole("button", { name: "Обновить данные", exact: true }).click();
   await expect.poll(() => state.snapshotReads).toBeGreaterThan(reads);
-  await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
-  await page.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
+  await page.keyboard.press("Escape");
   expect(await position(page)).toEqual(before);
-  reads = state.snapshotReads;
+  const versions = state.counts().versionReads;
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
   });
-  await expect.poll(() => state.snapshotReads).toBeGreaterThan(reads);
-  await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
+  await expect.poll(() => state.counts().versionReads).toBeGreaterThan(versions);
+  await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
   expect(await position(page)).toEqual(before);
   reads = state.snapshotReads;
-  // Let the real 30-second safety poll run; fixed fixture Date must advance too.
-  await page.clock.setFixedTime(new Date("2026-11-05T08:00:31Z"));
+  // An actual change notification refreshes only its target and preserves scroll.
+  state.network.broadcast("slots", { date: "2026-11-29", kind_id: "nitro-50" });
   await expect.poll(() => state.snapshotReads, { timeout: 10000 }).toBeGreaterThan(reads);
-  await expect(page.getByTestId("schedule-sync-status")).toHaveText("Актуально");
+  await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
   expect(await position(page)).toEqual(before);
   await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).not.toBeVisible();
   await page.screenshot({ path: "playwright-report/scroll-preserved.png" });

@@ -1,14 +1,17 @@
-import { loadCapacityLive } from "./capacityLive";
-import { loadDeadTimeIntervals } from "./deadTime";
-import { loadScheduleSettings } from "./scheduleSettings";
-import type { VariantCapacityMap } from "../schedule/capacity";
+import { capacityFromConfiguration } from "./capacityLive";
+import { deadTimeIntervalsFromRows } from "./deadTime";
+import { clubGridSettingsFromRow } from "./scheduleSettings";
+import { loadScheduleConfiguration } from "./scheduleConfiguration";
+import { syncSettingsFromRow } from "./scheduleSyncSettings";
 
 export async function loadScheduleContext(signal: AbortSignal) {
-  const [settings, deadTimeIntervals, nitro, regular] = await Promise.all([
-    loadScheduleSettings({ strict: true, signal }), loadDeadTimeIntervals(signal),
-    loadCapacityLive("nitro", signal), loadCapacityLive("regular", signal),
-  ]);
-  if (!nitro || !regular) throw new Error("capacity-unavailable");
-  return { settings, deadTimeIntervals, capacity: { nitro, regular } as VariantCapacityMap };
+  const configuration = await loadScheduleConfiguration(signal);
+  return {
+    settings: clubGridSettingsFromRow(configuration.settings),
+    deadTimeIntervals: deadTimeIntervalsFromRows(configuration.deadTimeIntervals),
+    capacity: { nitro: capacityFromConfiguration(configuration, "nitro"), regular: capacityFromConfiguration(configuration, "regular") },
+    syncSettings: syncSettingsFromRow(configuration.settings),
+    configurationRevision: configuration.revision,
+  };
 }
 export type ScheduleContext = Awaited<ReturnType<typeof loadScheduleContext>>;

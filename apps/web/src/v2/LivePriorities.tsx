@@ -1,4 +1,6 @@
 import { setActivePriority } from "../data/activePriority";
+import { createRosterRefresh } from "../data/rosterRefresh";
+import { subscribePriorityUpdates } from "../data/priorityUpdates";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -103,23 +105,25 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
     const token = ++generation.current;
     try {
       const [board, roles] = await Promise.all([loadPriorities(requestedPeriod, canManageDemo, kind, group), loadPriorityFilterRoles()]);
-      const list = board.data ? await listPriorityRequests(board.data.periodStart) : { data: null, error: null };
       if (token !== generation.current) return;
       setLoading(false);
-      if (board.error || list.error || roles.error || !board.data) { setError(board.error || list.error || roles.error || "empty response"); setSource(null); setDetail(null); return; }
-      setAccessRoles(roles.data); setSource(board.data); setRequests(list.data ?? []); setError("");
+      if (board.error || roles.error || !board.data) { setError(board.error || roles.error || "empty response"); setSource(null); setDetail(null); return; }
+      setAccessRoles(roles.data); setSource(board.data); setError("");
     } catch (e) { if (token === generation.current) { setError(String(e)); setSource(null); setLoading(false); } }
   }, [requestedPeriod, canManageDemo, kind, group]);
   useEffect(() => {
     viewEpoch.current++; setBusy(false); setDetail(null); setRequestList(false); setDeleteId(null);
     setLoading(true); setRequests([]); setSelected([]); setComposing(false); setHover(null); setInspect(null);
-    void refresh();
-    const update = () => { setToday(priorityToday()); void refresh(); };
-    const timer = window.setInterval(update, 30000);
-    window.addEventListener("focus", update); window.addEventListener("priority-distance-changed", update); window.addEventListener("storage", update);
+    const coordinator = createRosterRefresh(async () => { setToday(priorityToday()); await refresh(); }, () => !document.hidden);
+    const update = () => coordinator.request(true);
+    const visible = () => coordinator.request();
+    coordinator.request();
+    const offUpdates = subscribePriorityUpdates(update);
+    window.addEventListener("focus", visible); document.addEventListener("visibilitychange", visible);
+    window.addEventListener("priority-distance-changed", update); window.addEventListener("storage", update);
     const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("priority-refresh");
     if (channel) channel.onmessage = update;
-    return () => { generation.current++; detailGeneration.current++; clearInterval(timer); window.removeEventListener("focus", update); window.removeEventListener("priority-distance-changed", update); window.removeEventListener("storage", update); channel?.close(); };
+    return () => { generation.current++; detailGeneration.current++; coordinator.dispose(); offUpdates(); window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); window.removeEventListener("priority-distance-changed", update); window.removeEventListener("storage", update); channel?.close(); };
   }, [refresh]);
   useEffect(() => {
     const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) { setHover(null); setInspect(null); setDeleteId(null); setDetail(null); setRequestList(false); detailGeneration.current++; } };
@@ -143,6 +147,17 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   const canManage = current?.canManage ?? false;
   const detailRows = useMemo(() => detail ? rankPriorities(detail.snapshot.rankingPeople, detail.snapshot.periodStart, detail.variant, detail.snapshot.vipEnabled, detail.snapshot.version >= 3 ? "slice" : detail.snapshot.version >= 2 ? "distance" : "legacy-vip-seats", detail.snapshot.group ?? "50-100").filter((row) => detail.snapshot.people.some((p) => p.memberId === row.memberId)) : [], [detail]);
   const requestIds = requests.map((r) => r.id).join(",");
+  useEffect(() => {
+    if (!requestList || !source) return;
+    let cancelled = false;
+    setRequests([]);
+    void listPriorityRequests(source.periodStart).then(result => {
+      if (cancelled) return;
+      if (result.error) setNotice(t("priorities.operationError", { reason: result.error }));
+      else setRequests(result.data ?? []);
+    }).catch(error => { if (!cancelled) setNotice(t("priorities.operationError", { reason: String(error) })); });
+    return () => { cancelled = true; };
+  }, [requestList, source, t]);
   useEffect(() => {
     if (!requestList || !canManage || !requestIds) return;
     let cancelled = false;
@@ -180,7 +195,7 @@ export function V2Priorities({ canManageDemo = false, author = "you", preference
   return <div className="v2-prio-stage v2-prio-live min-h-0 flex-1 overflow-auto">
     <section className="v2-admin-card v2-prio-card">
       <header className="v2-prio-head"><h1>{t("nav.priorities")}</h1><span translate="no">Winamax</span>
-        <Button size="sm" variant="outline" onClick={() => setRequestList(true)} disabled={!current || busy}>{t("priorities.requests")} · {requests.length}{requests.some((r) => !r.closedAt) && <b className="v2-prio-new">{t("priorities.new")} {requests.filter((r) => !r.closedAt).length}</b>}</Button></header>
+        <Button size="sm" variant="outline" onClick={() => setRequestList(true)} disabled={!current || busy}>{t("priorities.requests")}</Button></header>
       <div className="v2-prio-report">
         <div className="v2-prio-report-main">
           <div className="v2-prio-report-period">

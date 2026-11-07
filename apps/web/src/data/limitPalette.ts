@@ -1,3 +1,4 @@
+import { loadScheduleConfiguration, invalidateScheduleConfiguration, subscribeConfigurationChanged } from "./scheduleConfiguration";
 import { getSupabase } from "./client";
 import { isDevSandboxEnabled } from "./config";
 import { isLimitPalette, normalizeLimitPalette, sameLimitPalette, type LimitPalette } from "../schedule/limitPalette";
@@ -33,11 +34,11 @@ export async function loadClubLimitPalette(): Promise<PaletteResult> {
   const db = getSupabase();
   if (!db) return { ...fallback, error: "not-configured" };
   try {
-    const { data, error } = await db.from("schedule_settings").select("limit_palette,slot_tint").eq("id", true).single();
-    if (error || !isLimitPalette(data?.limit_palette) || !isSlotTint(data?.slot_tint)) return { ...fallback, error: error?.message ?? "invalid-palette" };
-    return { palette: normalizeLimitPalette(data.limit_palette), tint: normalizeSlotTint(data.slot_tint) };
-  } catch {
-    return { ...fallback, error: "network-error" };
+    const { settings } = await loadScheduleConfiguration();
+    if (!isLimitPalette(settings.limit_palette) || !isSlotTint(settings.slot_tint)) return { ...fallback, error: "invalid-palette" };
+    return { palette: normalizeLimitPalette(settings.limit_palette), tint: normalizeSlotTint(settings.slot_tint) };
+  } catch (error) {
+    return { ...fallback, error: error instanceof Error ? error.message : "network-error" };
   }
 }
 
@@ -60,7 +61,7 @@ export async function saveClubLimitPalette(palette: LimitPalette, expected: Limi
     const { error } = tint
       ? await db.rpc("save_schedule_appearance", { p_palette: next, p_expected_palette: expected, p_tint: tint, p_expected_tint: expectedTint })
       : await db.rpc("save_schedule_limit_palette", { p_palette: next, p_expected: expected });
-    if (!error) window.dispatchEvent(new Event(EVENT));
+    if (!error) invalidateScheduleConfiguration();
     return { error: error?.message };
   } catch {
     return { error: "network-error" };
@@ -68,21 +69,12 @@ export async function saveClubLimitPalette(palette: LimitPalette, expected: Limi
 }
 
 export function subscribeClubLimitPalette(onChange: () => void) {
+  if (!isDevSandboxEnabled()) return subscribeConfigurationChanged(onChange);
   const onStorage = (event: StorageEvent) => { if (event.key === STORAGE_KEY || event.key === APPEARANCE_KEY || event.key === LOCKED_APPEARANCE_KEY || event.key === null) onChange(); };
   window.addEventListener(EVENT, onChange);
   window.addEventListener("storage", onStorage);
-  window.addEventListener("focus", onChange);
-  // Recover after a missed realtime event or a sleeping/disconnected tab.
-  const timer = window.setInterval(onChange, 60_000);
-  const db = isDevSandboxEnabled() ? null : getSupabase();
-  const channel = db?.channel("club-limit-palette")
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "schedule_settings" }, onChange)
-    .subscribe();
   return () => {
     window.removeEventListener(EVENT, onChange);
     window.removeEventListener("storage", onStorage);
-    window.removeEventListener("focus", onChange);
-    window.clearInterval(timer);
-    if (db && channel) void db.removeChannel(channel);
   };
 }

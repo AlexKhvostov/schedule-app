@@ -10,9 +10,19 @@ export class LiveEntryRecovery {
   private failures = 0;
   private abort?: AbortController;
   private retry?: ReturnType<typeof setTimeout>;
+  private invalidation?: ReturnType<typeof setTimeout>;
+  private dirty = false;
   constructor(private load: (signal: AbortSignal) => Promise<LiveEntry>, private changed: (state: State) => void) {}
+  /** Coalesce access events, including one follow-up for events during a read. */
+  invalidate() {
+    if (this.disposed) return;
+    this.dirty = true;
+    if (this.state.checking || this.invalidation !== undefined) return;
+    this.invalidation = setTimeout(() => { this.invalidation = undefined; void this.check(); }, 0);
+  }
   async check() {
     if (this.disposed || this.state.checking) return;
+    clearTimeout(this.invalidation); this.invalidation = undefined; this.dirty = false;
     clearTimeout(this.retry);
     const generation = ++this.generation;
     this.abort = new AbortController();
@@ -29,12 +39,16 @@ export class LiveEntryRecovery {
       this.retry = setTimeout(() => void this.check(), delay);
     }
     this.changed(this.state);
+    if (this.dirty && !this.state.unavailable) this.invalidate();
   }
   signedOut() {
     this.cancel();
     this.state = { entry: { kind: "none" }, checking: false, unavailable: false };
     this.changed(this.state);
   }
-  private cancel() { ++this.generation; clearTimeout(this.retry); this.abort?.abort(); }
+  private cancel() {
+    ++this.generation; clearTimeout(this.retry); clearTimeout(this.invalidation);
+    this.invalidation = undefined; this.dirty = false; this.abort?.abort();
+  }
   stop() { this.disposed = true; this.cancel(); }
 }

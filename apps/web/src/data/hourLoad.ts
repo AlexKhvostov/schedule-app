@@ -1,3 +1,4 @@
+import { loadScheduleConfiguration, invalidateScheduleConfiguration, subscribeConfigurationChanged } from "./scheduleConfiguration";
 import { getSupabase } from "./client";
 import { isDevSandboxEnabled } from "./config";
 import { emptyLoadRow, isHourLoadMap, isHourLoadRow, legacyLoadRow, sameLoadRow, validLoadKey, type HourLoadMap, type HourLoadRow } from "../schedule/hourLoad";
@@ -18,10 +19,10 @@ export async function loadClubHourLoad(): Promise<{ map: HourLoadMap; error?: st
     if (isDevSandboxEnabled()) return { map: demoLoad() };
     const db = getSupabase();
     if (!db) return { map: {}, error: "not-configured" };
-    const { data, error } = await db.from("schedule_settings").select("hour_load").eq("id", true).single();
-    if (error || !isHourLoadMap(data?.hour_load)) return { map: {}, error: error?.message ?? "invalid-hour-load" };
-    return { map: data.hour_load };
-  } catch { return { map: {}, error: "load-error" }; }
+    const { settings } = await loadScheduleConfiguration();
+    if (!isHourLoadMap(settings.hour_load)) return { map: {}, error: "invalid-hour-load" };
+    return { map: settings.hour_load };
+  } catch (error) { return { map: {}, error: error instanceof Error ? error.message : "load-error" }; }
 }
 export async function saveClubHourLoad(key: string, row: HourLoadRow, expected: HourLoadRow): Promise<{ error?: string }> {
   if (!validLoadKey(key) || !isHourLoadRow(row) || !isHourLoadRow(expected)) return { error: "invalid-hour-load" };
@@ -35,24 +36,19 @@ export async function saveClubHourLoad(key: string, row: HourLoadRow, expected: 
       if (!db) return { error: "not-configured" };
       const { error } = await db.rpc("save_schedule_hour_load", { p_key: key, p_row: row, p_expected: expected });
       if (error) return { error: error.message };
+      invalidateScheduleConfiguration();
     }
     window.dispatchEvent(new Event(EVENT));
     return {};
   } catch { return { error: "save-error" }; }
 }
 export function subscribeClubHourLoad(onChange: () => void) {
+  if (!isDevSandboxEnabled()) return subscribeConfigurationChanged(onChange);
   const storage = (event: StorageEvent) => { if (!event.key || event.key === KEY) onChange(); };
   window.addEventListener(EVENT, onChange);
   window.addEventListener("storage", storage);
-  window.addEventListener("focus", onChange);
-  const timer = window.setInterval(onChange, 60_000);
-  const db = isDevSandboxEnabled() ? null : getSupabase();
-  const channel = db?.channel("club-hour-load").on("postgres_changes", { event: "UPDATE", schema: "public", table: "schedule_settings" }, onChange).subscribe();
   return () => {
     window.removeEventListener(EVENT, onChange);
     window.removeEventListener("storage", storage);
-    window.removeEventListener("focus", onChange);
-    window.clearInterval(timer);
-    if (db && channel) void db.removeChannel(channel);
   };
 }
