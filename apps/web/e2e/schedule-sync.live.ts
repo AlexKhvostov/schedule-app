@@ -72,7 +72,9 @@ test("configuration error retains the grid and exposes recovery on a narrow scre
   state.failRules = false;
   await dialog.getByRole("button", { name: "Обновить", exact: true }).click();
   await expect(page.locator(".v2-sync-notice")).not.toBeVisible({ timeout: 20000 });
-  await page.getByTestId("schedule-sync-status").hover();
+  // Explicitly reopen after refresh: a hover may already be active while the
+  // focus popover has closed when its refresh button became disabled.
+  await page.getByTestId("schedule-sync-status").click();
   await expect(dialog).toContainText("Изменения приходят автоматически");
   expect(state.writes).toHaveLength(0);
 });

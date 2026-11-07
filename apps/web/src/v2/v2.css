@@ -618,49 +618,6 @@ html[data-ui-theme="light"] .v2-stage::before {
     linear-gradient(145deg, #f7fafc 0%, #e8eef3 48%, #eef4f6 100%);
 }
 
-.v2-boot {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: min(360px, calc(100vw - 32px));
-  align-self: center;
-  align-items: center;
-  gap: 12px;
-  padding: 15px 17px;
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--card) 92%, transparent);
-  color: var(--foreground);
-  box-shadow: 0 18px 55px rgb(0 0 0 / 0.22);
-  backdrop-filter: blur(14px);
-}
-
-.v2-boot-copy {
-  display: grid;
-  gap: 2px;
-}
-
-.v2-boot-copy b { font-size: 13px; }
-.v2-boot-copy small { color: var(--muted-foreground); font-size: 11px; }
-
-.v2-boot-spinner {
-  width: 18px;
-  height: 18px;
-  margin-left: auto;
-  border: 2px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: v2-boot-spin 700ms linear infinite;
-}
-
-@keyframes v2-boot-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .v2-boot-spinner { animation: none; }
-}
-
 .v2-root {
   position: relative;
   z-index: 1;
@@ -16757,9 +16714,7 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 .v2-auth-notice { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 12px; font-size: 12px; color: var(--foreground); background: var(--card); border-bottom: 1px solid var(--border); }
 .v2-auth-notice button { text-decoration: underline; flex-shrink: 0; cursor: pointer; }
 .v2-auth-notice button:disabled { opacity: .6; cursor: wait; }
-.v2-boot .v2-boot-copy { max-width: 360px; }
-.v2-boot .v2-ctrl { padding: 6px 10px; height: auto; flex-shrink: 0; }
-@media (max-width: 600px) { .v2-auth-notice, .v2-boot:has(button) { flex-wrap: wrap; } }
+@media (max-width: 600px) { .v2-auth-notice { flex-wrap: wrap; } }
 
 .v2-user-card { display: grid; gap: 5px; }
 .v2-user-card-hero {

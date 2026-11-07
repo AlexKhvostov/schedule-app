@@ -135,6 +135,8 @@
     "liveError": "Discord sign-in failed",
     "connecting": "Opening Discord…",
     "checking": "Checking sign-in…",
+    "loadingFiles": "Loading the app…",
+    "openingApp": "Opening the app…",
     "environmentTitle": "Application environment",
     "environmentLead": "Choose an environment: safe local demo data or the current working database.",
     "environment": {

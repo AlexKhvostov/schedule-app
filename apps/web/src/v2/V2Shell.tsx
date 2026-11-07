@@ -23,7 +23,7 @@ import { loadTheme, saveTheme, type UiTheme } from "./theme";
 import { loadSlotTheme, SLOT_THEME_EVENT, slotThemeVars } from "../schedule/slotTheme";
 import { usePlayerClock } from "./usePlayerClock";
 import { canAccessDashboard, defaultShellPage, resolveShellPage, type ShellPage } from "./shellNavigation";
-import "./v2.css";
+import "./appearance";
 import { ClubLimitPaletteProvider } from "./ClubLimitPalette";
 
 const Dashboard = lazy(() => import("../analytics").then((module) => ({ default: module.Dashboard })));

@@ -24,8 +24,9 @@ export default function AuthCallbackPage() {
     void run();
   }, [router]);
 
+  // This brief callback needs neither application CSS nor the translation runtime.
   return (
-    <main className="grid min-h-screen place-items-center text-sm text-[var(--muted-foreground)]">
+    <main style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", background: "var(--background, #0e1118)", color: "var(--muted-foreground, #9ca3af)", font: "14px system-ui, sans-serif" }}>
       Входим…
     </main>
   );

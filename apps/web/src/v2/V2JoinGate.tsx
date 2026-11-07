@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { submitJoinRequest } from "../data/people";
 import { setAppLanguage } from "../i18n";
-import "./v2.css";
+import "./appearance";
 
 type Props = {
   nick: string;

@@ -39,6 +39,30 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: fixture-public-key
       - name: Check production analytics and role boundary
         run: npx playwright test --config=playwright.analytics-production.config.ts --workers=1
+      - name: Build production asset delivery fixture
+        run: npm run build
+        env:
+          NEXT_DIST_DIR: .next-assets-check
+          VERCEL_ENV: production
+          REDPARTY_ASSET_ALIAS_ENABLED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://schedule-fixture.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: fixture-key
+      - name: Check cross-origin assets and auth return address
+        run: npx playwright test --config=playwright.assets-production.config.ts --workers=1
+        env:
+          REDPARTY_ASSET_ALIAS_ENABLED: "true"
+      - name: Build production with asset alias disabled
+        run: npm run build
+        env:
+          NEXT_DIST_DIR: .next-assets-check-off
+          VERCEL_ENV: production
+          REDPARTY_ASSET_ALIAS_ENABLED: "false"
+          NEXT_PUBLIC_SUPABASE_URL: https://schedule-fixture.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: fixture-key
+      - name: Check same-origin assets and auth return address
+        run: npx playwright test --config=playwright.assets-production.config.ts --workers=1
+        env:
+          REDPARTY_ASSET_ALIAS_ENABLED: "false"
       - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() }}
         with:

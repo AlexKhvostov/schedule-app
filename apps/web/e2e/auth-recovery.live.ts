@@ -71,6 +71,10 @@ test("failed data refresh keeps the last loaded marks visible without opening fr
   await page.getByTestId("schedule-sync-status").click();
   const dialog = page.getByRole("dialog", { name: "Актуальность расписания" });
   await dialog.getByRole("button", { name: "Обновить", exact: true }).click();
+  // Refresh disables the focused button; the hover/focus popover may close.
+  // The persistent notice and retained grid are the recovery contract.
+  await expect(page.locator(".v2-sync-notice")).toContainText("Обновления приостановлены", { timeout: 20000 });
+  await page.getByTestId("schedule-sync-status").click();
   await expect(dialog).toContainText("Обновления приостановлены", { timeout: 20000 });
   await expect(page.locator('[data-slot].is-on').first()).toContainText("AA");
   expect(state.writes).toHaveLength(1);

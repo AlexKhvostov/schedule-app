@@ -5,7 +5,7 @@ import { liveAuthReady, signInDiscord } from "../data/auth";
 import { devLoginAvailable, enableDevSandbox } from "../data/config";
 import { loadMembers } from "../schedule/members";
 import { roleFor, writeSession, type Session } from "./session";
-import "./v2.css";
+import "./appearance";
 
 type Props = { onEnter: (session: Session) => void };
 type DevelopmentEnvironment = "demo" | "working" | "production";

@@ -115,6 +115,7 @@ test("quick add sends one upsert and waits for read-back; failed removal can be 
    expect(path).toBe("/api/regs");const body=request.postDataJSON();expect(body).toEqual({player_name:"Demo 03",side:"ours"});rows=[body];await route.fulfill({json:{reg:body}});return;
   }
   if(path==="/api/regs"){await route.fulfill(failRead?{status:503,body:"private failure"}:{json:{regs:rows}});return;}
+  if(path==="/api/players/search"){await route.fulfill({json:{players:["Demo 03"]}});return;}
   const source=path==="/api/points/heatmap"?demoPointsSource.heatmap:demoPointsSource.timeline;
   await route.fulfill({json:await source(params,new AbortController().signal)});
  });

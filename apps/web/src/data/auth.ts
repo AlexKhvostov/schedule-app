@@ -134,14 +134,16 @@ async function loadLiveMemberForAuthUser(authUserId: string, signal = new AbortC
   signal.throwIfAborted();
   if (memberError) throw memberError;
   if (!member) return null;
-  const { data: ident, error: identError } = await db
-    .from("identities")
-    .select("provider, provider_uid, username, display_name, guild_nick, avatar_url")
-    .eq("member_id", member.id)
-    .abortSignal(signal).maybeSingle();
-  if (identError) throw identError;
-  const { data: context, error: contextError } = await db.rpc("member_access_context").abortSignal(signal);
+  // Both reads depend on the verified user/member, not on each other.
+  const [{ data: ident, error: identError }, { data: context, error: contextError }] = await Promise.all([
+    db.from("identities")
+      .select("provider, provider_uid, username, display_name, guild_nick, avatar_url")
+      .eq("member_id", member.id)
+      .abortSignal(signal).maybeSingle(),
+    db.rpc("member_access_context").abortSignal(signal),
+  ]);
   signal.throwIfAborted();
+  if (identError) throw identError;
   if (contextError) throw contextError;
   if (!context || !Array.isArray(context.permissions)) throw new Error("missing-access-context");
   const accessContext = (context ?? {}) as {
@@ -235,10 +237,18 @@ export async function loadLiveEntry(signal = new AbortController().signal): Prom
   if (authError) { if (isConfirmedAuthLoss(authError)) return { kind: "none" }; throw authError; }
   if (!auth.user) return { kind: "none" };
   const snapshot = () => checkDiscordSnapshot(auth.user, signal);
-  const check = takeFreshDiscordLogin()
-    ? await checkMyDiscordMember().then((result) => (result?.error ? snapshot() : result))
-    : await snapshot();
-  let member = await loadLiveMemberForAuthUser(auth.user.id, signal);
+  let check: DiscordCheck | null;
+  let member: LiveMember | null;
+  if (takeFreshDiscordLogin()) {
+    // This check can update membership/roles. Read the profile only afterwards.
+    check = await checkMyDiscordMember().then((result) => (result?.error ? snapshot() : result));
+    signal.throwIfAborted();
+    member = await loadLiveMemberForAuthUser(auth.user.id, signal);
+  } else {
+    // Restoring a session only reads the saved snapshot. Wait for BOTH checks
+    // before admitting the user, including when one service is unavailable.
+    [check, member] = await Promise.all([snapshot(), loadLiveMemberForAuthUser(auth.user.id, signal)]);
+  }
   if (!member && check?.present && check.hasRequiredRole) {
     signal.throwIfAborted();
     const { error } = await db.rpc("self_create_profile").abortSignal(signal);

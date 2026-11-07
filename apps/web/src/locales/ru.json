@@ -135,6 +135,8 @@
     "liveError": "Не удалось войти через Discord",
     "connecting": "Открываем Discord…",
     "checking": "Проверяем вход…",
+    "loadingFiles": "Загружаем приложение…",
+    "openingApp": "Открываем приложение…",
     "environmentTitle": "Среда приложения",
     "environmentLead": "Выберите среду: безопасное локальное демо или текущую рабочую базу.",
     "environment": {

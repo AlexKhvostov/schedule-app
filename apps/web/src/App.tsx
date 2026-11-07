@@ -17,7 +17,6 @@ import { getSupabase } from "./data/client";
 import { subscribeAppChanges } from "./data/appRealtime";
 import { disableDevSandbox } from "./data/config";
 import "./v2/theme";
-import "./v2/v2.css";
 
 const V2Login = lazy(() => import("./v2/V2Login").then(module => ({ default: module.V2Login })));
 const V2JoinGate = lazy(() => import("./v2/V2JoinGate").then(module => ({ default: module.V2JoinGate })));
@@ -106,7 +105,7 @@ export function App() {
   }, [live]);
 
   if (!hydrated || booting || (authState.unavailable && !session && !gate)) {
-    return <V2BootScreen languageReady={hydrated} unavailable={authState.unavailable} retrying={authState.checking} onRetry={retryAuth} />;
+    return <V2BootScreen phase={hydrated ? "auth" : "assets"} languageReady={hydrated} unavailable={authState.unavailable} retrying={authState.checking} onRetry={retryAuth} />;
   }
 
   if (gate) {
