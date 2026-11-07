@@ -7,12 +7,14 @@ export function OptNlChip({
   variant,
   lab,
   ghost,
+  groupLabel,
 }: {
   label: string;
   tone?: string;
   variant?: "nitro" | "regular";
   lab?: boolean;
   ghost?: boolean;
+  groupLabel?: string;
 }) {
   if (ghost) return <div className="v2-opt-nl is-ghost" aria-hidden />;
   const [limitLabel, laneNumber] = label.split("·");
@@ -22,7 +24,7 @@ export function OptNlChip({
       {lab ? (
         label
       ) : (
-        <span className="v2-limit-chip" aria-label={label} style={chipTone ? { color: chipTone } : undefined}>
+        <span className="v2-limit-chip" aria-label={groupLabel ?? label} style={chipTone ? { color: chipTone } : undefined}>
           <span className="v2-opt-limit-label" aria-hidden><PairLabel label={limitLabel} /></span>
           {laneNumber && <span className="v2-opt-lane-number" aria-hidden>{laneNumber}</span>}
         </span>

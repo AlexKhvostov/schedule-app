@@ -449,7 +449,8 @@ test("mobile schedule starts safe and only edits at a readable zoom", async ({ p
   await expect(fitZoom).toHaveText(initialFitLabel ?? "");
   for (let i = 0; i < 8; i += 1) await zoomIn.click();
   await expect(edit).toBeEnabled();
-  await expect(laneNumber).toBeVisible();
+  await expect(laneNumber).toBeHidden();
+  await expect(page.locator(".v2-opt-limit-label").first()).toBeVisible();
   await edit.click();
   await expect(dock.getByRole("button", { name: "Готово" })).toHaveAttribute("aria-pressed", "true");
   await expect(zoomIn).toBeDisabled();

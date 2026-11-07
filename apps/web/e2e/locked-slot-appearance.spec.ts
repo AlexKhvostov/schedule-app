@@ -49,7 +49,7 @@ for (const theme of ["dark", "light"]) {
     await expect(page.locator(".v2-opt-tip")).toContainText("Закрыто");
     await page.mouse.move(0, 0);
     const open = lane.locator('[data-slot][data-half="16"]');
-    expect(await open.evaluate(el => getComputedStyle(el).boxShadow)).toContain("0.38");
+    expect(await open.evaluate(el => getComputedStyle(el).boxShadow)).toContain("0.22");
     await expect(day.locator('.v2-opt-lane[data-lane="4-regular-50-1"] .v2-opt-locked-band')).toHaveCount(2);
     await day.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-05-locked-slots-${theme}.png`) });
     await page.evaluate(key => {

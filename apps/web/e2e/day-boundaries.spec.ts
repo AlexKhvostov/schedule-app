@@ -35,8 +35,8 @@ for (const theme of ["dark", "light"]) {
     await expect(kind).toHaveCSS("border-top-width","1px");
     await expect(kind).toHaveCSS("border-top-style","solid");
     await expect(limit).toHaveCSS("border-top-style","dashed");
-    await expect(kind).toHaveCSS("border-top-color",/0[.]3/);
-    await expect(limit).toHaveCSS("border-top-color",/0[.]18/);
+    await expect(kind).toHaveCSS("border-top-color",/0[.]22/);
+    await expect(limit).toHaveCSS("border-top-color",/0[.]12/);
     expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["1px","none","-3px","-1px"]);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/final-${theme}.png`),clip:{x:sb!.x,y:sb!.y,width:480,height:620}});
     // Force horizontal scrolling in a desktop container without changing zoom.

@@ -107,8 +107,8 @@ export function SlotDayPreview() {
                   </div>
                   <div className="v2-opt-gutter-nls">
                     <div className="v2-opt-gutter-limit">
-                      <OptNlChip label="N50·1" tone={limitTone("50")} />
-                      <OptNlChip label="N50·2" tone={limitTone("50")} />
+                      <OptNlChip label="N50·1" groupLabel="N50" tone={limitTone("50")} />
+                      <OptNlChip label="N50·2" groupLabel="N50" tone={limitTone("50")} />
                     </div>
                   </div>
                 </div>

@@ -1,20 +1,40 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function enter(page: Page, theme: string, mobile = false, bothKinds = false) {
+async function enter(page: Page, theme: string, mobile = false, bothKinds = false, closedMiddleLane = false) {
   await page.clock.setFixedTime(new Date("2026-11-07T08:00:00Z"));
   await page.setViewportSize({ width: mobile ? 390 : 1280, height: mobile ? 844 : 900 });
-  await page.addInitScript(({ theme, bothKinds }) => {
+  await page.addInitScript(({ theme, bothKinds, closedMiddleLane }) => {
     localStorage.setItem("v2-ui-theme", theme);
     localStorage.setItem("v2-schedule-prefs", JSON.stringify({ limits: ["50", "100"], kinds: bothKinds ? ["nitro", "regular"] : ["nitro"], hidePastDays: true }));
     const capacity = (count: number) => ({ hours: Array(24).fill(count), days: {}, weekdays: {}, equalize: false, weekOn: true, monthOn: true });
-    localStorage.setItem("v2-capacity-nitro", JSON.stringify({ "50": capacity(3), "100": capacity(2) }));
+    localStorage.setItem("v2-capacity-nitro", JSON.stringify({ "50": capacity(closedMiddleLane ? 1 : 3), "100": capacity(2) }));
     localStorage.setItem("v2-capacity-regular", JSON.stringify({ "50": capacity(1), "100": capacity(1) }));
-  }, { theme, bothKinds });
+    if (closedMiddleLane) localStorage.setItem("v2-demo-schedule-v1", JSON.stringify({
+      "2026-11:nitro:50": { days: 30, cells: [[7, 20, [null, null,
+        { t: "QA", bg: "#dc80aa", fg: "#111111", tables: 1 },
+        { t: "QB", bg: "#dc80aa", fg: "#111111", tables: 1 },
+      ]]] },
+    }));
+  }, { theme, bothKinds, closedMiddleLane });
   await page.goto("/#schedule");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 }
+
+test("shared limit label spans the group after capacity reduction with marks above a closed lane", async ({ page }) => {
+  await enter(page, "dark", false, false, true);
+  const group = page.locator('.v2-opt-block[data-row="7"] .v2-opt-gutter-limit[data-pair="nitro:50"]');
+  await expect(group.locator('.v2-opt-nl.is-ghost')).toHaveCount(1);
+  await expect(group.locator('.v2-opt-limit-label:visible')).toHaveText(["N50"]);
+  await centeredGroupLabels(page);
+  await expect(group.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.v2-opt')).toHaveClass(/is-overview/);
+  await expect(group.locator('.v2-opt-limit-label:visible')).toHaveText(["N50"]);
+  await centeredGroupLabels(page);
+  await expect(group.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
+});
 
 async function alignedRows(page: Page, count = 5) {
   const geometry = await page.locator('.v2-opt-block[data-row="7"]').evaluate(day => {
@@ -31,6 +51,15 @@ async function alignedRows(page: Page, count = 5) {
     expect(row.top).toBeLessThan(1);
     expect(row.height).toBeLessThan(1);
   }
+}
+
+async function centeredGroupLabels(page: Page) {
+  const offsets = await page.locator('.v2-opt-block[data-row="7"] .v2-opt-gutter-limit').evaluateAll(groups => groups.map(group => {
+    const label = group.querySelector('.v2-opt-limit-label')!.getBoundingClientRect();
+    const box = group.getBoundingClientRect();
+    return Math.abs((label.top + label.bottom) / 2 - (box.top + box.bottom) / 2);
+  }));
+  for (const offset of offsets) expect(offset).toBeLessThan(1);
 }
 
 async function hierarchyGaps(page: Page) {
@@ -68,7 +97,9 @@ for (const theme of ["dark", "light"]) {
       cell: el.querySelector("[data-slot]")!.getBoundingClientRect().height,
     }));
     expect(current.cell).toBe(20);
-    expect(current.height).toBeLessThanOrEqual(134);
+    expect(current.height).toBe(126);
+    await expect(day.locator('.v2-opt-limit-label:visible')).toHaveCount(2);
+    await expect(day.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath(`compact-${theme}.png`) });
 
     // Reproduce the previous spacing on exactly the same fixture and viewport.
@@ -106,6 +137,12 @@ for (const theme of ["dark", "light"]) {
     await enter(page, theme, false, true);
     await alignedRows(page, 7);
     expect(await expectHierarchy(page)).toEqual([2, 6, 10, 14]);
+    const day = page.locator('.v2-opt-block[data-row="7"]');
+    await expect(day.locator('.v2-opt-limit-label:visible')).toHaveText(["N50", "N100", "E50", "E100"]);
+    await expect(day.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
+    await centeredGroupLabels(page);
+    expect(await day.locator('.v2-limit-chip:visible').evaluateAll(chips => chips.map(chip => chip.getAttribute("aria-label"))))
+      .toEqual(["N50", "N100", "E50", "E100"]);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}.png`) });
   });
@@ -114,6 +151,7 @@ for (const theme of ["dark", "light"]) {
     await enter(page, theme, true, true);
     await alignedRows(page, 7);
     await expectHierarchy(page);
+    await centeredGroupLabels(page);
     const overviewLabels = page.locator('.v2-opt-block[data-row="7"] .v2-opt-limit-label:visible');
     await expect(overviewLabels).toHaveCount(4);
     const labelBoxes = await overviewLabels.evaluateAll(labels => labels.map(label => {
@@ -130,7 +168,9 @@ for (const theme of ["dark", "light"]) {
     await edit.click();
     await alignedRows(page, 7);
     await expectHierarchy(page);
-    await expect(page.locator('.v2-opt-block[data-row="7"] .v2-opt-limit-label:visible')).toHaveCount(7);
+    await centeredGroupLabels(page);
+    await expect(page.locator('.v2-opt-block[data-row="7"] .v2-opt-limit-label:visible')).toHaveCount(4);
+    await expect(page.locator('.v2-opt-block[data-row="7"] .v2-opt-lane-number:visible')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath(`compact-mobile-${theme}.png`) });
     const cell = page.locator('[data-slot][data-lane="7-nitro-100-1"][data-half="20"]');
     await cell.click();
@@ -142,6 +182,7 @@ for (const theme of ["dark", "light"]) {
     for (let step = 0; step < 10 && await zoom.isEnabled(); step += 1) await zoom.click();
     await alignedRows(page, 7);
     await expectHierarchy(page);
+    await centeredGroupLabels(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
 }

@@ -371,6 +371,7 @@ export const OptBody = memo(function OptBody({
                           tone={limitTone(rowInfo.limit)}
                           variant={group.variant}
                           ghost={ghost}
+                          groupLabel={rowInfo.label}
                           label={`${rowInfo.label}${named > 1 ? `·${level + 1}` : ""}`}
                         />
                       ));

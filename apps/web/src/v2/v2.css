@@ -9694,8 +9694,8 @@ textarea.v2-ctrl.v2-cab-area {
   --opt-board-inset: 4px;
   --opt-day-border: 1px;
   --opt-day-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
-  --slot-open-stroke: color-mix(in srgb, var(--foreground) 38%, transparent);
-  --opt-day-frame: color-mix(in srgb, var(--foreground) 44%, var(--slot-day, var(--card)));
+  --slot-open-stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --opt-day-frame: color-mix(in srgb, var(--foreground) 36%, var(--slot-day, var(--card)));
   background: var(--background);
   color: var(--opt-ink);
 }
@@ -10425,15 +10425,20 @@ textarea.v2-ctrl.v2-cab-area {
   .v2-palette-labels { flex-direction: column; gap: 0; font-size: 12px; }
 }
 
-.v2-opt.is-overview .v2-opt-lane-number { display: none; }
+.v2-opt-gutter-limit {
+  background: var(--slot-date, var(--day));
+  background-clip: content-box;
+  border-radius: 4px;
+}
 
-/* Overview rows can be shorter than a label. Name the group once rather than
-   stacking the same text on every miniature lane; editing zoom restores it. */
-.v2-opt.is-overview .v2-opt-gutter-limit > .v2-opt-nl .v2-limit-chip {
+.v2-opt-gutter-limit .v2-opt-lane-number { display: none; }
+
+/* One shared label spans the group at every zoom; row geometry stays intact. */
+.v2-opt-gutter-limit > .v2-opt-nl .v2-limit-chip {
   visibility: hidden;
 }
 
-.v2-opt.is-overview .v2-opt-gutter-limit > .v2-opt-nl:first-child .v2-limit-chip {
+.v2-opt-gutter-limit > .v2-opt-nl:first-child .v2-limit-chip {
   position: absolute;
   inset-inline: 0;
   top: 50%;
@@ -10889,13 +10894,13 @@ textarea.v2-ctrl.v2-cab-area {
 .v2-opt-gutter-limit + .v2-opt-gutter-limit {
   margin-top: calc(var(--opt-limit-gap) / 2);
   padding-top: calc(var(--opt-limit-gap) / 2 - 1px);
-  border-top: 1px dashed color-mix(in srgb, var(--foreground) 18%, transparent);
+  border-top: 1px dashed color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 .v2-opt-kind + .v2-opt-kind,
 .v2-opt-gutter-kind + .v2-opt-gutter-kind {
   margin-top: calc(var(--opt-kind-gap) / 2);
   padding-top: calc(var(--opt-kind-gap) / 2 - 1px);
-  border-top: 1px solid color-mix(in srgb, var(--foreground) 30%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 22%, transparent);
 }
 .v2-hour-load-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
 .v2-hour-load-tools .v2-ctrl { min-height: 30px; padding-inline: 12px; }
@@ -11744,8 +11749,8 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
 
 .v2-opt.is-kit .v2-opt-block .v2-opt-nl {
   align-self: stretch;
-  background: var(--slot-date, var(--day));
-  border-radius: 6px;
+  background: transparent;
+  border-radius: 0;
   box-shadow: none;
 }
 
