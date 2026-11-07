@@ -87,8 +87,8 @@ for (const theme of ["dark", "light"]) {
     await expect(n100.locator("[data-load-tone]")).toHaveCount(0);
     await expect(e50.locator('[data-load-tone="peach"]')).toHaveCount(0);
     await expect(e50.locator('[data-load-tone="sky"]').first()).toBeVisible();
-    await expect(n100).toHaveCSS("border-top-style", "dashed");
-    await expect(day.locator('.v2-opt-kind[data-variant="regular"]')).toHaveCSS("border-top-width", "1px");
+    await expect(n100).toHaveCSS("border-top-style", "solid");
+    await expect(day.locator('.v2-opt-kind[data-variant="regular"]')).toHaveCSS("border-top-width", "2px");
     const cell = n50.locator('[data-slot][data-half="6"]').first();
     await cell.hover();
     await expect(page.locator(".v2-opt-frame")).toHaveText("N50: 03:00 – 03:30");

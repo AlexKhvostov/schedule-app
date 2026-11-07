@@ -97,7 +97,7 @@ for (const theme of ["dark", "light"]) {
       cell: el.querySelector("[data-slot]")!.getBoundingClientRect().height,
     }));
     expect(current.cell).toBe(20);
-    expect(current.height).toBe(126);
+    expect(current.height).toBe(130);
     await expect(day.locator('.v2-opt-limit-label:visible')).toHaveCount(2);
     await expect(day.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath(`compact-${theme}.png`) });
@@ -136,7 +136,7 @@ for (const theme of ["dark", "light"]) {
   test(`schedule spacing groups levels, limits, kinds and days in ${theme}`, async ({ page }) => {
     await enter(page, theme, false, true);
     await alignedRows(page, 7);
-    expect(await expectHierarchy(page)).toEqual([2, 6, 10, 14]);
+    expect(await expectHierarchy(page)).toEqual([2, 6, 10, 18]);
     const day = page.locator('.v2-opt-block[data-row="7"]');
     await expect(day.locator('.v2-opt-limit-label:visible')).toHaveText(["N50", "N100", "E50", "E100"]);
     await expect(day.locator('.v2-opt-lane-number:visible')).toHaveCount(0);
@@ -145,6 +145,50 @@ for (const theme of ["dark", "light"]) {
       .toEqual(["N50", "N100", "E50", "E100"]);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}.png`) });
+  });
+
+  test(`hover connects the time hint to only the current day's shared limit in ${theme}`, async ({ page }) => {
+    await enter(page, theme, false, true);
+    await page.mouse.move(0, 0);
+    await expect(page.locator('.v2-opt-block.is-hot')).toHaveCount(0);
+    const day = page.locator('.v2-opt-block[data-row="7"]');
+    const groups = day.locator('.v2-opt-gutter-limit');
+    const baseline = await groups.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
+    const otherDay = page.locator('.v2-opt-block[data-row="8"] .v2-opt-gutter-limit');
+    const otherBaseline = await otherDay.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
+    const frame = page.locator('.v2-opt-frame');
+    for (const [index, pair, label, level] of [
+      [0, "nitro:50", "N50", 2], [1, "nitro:100", "N100", 1],
+      [2, "regular:50", "E50", 0], [3, "regular:100", "E100", 0],
+    ] as const) {
+      const [kind, limit] = pair.split(":");
+      const slot = day.locator(`[data-slot][data-lane="7-${kind}-${limit}-${level}"][data-half="20"]`);
+      await slot.hover();
+      await expect(frame).toHaveText(`${label}: 10:00 – 10:30`);
+      await expect(day.locator('.v2-opt-day')).toHaveCSS('outline-style', 'none');
+      await expect(day.locator('.v2-opt-day')).toHaveCSS('box-shadow', /inset/);
+      const colors = await groups.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
+      for (let i = 0; i < colors.length; i++) {
+        if (i === index) expect(colors[i]).not.toBe(baseline[i]);
+        else expect(colors[i]).toBe(baseline[i]);
+      }
+      expect(await otherDay.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor))).toEqual(otherBaseline);
+      if (index < 2) await page.screenshot({ path: test.info().outputPath(`limit-hover-${limit}-${theme}.png`) });
+    }
+    await page.mouse.move(0, 0);
+    await expect(frame).toBeHidden();
+    expect(await groups.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor))).toEqual(baseline);
+    await day.locator('[data-slot][data-lane="7-nitro-50-0"][data-half="20"]').hover();
+    await page.locator('.v2-opt-block[data-row="8"] [data-slot][data-lane="8-nitro-50-0"][data-half="20"]').hover();
+    expect(await groups.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor))).toEqual(baseline);
+    expect(await otherDay.first().evaluate(node => getComputedStyle(node).backgroundColor)).not.toBe(otherBaseline[0]);
+    const today = page.locator('.v2-opt-block.is-today');
+    const todayDate = today.locator('.v2-opt-day');
+    const todayBackground = await todayDate.evaluate(node => getComputedStyle(node).backgroundColor);
+    await today.locator('[data-slot][data-variant="nitro"][data-limit="50"]:not(.is-past)').first().hover();
+    await expect(todayDate).toHaveCSS('outline-style', 'none');
+    await expect(todayDate).toHaveCSS('box-shadow', /inset/);
+    await expect(todayDate).toHaveCSS('background-color', todayBackground);
   });
 
   test(`compact schedule keeps labels aligned at mobile overview and editing zoom in ${theme}`, async ({ page }) => {

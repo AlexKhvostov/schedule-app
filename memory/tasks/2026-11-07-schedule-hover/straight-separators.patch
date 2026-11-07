@@ -1,0 +1,101 @@
+diff --git a/apps/web/src/v2/optField/OptFieldGrid.tsx b/apps/web/src/v2/optField/OptFieldGrid.tsx
+index 506a654..4e10f1f 100644
+--- a/apps/web/src/v2/optField/OptFieldGrid.tsx
++++ b/apps/web/src/v2/optField/OptFieldGrid.tsx
+@@ -379,7 +379,8 @@ export const OptBody = memo(function OptBody({
+                         <span className="v2-limit-disabled" title={t("schedule.limitDisabled")}>{t("schedule.limitDisabled")}</span>
+                       ) : null;
+                       return (
+-                        <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}>
++                        <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}
++                          style={{ "--slot-limit-tone": limitTone(rowInfo.limit) } as CSSProperties}>
+                           {chips}
+                           {disabled}
+                         </div>
+diff --git a/apps/web/src/v2/v2.css b/apps/web/src/v2/v2.css
+index 98d135d..751044b 100644
+--- a/apps/web/src/v2/v2.css
++++ b/apps/web/src/v2/v2.css
+@@ -9668,12 +9668,12 @@ textarea.v2-ctrl.v2-cab-area {
+   --opt-nl-w: 26px;
+   --opt-nl-gap: 4px;
+   --opt-row-pad: 4px;
+-  /* At 100% zoom, visible slot gaps are 2 / 6 / 10 / 14px:
++  /* At 100% zoom, visible slot gaps are 2 / 6 / 10 / 18px:
+      same limit / next limit / next tournament kind / next day. */
+   --opt-lane-gap: 0px;
+   --opt-limit-gap: 4px;
+   --opt-kind-gap: 8px;
+-  --opt-day-gap: 6px;
++  --opt-day-gap: 10px;
+   --opt-day-pad-y: 2px;
+   --opt-pad-l: 2px;
+   --opt-pad-r: 2px;
+@@ -10433,6 +10433,34 @@ textarea.v2-ctrl.v2-cab-area {
+ 
+ .v2-opt-gutter-limit .v2-opt-lane-number { display: none; }
+ 
++/* Reuse applyNav's existing row/lane attributes: no pointer listeners or
++   React updates, and only the current day's matching limit is emphasized. */
++.v2-opt[data-lane*="-nitro-0.25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:0.25"],
++.v2-opt[data-lane*="-nitro-0.50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:0.50"],
++.v2-opt[data-lane*="-nitro-1-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:1"],
++.v2-opt[data-lane*="-nitro-2-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:2"],
++.v2-opt[data-lane*="-nitro-5-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:5"],
++.v2-opt[data-lane*="-nitro-10-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:10"],
++.v2-opt[data-lane*="-nitro-25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:25"],
++.v2-opt[data-lane*="-regular-0.25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:0.25"],
++.v2-opt[data-lane*="-regular-0.50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:0.50"],
++.v2-opt[data-lane*="-regular-1-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:1"],
++.v2-opt[data-lane*="-regular-2-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:2"],
++.v2-opt[data-lane*="-regular-5-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:5"],
++.v2-opt[data-lane*="-regular-10-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:10"],
++.v2-opt[data-lane*="-regular-25-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:25"],
++.v2-opt[data-lane*="-nitro-50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:50"],
++.v2-opt[data-lane*="-nitro-100-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:100"],
++.v2-opt[data-lane*="-nitro-250-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:250"],
++.v2-opt[data-lane*="-nitro-500-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:500"],
++.v2-opt[data-lane*="-regular-50-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:50"],
++.v2-opt[data-lane*="-regular-100-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:100"],
++.v2-opt[data-lane*="-regular-250-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:250"],
++.v2-opt[data-lane*="-regular-500-"] .v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="regular:500"] {
++  background-color: color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 16%, var(--slot-date, var(--day)));
++  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--slot-limit-tone, var(--muted-foreground)) 75%, transparent);
++}
++
+ /* One shared label spans the group at every zoom; row geometry stays intact. */
+ .v2-opt-gutter-limit > .v2-opt-nl .v2-limit-chip {
+   visibility: hidden;
+@@ -10899,8 +10927,8 @@ textarea.v2-ctrl.v2-cab-area {
+ .v2-opt-kind + .v2-opt-kind,
+ .v2-opt-gutter-kind + .v2-opt-gutter-kind {
+   margin-top: calc(var(--opt-kind-gap) / 2);
+-  padding-top: calc(var(--opt-kind-gap) / 2 - 1px);
+-  border-top: 1px solid color-mix(in srgb, var(--foreground) 22%, transparent);
++  padding-top: calc(var(--opt-kind-gap) / 2 - 2px);
++  border-top: 2px solid color-mix(in srgb, var(--foreground) 28%, transparent);
+ }
+ .v2-hour-load-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+ .v2-hour-load-tools .v2-ctrl { min-height: 30px; padding-inline: 12px; }
+@@ -11727,9 +11755,8 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
+   z-index: 2;
+   background: var(--slot-date, var(--day));
+   color: var(--foreground);
+-  box-shadow: none;
+-  outline: 2px solid var(--ring);
+-  outline-offset: 2px;
++  box-shadow: inset 0 0 0 2px var(--ring);
++  outline: none;
+ }
+ 
+ .v2-opt.is-kit .v2-opt-block.is-hot .v2-opt-day small {
+@@ -11738,8 +11765,7 @@ html[data-ui-theme="light"] .v2-opt-cell.is-hover::before {
+ 
+ .v2-opt.is-kit .v2-opt-block.is-today.is-hot .v2-opt-day {
+   background: color-mix(in srgb, var(--warning) 50%, var(--slot-date, var(--day)));
+-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--warning) 78%, transparent);
+-  outline-color: var(--ring);
++  box-shadow: inset 0 0 0 2px var(--ring);
+ }
+ 
+ .v2-opt.is-kit .v2-opt-lane.is-hot .v2-limit-chip {

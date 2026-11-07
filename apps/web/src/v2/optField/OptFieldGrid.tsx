@@ -379,7 +379,8 @@ export const OptBody = memo(function OptBody({
                         <span className="v2-limit-disabled" title={t("schedule.limitDisabled")}>{t("schedule.limitDisabled")}</span>
                       ) : null;
                       return (
-                        <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}>
+                        <div key={rowInfo.key} className="v2-opt-gutter-limit" data-pair={rowInfo.key}
+                          style={{ "--slot-limit-tone": limitTone(rowInfo.limit) } as CSSProperties}>
                           {chips}
                           {disabled}
                         </div>

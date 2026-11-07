@@ -36,6 +36,9 @@ test("club colors save, persist across players and reset; Regular stays italic",
   await expect(player.locator(".v2-limit-palette")).toHaveCount(0);
   await expect.poll(() => rootColor(player)).toBe("#66ccff");
   await expect(player.locator(".v2-opt-nl[data-variant=nitro] .v2-limit-chip").filter({ hasText: "N50" }).first()).toHaveCSS("color", "rgb(102, 204, 255)");
+  await player.locator('[data-slot][data-variant="nitro"][data-limit="50"]:not(.is-past)').first().hover();
+  const activeLimit = player.locator('.v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:50"]');
+  await expect(activeLimit).toHaveCSS("box-shadow", /color\(srgb 0\.4 0\.8 1 \/ 0\.75\)/);
   await player.getByRole("button", { name: "Nitro", exact: true }).click();
   await player.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
   await expect(player.locator('.v2-opt-nl[data-variant=regular] .v2-opt-limit-label').first()).toHaveCSS("font-style", "italic");

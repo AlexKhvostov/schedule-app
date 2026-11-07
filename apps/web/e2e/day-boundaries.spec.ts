@@ -32,11 +32,28 @@ for (const theme of ["dark", "light"]) {
     expect(backgrounds[0]).not.toBe(backgrounds[1]);
     const kind=day.locator('.v2-opt-kind[data-variant="regular"]');
     const limit=day.locator('.v2-opt-limit[data-pair="nitro:100"]');
-    await expect(kind).toHaveCSS("border-top-width","1px");
+    await expect(kind).toHaveCSS("border-top-width","2px");
     await expect(kind).toHaveCSS("border-top-style","solid");
-    await expect(limit).toHaveCSS("border-top-style","dashed");
-    await expect(kind).toHaveCSS("border-top-color",/0[.]22/);
-    await expect(limit).toHaveCSS("border-top-color",/0[.]12/);
+    await expect(limit).toHaveCSS("border-top-style","solid");
+    await expect(kind).toHaveCSS("border-image-source",/linear-gradient/);
+    await expect(limit).toHaveCSS("border-image-source",/linear-gradient/);
+    const joins = await day.evaluate(el => [
+      ['.v2-opt-gutter-limit[data-pair="nitro:100"]', '.v2-opt-lanes .v2-opt-limit[data-pair="nitro:100"]'],
+      ['.v2-opt-gutter-kind[data-variant="regular"]', '.v2-opt-lanes .v2-opt-kind[data-variant="regular"]'],
+    ].map(([labelSelector, trackSelector]) => {
+      const label = el.querySelector(labelSelector)!;
+      const track = el.querySelector(trackSelector)!;
+      const a = label.getBoundingClientRect(), b = track.getBoundingClientRect();
+      const line = getComputedStyle(label, '::before');
+      return { horizontal: b.left - (a.right - parseFloat(line.right)), vertical: b.top - a.top,
+        height: line.height, events: line.pointerEvents };
+    }));
+    for (const join of joins) {
+      expect(Math.abs(join.horizontal)).toBeLessThan(1);
+      expect(Math.abs(join.vertical)).toBeLessThan(1);
+      expect(join.events).toBe('none');
+    }
+    expect(joins.map(join => join.height)).toEqual(['1px', '2px']);
     expect(await gutter.evaluate(el=>{const s=getComputedStyle(el,"::before");return [s.borderLeftWidth,s.pointerEvents,s.top,s.left]})).toEqual(["1px","none","-3px","-1px"]);
     await page.screenshot({path:path.resolve(`../../memory/tasks/day-boundaries/final-${theme}.png`),clip:{x:sb!.x,y:sb!.y,width:480,height:620}});
     // Force horizontal scrolling in a desktop container without changing zoom.
