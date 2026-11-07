@@ -7,15 +7,16 @@ import { ROOM_OPTIONS } from "../schedule/rooms";
 import { showV2Toast } from "./V2Toast";
 import { V2SaveButton } from "./V2SaveButton";
 import { HistoricalDistanceImport } from "./HistoricalDistanceImport";
+import { DistanceImportPolicy } from "./DistanceImportPolicy";
 import {
   dumpLabelFromName,
   dumpPreviewCsv,
-  dumpSliceKey,
+  distanceImportWillWrite,
   dumpWriteRows,
   downloadTextFile,
   formatHands,
   loadDistancePeopleFlags,
-  loadExistingDistanceKeys,
+  loadExistingDistanceState,
   parseDistanceCsv,
   saveDistanceDump,
   clearDistanceRows,
@@ -26,6 +27,7 @@ import {
   type DistancePeopleFlags,
   type DistanceVariant,
   type DistanceWriteResult,
+  type ExistingDistanceState,
 } from "../data/distanceDump";
 
 type KindFilter = "all" | DistanceVariant;
@@ -90,7 +92,8 @@ export function V2Distances() {
   const [part, setPart] = useState(1);
   const entryKind = "primary";
   const [note, setNote] = useState("");
-  const [existing, setExisting] = useState<Map<string, number>>(new Map());
+  const [existing, setExisting] = useState<ExistingDistanceState>({ values: new Map(), manualEntries: new Set() });
+  const [overwriteManual, setOverwriteManual] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [writeResult, setWriteResult] = useState<DistanceWriteResult | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -112,11 +115,11 @@ export function V2Distances() {
 
   useEffect(() => {
     if (!dump || !monthStart) {
-      setExisting(new Map());
+      setExisting({ values: new Map(), manualEntries: new Set() });
       return;
     }
     let live = true;
-    void loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug).then((next) => {
+    void loadExistingDistanceState(monthStart, entryKind, part, roomSlug).then((next) => {
       if (live) setExisting(next);
     });
     return () => {
@@ -142,6 +145,7 @@ export function V2Distances() {
   }, [monthStart, writeResult, dbTick]);
 
   const readFile = async (file: File) => {
+    setOverwriteManual(false);
     const text = await file.text();
     const parsed = parseDistanceCsv(text, file.name);
     if (parsed.error && !parsed.people.length) {
@@ -195,7 +199,7 @@ export function V2Distances() {
     let withCard = 0;
     let withDiscord = 0;
     for (const row of cells) {
-      if (existing.has(dumpSliceKey(row.distance_ext_id, row.variant_id, row.limit_id))) {
+      if (!distanceImportWillWrite(row, existing, overwriteManual)) {
         skipDup += 1;
       }
       payload.push(row);
@@ -208,8 +212,8 @@ export function V2Distances() {
         unmatched.push({ playerId: row.distance_ext_id, nick: person?.nick ?? "" });
       }
     }
-    return { payload, cells: cells.length, write: payload.filter((row) => row.hands > 0 && !existing.has(dumpSliceKey(row.distance_ext_id, row.variant_id, row.limit_id))).length, skipDup, withCard, withDiscord, unmatched };
-  }, [dump, existing, flags]);
+    return { payload, cells: cells.length, write: payload.filter((row) => distanceImportWillWrite(row, existing, overwriteManual)).length, skipDup, withCard, withDiscord, unmatched };
+  }, [dump, existing, flags, overwriteManual]);
 
   const onWrite = async () => {
     if (!plan?.cells || !monthStart || writeBusy) return;
@@ -223,6 +227,7 @@ export function V2Distances() {
       batchLabel: dumpLabelFromName(dump?.fileName ?? "distance.csv"),
       note,
       rows: plan.payload,
+      overwriteManual,
     });
     setWriteBusy(false);
     if (saved.error || !saved.result) {
@@ -231,7 +236,7 @@ export function V2Distances() {
       return;
     }
     setWriteResult(saved.result);
-    const next = await loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug);
+    const next = await loadExistingDistanceState(monthStart, entryKind, part, roomSlug);
     setExisting(next);
     const nextFlags = await loadDistancePeopleFlags();
     setFlags(nextFlags);
@@ -256,7 +261,7 @@ export function V2Distances() {
     showV2Toast("ok", t("admin.distance.wipeDone", { n: result.deleted }));
     setWriteResult(null);
     if (monthStart) {
-      const next = await loadExistingDistanceKeys(monthStart, entryKind, part, roomSlug);
+      const next = await loadExistingDistanceState(monthStart, entryKind, part, roomSlug);
       setExisting(next);
     }
     setDbTick((n) => n + 1);
@@ -543,6 +548,7 @@ export function V2Distances() {
                   <Input value={note} placeholder={t("admin.distance.noteHint")} onChange={(event) => setNote(event.target.value)} />
                 </CompactField>
               </div>
+              <DistanceImportPolicy overwrite={overwriteManual} disabled={writeBusy} onChange={(value) => { setOverwriteManual(value); setWriteResult(null); }} />
               {plan ? (
                 <div className="v2-dist-write-facts">
                   <span className="is-add">{t("admin.distance.writeNew", { n: plan.write })}</span>

@@ -80,6 +80,7 @@ function parseLimit(raw: string): { limitId: string; variant: DistanceVariant } 
 
 function parseNumber(raw: string) {
   const text = raw.replace(/\s/g, "").replace(",", ".");
+  if (!text) return null;
   const value = Number(text);
   return Number.isFinite(value) ? value : null;
 }
@@ -406,7 +407,6 @@ export function parseHistoricalDistanceCsv(text: string, fileName: string): Hist
         if (!rawHands) continue;
         if (!/^\d+$/.test(rawHands)) throw new Error("hands");
         const hands = Number(rawHands);
-        if (!hands) continue;
         const monthStart = historicalMonth(dates[column]);
         const part = Number(parts[column].trim());
         const limitId = limits[column].trim();
@@ -436,6 +436,7 @@ export async function saveHistoricalDistanceDump(input: {
   roomSlug: string;
   variantId: DistanceVariant;
   rows: HistoricalDistanceFact[];
+  overwriteManual?: boolean;
 }) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const, result: null };
@@ -443,6 +444,7 @@ export async function saveHistoricalDistanceDump(input: {
     p_room_slug: input.roomSlug,
     p_variant_id: input.variantId,
     p_rows: input.rows,
+    p_overwrite_manual: input.overwriteManual ?? false,
   });
   if (error) return { error: error.message ?? error.code ?? "save", result: null };
   notifyPriorityDistanceChanged();
@@ -517,23 +519,34 @@ export async function loadDistancePeopleFlags(): Promise<DistancePeopleFlags> {
   return { redPartyIds, cardIds, byExt, ready: true };
 }
 
-export async function loadExistingDistanceKeys(monthStart: string, entryKind: string, part: number, roomSlug = "winamax") {
-  const empty = new Map<string, number>();
+export type ExistingDistanceState = { values: Map<string, number>; manualEntries: Set<string> };
+export function distanceImportWillWrite(row: DistanceDumpRow, existing: ExistingDistanceState, overwriteManual: boolean) {
+  const key = dumpSliceKey(row.distance_ext_id, row.variant_id, row.limit_id);
+  if (existing.manualEntries.has(`${row.distance_ext_id}|${row.variant_id}`)) {
+    return overwriteManual && (existing.values.get(key) ?? 0) !== row.hands;
+  }
+  return row.hands > 0 && !existing.values.has(key);
+}
+
+export async function loadExistingDistanceState(monthStart: string, entryKind: string, part: number, roomSlug = "winamax"): Promise<ExistingDistanceState> {
+  const empty: ExistingDistanceState = { values: new Map(), manualEntries: new Set() };
   const db = getSupabase();
   if (!db || !monthStart) return empty;
   const { data } = await db
     .from("distance_entries")
-    .select("distance_ext_id, variant_id, distance_values(limit_id, tournaments), rooms!inner(slug)")
+    .select("distance_ext_id, variant_id, manual_override, source, distance_values(limit_id, tournaments), rooms!inner(slug)")
     .eq("month_start", monthStart)
     .eq("part", part)
     .eq("rooms.slug", roomSlug);
   const keys = new Map<string, number>();
+  const manualEntries = new Set<string>();
   for (const row of data ?? []) {
+    if (row.manual_override || row.source === "manual") manualEntries.add(`${row.distance_ext_id}|${row.variant_id}`);
     for (const value of row.distance_values ?? []) {
       keys.set(dumpSliceKey(String(row.distance_ext_id), String(row.variant_id), String(value.limit_id)), Number(value.tournaments) || 0);
     }
   }
-  return keys;
+  return { values: keys, manualEntries };
 }
 
 export async function saveDistanceDump(input: {
@@ -544,6 +557,7 @@ export async function saveDistanceDump(input: {
   batchLabel: string;
   note: string;
   rows: DistanceDumpRow[];
+  overwriteManual?: boolean;
 }) {
   const db = getSupabase();
   if (!db) return { error: "not-configured" as const, result: null };
@@ -555,6 +569,7 @@ export async function saveDistanceDump(input: {
     p_batch_label: input.batchLabel,
     p_note: input.note,
     p_rows: input.rows,
+    p_overwrite_manual: input.overwriteManual ?? false,
   });
   if (error) return { error: error.message ?? error.code ?? "save", result: null };
   const row = data as DistanceWriteResult | null;

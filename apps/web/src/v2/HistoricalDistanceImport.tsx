@@ -12,6 +12,7 @@ import {
 } from "../data/distanceDump";
 import { showV2Toast } from "./V2Toast";
 import { V2SaveButton } from "./V2SaveButton";
+import { DistanceImportPolicy } from "./DistanceImportPolicy";
 
 const EMPTY_FLAGS: DistancePeopleFlags = {
   redPartyIds: new Set(),
@@ -33,6 +34,7 @@ export function HistoricalDistanceImport() {
   const [flags, setFlags] = useState<DistancePeopleFlags>(EMPTY_FLAGS);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [overwriteManual, setOverwriteManual] = useState(false);
   const [saved, setSaved] = useState<{ inserted: number; skipped: number; unknown: number; nick_updated: number } | null>(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function HistoricalDistanceImport() {
   }, []);
 
   const readFile = async (file: File) => {
+    setOverwriteManual(false);
     setSaved(null);
     const parsed = parseHistoricalDistanceCsv(await file.text(), file.name);
     setDump(parsed);
@@ -57,7 +60,7 @@ export function HistoricalDistanceImport() {
   const write = async () => {
     if (!dump?.facts.length || dump.error || busy) return;
     setBusy(true);
-    const response = await saveHistoricalDistanceDump({ roomSlug, variantId: variant, rows: dump.facts });
+    const response = await saveHistoricalDistanceDump({ roomSlug, variantId: variant, rows: dump.facts, overwriteManual });
     setBusy(false);
     if (response.error || !response.result) {
       showV2Toast("err", t("admin.distance.history.writeErr"));
@@ -143,6 +146,7 @@ export function HistoricalDistanceImport() {
               </table>
             </div>
             {saved ? <p className="v2-dist-write-ok">{t("admin.distance.history.result", saved)}</p> : null}
+            <DistanceImportPolicy overwrite={overwriteManual} disabled={busy} onChange={(value) => { setOverwriteManual(value); setSaved(null); }} />
             <V2SaveButton
               dirty={!saved && dump.facts.length > 0}
               saved={Boolean(saved)}

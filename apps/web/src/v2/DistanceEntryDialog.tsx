@@ -39,7 +39,7 @@ export function DistanceEntryDialog({ editor, limits, rooms, defaultMonth, defau
   const validMonth = /^\d{4}-(0[1-9]|1[0-2])-01$/.test(month);
   const validation = !validId ? t("admin.distanceBook.validationId") : !validMonth ? t("admin.distanceBook.editor.monthError")
     : !validPart ? t("admin.distanceBook.editor.partError") : parsed.invalid.length ? t("admin.distanceBook.editor.numberError")
-      : parsed.total <= 0 ? t("admin.distanceBook.validationValues") : "";
+      : !editing && parsed.total <= 0 ? t("admin.distanceBook.validationValues") : "";
   const canSave = !saving && !partLoading && !partLoadError && !validation && (editing || Boolean(person.memberId));
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function DistanceEntryDialog({ editor, limits, rooms, defaultMonth, defau
               data-initial-focus={index === 0 && (editing || Boolean(person.playerId)) ? "true" : undefined} onChange={(e) => { setValues((previous) => ({ ...previous, [limit]: e.target.value })); setSaveError(false); }} />
           </label>)}</div>
         </section>
-        <CompactField label={t("admin.distanceBook.comment")}><textarea className="v2-distance-editor-comment" rows={1} disabled={saving} value={comment} placeholder={t("admin.distanceBook.commentHint")} onChange={(e) => setComment(e.target.value)} /></CompactField>
+        <CompactField label={t("admin.distanceBook.comment")}><textarea className="v2-distance-editor-comment" aria-label={t("admin.distanceBook.comment")} rows={1} disabled={saving} value={comment} placeholder={t("admin.distanceBook.commentHint")} onChange={(e) => setComment(e.target.value)} /></CompactField>
         {validation ? <p className="v2-distance-editor-validation" role="status"><i className="fa-solid fa-circle-info" aria-hidden />{validation}</p> : null}
         {saveError ? <p className="v2-distance-editor-error" role="alert">{t("admin.distanceBook.editor.saveError")}</p> : null}
         {partLoading ? <p className="v2-distance-editor-validation" role="status">{t("admin.distanceBook.editor.partLoading")}</p> : null}

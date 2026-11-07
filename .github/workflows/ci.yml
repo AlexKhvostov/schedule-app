@@ -102,6 +102,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_table_presets.sql
       - name: Check current distance ID assignments
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/member_distance_links.sql
+      - name: Check clearing and restoring an existing distance entry
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/distance_zero_update.sql
       - name: Check current distance filter metadata
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/distance_filter_metadata.sql
       - name: Check live priorities and request privacy

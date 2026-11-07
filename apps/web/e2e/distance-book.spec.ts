@@ -31,12 +31,69 @@ test("distance control shows zero members and supports demo create/edit", async 
   const createDialog = page.getByRole("dialog", { name: "Новая запись дистанции" });
   await expect(createDialog.getByText("Введите ID дистанции")).toBeVisible();
   await createDialog.getByLabel("ID дистанции").fill("123456789012");
+  await createDialog.getByLabel("10 €").fill("0");
+  await expect(createDialog.getByRole("button", { name: "Сохранить" })).toBeDisabled();
   await createDialog.getByLabel("10 €").fill("125");
   await expect(createDialog.getByRole("button", { name: "Сохранить" })).toBeEnabled();
   await createDialog.getByRole("button", { name: "Сохранить" }).click();
   await expect(createDialog).toBeHidden();
   await expect(ninaRow.getByText("123456789012")).toBeVisible();
   await expect(ninaRow.locator("td.is-distance-id")).toHaveAttribute("title", "123456789012");
+});
+
+for (const value of ["0", ""]) test(`existing distance can be cleared with ${value ? "zeros" : "empty fields"} and restored`, async ({ page }) => {
+  await enterDemoDistanceBook(page);
+  const person = page.locator("tr.v2-dbook-person").filter({ hasText: "polar" });
+  await person.getByRole("button", { name: /polar/ }).click();
+  const edit = page.getByRole("button", { name: "Править запись", exact: true });
+  await edit.click();
+  const dialog = page.getByRole("dialog", { name: "Редактирование дистанции" });
+  await expect(dialog.locator(".v2-distance-editor-limit input")).toHaveCount(11);
+  for (const input of await dialog.locator(".v2-distance-editor-limit input").all()) await input.fill(value);
+  await dialog.getByLabel("Комментарий", { exact: true }).fill("До вступления в клуб");
+  await expect(dialog.locator(".v2-distance-editor-total strong")).toHaveText("0");
+  const save = dialog.getByRole("button", { name: "Сохранить", exact: true });
+  await expect(save).toBeVisible();
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(dialog).toBeHidden();
+  // Compact table cells render zero as a dash; the editor shows numeric 0.
+  await expect(person.locator("td.is-total")).toHaveText("—");
+  await expect(edit).toBeVisible();
+  await edit.click();
+  await expect(dialog.getByLabel("Part", { exact: true })).toHaveValue("1");
+  await expect(dialog.getByLabel("Комментарий", { exact: true })).toHaveValue("До вступления в клуб");
+  await expect(dialog.locator(".v2-distance-editor-total strong")).toHaveText("0");
+  await dialog.getByLabel("10 €", { exact: true }).fill("9");
+  await save.click();
+  await expect(dialog).toBeHidden();
+  await expect(person.locator("td.is-total")).toHaveText("9");
+});
+
+test("both import forms protect manual edits by default and reset overwrite for a new file", async ({ page }) => {
+  await enterDemoDistanceBook(page);
+  await page.goto("/#root-distance");
+  const file = { name: "Oct26.csv", mimeType: "text/csv", buffer: Buffer.from("PlayerID;Nickname;Limit;Tournaments\n42;Player;E10;9") };
+  const monthlyFile = page.locator("input.v2-dist-file");
+  await monthlyFile.setInputFiles(file);
+  const monthly = page.locator(".is-write").getByRole("switch", { name: "Перезаписать ручные правки" });
+  await expect(monthly).toHaveAttribute("aria-checked", "false");
+  await monthly.click();
+  await expect(monthly).toHaveAttribute("aria-checked", "true");
+  await monthlyFile.setInputFiles({ ...file, name: "Oct26-second.csv" });
+  await expect(monthly).toHaveAttribute("aria-checked", "false");
+  const history = page.locator(".v2-history-import");
+  const historicalFile = { name: "history.csv", mimeType: "text/csv", buffer: Buffer.from([
+    "date,date,date,date,окт. 26 г.", "part,part,part,part,1", "limit,limit,limit,limit,10",
+    "playerID,DiscordID,Discord,Nickname WNMX,tournaments", "42,,,Player,0",
+  ].join("\n")) };
+  await history.locator('input[type="file"]').setInputFiles(historicalFile);
+  const historical = history.getByRole("switch", { name: "Перезаписать ручные правки" });
+  await expect(historical).toHaveAttribute("aria-checked", "false");
+  await historical.click();
+  await expect(historical).toHaveAttribute("aria-checked", "true");
+  await history.locator('input[type="file"]').setInputFiles({ ...historicalFile, name: "second-history.csv" });
+  await expect(historical).toHaveAttribute("aria-checked", "false");
 });
 
 test("distance control modal fits a narrow viewport", async ({ page }) => {
