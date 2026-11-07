@@ -32,7 +32,7 @@ test("temporary auth failure retains marks, blocks editing, and recovers without
   await expect(dialog).toBeVisible();
   await page.screenshot({ path: "playwright-report/auth-retained-schedule.png" });
   await page.unroute("**/auth/v1/user");
-  await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
+  await dialog.getByRole("button", { name: "Обновить", exact: true }).click();
   await expect(page.locator(".v2-auth-notice")).not.toBeVisible({ timeout: 20000 });
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
   await expect(marked).toContainText("AA");
@@ -70,7 +70,7 @@ test("failed data refresh keeps the last loaded marks visible without opening fr
   await expect(page.getByRole("dialog", { name: "Актуальность расписания" })).not.toBeVisible();
   await page.getByTestId("schedule-sync-status").click();
   const dialog = page.getByRole("dialog", { name: "Актуальность расписания" });
-  await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
+  await dialog.getByRole("button", { name: "Обновить", exact: true }).click();
   await expect(dialog).toContainText("Обновления приостановлены", { timeout: 20000 });
   await expect(page.locator('[data-slot].is-on').first()).toContainText("AA");
   expect(state.writes).toHaveLength(1);

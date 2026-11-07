@@ -1,0 +1,25 @@
+.v2-person-identity {
+  --identity-avatar: 22px;
+  --identity-gap: 8px;
+  --identity-name-size: 12px;
+  --identity-name-line: 16px;
+  --identity-detail-size: 11px;
+  --identity-detail-line: 14px;
+  display: flex; align-items: center; gap: var(--identity-gap); min-width: 0; max-width: 100%; overflow: hidden;
+}
+.v2-person-identity[data-density="dense"] {
+  --identity-avatar: 18px;
+  --identity-gap: 4px;
+  --identity-name-size: 11px;
+  --identity-name-line: 11px;
+  --identity-detail-size: 10px;
+  --identity-detail-line: 10px;
+}
+.v2-person-identity .v2-ava.is-sm { width: var(--identity-avatar); height: var(--identity-avatar); min-width: var(--identity-avatar); flex: 0 0 var(--identity-avatar); font-size: 8px; }
+.v2-person-identity-text { flex: 1; min-width: 0; overflow: hidden; }
+.v2-person-identity-heading { display: flex; align-items: baseline; gap: 5px; min-width: 0; line-height: var(--identity-name-line); }
+.v2-person-identity-name, .v2-person-identity-discord, .v2-person-identity-winamax { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-person-identity-name { flex: 0 1 auto; min-width: 0; color: var(--foreground); font-size: var(--identity-name-size); line-height: var(--identity-name-line); font-weight: 650; }
+.v2-person-identity-heading[data-has-discord] .v2-person-identity-name { flex-shrink: 0; max-width: 50%; }
+.v2-person-identity-discord { flex: 1 1 auto; min-width: 0; }
+.v2-person-identity-discord, .v2-person-identity-winamax { color: var(--muted-foreground); font-size: var(--identity-detail-size); line-height: var(--identity-detail-line); font-weight: 400; }

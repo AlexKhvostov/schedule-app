@@ -56,6 +56,7 @@ export function markFromPlayer(row: SchedulePlayer): Mark {
     username: row.username,
     globalName: row.globalName,
     guildNick: row.guildNick,
+    profileName: row.profileName,
   };
 }
 
@@ -160,6 +161,7 @@ function demoLimitMarks(variant: "nitro" | "regular", limits: string[]): Mark[] 
       username: row.discord || "",
       globalName: row.discordDisplay || row.discord || "",
       guildNick: row.discordGuildNick || "",
+      profileName: row.name || "",
       vipNitro: asVip(row.vipNitro) || null,
       vipRegular: asVip(row.vipRegular) || null,
     }));

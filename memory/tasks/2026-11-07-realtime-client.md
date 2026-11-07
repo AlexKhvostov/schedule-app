@@ -31,3 +31,23 @@
 Проверки: 7 unit appRealtime PASS; 4 Presence E2E PASS (dark/light 320 px, 35 пользователей, пустой список, отсутствие SQL-пингов, дедуп, disconnect, реальная отправка профиля/аватара из сессии); дополнительно schedule-sync.live:60 PASS по просьбе основного агента. Первые два теста выявили ошибку fixture (повтор phx_ref сохранял старое содержимое Presence); исправлено уникальной ревизией phx_ref, после чего все 4 прошли. Снимки просмотрены: компактные строки, горизонтального переполнения нет, длинный Discord корректно обрезан. [Тёмная](2026-11-07-online-presence-dark.png), [светлая](2026-11-07-online-presence-light.png), [профиль/аватар](2026-11-07-online-presence-avatar.png).
 
 Изменён раздел 9 docs/schedule-data-sync.md. Общие typecheck/lint/unit/build и публикацию выполняет основной агент. Локальных коммитов/push нет.
+
+## 2026-11-07 15:10 Europe/Minsk — Winamax возвращён по новому указанию
+
+Последнее прямое уточнение Алексея заменяет предыдущий вариант «без Winamax». Первая строка теперь содержит имя из анкеты и справа публичный Discord, вторая — Winamax; слева остаётся аватар 22 px. Одинаковые имя/Discord не дублируются, обе строки ограничены ellipsis и имеют title. Время присутствия не добавлялось, достоверного существующего поля нет.
+
+Источник Winamax: результат уже существующего loadMyPlays, который расписание и анкета выполняют для своих функций. Дополнительные SQL-чтения/таймеры не добавлены. Optional winamax_nick ограничен 100 символами. Только свой member_id может обновить собственный Presence; одинаковый ник повторно не отправляется. До обычного чтения Winamax не отображается. На старте сначала завершается SDK getAppAccount, после чего фиксируется account generation; поздний ответ A→B и A→B→A не публикуется. При переключении профиля собственный ранее загруженный ник не теряется, при смене аккаунта очищается.
+
+Проверки: 14 unit appRealtime/playsPresence PASS; ESLint изменённых файлов PASS; typecheck прошёл до последнего небольшого accessor generation, общий финальный прогон выполняет основной агент. Presence E2E обновлены для Winamax и расположения строк, сервер не запускался по договорённости: основной агент проверяет вместе со своей карточкой. Старые снимки выше относятся к предыдущему варианту; нужны новые после общего E2E. Документация Presence обновлена без вмешательства в остальные разделы.
+
+Дополнительные файлы этого уточнения: src/data/plays.ts, новый src/data/playsPresence.test.ts; также изменены ранее перечисленные appRealtime, OnlineMenu/CSS, V2Shell, Presence E2E/fixture и docs §9. Коммитов/push этот агент не выполнял.
+
+## 2026-11-07 15:18 Europe/Minsk — общая идентичность для обоих списков
+
+По последнему уточнению Алексея создан один PersonIdentity для OnlineMenu и ScheduleRoster. Общая разметка: аватар; имя плотнее и рядом приглушённый публичный Discord без скобок/разделителей; ниже сам Winamax без префикса. formatPersonIdentity отвечает за fallback и отсутствие повторов. Helper имеет другое basename, чтобы Windows не спутал .ts и .tsx. CSS-плотности: Online 22 px, roster 18 px и строки 24 px; ширина roster по-прежнему ограничена, короткое имя не сжимается длинным Discord.
+
+Профильное имя уже было загружено в SchedulePlayer, но терялось в Mark. Добавлены Mark.profileName, передача в markFromPlayer и отдельный Demo mapper demoLimitMarks. Фактический rosterSource в Demo использует именно эти faces; они перекрывают данные grid marks. Приоритет, метка и открытие профиля остались в ScheduleRoster. Запросы не добавлены.
+
+Проверки: 17 unit format/converter/live+Demo/roster PASS; typecheck и ESLint PASS. Основной агент подтвердил Presence E2E 4/4 PASS. Его свежие mobile-снимки просмотрены: имя Борис полностью видно, Discord и Winamax сокращаются, обе темы без переполнения. [Тёмная](2026-11-07-shared-identity-online-dark.png), [светлая](2026-11-07-shared-identity-online-light.png). Независимый агент проверяет roster density/сжатие/profile; первые два order-теста застали код до Demo mapper fix, им нужен адресный повтор после freeze. Общий build/unit выполняет основной агент; исходники заморожены.
+
+Изменены PersonIdentity.tsx, formatPersonIdentity.ts/.test.ts, personIdentity.css; OnlineMenu.tsx/onlineMenu.css, schedule/ScheduleRoster.tsx; schedule/marks.ts, data/players.ts/.test.ts; e2e presence.live.ts, roster-order.spec.ts, login-schedule-mark.spec.ts. В docs/code-architecture.md добавлен только раздел общего компонента. Status/locales/schedule-sync.live не менялись.

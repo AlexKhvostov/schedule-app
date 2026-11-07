@@ -1224,9 +1224,9 @@ test("dead-time statistics appear only while intervals exist and update in both 
   const hours = page.locator(".v2-hours-summary");
   const people = page.locator(".v2-people-table");
   await expect(hours.locator("tbody tr").first()).toBeVisible();
-  await expect(people.locator(".v2-people-nicks").first()).toBeVisible();
+  await expect(people.locator(".v2-person-identity-text").first()).toBeVisible();
   const ordinaryHours = await hours.locator("tbody tr td:first-of-type").allTextContents();
-  const names = await people.locator(".v2-people-nicks").allTextContents();
+  const names = await people.locator(".v2-person-identity-text").allTextContents();
 
   for (const pair of [null, { variant: "regular", limit: "50" }, { variant: "nitro", limit: "100" }, { variant: "nitro", limit: "50" }, null]) {
     const enabled = pair?.variant === "nitro" && pair.limit === "50";
@@ -1258,7 +1258,7 @@ test("dead-time statistics appear only while intervals exist and update in both 
       if (!pair) await expect(hours.locator(".is-dead")).toHaveCount(0);
     }
     await expect(hours.locator("tbody tr td:first-of-type")).toHaveText(ordinaryHours);
-    await expect(people.locator(".v2-people-nicks")).toHaveText(names);
+    await expect(people.locator(".v2-person-identity-text")).toHaveText(names);
   }
 });
 
@@ -1273,7 +1273,9 @@ test("active members can move the Online panel and keep using the schedule", asy
   await expect(dialog).toContainText("На сайте · 1");
   const connected = dialog.getByRole("list", { name: "На сайте", exact: true });
   await expect(connected.getByRole("listitem")).toHaveCount(1);
-  await expect(connected.locator("strong")).toHaveText("you");
+  await expect(connected.locator("strong")).toHaveText("Ярослав");
+  await expect(connected.locator(".v2-person-identity-discord")).toHaveText("you");
+  await expect(connected.locator(".v2-person-identity-winamax")).toHaveText("YouNick");
   await expect(dialog.locator("time")).toHaveCount(0);
   await expect(dialog).not.toContainText("Только что");
   await expect(dialog.getByRole("button", { name: "Показать последние правки" })).toHaveCount(0);

@@ -1,6 +1,2 @@
 .v2-online-dialog .v2-online-person { min-height: 34px; gap: 8px; padding: 3px 0; }
-.v2-online-dialog .v2-online-person .v2-ava { width: 22px; height: 22px; flex: 0 0 22px; }
-.v2-online-person-text { flex: 1; min-width: 0; }
-.v2-online-person-text strong, .v2-online-person-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2-online-person-text strong { font-size: 12px; font-weight: 550; line-height: 16px; }
-.v2-online-person-text small { color: var(--muted-foreground); font-size: 11px; line-height: 14px; }
+.v2-online-person > .v2-person-identity { flex: 1; }

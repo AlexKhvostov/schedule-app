@@ -39,8 +39,8 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
     if (!open) return;
     const place = () => {
       const rect = button.current?.getBoundingClientRect();
-      const width = panel.current?.offsetWidth ?? 344;
-      const height = panel.current?.offsetHeight ?? 300;
+      const width = panel.current?.offsetWidth ?? 260;
+      const height = panel.current?.offsetHeight ?? 150;
       setPosition({ x: Math.max(8, Math.min((rect?.right ?? width + 8) - width, window.innerWidth - width - 8)),
         y: Math.max(8, Math.min((rect?.bottom ?? 82) + 8, window.innerHeight - height - 8)) });
     };
@@ -82,15 +82,16 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
       <div className="v2-sync-heading"><span>{t("schedule.sync.title")}</span><button type="button" aria-label={t("schedule.sync.close")} onClick={close}><i className="fa-solid fa-xmark" aria-hidden="true" /></button></div>
       <div className="v2-sync-summary">
         <span className="v2-sync-emblem" aria-hidden="true"><i className={`fa-solid ${icon}`} /></span>
-        <div><strong className="v2-sync-title">{t(`schedule.sync.${headline}`)}</strong><span className={`v2-sync-connection is-${status}`}><span aria-hidden="true" />{t(`schedule.sync.${status}`)}</span></div>
+        <strong className="v2-sync-title">{t(`schedule.sync.${headline}`)}</strong>
       </div>
       <p className="v2-sync-description" role="status">{t(`schedule.sync.${description}`)}</p>
-      <div className="v2-sync-timestamp">
-        <i className="fa-regular fa-clock" aria-hidden="true" />
-        <div><span>{t("schedule.sync.lastUpdate")}</span><small>{updatedAt ? updatedAt.toLocaleDateString(i18n.language, { day: "numeric", month: "long" }) : t("schedule.sync.neverUpdated")}</small></div>
-        {updatedAt && <time dateTime={updatedAt.toISOString()}>{updatedAt.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>}
-      </div>
       {busy && <div className="v2-sync-progress" role="status"><i className="fa-solid fa-arrows-rotate" aria-hidden="true" />{t("schedule.sync.checking")}</div>}
+      <div className="v2-sync-footer">
+      <div className="v2-sync-timestamp">
+        <span>{t("schedule.sync.lastUpdate")}</span>
+        {updatedAt ? <time dateTime={updatedAt.toISOString()} title={updatedAt.toLocaleString(i18n.language)} aria-label={updatedAt.toLocaleString(i18n.language)}>{updatedAt.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+          : <small>{t("schedule.sync.neverUpdated")}</small>}
+      </div>
       {isLiveData() && <div className="v2-sync-actions">
         {month.health.uncertain ? <button type="button" className="v2-ctrl" disabled={checkingWrite} onClick={() => {
           setCheckingWrite(true);
@@ -102,6 +103,7 @@ export function ScheduleSyncStatus({ month }: { month: Month }) {
           : <button type="button" className="v2-ctrl" disabled={busy} onClick={() => month.retryLoad()}><i className={`fa-solid fa-arrows-rotate${busy ? " is-spinning" : ""}`} aria-hidden="true" />{t("schedule.sync.refresh")}</button>}
         {month.syncError && !month.health.uncertain && <button type="button" className="v2-sync-reload" onClick={() => window.location.reload()}>{t("schedule.sync.reload")}</button>}
       </div>}
+      </div>
     </div>, document.body)}
   </>;
 }

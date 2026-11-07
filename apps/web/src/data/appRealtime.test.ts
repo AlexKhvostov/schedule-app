@@ -112,3 +112,25 @@ it("publishes profile details through the existing Presence channel without unre
   expect(channels[0].track).toHaveBeenCalledExactlyOnceWith({member_id:"a",nick:"PublicDiscord",profile_name:"Profile Name",avatar_url:"https://example.test/avatar.png"});
   expect(db.channel).toHaveBeenCalledOnce();
 });
+
+it("reuses only the own player's Winamax read, retains it during profile refresh and clears it on account change", async () => {
+  const {channels,auth} = setup(); const app = await import("./appRealtime");
+  cleanup.push(app.subscribeAppChanges(vi.fn()));
+  const off = app.publishAppPresence({member_id:"a",nick:"Discord"});
+  await app.getAppAccount(); channels[0].status("SUBSCRIBED");
+  app.updateAppPresenceWinamax("other-player","NotMine"); expect(channels[0].track).toHaveBeenCalledTimes(1);
+  app.updateAppPresenceWinamax("a"," WinaNick ");
+  expect(channels[0].track).toHaveBeenLastCalledWith({member_id:"a",nick:"Discord",winamax_nick:"WinaNick"});
+  app.updateAppPresenceWinamax("a","WinaNick"); expect(channels[0].track).toHaveBeenCalledTimes(2);
+  off(); cleanup.push(app.publishAppPresence({member_id:"a",nick:"Discord",profile_name:"Name"}));
+  expect(channels[0].track).toHaveBeenLastCalledWith({member_id:"a",nick:"Discord",profile_name:"Name",winamax_nick:"WinaNick"});
+  auth("account-b"); cleanup.push(app.publishAppPresence({member_id:"b",nick:"Other"})); channels[1].status("SUBSCRIBED");
+  app.updateAppPresenceWinamax("a","LateOldRead");
+  expect(channels[1].track).toHaveBeenCalledExactlyOnceWith({member_id:"b",nick:"Other"});
+});
+
+it("bounds the optional Winamax nickname and supports legacy Presence without it", async () => {
+  setup(); const app = await import("./appRealtime");
+  expect(app.connectedMembers({tabs:[{member_id:"a",nick:"A",winamax_nick:" "+"x".repeat(200)},{member_id:"b",nick:"B"}]}))
+    .toEqual([{member_id:"a",nick:"A",winamax_nick:"x".repeat(100)},{member_id:"b",nick:"B"}]);
+});

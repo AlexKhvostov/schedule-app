@@ -19,7 +19,7 @@ test("initial load finds today; refresh, resume and Broadcast patches preserve t
   expect(before.top).toBeGreaterThan(1000);
   await page.getByTestId("schedule-sync-status").click();
   let reads = state.snapshotReads;
-  await page.getByRole("dialog", { name: "Актуальность расписания" }).getByRole("button", { name: "Обновить данные", exact: true }).click();
+  await page.getByRole("dialog", { name: "Актуальность расписания" }).getByRole("button", { name: "Обновить", exact: true }).click();
   await expect.poll(() => state.snapshotReads).toBeGreaterThan(reads);
   await expect(page.getByTestId("schedule-sync-status")).toHaveText("онлайн");
   await page.keyboard.press("Escape");

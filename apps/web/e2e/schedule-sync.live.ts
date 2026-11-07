@@ -70,10 +70,10 @@ test("configuration error retains the grid and exposes recovery on a narrow scre
   expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
   await page.screenshot({ path: test.info().outputPath("sync-mobile.png") });
   state.failRules = false;
-  await dialog.getByRole("button", { name: "Обновить данные", exact: true }).click();
+  await dialog.getByRole("button", { name: "Обновить", exact: true }).click();
   await expect(page.locator(".v2-sync-notice")).not.toBeVisible({ timeout: 20000 });
   await page.getByTestId("schedule-sync-status").hover();
-  await expect(dialog).toContainText("изменения будут появляться автоматически");
+  await expect(dialog).toContainText("Изменения приходят автоматически");
   expect(state.writes).toHaveLength(0);
 });
 
@@ -85,10 +85,10 @@ test("details fit an English interface and manual refresh keeps permissions", as
   await expect(status).toHaveText("online");
   await status.hover();
   const dialog = page.getByRole("dialog", { name: "Schedule freshness" });
-  await expect(dialog).toContainText("Last data update");
+  await expect(dialog).toContainText("Last update");
   await page.screenshot({ path: test.info().outputPath("sync-light-en.png") });
   const before = state.snapshotReads;
-  await dialog.getByRole("button", { name: "Refresh data", exact: true }).click();
+  await dialog.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => state.snapshotReads).toBeGreaterThan(before);
   expect(state.writes).toHaveLength(0);
   await expect(page.getByTitle("Editing", { exact: true })).toHaveAttribute("aria-pressed", "false");

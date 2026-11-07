@@ -5,9 +5,9 @@ import type { DeadTimeBreakdown } from "../../schedule/deadTimeStats";
 import { deadTimeMemberKey } from "../../schedule/deadTimeStats";
 import { markKey } from "../../schedule/marks";
 import { formatHours, type RosterRow } from "../../schedule/roster";
-import { PersonAvatar } from "../PersonAvatar";
+import { PersonIdentity } from "../PersonIdentity";
 import { ScheduleSlot } from "../ScheduleSlot";
-import { publicDiscordName, rowInitials, showNick } from "../schedulePresentation";
+import { publicDiscordName, showNick } from "../schedulePresentation";
 import { displayScheduleColumn } from "../variantSchedule";
 
 const ROSTER_LIMIT_WIDTH = 44;
@@ -41,7 +41,7 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
       if (!active || !table.current) return;
       const range = document.createRange();
       let width = ROSTER_MIN_NAME_WIDTH;
-      for (const label of table.current.querySelectorAll("th:nth-child(2), .v2-people-nicks > *")) {
+      for (const label of table.current.querySelectorAll("th:nth-child(2), .v2-person-identity-text > *")) {
         range.selectNodeContents(label);
         const padding = label.tagName === "TH" ? 8 : 28;
         width = Math.max(width, Math.ceil(range.getBoundingClientRect().width) + padding);
@@ -138,13 +138,8 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
                   {vip ? <small className="v2-people-vip-number" title={t("priorities.coreBadge", { n: vip })}>{vip}</small> : null}
                 </td>
                 <td>
-                  <span className="v2-people-who">
-                    <PersonAvatar src={row.mark.avatarUrl} label={rowInitials(guild, row.mark.t)} size="sm" />
-                    <span className="v2-people-nicks" title={room ? `${guild} · ${room}` : guild}>
-                      <b title={guild}>{guild}</b>
-                      {room ? <span title={room}>{room}</span> : null}
-                    </span>
-                  </span>
+                  <PersonIdentity className="v2-people-who" density="dense" avatarUrl={row.mark.avatarUrl}
+                    profileName={row.mark.profileName} discord={guild} winamax={room} />
                 </td>
                 <td>
                   <span className="v2-mark-chip">

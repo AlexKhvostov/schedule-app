@@ -10,6 +10,7 @@ export type Mark = {
   username?: string;
   globalName?: string;
   guildNick?: string;
+  profileName?: string;
   priority?: number | null;
   vipNitro?: number | null;
   vipRegular?: number | null;

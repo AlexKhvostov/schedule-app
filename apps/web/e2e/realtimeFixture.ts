@@ -15,7 +15,7 @@ export async function realtimeFixture(page: Page) {
         if (topic === "realtime:app:changes") socket.send(JSON.stringify([joinRef, null, topic, "broadcast", { event, payload }]));
       }
     },
-    presence: (rows: { member_id: string; nick: string; profile_name?: string; avatar_url?: string }[]) => {
+    presence: (rows: { member_id: string; nick: string; profile_name?: string; avatar_url?: string; winamax_nick?: string }[]) => {
       ++presenceRevision;
       members = Object.fromEntries(rows.map((row, index) => [`connection-${index}`, { metas: [{ ...row, phx_ref: `ref-${presenceRevision}-${index}` }] }]));
       for (const [socket, topics] of joined) for (const [topic, joinRef] of topics) {

@@ -3,7 +3,7 @@ import { getSupabase } from "./client";
 
 export type AppConnection = "connecting" | "online" | "offline";
 export type AppChange = { domain: "slots" | "config" | "directory" | "priorities" | "access"; target?: { date: string; kind_id: string } };
-export type ConnectedMember = { member_id: string; nick: string; profile_name?: string; avatar_url?: string };
+export type ConnectedMember = { member_id: string; nick: string; profile_name?: string; avatar_url?: string; winamax_nick?: string };
 
 function presenceMember(value: unknown): ConnectedMember | null {
   const row = value as Partial<ConnectedMember> | null;
@@ -11,6 +11,7 @@ function presenceMember(value: unknown): ConnectedMember | null {
     || typeof row.nick !== "string" || !row.nick.trim()) return null;
   const member: ConnectedMember = { member_id: row.member_id, nick: row.nick.trim().slice(0, 100) };
   if (typeof row.profile_name === "string" && row.profile_name.trim()) member.profile_name = row.profile_name.trim().slice(0, 100);
+  if (typeof row.winamax_nick === "string" && row.winamax_nick.trim()) member.winamax_nick = row.winamax_nick.trim().slice(0, 100);
   if (typeof row.avatar_url === "string" && row.avatar_url.length <= 2048) {
     try {
       const url = new URL(row.avatar_url);
@@ -43,6 +44,7 @@ let account: string | null = null;
 let accountKnown = false;
 let epoch = 0;
 let presence: { token: symbol; member: ConnectedMember } | undefined;
+let knownWinamax: { memberId: string; nick?: string } | undefined;
 let starting = false;
 let accountEpoch = 0;
 
@@ -60,6 +62,7 @@ function updateAccount(next: string | null) {
   ++accountEpoch;
   if (changed) {
     presence = undefined;
+    knownWinamax = undefined;
     stopChannel();
   }
   accounts.forEach(listener => listener(next));
@@ -128,11 +131,13 @@ function releaseUnused() {
   if (listenersExist()) return;
   stopChannel(); authCleanup?.(); authCleanup = undefined;
   accountKnown = false; account = null;
+  knownWinamax = undefined;
   ++accountEpoch;
 }
 
 export function getAppConnection() { return connection; }
 export function getAppAccountKey() { return account; }
+export function getAppAccountGeneration() { return accountEpoch; }
 /** getSession reads the SDK's existing local session; no extra getUser request. */
 export async function getAppAccount(): Promise<string | null> {
   if (accountKnown) return account;
@@ -165,7 +170,8 @@ export function subscribeAppPresence(listener: (people: ConnectedMember[]) => vo
 }
 export function publishAppPresence(member: ConnectedMember) {
   const token = Symbol("presence-owner");
-  const payload = presenceMember(member);
+  const payload = presenceMember({ ...member,
+    winamax_nick: member.winamax_nick ?? (knownWinamax?.memberId === member.member_id ? knownWinamax.nick : undefined) });
   if (!payload) return () => {};
   presence = { token, member: payload };
   ensureStarted();
@@ -175,4 +181,14 @@ export function publishAppPresence(member: ConnectedMember) {
     presence = undefined;
     void channel?.untrack(); releaseUnused();
   };
+}
+
+/** Reuse an existing own-player read; never request profile data for Presence. */
+export function updateAppPresenceWinamax(memberId: string, nick: string) {
+  if (presence?.member.member_id !== memberId) return;
+  const next = presenceMember({ ...presence.member, winamax_nick: nick })!;
+  knownWinamax = { memberId, nick: next.winamax_nick };
+  if (next.winamax_nick === presence.member.winamax_nick) return;
+  presence.member = next;
+  if (connection === "online") void channel?.track(next);
 }

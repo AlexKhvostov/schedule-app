@@ -295,7 +295,8 @@ function V2ShellContent({ session, cursor, onCursorChange, onSession, onLogout }
           </div>
           <V2HeaderClock />
           <div className="v2-top-end">
-            {session.access === "active" && <OnlineMenu key={session.memberId ?? session.nick} memberId={session.memberId} nick={presenceNick} profileName={presenceName} avatarUrl={avatarUrl} />}
+            {session.access === "active" && <OnlineMenu key={session.memberId ?? session.nick} memberId={session.memberId} nick={presenceNick} profileName={presenceName} avatarUrl={avatarUrl}
+              winamaxNick={!isLiveData() ? demoMember?.plays?.find(play => play.roomId === "winamax")?.nick || demoMember?.room : undefined} />}
             {isAdmin ? (
               <div className="v2-staff" ref={adminRef}>
                 <button

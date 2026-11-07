@@ -1,4 +1,5 @@
 import { getSupabase } from "./client";
+import { getAppAccount, getAppAccountGeneration, getAppAccountKey, updateAppPresenceWinamax } from "./appRealtime";
 import {
   limitsOfKind,
   normalizePlay,
@@ -43,13 +44,19 @@ export async function loadMyPlays(memberId: string, strict = false): Promise<Roo
   const db = getSupabase();
   if (!db && strict) throw new Error("not-configured");
   if (!db) return [];
+  const account = await getAppAccount();
+  const accountGeneration = getAppAccountGeneration();
   const { data, error } = await db
     .from("players")
     .select("id, rooms(slug), player_limits(variant_id, limit_id), player_nicks(nick, at, source, distance_month)")
     .eq("member_id", memberId);
   if (error && strict) throw error;
-  if (error || !data?.length) return [];
-  return (data as PlayerRow[]).map(asPlay).filter((row): row is RoomPlay => Boolean(row));
+  if (error) return [];
+  const plays = ((data ?? []) as PlayerRow[]).map(asPlay).filter((row): row is RoomPlay => Boolean(row));
+  if (getAppAccountKey() === account && getAppAccountGeneration() === accountGeneration) {
+    updateAppPresenceWinamax(memberId, plays.find(play => play.roomId === "winamax")?.nick ?? "");
+  }
+  return plays;
 }
 
 type NickMapRow = {

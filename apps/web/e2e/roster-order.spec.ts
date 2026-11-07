@@ -61,8 +61,10 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
     return { stacked, smaller, sameHeight: before === after };
   });
   expect(layout).toEqual({ stacked: true, smaller: true, sameHeight: true });
-  await expect(active.nth(2).locator(".v2-people-nicks > b")).toHaveText("polar");
-  await expect(active.nth(2).locator(".v2-people-nicks > span")).toHaveText("PolarWin");
+  await expect(active.nth(2).locator(".v2-person-identity-name")).toHaveText("Алексей");
+  await expect(active.nth(2).locator('.v2-person-identity[data-density="dense"]')).toHaveCount(1);
+  await expect(active.nth(2).locator(".v2-person-identity-discord")).toHaveText("polar");
+  await expect(active.nth(2).locator(".v2-person-identity-winamax")).toHaveText("PolarWin");
   await expect(table.locator("thead")).toContainText("N50");
   await expect(table.locator("thead")).toContainText("N100");
   await expect(table.locator("thead")).not.toContainText("E50");
@@ -126,7 +128,7 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
   expect(await active.evaluateAll(rows => rows.every(row => {
     const cell = row.children[1].getBoundingClientRect();
     const avatar = row.querySelector('.v2-ava')!.getBoundingClientRect();
-    const names = row.querySelector('.v2-people-nicks')!.getBoundingClientRect();
+    const names = row.querySelector('.v2-person-identity-text')!.getBoundingClientRect();
     return avatar.width === 18 && avatar.left >= cell.left && avatar.right <= cell.right && names.width < 1;
   }))).toBe(true);
 
@@ -242,8 +244,9 @@ test("three queues keep their own players when the schedule shows only 250 and 5
   await expect.poll(panelWidth).toBe(expandedWidth);
   const alex = table.locator('[data-member="RP-502"]');
   await expect(alex.locator(".v2-people-num > b")).toHaveText("0.5");
-  await expect(alex.locator(".v2-people-nicks > b")).toHaveText("Public Alex");
-  await expect(alex.locator(".v2-people-nicks > span")).toHaveText("AlexK");
+  await expect(alex.locator(".v2-person-identity-name")).toHaveText("Александр");
+  await expect(alex.locator(".v2-person-identity-discord")).toHaveText("Public Alex");
+  await expect(alex.locator(".v2-person-identity-winamax")).toHaveText("AlexK");
   await alex.click();
   const card = page.locator(".v2-user-card");
   await expect(card.locator("h3")).toHaveText("Александр");
