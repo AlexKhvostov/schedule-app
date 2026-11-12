@@ -241,9 +241,13 @@ jobs:
           set +a
           supabase functions serve external-api > "$RUNNER_TEMP/external-api-serve.log" 2>&1 &
           ready=false
+          consecutive=0
           for attempt in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -H "X-API-Key: $EXTERNAL_API_TEST_KEY" 'http://127.0.0.1:54321/functions/v1/external-api/v1/schedule?date=2097-01-01&days=1' || true)
-            if [ "$code" = 200 ]; then ready=true; break; fi
+            if [ "$code" = 200 ]; then consecutive=$((consecutive + 1)); else consecutive=0; fi
+            # functions serve replaces the startup worker: one response may be
+            # from the old worker immediately before its shutdown.
+            if [ "$consecutive" -ge 3 ]; then ready=true; break; fi
             sleep 2
           done
           if [ "$ready" != true ]; then cat "$RUNNER_TEMP/external-api-serve.log"; exit 1; fi

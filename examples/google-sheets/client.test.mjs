@@ -14,6 +14,8 @@ test('calendar places coloured half-hour cells on the correct day and line, clea
   const lines=[{id:'line:0',number:1,variant:'regular',limit:50}];
   const m=ctx.calendarModel_(state,lines,'2026-11-01',30);
   assert.equal(m.values.length,30);assert.equal(m.values[0][0],'01, Вс');
+  assert.equal(m.values[0][1],'E');
+  assert.equal(ctx.variantLabel_('nitro'),'N');
   assert.equal(m.values[0][24],'EX');assert.equal(m.values[0][23],'');
   assert.equal(m.backgrounds[0][24],'#ffffff');assert.equal(m.notes[0][24],'Example');
   assert.equal(m.values[1][24],'');assert.equal(m.values[29][0],'30, Пн');

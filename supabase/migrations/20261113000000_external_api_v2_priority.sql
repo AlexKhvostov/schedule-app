@@ -232,4 +232,3 @@ end;
 $$;
 revoke all on function public.external_api_sync(text,text,integer,text,text,uuid,uuid) from public,anon,authenticated;
 grant execute on function public.external_api_sync(text,text,integer,text,text,uuid,uuid) to service_role;
-

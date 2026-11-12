@@ -261,7 +261,7 @@ function calendarModel_(state,lines,date,days) {
     const dt=new Date(date+'T12:00:00Z');dt.setUTCDate(dt.getUTCDate()+d);
     const key=dt.toISOString().slice(0,10),label=key.slice(8)+', '+weekdays[dt.getUTCDay()];
     active.forEach((line,i)=>{
-      const row=[i===0?label:'',String(line.variant),String(line.limit),String(line.number)];
+      const row=[i===0?label:'',variantLabel_(line.variant),String(line.limit),String(line.number)];
       const bg=Array(52).fill('#ffffff'),fg=Array(52).fill('#202124'),nt=Array(52).fill('');
       for(let j=0;j<4;j++){bg[j]='#404040';fg[j]='#ffffff';}
       for(let half=0;half<48;half++) {
@@ -279,6 +279,7 @@ function calendarModel_(state,lines,date,days) {
   }
   return {values,backgrounds,foregrounds,notes,linesPerDay:active.length};
 }
+function variantLabel_(variant) {return variant==='nitro'?'N':variant==='regular'?'E':String(variant);}
 function renderCalendar_(state) {
   const ss=SpreadsheetApp.getActiveSpreadsheet(),p=PropertiesService.getScriptProperties().getProperties();
   const lines=Object.keys(p).filter(k=>k.startsWith('RP_LINE_')).map(k=>JSON.parse(p[k]));
