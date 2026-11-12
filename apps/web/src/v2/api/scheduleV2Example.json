@@ -1,0 +1,91 @@
+{
+  "api_version": "2",
+  "mode": "full",
+  "batch_id": "cccccccc-0000-4000-8000-000000000001",
+  "page": 1,
+  "query": {
+    "date": "2030-01-15",
+    "days": 1,
+    "variant": "nitro",
+    "limit": "50"
+  },
+  "timezone": "Europe/Madrid",
+  "slot_minutes": 30,
+  "generated_at": "2030-01-15T10:00:00Z",
+  "lines": [
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:0",
+      "number": 1,
+      "variant": "nitro",
+      "limit": "50"
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:1",
+      "number": 2,
+      "variant": "nitro",
+      "limit": "50"
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:2",
+      "number": 3,
+      "variant": "nitro",
+      "limit": "50"
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:3",
+      "number": 4,
+      "variant": "nitro",
+      "limit": "50"
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:4",
+      "number": 5,
+      "variant": "nitro",
+      "limit": "50"
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001:5",
+      "number": 6,
+      "variant": "nitro",
+      "limit": "50"
+    }
+  ],
+  "items": [
+    {
+      "type": "person",
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "state": {
+        "name": "Example Player",
+        "discord_id": "123456789012345678",
+        "mark": {
+          "text": "AB",
+          "background": "#525252",
+          "foreground": "#ffffff"
+        },
+        "priority": {
+          "order": 1,
+          "core": 2,
+          "score": 1250.5,
+          "excluded": false,
+          "period_start": "2029-11-01",
+          "variant": "nitro",
+          "limit_group": "50-100"
+        }
+      }
+    },
+    {
+      "type": "cell",
+      "date": "2030-01-15",
+      "line_id": "bbbbbbbb-0000-4000-8000-000000000001:0",
+      "half": 43,
+      "state": {
+        "person_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "tables": 2
+      }
+    }
+  ],
+  "has_more": false,
+  "next_page": null,
+  "expires_at": "2030-01-15T10:15:00Z",
+  "cursor": "dddddddd-0000-4000-8000-000000000001"
+}

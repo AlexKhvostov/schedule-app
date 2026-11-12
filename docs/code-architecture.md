@@ -1,5 +1,9 @@
 # Архитектура кода
 
+## Версии инструкции подключения API
+
+ApiAdmin сохраняетguide_version приcreate и открываетинструкциюизметаданныхкарточки. ApiExamples сохраняет прежнийv1; ApiV2Examples строит экран и копируемыйтекст из одинаковыхRU/ENсекций/примеров full/delta/unchanged. externalApiEndpoint принимает1/2, новыйадреспоумолчаниюv2. ДоступкRootRPCостаётсявsrc/data; компонентынечитаютSupabaseнапрямую. guide_version — метаданныеинструкции, не новыйscope.
+
 ## External API v2 — опубликован 13 ноября 2026
 
 `supabase/functions/external-api/v2/query.ts` валидирует full/cursor/page; `v2/repository.ts` вызывает закрытую RPC `external_api_sync`. Общий `app.ts` явно маршрутизируетv1/v2, хеширует ключ и журналирует только статус/длительность/версию/размер ответа, без URL, курсора и данных людей. Бизнес-снимок строится сервером транзакционно; JS не сканирует аудит и не держит изменяемый кеш месяца. Нормализованный `items` содержит person и cell; адрес клетки независим от occupancy UUID. Версияv1 и её сериализатор сохранены. [Подробный контракт](../supabase/functions/external-api/V2-SYNC.md).

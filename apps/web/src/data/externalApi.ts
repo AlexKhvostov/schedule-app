@@ -5,8 +5,9 @@ export type ApiClient = {
   id: string; name: string; contact: string; notes: string;
   created_at: string; expires_at: string | null; revoked_at: string | null;
   requests_per_minute: number; scopes: string[];
+  guide_version: 1 | 2;
 };
-export type ApiClientDraft = Pick<ApiClient, "name" | "contact" | "notes" | "expires_at" | "requests_per_minute">;
+export type ApiClientDraft = Pick<ApiClient, "name" | "contact" | "notes" | "expires_at" | "requests_per_minute"> & { guide_version?: 1 | 2 };
 export type ApiCredential = { id: string; key: string; hash: string };
 
 // Demo records are deliberately ephemeral. No secret or hash is stored in browser storage.
@@ -23,9 +24,9 @@ export function apiClientStatus(client: ApiClient, now = Date.now()): "active" |
   return client.expires_at && Date.parse(client.expires_at) <= now ? "expired" : "active";
 }
 
-export function externalApiEndpoint() {
+export function externalApiEndpoint(version: 1 | 2 = 2) {
   const base = isLiveData() ? supabaseUrl().replace(/\/$/, "") : "http://127.0.0.1:54321";
-  return `${base}/functions/v1/external-api/v1/schedule`;
+  return `${base}/functions/v1/external-api/v${version}/schedule`;
 }
 
 export async function listApiClients(): Promise<ApiClient[]> {
@@ -41,7 +42,7 @@ export async function createApiClient(draft: ApiClientDraft, credential: ApiCred
   if (!db) {
     const existing = demoClients.find((row) => row.id === credential.id);
     if (existing) return existing;
-    const row: ApiClient = { ...draft, id: credential.id, created_at: new Date().toISOString(), revoked_at: null, scopes: ["schedule:read"] };
+    const row: ApiClient = { ...draft, guide_version: draft.guide_version ?? 1, id: credential.id, created_at: new Date().toISOString(), revoked_at: null, scopes: ["schedule:read"] };
     demoClients = [row, ...demoClients];
     return row;
   }

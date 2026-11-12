@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { apiClientStatus, createApiClient, generateApiCredential, listApiClients, revokeApiClient, type ApiClient } from "./externalApi";
+import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revokeApiClient, type ApiClient } from "./externalApi";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), live: true }));
 vi.mock("./client", () => ({ getSupabase: () => mocks.live ? { rpc: mocks.rpc } : null }));
@@ -9,6 +9,19 @@ const draft = { name: "Bot", contact: "Developer", notes: "Test", expires_at: nu
 
 describe("API client management", () => {
   beforeEach(() => { mocks.rpc.mockReset(); mocks.live = true; });
+  it("defaults the public endpoint to v2 and preserves explicit v1", () => {
+    expect(externalApiEndpoint()).toBe("https://example.invalid/functions/v1/external-api/v2/schedule");
+    expect(externalApiEndpoint(1)).toBe("https://example.invalid/functions/v1/external-api/v1/schedule");
+  });
+  it("persists the chosen guide version without changing the key or scope", async () => {
+    mocks.live = false;
+    const credential = await generateApiCredential();
+    const row = await createApiClient({ ...draft, guide_version: 2 }, credential);
+    expect(row.guide_version).toBe(2);
+    expect((await listApiClients()).find((item) => item.id === row.id)?.guide_version).toBe(2);
+    expect((await createApiClient({ ...draft, guide_version: 1 }, credential)).guide_version).toBe(2);
+    expect(row.scopes).toEqual(["schedule:read"]);
+  });
   it("generates independent 256-bit keys and hashes exactly what the API authenticates", async () => {
     const a = await generateApiCredential(); const b = await generateApiCredential();
     expect(a.key).toMatch(/^rp_[0-9a-f]{64}$/);

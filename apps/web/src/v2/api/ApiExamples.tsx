@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import scheduleExample from "./scheduleExample.json";
+import { ApiV2Examples, apiV2ExamplesText } from "./ApiV2Examples";
 
 export function apiExampleRequests(endpoint: string) {
   const get = (query: string) => `GET ${endpoint}?${query}\nX-API-Key: <API_KEY>`;
@@ -10,8 +11,9 @@ export function apiExampleRequests(endpoint: string) {
   };
 }
 
-export function ApiExamples({ endpoint }: { endpoint: string }) {
+export function ApiExamples({ endpoint, version = 1 }: { endpoint: string; version?: 1 | 2 }) {
   const { t } = useTranslation();
+  if (version === 2) return <ApiV2Examples endpoint={endpoint} />;
   return <section className="v2-api-examples">
     <h3>{t("apiAdmin.examplesTitle")}</h3>
     <p>{t("apiAdmin.examplesIntro")}</p>
@@ -26,7 +28,8 @@ export function ApiExamples({ endpoint }: { endpoint: string }) {
   </section>;
 }
 
-export function apiExamplesText(endpoint: string, translate: (key: string) => string) {
+export function apiExamplesText(endpoint: string, translate: (key: string) => string, version: 1 | 2 = 1) {
+  if (version === 2) return apiV2ExamplesText(endpoint, translate);
   const t = (key: string) => translate(`apiAdmin.${key}`);
   return [
     t("examplesTitle"), t("examplesIntro"),

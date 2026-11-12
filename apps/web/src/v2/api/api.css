@@ -23,6 +23,8 @@
 .v2-api-modal > header { margin-bottom: 20px; }
 .v2-api-modal p { margin: 12px 0; font-size: 14px; }
 .v2-api-form { display: grid; gap: 14px; min-width: 0; }
+.v2-api-version { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+.v2-api-version select { min-width: 0; max-width: 100%; }
 .v2-api-form label, .v2-api-secret { display: grid; gap: 6px; font-size: 13px; }
 .v2-api-form input, .v2-api-form textarea, .v2-api-form select, .v2-api-secret textarea { width: 100%; min-width: 0; }
 .v2-api-instructions { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.65 inherit; font-family: inherit; line-height: 1.65; margin-bottom: 18px; }

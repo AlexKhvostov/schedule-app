@@ -9,27 +9,31 @@ async function enter(page: Page) {
   await expect(page.getByRole("heading", { name: "API", exact: true })).toBeVisible();
 }
 
-test("root creates a one-time bot key, shares instructions and revokes access", async ({ page, context }) => {
+for (const version of [1, 2] as const) test(`root creates a v${version} key with matching saved instructions`, async ({ page, context }) => {
   let apiCalls = 0;
   page.on("request", (request) => { if (request.url().includes("supabase.co")) apiCalls++; });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await enter(page);
   await page.getByRole("button", { name: "Инструкция владельцу" }).click();
   await expect(page.getByRole("dialog")).toContainText("менеджере паролей");
-  await expect(page.getByRole("dialog")).toContainText("Все метки за три дня");
+  await expect(page.getByRole("dialog").getByLabel("Версия API")).toHaveValue("2");
+  if (version === 1) await page.getByRole("dialog").getByLabel("Версия API").selectOption("1");
   const example = JSON.parse(await page.getByTestId("api-response-example").innerText());
-  expect(example.days[0].lines[0].slots[0]).toEqual({
-    start: "21:30", end: "22:00", tables: 2,
-    mark: { text: "AB", background: "#525252", foreground: "#ffffff" },
-    owner: { discord_id: "123456789012345678", name: "Example Player" },
-  });
+  if (version === 1) expect(example.days[0].lines[0].slots[0].start).toBe("21:30");
+  else {
+    expect(example.api_version).toBe("2");
+    expect(example.items[0].state.priority.order).toBe(1);
+  }
   await page.getByRole("dialog").getByRole("button", { name: "Скопировать инструкцию", exact: true }).click();
   const ownerCopy = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n");
   expect(ownerCopy).toContain(JSON.stringify(example, null, 2));
-  expect(ownerCopy).toContain("?date=2030-01-15&days=3");
+  expect(ownerCopy).toContain(version === 1 ? "?date=2030-01-15&days=3" : "?date=2030-01-01&days=31");
+  expect(ownerCopy).toContain(`/external-api/v${version}/schedule`);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Создать ключ" }).click();
   const create = page.getByRole("dialog", { name: "Создать ключ" });
+  await expect(create.getByLabel("Версия API")).toHaveValue("2");
+  await create.getByLabel("Версия API").selectOption(String(version));
   await create.getByLabel("Название бота / подключения").fill("Test bot");
   await create.getByLabel("Контакт разработчика").fill("@developer");
   await create.getByRole("button", { name: "Создать ключ" }).click();
@@ -40,9 +44,10 @@ test("root creates a one-time bot key, shares instructions and revokes access", 
   await expect(secretDialog).toBeVisible();
   await secretDialog.getByRole("button", { name: "Скопировать инструкцию с ключом" }).click();
   const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n");
-  expect(copied).toContain(key); expect(copied).toContain("cursor=<next_cursor>"); expect(copied).toContain("Test bot");
+  expect(copied).toContain(key); expect(copied).toContain(version === 1 ? "cursor=<next_cursor>" : "cursor=<sync_cursor>"); expect(copied).toContain("Test bot");
   expect(copied).toContain(JSON.stringify(example, null, 2));
-  expect(copied).toContain("line.id и slot.start");
+  expect(copied).toContain(version === 1 ? "line.id и slot.start" : "priority.order");
+  expect(copied).toContain(`/external-api/v${version}/schedule`);
   expect(copied).not.toContain("slot.id");
   expect(copied).not.toContain("<API_KEY>");
   await secretDialog.getByLabel("Я сохранил ключ").check();
@@ -50,9 +55,14 @@ test("root creates a one-time bot key, shares instructions and revokes access", 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain(key);
   await page.getByRole("button", { name: "Инструкция для подключения" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Версия API")).toHaveValue(String(version));
   await expect(page.getByRole("dialog")).toContainText("<API_KEY>");
   await expect(page.getByRole("dialog")).not.toContainText(key);
   expect(JSON.parse(await page.getByTestId("api-response-example").innerText())).toEqual(example);
+  await page.getByRole("dialog").getByLabel("Версия API").selectOption(String(version === 1 ? 2 : 1));
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Инструкция для подключения" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Версия API")).toHaveValue(String(version));
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Отозвать доступ" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Отозвать доступ" }).click();
