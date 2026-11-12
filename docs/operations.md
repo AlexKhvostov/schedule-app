@@ -1,5 +1,11 @@
 # Эксплуатация
 
+## 13 ноября 2026 — порядок API v2
+
+Миграция20261112221205_external_api_v2_priority применена без изменения Edge version3. Авторизация/квота проверяются до prepare_priority; чистый активный кэш не пересчитывается, dirty обновляется существующей priority_slice_source. read_sync STABLE читает компактную проекцию кэша и добавляет его ревизию в вектор. При конкурентном dirty возвращается503, клиент сохраняет курсор и повторяет позже. Это не повод рестартовать БД. При откате достаточно восстановить read_sync/external_api_sync из предыдущей миграции через `CREATE OR REPLACE`; добавленные приватные helpers можно оставить, не удалять данные и не сбрасывать курсоры.
+
+Рабочая приёмка: старый курсор Google Sheets получает38person-изменений и0клеток; порядок1..38. Клиентам v2 после дельт сортировать полный сохранённый справочник поpriority.order. [Передаваемая инструкция](../supabase/functions/external-api/BOT-V2-CONNECTION.md).
+
 ## Выпуск API v2 — 13 ноября 2026
 
 API v2 опубликован по прямому поручению Алексея. Все5jobs [CI43306584877](https://github.com/AlexKhvostov/schedule-app/actions/runs/43306584877) успешны, включая чистый Supabase reset, SQL contracts/plpgsql_check, конкурентные изменения, настоящие Auth/Realtime и Edge HTTP. Docker на ПК не нужен: одноразовый стек запускается в GitHub Actions. Working миграция `20261112212201_external_api_v2.sql` применена; external-api version3 ACTIVE, verify_jwt=false как уv1 (собственная проверка API-ключа). Имя локального файла приведено к версии, выданной apply_migration; исходное имя20261112200259, SQL идентичен.

@@ -16,6 +16,8 @@ test('calendar places coloured half-hour cells on the correct day and line, clea
   assert.equal(m.values.length,30);assert.equal(m.values[0][0],'01, Вс');
   assert.equal(m.values[0][1],'E');
   assert.equal(ctx.variantLabel_('nitro'),'N');
+  assert.equal(ctx.calendarWidth_({[person]:owner.state}),16);
+  assert.equal(ctx.calendarWidth_({p:{name:'Example',mark:{text:'LONG'}}}),26);
   assert.equal(m.values[0][24],'EX');assert.equal(m.values[0][23],'');
   assert.equal(m.backgrounds[0][24],'#ffffff');assert.equal(m.notes[0][24],'Example');
   assert.equal(m.values[1][24],'');assert.equal(m.values[29][0],'30, Пн');
@@ -67,6 +69,16 @@ test('unchanged response skips all sheet data reads and writes',()=>{
   ctx.fetchBatch_=(_c,c)=>{c.calls++;return {mode:'unchanged',items:[],cursor:next};};
   ctx.merge_=ctx.writeData_=()=>{throw Error('must not touch data');};ctx.syncNow();
   assert.equal(values.RP_CURSOR,next);assert.equal(values.RP_ERROR,'');
+});
+test('priority-only person delta advances the cursor without touching the calendar or slot sheet',()=>{
+  const {ctx,values}=fixture();
+  ctx.SpreadsheetApp.getActiveSpreadsheet=()=>({getSheetByName:name=>{
+    assert.equal(name,'Люди');return {getLastRow:()=>2,getRange:()=>({getValues:()=>[
+      ['Example','123456789012345678','EX','#ffffff','#000000',person]]})};}});
+  ctx.fetchBatch_=(_c,stats)=>{stats.calls++;return {mode:'delta',cursor:next,
+    items:[{...owner,state:{...owner.state,priority:{order:2,score:1}}}]};};
+  ctx.merge_=ctx.writeData_=()=>{throw Error('rating must not rewrite the calendar');};
+  ctx.syncNow();assert.equal(values.RP_CURSOR,next);assert.equal(values.RP_ERROR,'');
 });
 test('410 forces one full resync; 429 keeps the checkpoint and schedules a retry',()=>{
   const {ctx,values}=fixture();let calls=0;

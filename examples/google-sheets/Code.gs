@@ -93,7 +93,7 @@ function sync_(manual) {
       p.deleteProperty('RP_CURSOR');
       packet=fetchBatch_(null,ctx); // One explicit resync only.
     }
-    if (packet.mode==='full' || packet.items.length) {
+    if ((packet.mode==='full' || packet.items.length) && affectsPresentation_(packet)) {
       const state=merge_(packet);
       writeStatus_('Обновление');
       writeData_(state,packet.mode==='full' ? packet.lines : null);
@@ -122,6 +122,21 @@ function sync_(manual) {
     }
     lock.releaseLock();
   }
+}
+
+// This calendar displays names/marks, not rating numbers. A priority-only delta
+// must advance its cursor without reading or rewriting thousands of slot rows.
+function affectsPresentation_(packet) {
+  if(packet.mode==='full'||packet.items.some(x=>x.type==='cell'))return true;
+  const existing={};data_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Люди'),6)
+    .forEach(r=>{if(r[5])existing[r[5]]=r.slice(0,5).map(String);});
+  return packet.items.some(x=>{
+    if(x.type!=='person')throw new Error('Неизвестная запись API');
+    if(x.state===null)return !!existing[x.id];
+    const p=x.state;
+    return JSON.stringify(existing[x.id])!==JSON.stringify([
+      p.name,p.discord_id==null?'':String(p.discord_id),p.mark.text,p.mark.background,p.mark.foreground]);
+  });
 }
 
 function fetchBatch_(cursor,ctx) {
@@ -164,7 +179,9 @@ function merge_(packet) {
     data_(ss.getSheetByName('Люди'),6).forEach(r=>{if(r[5]) people[r[5]]={name:r[0],discord_id:String(r[1]),mark:{text:r[2],background:r[3],foreground:r[4]}};});
     data_(ss.getSheetByName('Слоты')||ss.getSheetByName('Расписание'),12).forEach(r=>{
       if(!r[10])return;
-      const date=r[0] instanceof Date ? Utilities.formatDate(r[0],'Europe/Minsk','yyyy-MM-dd') : String(r[0]);
+      // Script-owned dates are written at UTC noon; pure JS avoids one remote
+      // Utilities.formatDate call for every slot in a month.
+      const date=r[0] instanceof Date ? r[0].toISOString().slice(0,10) : String(r[0]);
       const cell={date:date,line_id:String(r[10]),half:Number(r[11]),state:{person_id:String(r[9]),tables:r[8]===''?null:Number(r[8])}};
       cells[address_(cell)]=cell;
     });
@@ -285,6 +302,7 @@ function renderCalendar_(state) {
   const lines=Object.keys(p).filter(k=>k.startsWith('RP_LINE_')).map(k=>JSON.parse(p[k]));
   const model=calendarModel_(state,lines,RP_.date,RP_.days);
   const s=ss.getSheetByName('Расписание')||ss.insertSheet('Расписание');
+  const firstLayout=s.getRange('A3').getValue()!=='День';
   const rows=Math.max(4,model.values.length+3),oldRows=s.getLastRow();
   if(s.getMaxColumns()<52)s.insertColumnsAfter(s.getMaxColumns(),52-s.getMaxColumns());
   if(s.getMaxRows()<rows)s.insertRowsAfter(s.getMaxRows(),rows-s.getMaxRows());
@@ -299,7 +317,8 @@ function renderCalendar_(state) {
     ['День','Вариант','Лимит','Линия',...Array.from({length:48},(_,h)=>time(h))]
   ]);
   s.getRange(1,1,1,4).merge();s.getRange(2,1,1,4).merge();
-  s.getRange(1,1,rows,52).setFontFamily('Arial').setFontSize(9).setHorizontalAlignment('center').setVerticalAlignment('middle');
+  if(firstLayout) s.getRange(1,1,rows,52).setFontFamily('Roboto Mono').setFontSize(6)
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
   s.getRange(1,1,3,52).setBackground('#404040').setFontColor('#ffffff').setFontWeight('bold');
   s.getRange(3,1).setNote('Слоты по Europe/Madrid. Пустая клетка — нет занятого слота в API. Серые блокировки не выдумываются: v2 их не передаёт.');
   s.getRange(3,5,1,48).setBackground('#fff2cc').setFontColor('#202124');
@@ -312,7 +331,43 @@ function renderCalendar_(state) {
       s.getRange(first,1,1,52).setBorder(true,null,null,null,null,null,'#202124',SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
     }
   }
-  s.setFrozenRows(3);s.setFrozenColumns(4);s.setColumnWidth(1,82);s.setColumnWidth(2,65);
-  s.setColumnWidth(3,48);s.setColumnWidth(4,40);s.setColumnWidths(5,48,34);s.setRowHeights(1,rows,22);
-  s.setHiddenGridlines(false);
+  s.setFrozenRows(3);s.setFrozenColumns(4);
+  if(firstLayout) {
+    s.setColumnWidth(1,82);s.setColumnWidth(2,65);
+    s.setColumnWidth(3,48);s.setColumnWidth(4,40);s.setColumnWidths(5,48,34);s.setRowHeights(1,rows,22);
+    s.setHiddenGridlines(false);
+  }
+  compactCalendar_(s,state.people);
+}
+function calendarWidth_(people) {
+  const longest=Math.max(2,...Object.values(people).map(p=>Array.from(p.mark.text||p.name.slice(0,2)).length));
+  return Math.max(16,Math.ceil(longest*5+6));
+}
+function compactCalendar_(s,people) {
+  const rows=Math.max(4,s.getLastRow());
+  s.getRange(1,1,rows,52).setFontFamily('Roboto Mono').setFontSize(6);
+  s.setColumnWidth(1,44);s.setColumnWidth(2,20);s.setColumnWidth(3,30);s.setColumnWidth(4,18);
+  s.setColumnWidths(5,48,calendarWidth_(people));s.setRowHeightsForced(1,rows,14);
+  s.getRange(1,5,2,48).breakApart();
+  const hour=h=>String((h+24)%24).padStart(2,'0')+':00';
+  const offset=zone=>{const z=Utilities.formatDate(new Date(RP_.date+'T12:00:00Z'),zone,'Z');
+    return (z[0]==='-'?-1:1)*(Number(z.slice(1,3))*60+Number(z.slice(3,5)));};
+  const shift=(offset('Europe/Minsk')-offset('Europe/Madrid'))/60;
+  s.getRange(1,5,2,48).setValues([
+    Array.from({length:48},(_,h)=>h%2?'':hour(h/2)),
+    Array.from({length:48},(_,h)=>h%2?'':hour(h/2+shift))]);
+  for(let h=0;h<24;h++)for(let row=1;row<=2;row++)s.getRange(row,5+h*2,1,2).merge();
+  s.getRange(1,1).setValue('Madrid · '+RP_.date.slice(0,7));
+  s.getRange(3,2).setValue('Вид');s.getRange(3,4).setValue('№');
+  s.getRange(3,5,1,48).setValues([Array.from({length:48},(_,h)=>h%2?'30':'00')]);
+  s.getRange(1,1,3,52).setTextRotation(0).setWrap(false);
+}
+function formatCalendar() {
+  const lock=LockService.getScriptLock();if(!lock.tryLock(1000))throw new Error('Идёт обновление.');
+  try {
+    const ss=SpreadsheetApp.getActiveSpreadsheet(),people={};
+    data_(ss.getSheetByName('Люди'),6).forEach(r=>{if(r[5])people[r[5]]={name:String(r[0]),mark:{text:String(r[2])}};});
+    compactCalendar_(ss.getSheetByName('Расписание'),people);SpreadsheetApp.flush();
+    console.log('Календарь: Roboto Mono 6, компактные клетки, N/E.');
+  } finally {lock.releaseLock();}
 }
