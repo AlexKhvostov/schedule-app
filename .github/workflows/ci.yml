@@ -85,6 +85,11 @@ jobs:
       - run: deno task lint
       - run: deno task fmt:check
       - run: deno task test
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+      - name: Check Google Sheets cursor and calendar client
+        run: node --test ../../../examples/google-sheets/client.test.mjs
 
   database:
     runs-on: ubuntu-latest

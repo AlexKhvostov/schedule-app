@@ -1,8 +1,8 @@
 # Журнал крупных работ
 
-## 12.11.2026 — External API v2 реализован локально
+## 13.11.2026 — External API v2 опубликован и подключён Google Sheets
 
-Добавлены full/delta/unchanged, последние состояния клеток с очистками, нормализованные люди, курсоры на согласованный вектор версий, неизменные страницы, TTL/квоты/epoch cleanup. V1 сохранён; безопасный аудит различает версии и размер JSON. 43 API unit/контракта,7 HTTP-сценариев через локальный SQL-адаптер, security/v1/v2 SQL и конкурентные commit на PostgreSQL15.20 прошли. Web:479unit, типы/lint/build/bundle; первоначальный таймаут Dashboard не воспроизвёлся при повторе7тестов. Полный Supabase/реальный Broadcast и db lint пока не проверены: Docker недоступен, portable PostgreSQL без plpgsql_check. Не опубликовано; миграция Working/новые ключи не выполнялись. [Отчёт](../memory/tasks/2026-11-12-api-v2-implementation.md), [инструкция клиента](../supabase/functions/external-api/V2-SYNC.md).
+По поручению Алексея выполнены push, настоящие Supabase/Realtime/Edge проверки в GitHub Actions без установки Docker на ПК; все5jobs CI43306584877 успешны. Working: добавочная миграция20261112212201, Edge external-api version3 ACTIVE. Количество occupancy7303 и сумма tables21628 до/после миграции не изменились. Отдельный ключ schedule:read выдан связанному Apps Script. Ноябрь:6828клеток/38людей подтверждены SQL, full7HTTP/1268002байта JSON, unchanged131байт, v1HTTP200. Пример клиента и7unit-тестов добавлены; автообновление примерно раз3минуты включено. По уточнению Алексея главный лист — цветная календарная сетка, исходные слоты скрыты; таймер после переделки успешно выполнен00:45:58. [Отчёт](../memory/tasks/2026-11-12-api-v2-implementation.md), [клиент](../examples/google-sheets/README.md).
 
 ## 07.11.2026 21:26 Europe/Minsk — исправление доставки и ускорение входа опубликованы
 
