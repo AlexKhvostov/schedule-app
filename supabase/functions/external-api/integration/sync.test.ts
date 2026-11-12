@@ -29,6 +29,15 @@ Deno.test("v2 local HTTP: full pages, replay and small unchanged response", asyn
   const all = [...first.body.items, ...last.body.items];
   strictEqual(all.filter((x) => x.type === "cell").length, 1106);
   strictEqual(all.filter((x) => x.type === "person").length, 3);
+  const people = all.filter((x) => x.type === "person");
+  equal(people.map((x) => x.state.priority.order), [1, 2, 3]);
+  strictEqual(
+    people.every((x) =>
+      x.state.priority.variant === "nitro" &&
+      x.state.priority.limit_group === "50-100"
+    ),
+    true,
+  );
   equal((await get(`page=${first.body.next_page}`)).body, last.body);
   const idle = await get(`cursor=${last.body.cursor}`);
   strictEqual(idle.status, 200);

@@ -33,6 +33,7 @@
 | Discord и боты | [discord-now.md](discord-now.md) |
 | Внешний API: ключи, расписание, снимки/страницы и локальный запуск | [external-api/README.md](../supabase/functions/external-api/README.md) |
 | Инкрементальный API v2: клетки, люди, курсор и восстановление | [V2-SYNC.md](../supabase/functions/external-api/V2-SYNC.md) |
+| Универсальное подключение бота к API v2 | [BOT-V2-CONNECTION.md](../supabase/functions/external-api/BOT-V2-CONNECTION.md) |
 | Инструкция стороннему разработчику бота | [BOT-CONNECTION.md](../supabase/functions/external-api/BOT-CONNECTION.md) |
 | Данные, подключение и событийные обновления | [schedule-data-sync.md](schedule-data-sync.md) |
 | UX расписания | [schedule-ux.md](schedule-ux.md) |

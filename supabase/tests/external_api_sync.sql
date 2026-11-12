@@ -70,9 +70,11 @@ begin
   update schedule_private.sync_versions set changed_in=0;
   delete from public.occupancy where member_id='aaaaaaaa-0000-4000-8000-000000000003';
   c:=public.external_api_sync(repeat('a',64),p_cursor=>cur);
-  perform pg_temp.check_sync(jsonb_array_length(c->'items')=2
-    and c->'items'->0->>'type'='person' and c->'items'->0->'state'='null'
-    and c->'items'->1->'state'='null','last-slot and dictionary deletion');
+  perform pg_temp.check_sync((select count(*) from jsonb_array_elements(c->'items') x where x->>'type'='cell')=1
+    and exists(select 1 from jsonb_array_elements(c->'items') x where x->>'type'='person'
+      and x->>'id'='aaaaaaaa-0000-4000-8000-000000000003' and x->'state'='null')
+    and exists(select 1 from jsonb_array_elements(c->'items') x where x->>'type'='cell'
+      and x->'state'='null'),'last-slot and dictionary deletion');
   cur:=(c->>'cursor')::uuid;
 
   -- Original pages remain unchanged even after live deletes and metadata edits.

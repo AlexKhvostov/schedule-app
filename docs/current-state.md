@@ -1,5 +1,9 @@
 # Текущее состояние
 
+## 13 ноября 2026 — порядок игроков API v2 (подготовлен)
+
+По поручению Алексея подготовлены рассчитанный приоритет Nitro50–100 с Core в person.state.priority и [универсальная инструкция бота](../supabase/functions/external-api/BOT-V2-CONNECTION.md). Тестируются full/delta/неизменные страницы и смена рейтинга без изменений слотов. Добавочная миграция пока не применена в Working; действующийAPI описан ниже.
+
 ## 13 ноября 2026 — API v2 опубликован
 
 Добавлен `/external-api/v2/schedule`: full без курсора, затем последние состояния изменённых клеток и отдельные изменения людей; тихий запрос читает только версии. V1 сохранён. В Working применена `20261112212201_external_api_v2.sql`, external-api version3 ACTIVE. Все пять jobs [CI43306584877](https://github.com/AlexKhvostov/schedule-app/actions/runs/43306584877) успешны: настоящий Supabase reset/contracts/lint, Realtime и Edge HTTP. Google Sheets за ноябрь подключена отдельным read-only ключом:6828слотов/38людей совпали с SQL, full7запросов/1268002байта JSON; повтор unchanged131байт; v1HTTP200. Таймер примерно3минуты включён. [Контракт](../supabase/functions/external-api/V2-SYNC.md), [пример Apps Script](../examples/google-sheets/README.md), [отчёт](../memory/tasks/2026-11-12-api-v2-implementation.md).

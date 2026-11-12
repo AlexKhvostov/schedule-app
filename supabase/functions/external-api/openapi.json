@@ -792,6 +792,9 @@
           },
           "mark": {
             "$ref": "#/components/schemas/Mark"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/SyncPriority"
           }
         }
       },
@@ -1027,6 +1030,46 @@
             "items": {
               "$ref": "#/components/schemas/SyncLine"
             }
+          }
+        }
+      },
+      "SyncPriority": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "order",
+          "core",
+          "score",
+          "excluded",
+          "period_start",
+          "variant",
+          "limit_group"
+        ],
+        "properties": {
+          "order": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Order within this query person dictionary; Core first, calculated Nitro50–100 score next, excluded last. Persist and sort locally after deltas."
+          },
+          "core": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "score": {
+            "type": "number"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "variant": {
+            "const": "nitro"
+          },
+          "limit_group": {
+            "const": "50-100"
           }
         }
       }
