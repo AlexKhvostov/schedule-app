@@ -49,6 +49,7 @@ do $$ declare result jsonb; again jsonb; begin
     'name',' Test bot ', 'key_hash', repeat('f',64), 'contact','developer', 'notes','private note',
     'expires_at',now()+interval '90 days','requests_per_minute',42, 'scopes',jsonb_build_array('admin')));
   if result->0->>'name' <> 'Test bot' or result->0->>'requests_per_minute' <> '42'
+    or result->0->>'guide_version' <> '1'
     or result->0->'scopes' <> '["schedule:read"]'::jsonb
     or (result->0) ? 'key_hash' or result::text like '%'||repeat('f',64)||'%' then
     raise exception 'create response, scopes or secret boundary broken';
@@ -66,6 +67,20 @@ do $$ declare result jsonb; again jsonb; begin
   begin
     perform public.root_api_clients('create',gen_random_uuid(),jsonb_build_object('name','Quota','key_hash',repeat('e',64),'requests_per_minute',601));
     raise exception 'excess quota allowed';
+  exception when invalid_parameter_value then null; end;
+  result:=public.root_api_clients('create','cccccccc-2000-4000-8000-000000000002',
+    jsonb_build_object('name','V2 bot','key_hash',repeat('b',64),'guide_version',2));
+  if result->0->>'guide_version'<>'2' then raise exception 'v2 preference not saved'; end if;
+  again:=public.root_api_clients('create','cccccccc-2000-4000-8000-000000000002',
+    jsonb_build_object('name','Retry v1','key_hash',repeat('b',64),'guide_version',1));
+  if again<>result then raise exception 'retry changed guide version'; end if;
+  if not exists(select 1 from jsonb_array_elements(public.root_api_clients()) x
+    where x->>'id'='cccccccc-2000-4000-8000-000000000002' and x->>'guide_version'='2') then
+    raise exception 'listed client lost guide preference'; end if;
+  begin
+    perform public.root_api_clients('create',gen_random_uuid(),
+      jsonb_build_object('name','Invalid version','key_hash',repeat('c',64),'guide_version',3));
+    raise exception 'unknown guide version allowed';
   exception when invalid_parameter_value then null; end;
   begin perform public.root_api_clients('unknown'); raise exception 'invalid action allowed';
   exception when invalid_parameter_value then null; end;
