@@ -2,7 +2,7 @@
 
 ## Версии инструкции подключения API
 
-ApiAdmin сохраняетguide_version приcreate и открываетинструкциюизметаданныхкарточки. ApiExamples сохраняет прежнийv1; ApiV2Examples строит экран и копируемыйтекст из одинаковыхRU/ENсекций/примеров full/delta/unchanged. externalApiEndpoint принимает1/2, новыйадреспоумолчаниюv2. ДоступкRootRPCостаётсявsrc/data; компонентынечитаютSupabaseнапрямую. guide_version — метаданныеинструкции, не новыйscope.
+`ApiAdmin` сохраняет `guide_version` при create и открывает инструкцию из метаданных карточки. `ApiExamples` сохраняет прежний v1; `ApiV2Examples` строит экран и копируемый текст из одинаковых RU/EN секций и примеров full/delta/unchanged. `externalApiEndpoint` принимает 1/2, по умолчанию возвращает v2. Доступ к Root RPC остаётся в `src/data`. `guide_version` — метаданные инструкции, не новый scope. Ключ добавляется в комплект только в окне его однократного показа; обычная инструкция содержит placeholder.
 
 ## External API v2 — опубликован 13 ноября 2026
 
