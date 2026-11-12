@@ -1,5 +1,11 @@
 # База schedule-app
 
+## External API v2 — локальная миграция 12 ноября 2026
+
+`20261112200259_external_api_v2.sql` расширяет существующий `notify_slots`: после транзакционного `bump_version` сохраняется один маркер на `(kind_id,slot_date,half,level)` в `external_api_private.cell_changes`. FK на occupancy/kind намеренно нет: удаление адреса должно оставлять маркер. Текущее состояние читается из occupancy, оба прежних Broadcast сохраняются. Конфигурационные изменения требуют resync; изменения людей дают отдельные записи справочника.
+
+`read_sync` (STABLE, invoker) согласованно читает версии/данные; неизменный вектор обрабатывается без occupancy. `external_api_sync` — закрытая RPC только service_role с прежним `schedule:read`, квотой и привязкой курсора к клиенту. `sync_states` хранят query/вектор/хеши людей24h, `sync_batches`/`sync_pages` — неизменный пакет15min,1000элементов на страницу, финальный sync cursor только на последней. В закрытых таблицах RLS, anon/authenticated доступа не имеют. До600состояний и64MiB на состояния/64MiB на пакеты ключа. Маркеры старше30дней очищает часовой cron; эпоха меняется в той же транзакции, старые курсоры получают410. Наивный sequence watermark и обычный аудит не используются. В Working пока не применено. [Контракт](../supabase/functions/external-api/V2-SYNC.md).
+
 ## Событийный контракт Preview — 7 ноября2026
 
 Новая совместимая миграция добавляет `load_schedule_snapshot_v2`, `load_schedule_versions`, `load_schedule_configuration`, `save_schedule_sync` и `apply_schedule_edit_v2`. Закрытые `schedule_private.sync_versions/edit_receipts`, атомарное сравнение клеток/квитанция UUID; каналы `app:changes` и legacy `schedule:changes` работают совместно. RLS разрешает активным участникам получение минимальных событий и публикацию только Presence, клиентский Broadcast запрещён. [Полный контракт](schedule-data-sync.md).

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "RedParty External API",
-    "version": "1.1.0",
-    "description": "Individual integration keys. Compact v1 schedule response. Immutable 15-minute exports, 1000 marks per page."
+    "version": "2.0.0",
+    "description": "Versioned external schedule API. V1 immutable exports preserved; v2 normalized full/delta sync, separate people and last-cell state."
   },
   "servers": [
     {
@@ -243,6 +243,190 @@
           }
         },
         "description": "First request: date and days are required, filters optional. Continuation/replay: cursor alone, no date/days/filters. Each request needs the same active integration key. Discard all partial data and restart on 410. Merge pages by date, line.id and slot.id; empty arrays are page-local."
+      }
+    },
+    "/v2/schedule": {
+      "get": {
+        "operationId": "syncSchedule",
+        "summary": "Full range without cursor; latest cell and people changes with cursor",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "First calendar date in Europe/Madrid; explicit YYYY-MM-DD, not today. Required on the first request; forbidden with cursor."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31
+            },
+            "description": "Includes date: 3 means this date and the next two. Required on the first request; forbidden with cursor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,4}(\\.\\d{1,2})?$"
+            },
+            "description": "Exact buy-in catalog ID, e.g. 50 or 0.50. Omitted = all. Not a row limit."
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "nitro",
+                "regular"
+              ]
+            },
+            "description": "Omitted = both types."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque sync cursor, alone; returned only on final page.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Opaque continuation page token, alone; not a sync cursor.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized full, delta or small unchanged response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, duplicate or unknown parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or expired integration key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key lacks schedule:read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown route",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Safety limit: one raw page exceeds 4 MiB, final JSON 5 MiB, or export exceeds 250000 marks / 128 MiB. No partial snapshot is created; narrow the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request quota or active-export quota exceeded. Retry-After gives seconds to wait.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Seconds until the next request window"
+              }
+            }
+          },
+          "503": {
+            "description": "Database or service unavailable; never interpreted as an empty schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Unknown, expired or foreign cursor/page, config or retention epoch changed; full resync required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "See V2-SYNC.md. date/days[/limit/variant], cursor alone, or page alone. Consume immutable 1000-item pages within 15 minutes; atomically save all changes and final cursor. Cursor idle TTL 24 hours. 410 requires a fresh full range. Cells use Europe/Madrid half-hours, not UTC instants."
       }
     }
   },
@@ -518,7 +702,8 @@
                   "response_too_large",
                   "schedule_unavailable",
                   "snapshot_unavailable",
-                  "snapshot_limit"
+                  "snapshot_limit",
+                  "resync_required"
                 ]
               },
               "field": {
@@ -584,6 +769,264 @@
               "null"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "SyncPerson": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "discord_id",
+          "mark"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "discord_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mark": {
+            "$ref": "#/components/schemas/Mark"
+          }
+        }
+      },
+      "SyncPersonChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "id",
+          "state"
+        ],
+        "properties": {
+          "type": {
+            "const": "person"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SyncPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SyncCellChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "date",
+          "line_id",
+          "half",
+          "state"
+        ],
+        "properties": {
+          "type": {
+            "const": "cell"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "line_id": {
+            "type": "string"
+          },
+          "half": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 47
+          },
+          "state": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "person_id",
+                  "tables"
+                ],
+                "properties": {
+                  "person_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "tables": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 30
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SyncLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "number",
+          "variant",
+          "limit"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "variant": {
+            "enum": [
+              "nitro",
+              "regular"
+            ]
+          },
+          "limit": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "api_version",
+          "mode",
+          "cursor",
+          "has_more",
+          "next_page",
+          "items"
+        ],
+        "properties": {
+          "api_version": {
+            "const": "2"
+          },
+          "mode": {
+            "enum": [
+              "full",
+              "delta",
+              "unchanged"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next_page": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SyncPersonChange"
+                },
+                {
+                  "$ref": "#/components/schemas/SyncCellChange"
+                }
+              ]
+            }
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "const": "Europe/Madrid"
+          },
+          "slot_minutes": {
+            "const": 30
+          },
+          "query": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "date",
+              "days",
+              "variant",
+              "limit"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              "variant": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "nitro",
+                  "regular",
+                  null
+                ]
+              },
+              "limit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLine"
+            }
           }
         }
       }

@@ -1,5 +1,7 @@
 # Структура репозитория
 
+Локальный API v2 (12.11.2026): `supabase/functions/external-api/v2/` — строгий запрос и RPC repository, `V2-SYNC.md` — контракт синхронизации; `supabase/tests/external_api_sync.sql` — SQL/безопасность/дельты, `external_api_sync_concurrency.py` — независимые транзакции через psql. Unit/HTTP-контракты — `functions/external-api/tests/sync.test.ts`, сетевой smoke — `integration/sync.test.ts`. Существующийv1 остаётся в своём модуле.
+
 Выпущено4 ноября2026 вmain656806e: `apps/web/src/data/roster.ts` — единая условная загрузка окна игроков и ограниченный кэш экрана; `data/rosterRefresh.ts` — объединение сигналов обновления; `schedule/rosterPriorities.ts` — компактный тип и Demo-проекция. Серверный контракт — `supabase/migrations/20261104164056_compact_month_roster.sql`, проверки — `supabase/tests/month_roster.sql` и сценарий в `apps/web/e2e/schedule-loading.live.ts`. [Архитектура](code-architecture.md).
 
 ```

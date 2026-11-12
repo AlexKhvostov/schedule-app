@@ -3,24 +3,38 @@ import { ApiError, json } from "./core/errors.ts";
 import type { ScheduleRepository } from "./core/repository.ts";
 import { parseRequest } from "./v1/schedule/query.ts";
 import { scheduleResponse } from "./v1/schedule/response.ts";
+import { parseSyncRequest } from "./v2/query.ts";
+import type { SyncRepository } from "./v2/repository.ts";
 
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
-type Audit = { request_id: string; status: number; duration_ms: number; slots_count?: number };
+type Audit = {
+  request_id: string;
+  status: number;
+  duration_ms: number;
+  slots_count?: number;
+  api_version?: "1" | "2";
+  response_bytes?: number;
+};
 
 export function createApp(
   loadSchedule: ScheduleRepository,
   log: (event: Audit) => void = () => {},
+  loadSync?: SyncRepository,
 ) {
   return async (request: Request): Promise<Response> => {
     const started = performance.now();
     const requestId = crypto.randomUUID();
     let status = 500, slotsCount: number | undefined;
+    let apiVersion: "1" | "2" | undefined, responseBytes: number | undefined;
     try {
       const url = new URL(request.url);
       const route = url.pathname.replace(/^\/functions\/v1\/external-api(?=\/|$)/, "")
         .replace(/^\/external-api(?=\/|$)/, "");
       // Explicit routes: no dynamic table names or wildcard resource access.
-      if (route !== "/v1/schedule") throw new ApiError(404, "not_found");
+      if (route !== "/v1/schedule" && !(route === "/v2/schedule" && loadSync)) {
+        throw new ApiError(404, "not_found");
+      }
+      apiVersion = route === "/v2/schedule" ? "2" : "1";
       if (request.method !== "GET") throw new ApiError(405, "method_not_allowed");
       let hash: string;
       try {
@@ -28,15 +42,19 @@ export function createApp(
       } catch {
         throw new ApiError(401, "invalid_api_key");
       }
-      const query = parseRequest(url.searchParams);
-      const snapshot = await loadSchedule(hash, query);
-      const body = scheduleResponse(snapshot.query, snapshot);
+      const body = route === "/v2/schedule" && loadSync
+        ? await loadSync(hash, parseSyncRequest(url.searchParams))
+        : await (async () => {
+          const snapshot = await loadSchedule(hash, parseRequest(url.searchParams));
+          return scheduleResponse(snapshot.query, snapshot);
+        })();
       const encoded = JSON.stringify(body);
-      if (new TextEncoder().encode(encoded).byteLength > MAX_RESPONSE_BYTES) {
+      responseBytes = new TextEncoder().encode(encoded).byteLength;
+      if (responseBytes > MAX_RESPONSE_BYTES) {
         throw new ApiError(422, "response_too_large");
       }
       status = 200;
-      slotsCount = body.slots_count;
+      slotsCount = typeof body.slots_count === "number" ? body.slots_count : undefined;
       return new Response(encoded, {
         status,
         headers: {
@@ -68,6 +86,8 @@ export function createApp(
         status,
         duration_ms: Math.round(performance.now() - started),
         ...(slotsCount !== undefined ? { slots_count: slotsCount } : {}),
+        ...(apiVersion !== undefined ? { api_version: apiVersion } : {}),
+        ...(status === 200 ? { response_bytes: responseBytes } : {}),
       });
     }
   };

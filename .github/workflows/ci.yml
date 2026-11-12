@@ -148,10 +148,22 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api.sql
       - name: Check immutable API snapshot pagination
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_pagination.sql
+      - name: Check API v2 cursor isolation, cell deltas and metadata
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_sync.sql
       - name: Check root log filters, permissions and cleanup
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/root_logs.sql
       - name: Check root API client administration
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_root_admin.sql
+      - name: Check API v2 concurrent commits
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -c 'begin' -f supabase/tests/fixtures/external_api_seed.sql -c 'commit'
+          python3 supabase/tests/external_api_sync_concurrency.py
       - name: Stop local database
         if: ${{ always() }}
         run: supabase stop --no-backup
@@ -193,5 +205,40 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 7
       - name: Stop disposable stack
+        if: ${{ always() }}
+        run: supabase stop --no-backup
+
+  external-api-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Start disposable Supabase with real Edge runtime
+        run: |
+          supabase start -x storage-api,imgproxy,logflare,vector,supavisor,studio,postgres-meta,mailpit
+          supabase db reset
+      - name: Prepare isolated HTTP fixture keys
+        run: |
+          python3 supabase/functions/external-api/tools/prepare-local-tests.py --database-url postgresql://postgres:postgres@127.0.0.1:54322/postgres --env-file "$RUNNER_TEMP/api-integration.env"
+      - name: Serve and test both API versions over the actual gateway
+        working-directory: supabase/functions/external-api
+        run: |
+          supabase functions serve external-api > "$RUNNER_TEMP/external-api-serve.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:54321/functions/v1/external-api/v1/schedule || true)
+            if [ "$code" = 401 ]; then break; fi
+            sleep 2
+          done
+          set -a
+          source "$RUNNER_TEMP/api-integration.env"
+          set +a
+          deno task test:integration
+      - name: Stop disposable API stack
         if: ${{ always() }}
         run: supabase stop --no-backup

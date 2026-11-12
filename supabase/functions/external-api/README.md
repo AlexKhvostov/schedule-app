@@ -1,5 +1,20 @@
 # RedParty External API
 
+## Подготовленный API v2
+
+`GET /v2/schedule`: без курсора — полный диапазон; с курсором — последние состояния изменённых
+клеток и отдельные изменения людей. V1 ниже сохраняется без смены контракта. Новый код и миграция
+пока локальные; до выпуска Working используетv1. [Контракт и алгоритм клиента](V2-SYNC.md),
+[OpenAPI](openapi.json).
+
+Для проверки на одноразовом Supabase дополнительно выполнить
+`psql "$LOCAL_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_sync.sql`. После
+подготовки **закоммиченных синтетических** fixtures выполнить
+`python supabase/tests/external_api_sync_concurrency.py`, задав локальные PGHOST/PGPORT/
+PGUSER/PGDATABASE и при необходимости PSQL_BIN. Этот тест меняет только fixtures, временно отключает
+admission guard, сохраняя feed-триггеры; облачные адреса запрещены. Сетевой
+`deno task test:integration` теперь проверяет обе версии на тех же fixture-ключах.
+
 Реализация опубликована 3 ноября 2026 в текущий Supabase schedule-app (external-api v1 и три
 миграции). Общая точка входа внешних интеграций; расписание — первый ресурс. Формальный контракт:
 [openapi.json](openapi.json). Готовая инструкция для стороннего разработчика:
