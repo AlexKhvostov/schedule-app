@@ -132,6 +132,7 @@ begin
   if (select count(*) from public.members)<>before_count+1 then raise exception 'New registration created duplicate cards'; end if;
 
   perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{}',true);
   execute 'set local role authenticated';
   begin
     perform public.self_create_profile();
