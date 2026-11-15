@@ -180,6 +180,21 @@
       "magic": "invite link"
     }
   },
+  "accessAlert": {
+    "permissionTitle": "Access denied",
+    "permission": "You do not have permission for this action. If you should have access, contact an administrator and share the details below.",
+    "sessionTitle": "Sign in again",
+    "session": "The server could not verify your sign-in. Sign in again, then retry the action.",
+    "linkConflictTitle": "Could not connect your profile",
+    "linkConflict": "This profile is already linked to another account. Contact an administrator; you do not need to create another profile.",
+    "unavailableTitle": "Could not check access",
+    "unavailable": "Sign-in verification is temporarily unavailable. This does not mean your profile is blocked. Try again; if it keeps happening, share the details below with an administrator.",
+    "details": "Diagnostic details: {{details}}",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the details manually.",
+    "close": "Dismiss access error message"
+  },
   "nav": {
     "logs": "Logs",
     "logsHint": "Activity and log cleanup",

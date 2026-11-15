@@ -1,6 +1,7 @@
 import { getSupabase } from "./client";
 import { isConfirmedAuthLoss } from "./authFailure";
 import { isLiveData } from "./config";
+import { clearAccessIssues } from "./accessIssues";
 import type { AppRole, AuthVia, Session } from "../v2/session";
 
 const FRESH_DISCORD_LOGIN_KEY = "v2-fresh-discord-login";
@@ -110,6 +111,7 @@ export async function signInDiscord(redirectTo = `${window.location.origin}/auth
 }
 
 export async function signOutLive() {
+  clearAccessIssues();
   const db = getSupabase();
   if (db) await db.auth.signOut();
 }

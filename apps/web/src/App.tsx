@@ -17,6 +17,7 @@ import { getSupabase } from "./data/client";
 import { subscribeAppChanges } from "./data/appRealtime";
 import { disableDevSandbox } from "./data/config";
 import "./v2/theme";
+import { AccessIssueBanner } from "./v2/AccessIssueBanner";
 
 const V2Login = lazy(() => import("./v2/V2Login").then(module => ({ default: module.V2Login })));
 const V2JoinGate = lazy(() => import("./v2/V2JoinGate").then(module => ({ default: module.V2JoinGate })));
@@ -44,6 +45,10 @@ function bootLocalSession(): Session | null {
 }
 
 export function App() {
+  return <><AccessIssueBanner /><AppContent /></>;
+}
+
+function AppContent() {
   const live = liveAuthReady();
   const { t } = useTranslation();
   const recovery = useRef<LiveEntryRecovery | null>(null);

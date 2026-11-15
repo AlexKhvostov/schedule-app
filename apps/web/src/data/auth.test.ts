@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const fake = vi.hoisted(() => ({ storedError: null as unknown, authError: null as unknown, failure: "", missing: false, blocked: false, discord: false, selfCreateError: null as unknown, rpc: vi.fn() }));
+const fake = vi.hoisted(() => ({ storedError: null as unknown, authError: null as unknown, failure: "", missing: false, blocked: false, discord: false, selfCreateLinks: false, selfCreateError: null as unknown, rpc: vi.fn() }));
 vi.mock("./config", () => ({ isLiveData: () => true }));
 vi.mock("./client", () => ({ getSupabase: () => ({
   auth: {
@@ -18,11 +18,12 @@ vi.mock("./client", () => ({ getSupabase: () => ({
   },
   rpc: (name: string) => {
     fake.rpc(name);
+    if (name === "self_create_profile" && fake.selfCreateLinks) fake.missing = false;
     return { abortSignal: async () => ({ data: { permissions: ["schedule"], hasRequiredRole: true, blockReason: fake.blocked ? "manual" : null }, error: name === "self_create_profile" ? fake.selfCreateError : fake.failure === name ? { message: "service unavailable" } : null }) };
   },
 }) }));
 import { loadLiveEntry } from "./auth";
-beforeEach(() => { fake.authError = null; fake.storedError = null; fake.failure = ""; fake.missing = false; fake.blocked = false; fake.discord = false; fake.selfCreateError = null; fake.rpc.mockClear(); });
+beforeEach(() => { fake.authError = null; fake.storedError = null; fake.failure = ""; fake.missing = false; fake.blocked = false; fake.discord = false; fake.selfCreateLinks = false; fake.selfCreateError = null; fake.rpc.mockClear(); });
 
 it.each(["members", "identities", "member_access_context"])("throws %s errors instead of removing or recreating membership", async failure => {
   fake.failure = failure;
@@ -58,6 +59,12 @@ it("a disabled self-registration policy still opens the request gate; outages do
   await expect(loadLiveEntry()).resolves.toMatchObject({ kind: "gate", requestKind: "join", canRequest: true });
   fake.selfCreateError = { code: "57014", message: "query cancelled" };
   await expect(loadLiveEntry()).rejects.toEqual(fake.selfCreateError);
+});
+
+it("opens the existing card after the server links an account that signed in before admin approval", async () => {
+  fake.missing = true; fake.discord = true; fake.selfCreateLinks = true;
+  await expect(loadLiveEntry()).resolves.toMatchObject({ kind: "member", session: { memberId: "self", access: "active" } });
+  expect(fake.rpc).toHaveBeenCalledWith("self_create_profile");
 });
 
 it.each(["discord_members", "club_settings"])("Discord snapshot errors (%s) cannot recreate a profile", async failure => {

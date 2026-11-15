@@ -1,10 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isLiveData, supabaseAnonKey, supabaseUrl } from "./config";
+import { fetchWithAccessIssues } from "./accessIssues";
 
 let cached: SupabaseClient | null = null;
 
 export function getSupabase() {
   if (!isLiveData()) return null;
-  if (!cached) cached = createClient(supabaseUrl(), supabaseAnonKey());
+  if (!cached) cached = createClient(supabaseUrl(), supabaseAnonKey(), { global: { fetch: fetchWithAccessIssues } });
   return cached;
 }

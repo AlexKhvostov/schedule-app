@@ -1,5 +1,6 @@
 import type { LiveEntry } from "./auth";
 import { readWithDeadline } from "./readDeadline";
+import { clearAccessIssues, reportEntryFailure } from "./accessIssues";
 
 type State = { entry: LiveEntry | null; checking: boolean; unavailable: boolean };
 /** Single flight, bounded waiting, and generation guards across logout/unmount. */
@@ -32,8 +33,9 @@ export class LiveEntryRecovery {
       if (this.disposed || generation !== this.generation) return;
       this.failures = 0;
       this.state = { entry, checking: false, unavailable: false };
-    } catch {
+    } catch (error) {
       if (this.disposed || generation !== this.generation) return;
+      reportEntryFailure(error);
       this.state = { ...this.state, checking: false, unavailable: true };
       const delay = Math.min(30000, 5000 * 2 ** Math.min(this.failures++, 3));
       this.retry = setTimeout(() => void this.check(), delay);
@@ -43,6 +45,7 @@ export class LiveEntryRecovery {
   }
   signedOut() {
     this.cancel();
+    clearAccessIssues();
     this.state = { entry: { kind: "none" }, checking: false, unavailable: false };
     this.changed(this.state);
   }

@@ -1848,6 +1848,11 @@ html[data-ui-theme="light"],
 }
 
 .v2-gate {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
   display: grid;
   gap: 12px;
   width: min(560px, 100%);
