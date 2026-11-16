@@ -137,7 +137,7 @@ export function CabinetPlaysPanel({
                     return (
                       <div key={kind} className={`v2-cab-kind${selected.length ? "" : " is-off"}`}>
                         <div className="v2-cab-kind-head">
-                          <b>{kind === "nitro" ? "Nitro" : "Regular"}</b>
+                          <b>{kind === "nitro" ? "Nitro" : "Expresso"}</b>
                           <small>{selected.length ? t("cabinet.kindOn", { n: selected.length }) : t("cabinet.kindOff")}</small>
                         </div>
                         <div className="v2-cab-pills">

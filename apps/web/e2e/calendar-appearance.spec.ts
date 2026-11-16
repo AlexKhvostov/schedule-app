@@ -80,7 +80,7 @@ for (const theme of ["dark", "light"] as const) {
     const groups = calendar.locator(".v2-mine-legend-group");
     await expect(groups).toHaveCount(2);
     await expect(groups.nth(0)).toHaveAttribute("aria-label", "Nitro");
-    await expect(groups.nth(1)).toHaveAttribute("aria-label", "Regular");
+    await expect(groups.nth(1)).toHaveAttribute("aria-label", "Expresso");
     await expect(groups.nth(0).locator(".v2-mine-swatch")).toHaveText(LIMIT_OPTIONS.map(() => "N"));
     await expect(groups.nth(1).locator(".v2-mine-swatch")).toHaveText(LIMIT_OPTIONS.map(() => "E"));
     await expect(groups.nth(1).locator(".v2-mine-swatch").first()).toHaveCSS("font-style", "italic");
@@ -96,7 +96,7 @@ for (const theme of ["dark", "light"] as const) {
     expect(paints.filter(p => p.y < 750 && p.text === "N")).toHaveLength(LIMIT_OPTIONS.length);
     expect(paints.filter(p => p.y < 750 && p.text === "E")).toHaveLength(LIMIT_OPTIONS.length);
     expect(paints.some(p => /^([NE])\d/.test(p.text))).toBe(false);
-    expect(paints.find(p => p.text === "Regular")!.x).toBeGreaterThan(paints.find(p => p.text === "Nitro")!.x);
+    expect(paints.find(p => p.text === "Expresso")!.x).toBeGreaterThan(paints.find(p => p.text === "Nitro")!.x);
     expect(paints.filter(p => p.y > 750 && p.text === "E").every(p => p.font.includes("italic"))).toBe(true);
     expect(paints.filter(p => p.y > 750 && p.text === "50").map(p => p.fill)).toEqual([theme === "dark" ? "#cc6666" : "#b74e4e", theme === "dark" ? "#cc6666" : "#b74e4e"]);
     await calendar.screenshot({ path: path.resolve(`../../memory/tasks/2026-11-05-calendar-${theme}.png`) });

@@ -103,8 +103,8 @@ test("monthly roster separates kind-specific Core queues, distance order and exc
   await expect(table.getByRole("columnheader", { name: /^N\s*50\s/ })).toHaveCount(0);
   await expect(avatar).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("roster-regular.png") });
-  await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.getByRole("button", { name: "Nitro · Expresso", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await expect(regular).toHaveAttribute("aria-pressed", "true");
   await expect(table.locator("thead")).not.toContainText("E50");
   await page.getByRole("button", { name: "N50-100", exact: true }).click();

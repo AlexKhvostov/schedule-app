@@ -3,7 +3,7 @@ import { normalizePlay } from "./members";
 import { schedulePlayPairKeys } from "./playerScheduleLimits";
 
 describe("schedulePlayPairKeys", () => {
-  it("keeps Nitro and Regular selections separate", () => {
+  it("keeps Nitro and Expresso selections separate", () => {
     const keys = schedulePlayPairKeys([
       normalizePlay({
         id: "winamax-player",

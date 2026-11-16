@@ -560,7 +560,7 @@ function playsStoreKey(memberId: string) {
   return `v2-member-plays:${memberId}`;
 }
 
-/** Полный набор румов из кабинета: Nitro/Regular отдельно, ник и история. */
+/** Полный набор румов из кабинета: Nitro/Expresso отдельно, ник и история. */
 export function loadStoredPlays(memberId?: string): RoomPlay[] {
   if (!memberId) return [];
   try {

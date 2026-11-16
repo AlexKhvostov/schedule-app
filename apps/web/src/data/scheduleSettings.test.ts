@@ -64,7 +64,7 @@ describe("schedule settings adapter", () => {
 describe("schedule filter limit selection", () => {
   const initial = { nitro: ["50", "100"], regular: ["25"] };
 
-  it("changes Nitro and Regular independently and keeps catalog order", () => {
+  it("changes Nitro and Expresso independently and keeps catalog order", () => {
     expect(toggleScheduleFilterLimit(initial, "nitro", "25")).toEqual({
       nitro: ["25", "50", "100"],
       regular: ["25"],

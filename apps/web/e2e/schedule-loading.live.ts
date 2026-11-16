@@ -82,7 +82,7 @@ test("capacity read failures hide the grid until both kinds load successfully", 
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 });
 
-test("Regular capacity saves only its edited limit and a rejected save retains the draft", async ({ page }) => {
+test("Expresso capacity saves only its edited limit and a rejected save retains the draft", async ({ page }) => {
   const { gates, configuration } = await fixture(page); gates.forEach(g => g.release());
   let failSave = true;
   const saves: { p_variant: string; p_profiles: Record<string, { hours: number[]; days: Record<string, number[]> }> }[] = [];

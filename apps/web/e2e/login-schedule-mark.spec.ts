@@ -13,7 +13,7 @@ async function expectInsideViewport(locator: import("@playwright/test").Locator,
   }
 }
 
-async function enableDemoGameLimit(page: import("@playwright/test").Page, kind: "Nitro" | "Regular", limit: string) {
+async function enableDemoGameLimit(page: import("@playwright/test").Page, kind: "Nitro" | "Expresso", limit: string) {
   await page.getByRole("button", { name: "you" }).click();
   await page.getByRole("button", { name: "Кабинет" }).click();
   await page.getByRole("button", { name: "Игра" }).click();
@@ -531,12 +531,25 @@ test("demo schedule persists after switching test users", async ({ page }) => {
   await expect(page.locator(sharedCell)).toHaveAttribute("data-mark", "YO");
 });
 
-test("language choice survives navigation", async ({ page }) => {
+test("language choice survives navigation", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.getByRole("button", { name: "EN" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await page.getByRole("tab", { name: /Demo/ }).click();
+  await page.getByRole("button", { name: "Open test session" }).click();
+  await expect(page.locator(".v2-opt-sheet")).toBeVisible();
+  await page.getByRole("button", { name: "Nitro", exact: true }).click();
+  const expresso = page.locator(".v2-bar-menu button").filter({ hasText: "Expresso" });
+  await expect(expresso).toBeVisible();
+  await expect(page.locator(".v2-bar-menu")).not.toContainText("Regular");
+  await page.screenshot({ path: testInfo.outputPath("expresso-filter-en-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const filterBox = await expresso.boundingBox();
+  expect(filterBox).not.toBeNull();
+  expect(filterBox!.x + filterBox!.width).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: testInfo.outputPath("expresso-filter-en-mobile.png") });
 });
 
 test("active player starts on schedule and the brand returns there", async ({ page }) => {
@@ -559,7 +572,7 @@ test("schedule-limit editor keeps tournament types independent and stays admin-o
   await expect(page.getByRole("heading", { name: "Лимиты в расписании" })).toBeVisible();
   await page.locator(".v2-admin-card", { has: page.getByRole("heading", { name: "Лимиты в расписании", exact: true }) }).getByRole("button", { name: "Развернуть", exact: true }).click();
   const nitro25 = page.getByRole("button", { name: "Nitro 25 €", exact: true });
-  const regular25 = page.getByRole("button", { name: "Regular 25 €", exact: true });
+  const regular25 = page.getByRole("button", { name: "Expresso 25 €", exact: true });
   await expect(nitro25).toHaveAttribute("aria-pressed", "true");
   await expect(regular25).toHaveAttribute("aria-pressed", "true");
   await nitro25.click();
@@ -629,18 +642,18 @@ test("dead-time editor persists CRUD, blocks overlap and stays admin-only", asyn
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
 });
 
-test("schedule can show Nitro and Regular together with distinct N/E rows", async ({ page }) => {
+test("schedule can show Nitro and Expresso together with distinct N/E rows", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await enableDemoGameLimit(page, "Regular", "50");
+  await enableDemoGameLimit(page, "Expresso", "50");
 
   const label = page.locator(".v2-opt-hours .v2-opt-gutter-nls .v2-opt-lab");
   await expect(label).toHaveText("N");
   await expect(page.getByText("NL", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await expect(label).toHaveText("N/E");
   await expect(page.locator('.v2-opt-gutter-kind[data-variant="nitro"] .v2-limit-chip', { hasText: "N50" }).first()).toBeVisible();
   await expect(page.locator('.v2-opt-gutter-kind[data-variant="regular"] .v2-limit-chip', { hasText: "E50" }).first()).toBeVisible();
@@ -671,7 +684,7 @@ test("schedule can show Nitro and Regular together with distinct N/E rows", asyn
   else await expect(nitroCell).not.toHaveClass(/is-on/);
 
   await page.reload();
-  await expect(page.getByRole("button", { name: "Nitro · Regular", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nitro · Expresso", exact: true })).toBeVisible();
   await expect(label).toHaveText("N/E");
   const persistedRegular = page.locator(`[data-slot][data-variant="regular"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
   const persistedNitro = page.locator(`[data-slot][data-variant="nitro"][data-limit="50"][data-day="${day}"][data-half="${half}"][data-level="${level}"]`);
@@ -720,10 +733,10 @@ test("other schedule highlight includes a hidden tournament kind", async ({ page
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await enableDemoGameLimit(page, "Regular", "50");
+  await enableDemoGameLimit(page, "Expresso", "50");
 
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await page.getByTitle("Редактирование").click();
 
   const regularCell = page.locator('[data-slot][data-variant="regular"][data-limit="50"][data-level="0"]:not(.is-past):not(.is-lock):not(.is-on)').first();
@@ -739,23 +752,23 @@ test("other schedule highlight includes a hidden tournament kind", async ({ page
   await page.getByRole("button", { name: "Другие лимиты" }).click();
   expect((await nitroCell.getAttribute("data-busy")) ?? "").not.toContain("regular:50");
 
-  await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.getByRole("button", { name: "Nitro · Expresso", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await expect(page.locator('.v2-opt-kind[data-variant="regular"]')).toHaveCount(0);
   await expect(nitroCell).toHaveClass(/is-busy/);
   await expect(nitroCell).toHaveAttribute("data-busy", /regular:50/);
 
   await nitroCell.hover();
-  await expect(page.locator(".v2-opt-tip-note")).toContainText("Уже Regular · 50 €");
+  await expect(page.locator(".v2-opt-tip-note")).toContainText("Уже Expresso · 50 €");
 });
 
 test("auxiliary schedule windows keep N/E separate without doubling physical hours", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Демо/ }).click();
   await page.getByRole("button", { name: "Войти для проверки" }).click();
-  await enableDemoGameLimit(page, "Regular", "50");
+  await enableDemoGameLimit(page, "Expresso", "50");
   await page.getByRole("button", { name: "Nitro", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
 
   await page.getByTitle("Редактирование").click();
   const nitroEmpty = page.locator('[data-slot][data-variant="nitro"][data-limit="50"][data-level="0"]:not(.is-past):not(.is-lock):not(.is-on)').first();
@@ -813,8 +826,8 @@ test("auxiliary schedule windows keep N/E separate without doubling physical hou
   await page.locator(".v2-user-float").getByRole("button", { name: "close" }).click();
   await page.getByRole("button", { name: "Игроки", exact: true }).click();
 
-  await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
-  await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await page.getByRole("button", { name: "Nitro · Expresso", exact: true }).click();
+  await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await expect(page.locator(".v2-ctrl.v2-field-hit", { hasText: "Nitro" })).toBeVisible();
   await expect(page.locator('[data-slot][data-variant="regular"]')).toHaveCount(0);
 
@@ -991,7 +1004,7 @@ test("table presets drive new marks, stay frozen and survive a demo user switch"
   await page.locator(sharedCell).click({ button: "right" });
   const tip = page.locator(".v2-opt-tip");
   await expect(tip).toBeVisible();
-  await expect(tip.locator(".v2-opt-tip-kind")).toHaveText(variant === "regular" ? "Regular" : "Nitro");
+  await expect(tip.locator(".v2-opt-tip-kind")).toHaveText(variant === "regular" ? "Expresso" : "Nitro");
   await expect(tip.locator(".v2-opt-tip-limit")).toHaveText(`${limit} €`);
   await expect(tip.locator(".v2-opt-tip-time.is-cet > b")).toHaveText(`${formatHalf(occupiedHalf)} – ${formatHalf(occupiedHalf + 1)}`);
   await expect(tip.locator(".v2-opt-tip-who img.v2-ava")).toHaveAttribute("src", /cdn\.discordapp\.com/);

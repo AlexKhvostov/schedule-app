@@ -103,8 +103,8 @@ for (const theme of ["dark", "light"]) {
       if (width === 1280) await panel.screenshot({ path: testInfo.outputPath(`roster-scroll-${theme}.png`) });
     }
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.getByRole("button", { name: "Nitro · Regular", exact: true }).click();
-    await page.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+    await page.getByRole("button", { name: "Nitro · Expresso", exact: true }).click();
+    await page.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
     await expect(panel.getByRole("button", { name: "E50-100", exact: true })).toBeEnabled();
     await scroll.evaluate(node => { node.scrollTop = 180; });
     await expect.poll(() => panel.locator("thead th").first().evaluate(cell => Math.abs(cell.getBoundingClientRect().top - cell.closest(".v2-float-body")!.getBoundingClientRect().top))).toBeLessThan(0.6);

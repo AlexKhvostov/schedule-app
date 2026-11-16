@@ -31,7 +31,7 @@ for (const theme of ["dark", "light"]) {
     await page.getByRole("button", { name: "you", exact: true }).click();
     await page.getByRole("button", { name: "Кабинет" }).click();
     await page.getByRole("button", { name: "Игра", exact: true }).click();
-    const regular = page.locator(".v2-cab-kind", { hasText: "Regular" }).getByRole("button", { name: "50 €", exact: true });
+    const regular = page.locator(".v2-cab-kind", { hasText: "Expresso" }).getByRole("button", { name: "50 €", exact: true });
     if (!(await regular.getAttribute("class"))?.includes("is-on")) {
       await regular.click();
       await page.locator(".v2-cab-room").getByRole("button", { name: "Сохранить", exact: true }).click();

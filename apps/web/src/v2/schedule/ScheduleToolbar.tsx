@@ -158,7 +158,7 @@ export function ScheduleToolbar({ controls, brush, filters, display, tools, sync
                 setMonthOpen(false);
               }}
             >
-              {kinds.map((variant) => variant === "nitro" ? "Nitro" : "Regular").join(" · ")}
+              {kinds.map((variant) => variant === "nitro" ? "Nitro" : "Expresso").join(" · ")}
               <i className="fa-solid fa-angle-down v2-muted ml-2" />
             </button>
             {kindOpen && (
@@ -166,7 +166,7 @@ export function ScheduleToolbar({ controls, brush, filters, display, tools, sync
                 {(
                   [
                     ["nitro", "Nitro"],
-                    ["regular", "Regular"],
+                    ["regular", "Expresso"],
                   ] as const
                 ).map(([value, label]) => (
                   <button

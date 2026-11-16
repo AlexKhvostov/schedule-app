@@ -212,7 +212,7 @@ export function MembersRoleSettings() {
                   <div className="v2-role-editor-limits">
                     {(["nitro", "regular"] as const).map((variant) => (
                       <div key={variant}>
-                        <b>{variant === "nitro" ? "Nitro" : "Regular"}</b>
+                        <b>{variant === "nitro" ? "Nitro" : "Expresso"}</b>
                         <span>
                           {LIMIT_OPTIONS.map((limit) => {
                             const checked = editingRole.limits.some((item) => item.variant === variant && item.limit === limit);

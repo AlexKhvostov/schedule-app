@@ -44,7 +44,7 @@ export function ScheduleAccessPanel({ memberId }: Props) {
           <p className="v2-cab-hint">{t("admin.people.roleManagedAccess")}</p>
           {(["nitro", "regular"] as const).map((kind) => (
             <div key={kind} className="v2-access-kind">
-              <b>{kind === "nitro" ? "Nitro" : "Regular"}</b>
+              <b>{kind === "nitro" ? "Nitro" : "Expresso"}</b>
               <div className="v2-cab-pills">
                 {LIMIT_OPTIONS.map((limit) => {
                   const id = accessKey(kind, limit);

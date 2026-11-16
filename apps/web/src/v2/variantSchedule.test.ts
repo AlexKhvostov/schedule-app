@@ -3,7 +3,7 @@ import { emptyMonth } from "../schedule/plan";
 import { gridsByVariantLabel, schedulePairRows, variantGridItems } from "./variantSchedule";
 
 describe("variant schedule projection", () => {
-  it("keeps Nitro and Regular of the same limit separate", () => {
+  it("keeps Nitro and Expresso of the same limit separate", () => {
     const nitro = emptyMonth(2026, 8);
     const regular = emptyMonth(2026, 8);
     const items = variantGridItems(

@@ -26,7 +26,7 @@ test("both kinds use their own lines and slots; marks survive a capacity reducti
   await page.getByRole("button", { name: "you", exact: true }).click();
   await page.getByRole("button", { name: "Кабинет", exact: true }).click();
   await page.getByRole("button", { name: "Игра", exact: true }).click();
-  await page.locator(".v2-cab-kind", { hasText: "Regular" }).getByRole("button", { name: "50 €", exact: true }).click();
+  await page.locator(".v2-cab-kind", { hasText: "Expresso" }).getByRole("button", { name: "50 €", exact: true }).click();
   await page.locator(".v2-cab-room").getByRole("button", { name: "Сохранить", exact: true }).click();
   await page.getByRole("navigation", { name: "Меню" }).getByRole("button", { name: "Расписание", exact: true }).click();
   const day = page.locator('.v2-opt-block[data-row="4"]');
@@ -34,7 +34,7 @@ test("both kinds use their own lines and slots; marks survive a capacity reducti
     await expect(day.locator(`.v2-opt-lane[data-lane^="4-${pair}-"]`)).toHaveCount(count);
   }
   await expect(day.locator('[data-lane="4-nitro-50-5"] [data-slot][data-half="16"]')).toHaveAttribute("data-mark", "QA");
-  // Four visible half-hours: 3 Regular lanes, all open.
+  // Four visible half-hours: 3 Expresso lanes, all open.
   await expect(day.locator('.v2-opt-lane[data-lane^="4-regular-50-"] [data-slot]')).toHaveCount(12);
   await page.getByTitle("Редактирование", { exact: true }).click();
   const regularSeat = day.locator('.v2-opt-lane[data-lane="4-regular-50-2"] [data-slot][data-half="18"]');
@@ -50,7 +50,7 @@ test("both kinds use their own lines and slots; marks survive a capacity reducti
   await day.screenshot({ path: test.info().outputPath("capacity-both-kinds.png") });
 });
 
-test("admin edits Regular only, preserves disabled rules and applies saved capacity to the grid", async ({ page }) => {
+test("admin edits Expresso only, preserves disabled rules and applies saved capacity to the grid", async ({ page }) => {
   await enter(page, "admin-schedule");
   const panel = page.locator(".v2-admin-card").filter({ has: page.getByText("Ёмкость по часам CET", { exact: true }) });
   await panel.getByRole("button", { name: "Развернуть", exact: true }).click();

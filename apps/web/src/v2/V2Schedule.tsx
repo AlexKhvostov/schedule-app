@@ -678,7 +678,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
           {missingPlayPair ? (
             <p className="v2-play-limit-required">
               {t(missingPlayPair.memberId === selfId ? "schedule.playLimitRequiredBody" : "schedule.playLimitRequiredOther", {
-                variant: missingPlayPair.variant === "nitro" ? "Nitro" : "Regular",
+                variant: missingPlayPair.variant === "nitro" ? "Nitro" : "Expresso",
                 limit: formatLimit(missingPlayPair.limit),
                 player: missingPlayPair.playerName,
               })}

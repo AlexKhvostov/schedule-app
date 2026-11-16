@@ -17,7 +17,7 @@ async function openEditor(page: Page) {
 }
 const rootColor = (page: Page) => page.locator("html").evaluate((node) => getComputedStyle(node).getPropertyValue("--limit-50").trim());
 
-test("club colors save, persist across players and reset; Regular stays italic", async ({ page, context }) => {
+test("club colors save, persist across players and reset; Expresso stays italic", async ({ page, context }) => {
   await enter(page);
   const editor = await openEditor(page);
   const settingsCards = page.locator(".v2-admin-page > section");
@@ -42,7 +42,7 @@ test("club colors save, persist across players and reset; Regular stays italic",
   const activeLimit = player.locator('.v2-opt-block.is-hot .v2-opt-gutter-limit[data-pair="nitro:50"] .v2-opt-limit-surface');
   await expect(activeLimit).toHaveCSS("box-shadow", /color\(srgb 0\.4 0\.8 1 \/ 0\.75\)/);
   await player.getByRole("button", { name: "Nitro", exact: true }).click();
-  await player.locator(".v2-bar-menu button", { hasText: "Regular" }).click();
+  await player.locator(".v2-bar-menu button", { hasText: "Expresso" }).click();
   await expect(player.locator('.v2-opt-nl[data-variant=regular] .v2-opt-limit-label').first()).toHaveCSS("font-style", "italic");
   await editor.getByRole("button", { name: "Вернуть покерные цвета" }).click();
   expect(await rootColor(page)).toBe("#66ccff");

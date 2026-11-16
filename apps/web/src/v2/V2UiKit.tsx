@@ -300,7 +300,7 @@ export function V2UiKit() {
               Nitro
             </button>
             <button type="button" className="rp-kit-chip">
-              Regular
+              Expresso
             </button>
             <button type="button" className="rp-kit-tick is-on" aria-label={t("kit.ok")}>
               <i className="fa-solid fa-check text-[10px]" />

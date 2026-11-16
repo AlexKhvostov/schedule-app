@@ -295,7 +295,7 @@ test("compact summary follows the visible kind, filters and Core display", async
   await page.getByLabel("Активная карточка", { exact: true }).check();
   await checkSummary();
   await page.getByRole("tab", { name: "E50-100", exact: true }).click();
-  await expect(page.getByRole("complementary", { name: "Сводка · Регулярные" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Сводка · Expresso" })).toBeVisible();
   await checkSummary();
   await page.getByLabel("Показывать Core", { exact: true }).uncheck();
   await checkSummary();
@@ -364,7 +364,7 @@ test("grouped request snapshots, public replies, private comments and admin dele
       await person.locator(".v2-prio-source > summary").click();
       await expectCalculationColumns(person.locator(".v2-prio-source table"));
       await expect(person.locator(".v2-prio-source table").getByRole("columnheader", { name: "Nitro", exact: true })).toHaveCount(1);
-      await expect(person.locator(".v2-prio-source table").getByRole("columnheader", { name: "Регулярные", exact: true })).toHaveCount(0);
+      await expect(person.locator(".v2-prio-source table").getByRole("columnheader", { name: "Expresso", exact: true })).toHaveCount(0);
       await expect(person.locator(".v2-prio-source table thead tr").last().getByRole("columnheader", { name: "50 €", exact: true })).toHaveCount(1);
       const first = await person.locator(".v2-prio-source tbody tr").first().locator("td").allTextContents();
       expect(first[0]).toBe("1");

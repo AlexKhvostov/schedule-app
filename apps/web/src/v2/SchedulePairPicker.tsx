@@ -12,7 +12,7 @@ export function SchedulePairPicker({ variant, limit, onChange, disabled, hasDraf
   return <aside className="v2-pair-picker" aria-label={t("pairPicker.label")}>
     <div className="v2-pair-picker-columns">
       {(["nitro", "regular"] as const).map((kind) => <div className="v2-pair-picker-column" key={kind} data-variant={kind}>
-        <strong>{kind === "nitro" ? "Nitro" : "Regular"}</strong>
+        <strong>{kind === "nitro" ? "Nitro" : "Expresso"}</strong>
         {LIMIT_OPTIONS.map((value) => {
           const label = formatVariantLimit(kind, value);
           const dirty = hasDraft?.(kind, value);

@@ -33,7 +33,7 @@ describe("monthly filling order", () => {
     ]);
     expect(rows).toEqual(original);
   });
-  it("has independent VIP and exclusion settings for Regular", () => {
+  it("has independent VIP and exclusion settings for Expresso", () => {
     expect(orderRosterRows(rows, compactRosterPriorities(source, "regular", "50-100"), "regular").map((p) => p.mark.memberId)).toEqual(["vip3", "vip1", "out", "high", "low", "missing"]);
   });
   it("uses the selected period and breaks zero-point ties by nick", () => {

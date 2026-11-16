@@ -252,7 +252,7 @@ test("distance filters persist while hidden limits stay in totals, CSV and the e
   await page.getByLabel("Месяц", { exact: true }).fill("2026-08");
   await page.getByRole("button", { name: "Только RedParty", exact: true }).click();
   await page.getByRole("button", { name: "Активные с анкетой", exact: true }).click();
-  await page.getByRole("button", { name: "Regular", exact: true }).click();
+  await page.getByRole("button", { name: "Expresso", exact: true }).click();
   await page.getByLabel("Статус ID").selectOption("set");
   await page.getByLabel("Статус дистанции").selectOption("with");
   await page.getByLabel("Сортировка").selectOption("distanceId");
@@ -278,7 +278,7 @@ test("distance filters persist while hidden limits stay in totals, CSV and the e
   await expect(page.getByLabel("Статус дистанции")).toHaveValue("with");
   await expect(page.getByRole("button", { name: "Только RedParty", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Активные с анкетой", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Regular", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Expresso", exact: true })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("columnheader", { name: "25 €", exact: true })).toHaveCount(0);
   await expect(row.locator("td.is-total")).toHaveText(total);
   const downloadPromise = page.waitForEvent("download");

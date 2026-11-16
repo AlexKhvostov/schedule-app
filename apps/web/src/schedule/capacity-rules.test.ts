@@ -9,7 +9,7 @@ const hours = (n: number) => Array(24).fill(n) as number[];
 const mark = { discord: "QA", room: "", t: "QA", bg: "#000000", fg: "#ffffff", tables: 1 };
 
 describe("capacity rules for every tournament pair", () => {
-  it.each(LIMIT_OPTIONS)("keeps Nitro and Regular %s independent through Demo save/reload", limit => {
+  it.each(LIMIT_OPTIONS)("keeps Nitro and Expresso %s independent through Demo save/reload", limit => {
     const storage = new Map<string, string>();
     vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
     const nitro = applyHours(defaultCapacity(), limit, hours(2), "month", [5]);

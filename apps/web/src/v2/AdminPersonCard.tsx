@@ -189,7 +189,7 @@ function PriorityExclusions({ memberId, disabled }: { memberId: string; disabled
         <label key={kind}>
           <input type="checkbox" checked={flags?.[kind] ?? false} disabled={!flags || saving || disabled}
             onChange={(event) => void change(kind, event.target.checked)} />
-          {t("priorities.excluded")} · {kind === "nitro" ? "Nitro" : "Regular"}
+          {t("priorities.excluded")} · {kind === "nitro" ? "Nitro" : "Expresso"}
         </label>
       ))}
       <p>{t("admin.people.priorityExclusionsImmediate")}</p>
@@ -607,7 +607,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                             onChange={(event) => setVipNitro(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
                           />
                         </Field>
-                        <Field label="50–100 · Regular">
+                        <Field label="50–100 · Expresso">
                           <input
                             className="v2-ctrl w-full px-3"
                             inputMode="numeric"
@@ -619,7 +619,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                       </div>
                       <div className="v2-prio-edit-grid">
                         <Field label="250-500 · Nitro"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreNitro250} onChange={(e) => setCoreNitro250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
-                        <Field label="250-500 · Regular"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
+                        <Field label="250-500 · Expresso"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
                       </div>
                       {person.memberId && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
                     </div>

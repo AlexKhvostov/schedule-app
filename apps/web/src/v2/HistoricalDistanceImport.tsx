@@ -92,7 +92,7 @@ export function HistoricalDistanceImport() {
             <span>{t("admin.distance.kind")}</span>
             <select className="v2-ctrl px-2" value={variant} onChange={(event) => { setVariant(event.target.value as DistanceVariant); setSaved(null); }}>
               <option value="nitro">Nitro</option>
-              <option value="regular">Regular</option>
+              <option value="regular">Expresso</option>
             </select>
           </label>
           <label className="v2-field">

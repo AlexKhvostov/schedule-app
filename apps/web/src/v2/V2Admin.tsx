@@ -463,7 +463,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
         {filtersOpen && <div className="v2-filter-limit-editor">
           {(["nitro", "regular"] as const).map((kind) => (
             <fieldset key={kind} className={`v2-filter-limit-kind is-${kind}`}>
-              <legend>{kind === "nitro" ? "Nitro" : "Regular"}</legend>
+              <legend>{kind === "nitro" ? "Nitro" : "Expresso"}</legend>
               <div className="v2-filter-limit-options">
                 {LIMIT_OPTIONS.map((value) => {
                   const active = filterLimits[kind].includes(value);
@@ -473,7 +473,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
                       type="button"
                       className={active ? "is-on" : undefined}
                       aria-pressed={active}
-                      aria-label={`${kind === "nitro" ? "Nitro" : "Regular"} ${formatLimit(value)}`}
+                      aria-label={`${kind === "nitro" ? "Nitro" : "Expresso"} ${formatLimit(value)}`}
                       disabled={filterLimitsSaving}
                       onClick={() => {
                         const next = toggleScheduleFilterLimit(filterLimits, kind, value);
