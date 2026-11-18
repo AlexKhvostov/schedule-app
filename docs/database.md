@@ -24,7 +24,7 @@
 
 Новая совместимая миграция добавляет `load_schedule_snapshot_v2`, `load_schedule_versions`, `load_schedule_configuration`, `save_schedule_sync` и `apply_schedule_edit_v2`. Закрытые `schedule_private.sync_versions/edit_receipts`, атомарное сравнение клеток/квитанция UUID; каналы `app:changes` и legacy `schedule:changes` работают совместно. RLS разрешает активным участникам получение минимальных событий и публикацию только Presence, клиентский Broadcast запрещён. [Полный контракт](schedule-data-sync.md).
 
-## Очередь планирования (локально, 18 ноября 2026)
+## Очередь планирования (Working, 18 ноября 2026)
 
 `schedule_private.fill_completions` хранит галки завершения и пропуска по месяцу расписания, закладке и игроку. Автор определяется сервером из сессии. `fill_deliveries` хранит задания и результаты для канала и лички. `load_fill_queue`, `preview_fill_completion` и `confirm_fill_completion` проверяют активный доступ к расписанию. Получение заданий и отметка доставки доступны сервисной роли. При включённом `lock_fill_queue` запись в `occupancy` проверяет общий триггер. Root читает аудит через существующий `root_logs`. Галка и аудит хранятся в одной записи, очистка старых меток через Root не сбрасывает очередь. [Правила](fill-queue.md).
 
