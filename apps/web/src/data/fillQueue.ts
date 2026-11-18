@@ -37,8 +37,12 @@ function demoState(month: string, queue: RosterKind, order: string[]): FillQueue
 export async function loadFillQueue(month: string, queue: RosterKind): Promise<FillQueueState> {
   if (!isLiveData()) return demoState(month, queue, (await demoRoster(queue)).map(row => row.mark.memberId!));
   const { data, error } = await getSupabase()!.rpc("load_fill_queue", { p_month: month, p_queue: queue });
-  if (error || !data) throw new Error(error?.message ?? "fill-queue-unavailable");
-  return data as FillQueueState;
+  const state = data as Partial<FillQueueState> | null;
+  if (error || !state || !Array.isArray(state.order) || !Array.isArray(state.done) || !Array.isArray(state.skipped)
+    || (state.current !== null && typeof state.current !== "string")) {
+    throw new Error(error?.message ?? "fill-queue-unavailable");
+  }
+  return { order: state.order, done: state.done, skipped: state.skipped, current: state.current };
 }
 
 export async function previewFill(month: string, queue: RosterKind, actor: string, member: string): Promise<FillOffer> {
