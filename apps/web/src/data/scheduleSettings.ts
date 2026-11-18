@@ -11,6 +11,7 @@ export type ScheduleFilterLimits = {
 export type ClubGridSettings = {
   allowOverwriteMarks: boolean;
   allowActAs: boolean;
+  lockFillQueue?: boolean;
   countTables: boolean;
   editByButton: boolean;
   mergeAdjacentSlots: boolean;
@@ -20,6 +21,7 @@ export type ClubGridSettings = {
 const EMPTY: ClubGridSettings = {
   allowOverwriteMarks: false,
   allowActAs: false,
+  lockFillQueue: false,
   countTables: false,
   editByButton: true,
   mergeAdjacentSlots: false,
@@ -47,6 +49,7 @@ function loadDemoScheduleSettings() {
     return {
       allowOverwriteMarks: Boolean(stored.allowOverwriteMarks),
       allowActAs: Boolean(stored.allowActAs),
+      lockFillQueue: Boolean(stored.lockFillQueue),
       countTables: Boolean(stored.countTables),
       editByButton: stored.editByButton !== false,
       mergeAdjacentSlots: Boolean(stored.mergeAdjacentSlots),
@@ -69,6 +72,7 @@ function saveDemoScheduleSettings(settings: ClubGridSettings) {
 type ScheduleSettingsRow = {
   allow_overwrite_marks?: unknown;
   allow_act_as?: unknown;
+  lock_fill_queue?: unknown;
   count_tables?: unknown;
   edit_by_button?: unknown;
   merge_adjacent_slots?: unknown;
@@ -80,6 +84,7 @@ export function clubGridSettingsFromRow(data: ScheduleSettingsRow): ClubGridSett
   return {
     allowOverwriteMarks: Boolean(data?.allow_overwrite_marks),
     allowActAs: Boolean(data?.allow_act_as),
+    lockFillQueue: Boolean(data?.lock_fill_queue),
     countTables: Boolean(data?.count_tables),
     editByButton: data?.edit_by_button !== false,
     mergeAdjacentSlots: Boolean(data?.merge_adjacent_slots),
@@ -163,6 +168,10 @@ export async function saveActAs(value: boolean) {
   return saveScheduleFlag("allow_act_as", value);
 }
 
+export async function saveFillLock(value: boolean) {
+  return saveScheduleFlag("lock_fill_queue", value);
+}
+
 export async function saveEditByButton(value: boolean) {
   return saveScheduleFlag("edit_by_button", value);
 }
@@ -172,7 +181,7 @@ export async function saveMergeAdjacentSlots(value: boolean) {
 }
 
 async function saveScheduleFlag(
-  column: "allow_overwrite_marks" | "allow_act_as" | "count_tables" | "edit_by_button" | "merge_adjacent_slots",
+  column: "allow_overwrite_marks" | "allow_act_as" | "lock_fill_queue" | "count_tables" | "edit_by_button" | "merge_adjacent_slots",
   value: boolean,
 ) {
   if (isDevSandboxEnabled()) {
@@ -180,6 +189,7 @@ async function saveScheduleFlag(
     const keys = {
       allow_overwrite_marks: "allowOverwriteMarks",
       allow_act_as: "allowActAs",
+      lock_fill_queue: "lockFillQueue",
       count_tables: "countTables",
       edit_by_button: "editByButton",
       merge_adjacent_slots: "mergeAdjacentSlots",

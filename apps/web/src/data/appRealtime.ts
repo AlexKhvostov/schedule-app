@@ -2,7 +2,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "./client";
 
 export type AppConnection = "connecting" | "online" | "offline";
-export type AppChange = { domain: "slots" | "config" | "directory" | "priorities" | "access"; target?: { date: string; kind_id: string } };
+export type AppChange = { domain: "slots" | "config" | "directory" | "priorities" | "access" | "fill-queue"; target?: { date: string; kind_id: string }; month?: string; queue?: string };
 export type ConnectedMember = { member_id: string; nick: string; profile_name?: string; avatar_url?: string; winamax_nick?: string };
 
 function presenceMember(value: unknown): ConnectedMember | null {
@@ -93,12 +93,15 @@ function startChannel() {
   }];
   callbacks.push(entry);
   socketCleanup = () => { const index = callbacks.indexOf(entry); if (index >= 0) callbacks.splice(index, 1); };
-  for (const domain of ["slots", "config", "directory", "priorities", "access"] as const) {
+  for (const domain of ["slots", "config", "directory", "priorities", "access", "fill-queue"] as const) {
     live.on("broadcast", { event: domain }, ({ payload }) => {
       if (!isCurrent()) return;
       if (domain === "slots") {
         if (typeof payload?.date !== "string" || typeof payload?.kind_id !== "string") return;
         changes.forEach(listener => listener({ domain, target: { date: payload.date, kind_id: payload.kind_id } }));
+      } else if (domain === "fill-queue") {
+        if (typeof payload?.month !== "string" || typeof payload?.queue !== "string") return;
+        changes.forEach(listener => listener({ domain, month: payload.month, queue: payload.queue }));
       } else changes.forEach(listener => listener({ domain }));
     });
   }

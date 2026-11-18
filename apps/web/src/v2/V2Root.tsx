@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { isLiveData } from "../data/config";
 import {
@@ -9,6 +9,7 @@ import {
   type BotId,
   type BotRow,
 } from "../data/botSettings";
+import { DiscordFillSettings } from "./schedule/DiscordFillSettings";
 import { FoldHead } from "./FoldHead";
 import { V2SaveButton } from "./V2SaveButton";
 import { showV2Toast } from "./V2Toast";
@@ -86,6 +87,11 @@ function BotPane({
   );
 }
 
+function botConfig(row: BotRow) {
+  const { appName, appId, botUsername, guildId, noticeChat } = row;
+  return { appName, appId, botUsername, guildId, noticeChat };
+}
+
 function BotPanel({
   bot,
   row,
@@ -104,20 +110,19 @@ function BotPanel({
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [flagBusy, setFlagBusy] = useState<string | null>(null);
+  const configKey = JSON.stringify(botConfig(row));
+  const previousConfig = useRef(configKey);
 
   useEffect(() => {
-    setDraft(row);
-    setToken("");
+    if (previousConfig.current !== configKey) {
+      previousConfig.current = configKey;
+      setDraft(current => ({ ...current, ...botConfig(row) }));
+      setToken("");
+    }
     setTarget((curr) => (curr.trim() ? curr : row.noticeChat));
-  }, [row]);
+  }, [row, configKey]);
 
-  const dirty =
-    draft.appName !== row.appName ||
-    draft.appId !== row.appId ||
-    draft.botUsername !== row.botUsername ||
-    draft.guildId !== row.guildId ||
-    draft.noticeChat !== row.noticeChat ||
-    Boolean(token.trim());
+  const dirty = JSON.stringify(botConfig(draft)) !== configKey || Boolean(token.trim());
 
   const save = () => {
     setSaving(true);
@@ -135,7 +140,8 @@ function BotPanel({
         return;
       }
       onChange({
-        ...draft,
+        ...row,
+        ...botConfig(draft),
         hasToken: row.hasToken || Boolean(token.trim()),
       });
       setToken("");
@@ -256,7 +262,7 @@ function BotPanel({
             hint={t("admin.root.autoMarkHint")}
             onToggle={() => toggleFlag("notify_mark_removed", !row.notifyMarkRemoved)}
           />
-          <FlagRow
+          {bot === "telegram" && <FlagRow
             on={row.notifyFillQueue}
             busy={flagBusy === "notify_fill_queue"}
             icon="fa-list-ol"
@@ -264,8 +270,9 @@ function BotPanel({
             hint={t("admin.root.autoQueueHint")}
             soon
             onToggle={() => toggleFlag("notify_fill_queue", !row.notifyFillQueue)}
-          />
+          />}
         </div>
+        {bot === "discord" && <DiscordFillSettings row={row} onChange={onChange} />}
       </BotPane>
 
       <BotPane

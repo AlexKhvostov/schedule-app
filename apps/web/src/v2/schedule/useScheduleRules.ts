@@ -22,6 +22,7 @@ export function useScheduleRules({ kindsRef, setLimits, t, context }: {
   const [allowOverwrite, setAllowOverwrite] = useState(false);
 
   const [allowActAs, setAllowActAs] = useState(false);
+  const [lockFillQueue, setLockFillQueue] = useState(false);
 
   const [countTables, setCountTables] = useState(false);
 
@@ -42,6 +43,7 @@ export function useScheduleRules({ kindsRef, setLimits, t, context }: {
         if (!live) return;
         setAllowOverwrite(next.allowOverwriteMarks);
         setAllowActAs(next.allowActAs);
+        setLockFillQueue(Boolean(next.lockFillQueue));
         setCountTables(next.countTables);
         setMergeAdjacentSlots(next.mergeAdjacentSlots);
         setEditByButton(next.editByButton);
@@ -87,5 +89,5 @@ export function useScheduleRules({ kindsRef, setLimits, t, context }: {
   }, [context, t]);
 
   if (context) return { ...context.settings, deadTimeIntervals: context.deadTimeIntervals, allowOverwrite: context.settings.allowOverwriteMarks };
-  return { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits };
+  return { editByButton, allowOverwrite, allowActAs, lockFillQueue, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits };
 }

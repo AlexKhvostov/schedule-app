@@ -27,6 +27,10 @@ enabled = false
 [functions.external-api]
 verify_jwt = false
 
+# The worker verifies a user's JWT or the private scheduler token in the function.
+[functions.notify-fill-queue]
+verify_jwt = false
+
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"

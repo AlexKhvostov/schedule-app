@@ -6,7 +6,7 @@ import type { Mark } from "../../schedule/marks";
 import type { PriorityGroup } from "../../schedule/priorities";
 import type { RosterKind, RosterPrioritySource } from "../../schedule/rosterPriorities";
 
-type State = { key: string; source: RosterPrioritySource | null; faces: Mark[]; error: string };
+type State = { key: string; source: RosterPrioritySource | null; faces: Mark[]; error: string; directoryRevision?: string };
 
 export function useRosterSource(enabled: boolean, period: string | null, kind: RosterKind, limits: string[], group: PriorityGroup, account = "demo") {
   const limitsKey = [...new Set(limits)].sort().join(",");
@@ -47,5 +47,6 @@ export function useRosterSource(enabled: boolean, period: string | null, kind: R
     };
   }, [enabled, key, period, kind, group, limitsKey, retry, loader]);
   const current = enabled && state?.key === key ? state : null;
-  return { source: current?.source ?? null, faces: current?.faces ?? [], error: current?.error ?? "", loading: enabled && !current, retry: () => setRetry((n) => n + 1) };
+  return { source: current?.source ?? null, faces: current?.faces ?? [], directoryRevision: current?.directoryRevision,
+    error: current?.error ?? "", loading: enabled && !current, retry: () => setRetry((n) => n + 1) };
 }

@@ -2,12 +2,14 @@ import type { TFunction } from "i18next";
 import type { MutableRefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isLiveData } from "../../data/config";
+import { loadFillQueue } from "../../data/fillQueue";
 import { notifyMarkRemoved } from "../../data/notifyMark";
 import { accessKey } from "../../data/scheduleAccess";
 import type { ScheduleFilterLimits } from "../../data/scheduleSettings";
 import { applyScheduleEdit, monthGridKey, type ScheduleVariant } from "../../data/slots";
 import { saveDemoSchedule } from "../../schedule/demoScheduleStore";
 import { applyGridEdits, gridEdits, type GridEdit } from "../../schedule/gridEdits";
+import { fillQueueOf, scheduleMonth, waitingForFill } from "../../schedule/fillQueue";
 import type { Occupancy } from "../../schedule/plan";
 import type { OverwriteAsk } from "../optFieldModel";
 import { showV2Toast } from "../V2Toast";
@@ -30,12 +32,13 @@ type Options = {
   selectedPlayPairsRef: MutableRefObject<Set<string> | null>;
   brushAccessRef: MutableRefObject<BrushAccessState>;
   filterLimits: ScheduleFilterLimits;
+  lockFillQueue?: boolean;
   t: TFunction;
   language: string;
   onSyncBlocked?: () => void;
 };
 
-export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language, onSyncBlocked }: Options) {
+export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, lockFillQueue, t, language, onSyncBlocked }: Options) {
   const { controller } = month;
   const current = useRef(controller);
   current.current = controller;
@@ -83,8 +86,32 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
   const showWriteError = (error: string, variant: ScheduleVariant, limit: string, target: PlacementTarget) => {
     if (error === "schedule-stale") { onSyncBlocked?.(); return; }
     if (error.includes("schedule-player-limit-not-selected")) setMissingPlayPair({ variant, limit, ...target });
-    else showV2Toast("err", error.includes("no schedule access") ? t("schedule.toastNoAccess")
+    else showV2Toast("err", error.includes("schedule-fill-queue-locked") ? t("schedule.fill.editLocked")
+      : error.includes("no schedule access") ? t("schedule.toastNoAccess")
       : error.includes("schedule-conflict") ? t("schedule.toastConflict") : t("schedule.toastSaveError"));
+  };
+
+  const demoFillAllowed = async (variant: ScheduleVariant, limit: string, edits: GridEdit[]) => {
+    const queue = fillQueueOf(variant, limit);
+    if (!queue) return true;
+    const key = monthGridKey(variant, limit);
+    const grid = controller.snapshot.grids[key];
+    try {
+      const state = await loadFillQueue(scheduleMonth(year, monthIndex), queue);
+      if (current.current !== controller) return false;
+      if (controller.snapshot.grids[key] !== grid) {
+        showV2Toast("err", t("schedule.toastConflict"));
+        return false;
+      }
+      if (waitingForFill(state, selfIdRef.current) || edits.some(edit => edit.after && waitingForFill(state, edit.after.memberId))) {
+        showV2Toast("err", t("schedule.fill.editLocked"));
+        return false;
+      }
+      return true;
+    } catch {
+      if (current.current === controller) showV2Toast("err", t("schedule.toastSaveError"));
+      return false;
+    }
   };
 
   const writeEdits = async (operationId: string, variant: ScheduleVariant, limit: string, edits: GridEdit[], self: string, painter: string,
@@ -103,13 +130,14 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     return result.error;
   };
 
-  const onGridChange = (variant: ScheduleVariant, limit: string, next: Occupancy) => {
+  const onGridChange = async (variant: ScheduleVariant, limit: string, next: Occupancy) => {
     if (isLiveData() && !controller.canEdit) { onSyncBlocked?.(); return; }
     const key = monthGridKey(variant, limit);
     const previous = controller.snapshot.grids[key] ?? [];
     const edits = gridEdits(previous, next);
     if (!edits.length || !placementAllowed(variant, limit, edits)) return;
     if (!isLiveData()) {
+      if (lockFillQueue && !await demoFillAllowed(variant, limit, edits)) return;
       controller.replaceLocal({ ...controller.snapshot.grids, [key]: applyGridEdits(previous, edits) });
       saveDemoSchedule(year, monthIndex, variant, limit, controller.snapshot.grids[key]);
       showV2Toast(edits[0].after ? "ok" : "off", t(edits[0].after ? "schedule.toastPlaced" : "schedule.toastRemoved"));
@@ -127,7 +155,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     });
   };
 
-  const confirmOverwrite = (action: "wipe" | "empty" = "wipe") => {
+  const confirmOverwrite = async (action: "wipe" | "empty" = "wipe") => {
     if (isLiveData() && !controller.canEdit) { setOverwriteAsk(null); onSyncBlocked?.(); return; }
     const ask = overwriteAsk;
     if (!ask || overwritePending.current || ask.year !== year || ask.monthIndex !== monthIndex) return;
@@ -141,6 +169,7 @@ export function useScheduleMutations({ year, monthIndex, month, selfIdRef, actin
     }
     const toastKey = ask.kind === "place" ? action === "empty" ? "schedule.toastPlaced" : "schedule.toastReplaced" : "schedule.toastRemoved";
     if (!isLiveData()) {
+      if (lockFillQueue && !await demoFillAllowed(ask.variant, ask.limit, edits)) { setOverwriteAsk(null); return; }
       controller.replaceLocal({ ...controller.snapshot.grids, [key]: applyGridEdits(controller.snapshot.grids[key], edits) });
       saveDemoSchedule(year, monthIndex, ask.variant, ask.limit, controller.snapshot.grids[key]);
       setOverwriteAsk(null);

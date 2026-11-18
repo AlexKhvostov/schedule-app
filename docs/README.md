@@ -37,6 +37,7 @@
 | Инструкция стороннему разработчику бота | [BOT-CONNECTION.md](../supabase/functions/external-api/BOT-CONNECTION.md) |
 | Данные, подключение и событийные обновления | [schedule-data-sync.md](schedule-data-sync.md) |
 | UX расписания | [schedule-ux.md](schedule-ux.md) |
+| Передача хода, блокировка и Discord | [fill-queue.md](fill-queue.md) |
 | Живые приоритеты и заявки | [priorities.md](priorities.md) |
 | Деплой, CI, backup и откат | [operations.md](operations.md) |
 | UI-кит | [ui-kits.md](ui-kits.md) |
@@ -50,7 +51,6 @@
 
 - [product-improvements.md](product-improvements.md) — рабочий backlog доработок по итогам пользовательского тестирования; не описывает уже реализованное состояние.
 - [product-improvements-plan.md](product-improvements-plan.md) — исполняемый план backlog: задачи, зависимости, статусы, приёмка и проверки.
-- [fill-queue.md](fill-queue.md) — проект автоматической очереди заполнения. Пока не реализовывать без отдельного решения.
 - [schedule-undo.md](schedule-undo.md) — backlog условной отмены последних действий расписания (`Ctrl+Z` и мобильная кнопка), включая конкурентные проверки, busy-состояние и будущий возврат чужих меток. В MVP не входит.
 
 ## Исторические материалы

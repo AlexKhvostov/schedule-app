@@ -42,6 +42,9 @@ export function RootLogs() {
   const details = (row: LogEntry) => {
     const d = row.detail;
     if (row.action === "distance_ids") return <span className="root-log-change">{d.old_ids?.join(", ") || "∅"}<b aria-hidden="true"> → </b>{d.new_ids?.join(", ") || "∅"}</span>;
+    if (row.action === "fill_complete" || row.action === "fill_skip") return <><strong>{d.date?.slice(0, 7)} · {t(`schedule.fill.tabs.${d.queue}`)}</strong>
+      {d.delivery && <small>{Object.entries(d.delivery).map(([destination, status]) =>
+        t("logs.fillDelivery", { destination: t(`logs.fillDest.${destination}`), status: t(`logs.fillStatus.${status}`) })).join(" · ")}</small>}</>;
     const half = d.half ?? 0;
     const time = `${String(Math.floor(half / 2)).padStart(2, "0")}:${half % 2 ? "30" : "00"}`;
     return <><strong>{d.date} · {time} CET</strong><span>{[d.room, d.variant, d.limit && `${d.limit} €`].filter(Boolean).join(" · ")}</span>
@@ -74,7 +77,8 @@ export function RootLogs() {
       <label>{t("logs.from")}<input type="date" value={draft.from} max={draft.to || undefined} onChange={(e) => field("from", e.target.value)} /></label>
       <label>{t("logs.to")}<input type="date" value={draft.to} min={draft.from || undefined} onChange={(e) => field("to", e.target.value)} /></label>
       <label>{t("logs.action")}<select aria-label={t("logs.action")} value={draft.action} onChange={(e) => field("action", e.target.value)}><option value="">{t("logs.all")}</option>
-        {draft.source === "schedule" ? <><option value="place">{t("logs.place")}</option><option value="remove">{t("logs.remove")}</option></> : <option value="distance_ids">{t("logs.distance_ids")}</option>}</select></label>
+        {draft.source === "schedule" ? <><option value="place">{t("logs.place")}</option><option value="remove">{t("logs.remove")}</option>
+          <option value="fill_complete">{t("logs.fill_complete")}</option><option value="fill_skip">{t("logs.fill_skip")}</option></> : <option value="distance_ids">{t("logs.distance_ids")}</option>}</select></label>
       <label>{t("logs.pageSize")}<select aria-label={t("logs.pageSize")} value={draft.limit} onChange={(e) => field("limit", Number(e.target.value))}>{[50, 100, 200].map((size) => <option key={size}>{size}</option>)}</select></label>
       <button className="v2-ctrl" type="submit" disabled={busy}>{t("logs.apply")}</button>
       <button className="v2-ctrl" type="button" disabled={busy} onClick={() => { setDraft(defaultLogFilters); setQuery({ ...defaultLogFilters }); }}>{t("logs.reset")}</button>

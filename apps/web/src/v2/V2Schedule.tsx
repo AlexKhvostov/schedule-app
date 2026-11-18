@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../components/ui/button";
 import { Dialog } from "../components/ui/dialog";
 import { isLiveData } from "../data/config";
+import { confirmFill, previewFill } from "../data/fillQueue";
 import { loadPublicNames } from "../data/people";
 import { listLimitMarks } from "../data/players";
 import {
@@ -16,6 +17,7 @@ import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadT
 import { demoMonthPlan } from "../schedule/demoPlan";
 import { resetDemoSchedules } from "../schedule/demoScheduleStore";
 import { monthTitle } from "../schedule/formatDate";
+import { scheduleMonth, type FillOffer } from "../schedule/fillQueue";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { markKey, type Mark } from "../schedule/marks";
 import { emptyMonth } from "../schedule/plan";
@@ -49,6 +51,8 @@ import { useScheduleMutations } from "./schedule/useScheduleMutations";
 import { useSchedulePreferences } from "./schedule/useSchedulePreferences";
 import { useScheduleRules } from "./schedule/useScheduleRules";
 import { ScheduleRosterHelp } from "./schedule/ScheduleRosterHelp";
+import { FillConfirm } from "./schedule/FillConfirm";
+import { useFillQueue } from "./schedule/useFillQueue";
 import { useRosterSource } from "./schedule/useRosterSource";
 import { useScheduleToolbar } from "./schedule/useScheduleToolbar";
 import { scheduleZoomCanEdit, stepScheduleCellWidth } from "./scheduleZoom";
@@ -115,7 +119,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const [cetTick, setCetTick] = useState(() => readCet());
   const month = useScheduleMonth({ year, monthIndex, selfId: memberId, t });
   const capacity = month.context?.capacity ?? initialCapacity;
-  const { editByButton, allowOverwrite, allowActAs, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits } = useScheduleRules({ kindsRef, setLimits, t, context: month.context });
+  const { editByButton, allowOverwrite, allowActAs, lockFillQueue, countTables, mergeAdjacentSlots, deadTimeIntervals, filterLimits } = useScheduleRules({ kindsRef, setLimits, t, context: month.context });
   const brush = useScheduleBrush({
     memberId, mayActAs: canActAs || allowActAs, editByButton, canEdit, limitMarks,
   });
@@ -123,7 +127,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const { setGridStore, busyRemote, requestedLimits, fetchKey, gridLoading, shownGridStore } = month;
 
   const { overwriteAsk, setOverwriteAsk, overwriteBusy, missingPlayPair, setMissingPlayPair, onGridChange, confirmOverwrite } = useScheduleMutations({
-    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, t, language: i18n.language,
+    year, monthIndex, month, selfIdRef, actingRef, accessRef, selectedPlayPairsRef, brushAccessRef, filterLimits, lockFillQueue, t, language: i18n.language,
   });
   const paintOn = touchLayout ? mobileEditOn : !editByButton || canEdit;
   const { prepareEditing } = month;
@@ -151,6 +155,41 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const rosterLabels = useMemo(() => rosterItems.map((item) => item.label), [rosterItems]);
   // The server resolves the shared active rating, independently of the open schedule month.
   const rosterSource = useRosterSource(showPeople, null, rosterQueue, priorityGroupLimits[rosterGroup], rosterGroup, memberId);
+  const rosterMonth = scheduleMonth(year, monthIndex);
+  const fillScope = `${rosterMonth}:${rosterQueue}:${selfId ?? ""}`;
+  const { state: fillState, failed: fillFailed, refresh: refreshFill } = useFillQueue(showPeople && Boolean(rosterSource.source),
+    rosterMonth, rosterQueue, selfId, `${rosterSource.source?.revision}:${rosterSource.directoryRevision}`);
+  const [fillOffer, setFillOffer] = useState<{ scope: string; offer: FillOffer } | null>(null);
+  const [fillBusy, setFillBusy] = useState(false);
+  const fillRequest = useRef(false);
+  useEffect(() => { setFillOffer(null); }, [fillScope, showPeople]);
+
+  const openFillOffer = async (target: string) => {
+    if (fillRequest.current || !selfId) return;
+    fillRequest.current = true;
+    try { setFillOffer({ scope: fillScope, offer: await previewFill(rosterMonth, rosterQueue, selfId, target) }); }
+    catch { refreshFill(); showV2Toast("err", t("schedule.fill.changed")); }
+    finally { fillRequest.current = false; }
+  };
+
+  const confirmFillOffer = async () => {
+    if (fillRequest.current || !selfId || fillOffer?.scope !== fillScope) return;
+    fillRequest.current = true;
+    setFillBusy(true);
+    try {
+      const result = await confirmFill(rosterMonth, rosterQueue, selfId, fillOffer.offer);
+      setFillOffer(result.offer ? { scope: fillScope, offer: result.offer } : null);
+      if (result.offer) showV2Toast("err", t("schedule.fill.changed"));
+      else showV2Toast("ok", t(fillOffer.offer.mode === "skip" ? "schedule.fill.skipSaved" : "schedule.fill.saved"));
+    } catch (error) {
+      if (String(error).includes("fill-queue-stale")) setFillOffer(null);
+      showV2Toast("err", t("schedule.fill.changed"));
+    } finally {
+      refreshFill();
+      setFillBusy(false);
+      fillRequest.current = false;
+    }
+  };
   const calendarItems = useMemo(
     () => variantGridItems(shownGridStore, [...CALENDAR_VARIANTS], requestedLimits),
     [shownGridStore, fetchKey],
@@ -222,8 +261,15 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
     if (!showPeople || !rosterSource.source) return [];
     const items = rosterItems.map((item) => ({ limit: item.label, grid: item.grid }));
     const rows = rosterFromGrids(items, year, monthIndex, cetTick, rosterSource.faces, rosterKind);
-    return orderRosterRows(rows, rosterSource.source, rosterKind);
-  }, [showPeople, rosterItems, year, monthIndex, cetTick, rosterSource.source, rosterSource.faces, rosterKind]);
+    const ordered = orderRosterRows(rows, rosterSource.source, rosterKind);
+    if (!fillState || !isLiveData()) return ordered;
+    const positions = new Map(fillState.order.map((id, index) => [id, index + 1]));
+    // Keep the existing roster if the two reads straddle a directory change.
+    const numbered = ordered.filter(row => row.n > 0);
+    if (numbered.length !== positions.size || numbered.some(row => !positions.has(row.mark.memberId ?? ""))) return ordered;
+    return ordered.map(row => row.n > 0 ? { ...row, n: positions.get(row.mark.memberId!)! } : row)
+      .sort((a, b) => (a.n || Infinity) - (b.n || Infinity));
+  }, [showPeople, rosterItems, year, monthIndex, cetTick, rosterSource.source, rosterSource.faces, rosterKind, fillState]);
   useEffect(() => { setPeek(null); }, [rosterQueue, year, monthIndex]);
 
   const peopleIdsKey = useMemo(() => {
@@ -583,7 +629,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
                 <span>{t("schedule.rosterPriorityPeriod")}</span>
                 <strong>{new Intl.DateTimeFormat(i18n.language, { month: "long", timeZone: "UTC" }).format(new Date(rosterSource.source.periodStart))} {rosterSource.source.periodStart.slice(0, 4)}</strong>
               </div>}
-              <ScheduleRosterHelp group={rosterGroup} preliminary={Boolean(rosterGroup === "50-100" && rosterSource.source && isPriorityPreliminary(rosterSource.source))} />
+              <ScheduleRosterHelp group={rosterGroup} lockFillQueue={lockFillQueue} preliminary={Boolean(rosterGroup === "50-100" && rosterSource.source && isPriorityPreliminary(rosterSource.source))} />
             </>}
             x={peoplePos.x}
             y={peoplePos.y}
@@ -619,8 +665,12 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
               </label>}
             </div>
             <div id="roster-panel">
+            {fillFailed && <button type="button" className="v2-fill-retry" onClick={refreshFill}>{t("schedule.fill.retry")}</button>}
             <ScheduleRoster
               roster={rosterSource.source ? roster : []}
+              fillState={fillState}
+              fillActor={selfId}
+              onFill={selfId ? openFillOffer : undefined}
               emptyContent={rosterSource.loading ? <p className="v2-people-empty" role="status">{t("priorities.loading")}</p>
                 : rosterSource.error ? <div role="alert"><p className="v2-people-empty">{t("schedule.rosterLoadError")}</p><Button size="sm" onClick={rosterSource.retry}>{t("priorities.retry")}</Button></div>
                 : undefined}
@@ -634,6 +684,8 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
             </div>
           </V2Float>
         )}
+        {showPeople && selfId && fillOffer?.scope === fillScope && <FillConfirm month={rosterMonth} queue={rosterQueue}
+          offer={fillOffer.offer} actor={selfId} busy={fillBusy} onCancel={() => setFillOffer(null)} onConfirm={confirmFillOffer} />}
         {peek ? (
           <V2UserCard
             row={peek}

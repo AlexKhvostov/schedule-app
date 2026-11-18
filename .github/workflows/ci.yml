@@ -85,6 +85,11 @@ jobs:
       - run: deno task lint
       - run: deno task fmt:check
       - run: deno task test
+      - name: Check Discord planning delivery
+        working-directory: .
+        run: |
+          deno check --no-lock supabase/functions/notify-fill-queue/index.ts
+          deno test supabase/functions/notify-fill-queue/delivery.test.ts
       - uses: actions/setup-node@v6
         with:
           node-version: 22.13.0
@@ -161,6 +166,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_priority.sql
       - name: Check root log filters, permissions and cleanup
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/root_logs.sql
+      - name: Planning queue and delivery contracts
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/fill_queue.sql
       - name: Check root API client administration
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/external_api_root_admin.sql
       - name: Check API v2 concurrent commits

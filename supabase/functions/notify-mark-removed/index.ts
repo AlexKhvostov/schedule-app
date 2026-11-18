@@ -1,4 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { discordRequest } from "../_shared/discord.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -14,15 +15,7 @@ function json(body: unknown, status = 200) {
 
 async function discord<T>(token: string, path: string, init?: { method?: string; body?: unknown }) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const res = await fetch(`https://discord.com/api/v10${path}`, {
-      method: init?.method ?? "GET",
-      headers: {
-        Authorization: `Bot ${token}`,
-        "Content-Type": "application/json",
-        "User-Agent": "RedPartySchedule (https://github.com/AlexKhvostov/schedule-app, 1.0)",
-      },
-      body: init?.body ? JSON.stringify(init.body) : undefined,
-    });
+    const res = await discordRequest(token, path, init);
     const text = await res.text();
     let parsed: unknown = null;
     try {
@@ -49,7 +42,7 @@ async function discord<T>(token: string, path: string, init?: { method?: string;
   return { error: "discord retry exhausted", status: 503 };
 }
 
-async function botToken(admin: ReturnType<typeof createClient>, bot: string, fallback: string) {
+async function botToken(admin: SupabaseClient, bot: string, fallback: string) {
   const { data } = await admin.from("bot_secrets").select("token").eq("bot_id", bot).maybeSingle();
   return String(data?.token ?? "").trim() || fallback;
 }
@@ -106,7 +99,7 @@ function eventLabel(rows: RemovalEvent[]) {
 type DeliveryStatus = "delivered" | "partial" | "failed" | "skipped";
 
 async function recordDelivery(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   eventIds: string[],
   result: {
     status: DeliveryStatus;

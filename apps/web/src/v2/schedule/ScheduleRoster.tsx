@@ -9,6 +9,7 @@ import { PersonIdentity } from "../PersonIdentity";
 import { ScheduleSlot } from "../ScheduleSlot";
 import { publicDiscordName, showNick } from "../schedulePresentation";
 import { displayScheduleColumn } from "../variantSchedule";
+import type { FillQueueState } from "../../schedule/fillQueue";
 
 const ROSTER_LIMIT_WIDTH = 44;
 const ROSTER_MIN_NAME_WIDTH = 24; // 18px avatar + 3px cell padding on each side.
@@ -26,9 +27,12 @@ type Props = {
   showTables: boolean;
   emptyContent?: ReactNode;
   onPeek: (row: RosterRow) => void;
+  fillState?: FillQueueState | null;
+  fillActor?: string;
+  onFill?: (member: string) => void;
 };
 
-export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, showDeadTime, showTables, emptyContent, onPeek, onNameWidth }: Props) {
+export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, showDeadTime, showTables, emptyContent, onPeek, onNameWidth, fillState, fillActor, onFill }: Props) {
   const { t } = useTranslation();
   const table = useRef<HTMLTableElement>(null);
   const [collapsed, setCollapsed] = useState<Partial<Record<number, boolean>>>({});
@@ -97,7 +101,7 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
               <span>{t("schedule.deadTotal")}</span>
               <small>{t("schedule.colHoursUnit")}</small>
             </th>}
-            <th className="v2-people-tick-h" title={t("schedule.donePlanHint")} aria-label={t("schedule.colDone")}>
+            <th className="v2-people-tick-h" aria-label={t("schedule.colDone")}>
               <i className="fa-solid fa-check" aria-hidden />
             </th>
           </tr>
@@ -107,6 +111,11 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
             {emptyContent ?? <p className="v2-people-empty">{t("schedule.playersEmpty")}</p>}
           </td></tr>}
           {roster.map((row, index) => {
+            const member = row.mark.memberId;
+            const fillStatus = member && member === fillState?.current ? "current"
+              : member && fillState?.skipped.includes(member) ? "skipped"
+              : member && fillState?.done.includes(member) ? "done"
+              : member && member === fillActor && fillState?.current && fillState.order.includes(member) ? "skip" : "waiting";
             const tier = row.coreTier;
             const heading = tier === undefined ? undefined : coreHeadings[tier];
             const firstInTier = tier !== undefined && tier !== roster[index - 1]?.coreTier;
@@ -184,12 +193,11 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
                 <td className="v2-people-tick-cell">
                   <button
                     type="button"
-                    className="v2-people-tick"
-                    disabled
-                    title={t("schedule.donePlanHint")}
-                    aria-label={t("schedule.colDone")}
+                    className={`v2-people-tick is-${fillStatus}`}
+                    disabled={(fillStatus !== "current" && fillStatus !== "skip") || !member || !onFill}
+                    aria-label={t(`schedule.fill.status.${fillStatus}`, { player: row.mark.discord })}
                     onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
+                    onClick={(event) => { event.stopPropagation(); if (member) onFill?.(member); }}
                   >
                     <i className="fa-solid fa-check" aria-hidden />
                   </button>

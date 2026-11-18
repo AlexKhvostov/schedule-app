@@ -1,10 +1,14 @@
 import { getSupabase } from "./client";
+import { demoFillCompletions } from "./fillQueue";
+import { loadMembers } from "../schedule/members";
+import type { RosterKind } from "../schedule/rosterPriorities";
 
 export type LogSource = "schedule" | "distance";
 export type LogPerson = { id: string | null; name?: string; discord?: string; discord_id?: string; code?: string };
 export type LogEntry = {
-  id: string; at: string; action: "place" | "remove" | "distance_ids"; actor: LogPerson; member: LogPerson;
-  detail: { date?: string; half?: number; level?: number; tables?: number; room?: string; limit?: string; variant?: string; old_ids?: string[]; new_ids?: string[] };
+  id: string; at: string; action: "place" | "remove" | "distance_ids" | "fill_complete" | "fill_skip"; actor: LogPerson; member: LogPerson;
+  detail: { date?: string; half?: number; level?: number; tables?: number; room?: string; limit?: string; variant?: string; old_ids?: string[]; new_ids?: string[];
+    queue?: RosterKind; delivery?: Record<string, string> | null };
 };
 export type LogFilters = { source: LogSource; person: string; role: "actor" | "member"; from: string; to: string; action: string; limit: number };
 export type LogPage = { rows: LogEntry[]; has_more: boolean };
@@ -33,7 +37,14 @@ const demoDistance: LogEntry[] = [{ id: "1", at: new Date(demoStart).toISOString
 export async function loadRootLogs(filters: LogFilters, before?: Pick<LogEntry, "at" | "id">): Promise<LogPage> {
   const db = getSupabase();
   if (!db) {
-    const rows = (filters.source === "schedule" ? demoSchedule : demoDistance).filter((row) => matchesLog(row, filters)
+    const completions = filters.source === "schedule" ? demoFillCompletions() : [];
+    const members = new Map(completions.length ? loadMembers().map(person => [person.id, person]) : []);
+    const person = (id: string) => ({ id, name: members.get(id)?.name ?? id, discord: members.get(id)?.discord });
+    const events = completions.map((row): LogEntry => ({
+      id: row.id, at: row.at, action: row.skipped ? "fill_skip" : "fill_complete", actor: person(row.actor), member: person(row.member),
+      detail: { date: row.month, queue: row.queue },
+    }));
+    const rows = (filters.source === "schedule" ? [...events, ...demoSchedule] : demoDistance).filter((row) => matchesLog(row, filters)
       && (!before || row.at < before.at || (row.at === before.at && Number(row.id) < Number(before.id))));
     return { rows: rows.slice(0, filters.limit), has_more: rows.length > filters.limit };
   }

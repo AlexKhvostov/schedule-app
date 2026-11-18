@@ -3249,8 +3249,8 @@ img.v2-cab-ava {
 
 .v2-bot-body {
   display: grid;
-  gap: 10px;
-  padding: 4px 10px 12px;
+  gap: 8px;
+  padding: 4px 8px 10px;
 }
 
 .v2-bot-pane {
@@ -3281,24 +3281,24 @@ img.v2-cab-ava {
 
 .v2-bot-pane-head {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 7px 10px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--bot-accent) 14%, transparent), transparent 78%);
   border-bottom: 1px solid color-mix(in srgb, var(--bot-accent) 22%, var(--border));
 }
 
 .v2-bot-pane-ico {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   flex: none;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--bot-accent) 18%, transparent);
   color: var(--bot-accent);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .v2-bot-pane-copy {
@@ -14309,6 +14309,8 @@ img.v2-people-ava {
 .v2-roster-info:hover, .v2-roster-info:focus-visible { color: var(--title); border-color: var(--title); }
 .v2-roster-help-tip { position: fixed; z-index: 1000; width: min(300px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); box-shadow: 0 4px 16px rgb(0 0 0 / .25); font-size: 11px; line-height: 1.5; pointer-events: none; }
 .v2-roster-help-tip > span { display: block; margin-top: 6px; color: var(--muted-foreground); }
+.v2-roster-help-tip ol { margin: 4px 0 0; padding-inline-start: 1.35em; list-style: decimal; }
+.v2-roster-help-tip li + li { margin-top: 2px; }
 
 .v2-people-table {
   width: 100%;
@@ -14629,6 +14631,58 @@ img.v2-people-ava {
   cursor: not-allowed;
   opacity: 0.45;
 }
+
+.v2-people-tick.is-current {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.v2-people-tick.is-done:disabled,
+.v2-people-tick.is-skipped:disabled {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 22%, var(--card));
+  cursor: default;
+  opacity: 1;
+}
+.v2-people-tick.is-skip { opacity: .65; }
+.v2-people-tick.is-skip:hover,
+.v2-people-tick.is-skip:focus-visible { opacity: 1; }
+
+.v2-fill-confirm {
+  margin: auto;
+  width: min(360px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 13px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .3);
+}
+.v2-fill-confirm::backdrop { background: rgb(0 0 0 / .45); }
+.v2-fill-confirm h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
+.v2-fill-confirm p { margin: 4px 0; }
+.v2-fill-context { color: var(--muted-foreground); }
+.v2-fill-actions { display: flex; justify-content: end; gap: 6px; margin-top: 10px; }
+.v2-fill-actions button { padding-inline: 12px; }
+.v2-fill-actions .is-primary { background: var(--primary); color: var(--primary-foreground); }
+.v2-fill-retry { padding: 3px 6px; font-size: 11px; text-decoration: underline; }
+
+.v2-discord-fill {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.v2-discord-fill legend { padding-inline: 4px; font-weight: 650; }
+.v2-discord-fill-toggle { display: flex; align-items: center; gap: 6px; }
+.v2-discord-fill-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(126px, 1fr)); gap: 5px; }
+.v2-discord-fill-fields label { min-width: 0; display: grid; gap: 2px; }
+.v2-discord-fill-fields input { min-width: 0; width: 100%; padding-inline: 7px; }
 
 .v2-user-card {
   width: min(420px, calc(100vw - 32px));

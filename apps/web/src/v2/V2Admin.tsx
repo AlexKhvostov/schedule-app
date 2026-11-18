@@ -32,6 +32,7 @@ import { ScheduleSyncSettingsEditor } from "./ScheduleSyncSettingsEditor";
 import {
   loadScheduleSettings,
   saveActAs,
+  saveFillLock,
   saveCountTables,
   saveEditByButton,
   saveMergeAdjacentSlots,
@@ -103,6 +104,8 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
   const [allowOverwrite, setAllowOverwrite] = useState(false);
   const [overwriteSaving, setOverwriteSaving] = useState(false);
   const [allowActAs, setAllowActAs] = useState(false);
+  const [lockFillQueue, setLockFillQueue] = useState(false);
+  const [fillLockSaving, setFillLockSaving] = useState(false);
   const [actAsSaving, setActAsSaving] = useState(false);
   const [countTables, setCountTables] = useState(false);
   const [tablesSaving, setTablesSaving] = useState(false);
@@ -171,6 +174,7 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
         if (!live) return;
         setAllowOverwrite(next.allowOverwriteMarks);
         setAllowActAs(next.allowActAs);
+        setLockFillQueue(Boolean(next.lockFillQueue));
         setCountTables(next.countTables);
         setEditByButton(next.editByButton);
         setMergeAdjacentSlots(next.mergeAdjacentSlots);
@@ -365,6 +369,20 @@ export function V2Admin({ capacity, isRoot, section = "people", variant, onVaria
               <small>{t("admin.control.actAsHint")}</small>
             </span>
             <span className={`v2-settings-switch${allowActAs ? " is-on" : ""}`} aria-hidden />
+          </button>
+          <button type="button" role="switch" aria-checked={lockFillQueue}
+            className={`v2-settings-row${lockFillQueue ? " is-on" : ""}`} disabled={fillLockSaving}
+            onClick={() => {
+              setFillLockSaving(true);
+              const next = !lockFillQueue;
+              void saveFillLock(next).then(({ error }) => {
+                if (error) showV2Toast("err", t("admin.people.saveErr"));
+                else { setLockFillQueue(next); showV2Toast("ok", t("admin.saved")); }
+              }).catch(() => showV2Toast("err", t("admin.people.saveErr"))).finally(() => setFillLockSaving(false));
+            }}>
+            <span className="v2-settings-ico"><i className="fa-solid fa-list-ol" aria-hidden /></span>
+            <span className="v2-settings-copy"><b>{t("admin.control.fillLock")}</b><small>{t("admin.control.fillLockHint")}</small></span>
+            <span className={`v2-settings-switch${lockFillQueue ? " is-on" : ""}`} aria-hidden />
           </button>
           <button
             type="button"
