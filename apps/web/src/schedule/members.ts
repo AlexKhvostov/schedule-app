@@ -245,7 +245,7 @@ export const SEED_MEMBERS: ClubMember[] = [
     limits: ["50", "100"],
     status: "active",
     appAccess: true,
-    vipNitro: 0,
+    vipNitro: 2,
     vipRegular: 0,
     distance: 14,
     mark: mark(120, "YO"),

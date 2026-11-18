@@ -29,7 +29,7 @@ type Props = {
   onPeek: (row: RosterRow) => void;
   fillState?: FillQueueState | null;
   fillActor?: string;
-  onFill?: (member: string) => void;
+  onFill?: (row: RosterRow) => void;
 };
 
 export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, showDeadTime, showTables, emptyContent, onPeek, onNameWidth, fillState, fillActor, onFill }: Props) {
@@ -102,7 +102,7 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
               <small>{t("schedule.colHoursUnit")}</small>
             </th>}
             <th className="v2-people-tick-h" aria-label={t("schedule.colDone")}>
-              <i className="fa-solid fa-check" aria-hidden />
+              <i className="fa-solid fa-flag-checkered" aria-hidden />
             </th>
           </tr>
         </thead>
@@ -116,6 +116,7 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
               : member && fillState?.skipped.includes(member) ? "skipped"
               : member && fillState?.done.includes(member) ? "done"
               : member && member === fillActor && fillState?.current && fillState.order.includes(member) ? "skip" : "waiting";
+            const fillHint = fillStatus === "waiting" ? "skip" : fillStatus;
             const tier = row.coreTier;
             const heading = tier === undefined ? undefined : coreHeadings[tier];
             const firstInTier = tier !== undefined && tier !== roster[index - 1]?.coreTier;
@@ -190,17 +191,17 @@ export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, show
                 >
                   {deadTimeByMember && memberDeadTime?.total ? formatHours(memberDeadTime.total) : "—"}
                 </td>}
-                <td className="v2-people-tick-cell">
+                <td className="v2-people-tick-cell" title={t(`schedule.fill.switchHint.${fillHint}`)}>
                   <button
                     type="button"
-                    className={`v2-people-tick is-${fillStatus}`}
-                    disabled={(fillStatus !== "current" && fillStatus !== "skip") || !member || !onFill}
+                    role="switch"
+                    className={`v2-people-switch is-${fillStatus}`}
+                    aria-checked={fillStatus === "done" || fillStatus === "skipped"}
+                    disabled={fillStatus === "done" || fillStatus === "skipped" || !onFill}
                     aria-label={t(`schedule.fill.status.${fillStatus}`, { player: row.mark.discord })}
                     onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => { event.stopPropagation(); if (member) onFill?.(member); }}
-                  >
-                    <i className="fa-solid fa-check" aria-hidden />
-                  </button>
+                    onClick={(event) => { event.stopPropagation(); onFill?.(row); }}
+                  />
                 </td>
               </tr>
             );

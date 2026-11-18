@@ -64,7 +64,7 @@ export async function previewFill(month: string, queue: RosterKind, actor: strin
   return data as FillOffer;
 }
 
-export async function confirmFill(month: string, queue: RosterKind, actor: string, offer: FillOffer): Promise<{ offer?: FillOffer }> {
+export async function confirmFill(month: string, queue: RosterKind, actor: string, offer: FillOffer, notify: boolean): Promise<{ offer?: FillOffer }> {
   if (!isLiveData()) {
     const latest = await previewFill(month, queue, actor, offer.member);
     if (JSON.stringify(latest) !== JSON.stringify(offer)) return { offer: latest };
@@ -77,10 +77,10 @@ export async function confirmFill(month: string, queue: RosterKind, actor: strin
   }
   const db = getSupabase()!;
   const { data, error } = await db.rpc("confirm_fill_completion", {
-    p_month: month, p_queue: queue, p_member: offer.member, p_expected: offer,
+    p_month: month, p_queue: queue, p_member: offer.member, p_expected: offer, p_notify: notify,
   });
   if (error || !data) throw new Error(error?.message ?? "fill-queue-unavailable");
   const result = data as { id?: string; offer?: FillOffer };
-  if (result.id && offer.dm) void db.functions.invoke("notify-fill-queue", { body: { id: result.id } }).catch(() => {});
+  if (result.id && notify && offer.dm) void db.functions.invoke("notify-fill-queue", { body: { id: result.id } }).catch(() => {});
   return result;
 }

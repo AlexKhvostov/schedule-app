@@ -8,9 +8,13 @@ declare
   season date := date_trunc('month',future)::date;
   future2 date := (season+interval '1 month 6 days')::date;
   season2 date := date_trunc('month',future2)::date;
+  season3 date := (season+interval '2 months')::date;
+  season4 date := (season+interval '3 months')::date;
   place jsonb; offer jsonb; event_id uuid; skip_id uuid; logs jsonb;
+  silent_id uuid; notify_id uuid; disabled_id uuid;
 begin
   if has_function_privilege('anon','public.load_fill_queue(date,text)','EXECUTE')
+    or has_function_privilege('anon','public.confirm_fill_completion(date,text,uuid,jsonb,boolean)','EXECUTE')
     or has_function_privilege('authenticated','public.claim_fill_deliveries(uuid,uuid)','EXECUTE')
     or has_table_privilege('authenticated','schedule_private.fill_completions','UPDATE') then
     raise exception 'fill queue privileges too broad';
@@ -133,6 +137,46 @@ begin
     raise exception 'wrong skip audit evidence %',logs;
   end if;
   execute 'reset role';
+
+  perform set_config('request.jwt.claim.sub',a_auth::text,true);
+  execute 'set local role authenticated';
+  offer := preview_fill_completion(season3,'nitro',a);
+  silent_id := (confirm_fill_completion(season3,'nitro',a,offer,false)->>'id')::uuid;
+  if silent_id is null or load_fill_queue(season3,'nitro')->>'current' is distinct from b::text
+    or (confirm_fill_completion(season3,'nitro',a,offer,true)->>'id')::uuid is distinct from silent_id then
+    raise exception 'silent completion did not hand off or was not idempotent';
+  end if;
+  perform set_config('request.jwt.claim.sub',b_auth::text,true);
+  offer := preview_fill_completion(season3,'nitro',b);
+  notify_id := (confirm_fill_completion(season3,'nitro',b,offer,true)->>'id')::uuid;
+  if notify_id is null or load_fill_queue(season3,'nitro')->>'current' is distinct from c::text then
+    raise exception 'notification choice carried over to the next turn';
+  end if;
+  execute 'reset role';
+  if exists(select 1 from schedule_private.fill_deliveries where completion_id=silent_id)
+    or (select count(*) from schedule_private.fill_deliveries where completion_id=notify_id and next_member=c)<>2 then
+    raise exception 'per-turn notification choice did not constrain delivery jobs';
+  end if;
+  perform set_config('request.jwt.claim.sub',root_auth::text,true);
+  execute 'set local role authenticated';
+  logs := root_logs(p_action=>'fill_complete',p_person=>'FILL-A',p_role=>'actor');
+  if not exists(select 1 from jsonb_array_elements(logs->'rows') event where event->>'id'=silent_id::text) then
+    raise exception 'silent completion was not audited';
+  end if;
+  execute 'reset role';
+
+  update bot_settings set notify_fill_queue=false where id='discord';
+  perform set_config('request.jwt.claim.sub',a_auth::text,true);
+  execute 'set local role authenticated';
+  offer := preview_fill_completion(season4,'nitro',a);
+  disabled_id := (confirm_fill_completion(season4,'nitro',a,offer,true)->>'id')::uuid;
+  if disabled_id is null or load_fill_queue(season4,'nitro')->>'current' is distinct from b::text then
+    raise exception 'handoff failed when club notifications were disabled';
+  end if;
+  execute 'reset role';
+  if exists(select 1 from schedule_private.fill_deliveries where completion_id=disabled_id) then
+    raise exception 'caller overrode the club notification setting';
+  end if;
 
   update members set vip_nitro=4 where id=b;
   perform set_config('request.jwt.claim.sub',a_auth::text,true);

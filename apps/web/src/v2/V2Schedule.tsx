@@ -17,7 +17,7 @@ import { deadTimeBreakdownsByMember, deadTimeMemberKey } from "../schedule/deadT
 import { demoMonthPlan } from "../schedule/demoPlan";
 import { resetDemoSchedules } from "../schedule/demoScheduleStore";
 import { monthTitle } from "../schedule/formatDate";
-import { scheduleMonth, type FillOffer } from "../schedule/fillQueue";
+import { scheduleMonth } from "../schedule/fillQueue";
 import { type HourLoadMap } from "../schedule/hourLoad";
 import { markKey, type Mark } from "../schedule/marks";
 import { emptyMonth } from "../schedule/plan";
@@ -51,7 +51,7 @@ import { useScheduleMutations } from "./schedule/useScheduleMutations";
 import { useSchedulePreferences } from "./schedule/useSchedulePreferences";
 import { useScheduleRules } from "./schedule/useScheduleRules";
 import { ScheduleRosterHelp } from "./schedule/ScheduleRosterHelp";
-import { FillConfirm } from "./schedule/FillConfirm";
+import { FillConfirm, type FillConfirmContent } from "./schedule/FillConfirm";
 import { useFillQueue } from "./schedule/useFillQueue";
 import { useRosterSource } from "./schedule/useRosterSource";
 import { useScheduleToolbar } from "./schedule/useScheduleToolbar";
@@ -159,30 +159,40 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const fillScope = `${rosterMonth}:${rosterQueue}:${selfId ?? ""}`;
   const { state: fillState, failed: fillFailed, refresh: refreshFill } = useFillQueue(showPeople && Boolean(rosterSource.source),
     rosterMonth, rosterQueue, selfId, `${rosterSource.source?.revision}:${rosterSource.directoryRevision}`);
-  const [fillOffer, setFillOffer] = useState<{ scope: string; offer: FillOffer } | null>(null);
+  const [fillDialog, setFillDialog] = useState<(FillConfirmContent & { scope: string }) | null>(null);
+  const fillOffer = fillDialog && "offer" in fillDialog ? fillDialog.offer : null;
+  const finisherAvatar = fillOffer ? rosterSource.faces.find(face => face.memberId === fillOffer.member)?.avatarUrl : undefined;
+  const nextFillAvatar = fillOffer?.next ? rosterSource.faces.find(face => face.memberId === fillOffer.next)?.avatarUrl : undefined;
   const [fillBusy, setFillBusy] = useState(false);
   const fillRequest = useRef(false);
-  useEffect(() => { setFillOffer(null); }, [fillScope, showPeople]);
+  useEffect(() => { setFillDialog(null); }, [fillScope, showPeople]);
 
-  const openFillOffer = async (target: string) => {
+  const openFillOffer = async (row: RosterRow) => {
     if (fillRequest.current || !selfId) return;
+    const target = row.mark.memberId;
+    if (!fillState?.current || !target || !fillState.order.includes(target) || (target !== fillState.current && target !== selfId)) {
+      const notice = !fillState ? "unavailable" : !target || !fillState.order.includes(target) ? "outside"
+        : fillState.current ? "waiting" : "unavailable";
+      setFillDialog({ scope: fillScope, notice, player: row.mark.discord || row.mark.t });
+      return;
+    }
     fillRequest.current = true;
-    try { setFillOffer({ scope: fillScope, offer: await previewFill(rosterMonth, rosterQueue, selfId, target) }); }
+    try { setFillDialog({ scope: fillScope, offer: await previewFill(rosterMonth, rosterQueue, selfId, target) }); }
     catch { refreshFill(); showV2Toast("err", t("schedule.fill.changed")); }
     finally { fillRequest.current = false; }
   };
 
-  const confirmFillOffer = async () => {
-    if (fillRequest.current || !selfId || fillOffer?.scope !== fillScope) return;
+  const confirmFillOffer = async (notify: boolean) => {
+    if (fillRequest.current || !selfId || fillDialog?.scope !== fillScope || !("offer" in fillDialog)) return;
     fillRequest.current = true;
     setFillBusy(true);
     try {
-      const result = await confirmFill(rosterMonth, rosterQueue, selfId, fillOffer.offer);
-      setFillOffer(result.offer ? { scope: fillScope, offer: result.offer } : null);
+      const result = await confirmFill(rosterMonth, rosterQueue, selfId, fillDialog.offer, notify);
+      setFillDialog(result.offer ? { scope: fillScope, offer: result.offer } : null);
       if (result.offer) showV2Toast("err", t("schedule.fill.changed"));
-      else showV2Toast("ok", t(fillOffer.offer.mode === "skip" ? "schedule.fill.skipSaved" : "schedule.fill.saved"));
+      else showV2Toast("ok", t(fillDialog.offer.mode === "skip" ? "schedule.fill.skipSaved" : "schedule.fill.saved"));
     } catch (error) {
-      if (String(error).includes("fill-queue-stale")) setFillOffer(null);
+      if (String(error).includes("fill-queue-stale")) setFillDialog(null);
       showV2Toast("err", t("schedule.fill.changed"));
     } finally {
       refreshFill();
@@ -684,8 +694,9 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
             </div>
           </V2Float>
         )}
-        {showPeople && selfId && fillOffer?.scope === fillScope && <FillConfirm month={rosterMonth} queue={rosterQueue}
-          offer={fillOffer.offer} actor={selfId} busy={fillBusy} onCancel={() => setFillOffer(null)} onConfirm={confirmFillOffer} />}
+        {showPeople && selfId && fillDialog?.scope === fillScope && <FillConfirm month={rosterMonth} queue={rosterQueue}
+          content={fillDialog} actor={selfId} finisherAvatar={finisherAvatar} nextAvatar={nextFillAvatar} busy={fillBusy}
+          onCancel={() => setFillDialog(null)} onConfirm={confirmFillOffer} />}
         {peek ? (
           <V2UserCard
             row={peek}
