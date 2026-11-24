@@ -489,7 +489,7 @@ export function MembersAdmin() {
                         {row.memberId && row.clubOrder != null ? <div className="v2-club-order-cell"
                           title={!canMoveOrder ? t("admin.people.order.fullListRequired") : undefined}>
                           <span className="v2-club-order-number">{row.clubOrder}</span>
-                          {([-1, 1] as const).map(direction => <button key={direction} type="button"
+                          <span className="v2-club-order-controls">{([-1, 1] as const).map(direction => <button key={direction} type="button"
                             aria-label={t(direction === -1 ? "admin.people.order.up" : "admin.people.order.down", { name: discordPrimary(row) })}
                             disabled={busyLoad || orderEditor.busy || !canMoveOrder || (orderEditor.editing && !orderEditor.valid)
                               || (direction === -1 ? numberedRows[0] : numberedRows.at(-1))?.memberId === row.memberId}
@@ -497,7 +497,7 @@ export function MembersAdmin() {
                               event.stopPropagation();
                               if (orderEditor.editing) orderEditor.move(row.memberId!, direction);
                               else void startOrderEdit({ memberId: row.memberId!, direction });
-                            }}>{direction === -1 ? "↑" : "↓"}</button>)}
+                            }}>{direction === -1 ? "↑" : "↓"}</button>)}</span>
                         </div> : row.clubOrder ?? "—"}
                       </td>
                       <td>

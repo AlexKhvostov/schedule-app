@@ -27,6 +27,13 @@ test("arrows swap neighbours; profile inserts at occupied position and validates
   await expect(rows.first().getByRole("button", { name: /Выше:/ })).toBeDisabled();
   const positionColumn = await rows.first().locator(".v2-mem-order").boundingBox();
   expect(positionColumn!.width).toBeLessThanOrEqual(78);
+  // Keep the number/control hierarchy reviewable in both themes.
+  for (const [theme, label] of [["dark", "Тёмная тема"], ["light", "Светлая тема"], ["dark", "Тёмная тема"]]) {
+    await page.getByRole("button", { name: "you", exact: true }).first().click();
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await page.getByRole("button", { name: "you", exact: true }).first().click();
+    await page.screenshot({ path: info.outputPath(`club-position-hierarchy-${theme}.png`) });
+  }
   await expect(page.locator(".v2-profiles-table").getByRole("spinbutton")).toHaveCount(0);
   await rows.first().getByRole("button", { name: /Ниже:/ }).click();
   await expect(rows.first()).not.toHaveAttribute("data-profile-id", first!);
