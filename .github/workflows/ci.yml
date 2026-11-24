@@ -108,6 +108,12 @@ jobs:
         run: supabase db start
       - name: Rebuild schema from migrations
         run: supabase db reset
+      - name: Check RedParty positions and queue ties
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/club_order.sql
+      - name: Check concurrent RedParty reordering and member deletion
+        env:
+          PGPASSWORD: postgres
+        run: python3 supabase/tests/club_order_concurrency.py
       - name: Check database security contracts
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/security_contracts.sql
       - name: Check Dashboard role access

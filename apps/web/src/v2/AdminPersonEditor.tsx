@@ -8,7 +8,7 @@ import { readSession } from "./session";
 import { showV2Toast } from "./V2Toast";
 
 /** Shared editor for the people list and the schedule. All writes retain their existing server checks. */
-export function AdminPersonEditor({ person, people, onClose, onReload, onCreateCard, busy = false, countTables = false }: {
+export function AdminPersonEditor({ person, people, onClose, onReload, onCreateCard, busy = false, countTables = false, orderPending = false }: {
   person: AdminPerson;
   people: AdminPerson[];
   onClose: () => void;
@@ -16,6 +16,7 @@ export function AdminPersonEditor({ person, people, onClose, onReload, onCreateC
   onCreateCard?: () => void;
   busy?: boolean;
   countTables?: boolean;
+  orderPending?: boolean;
 }) {
   const { t } = useTranslation();
   const selfMemberId = readSession()?.memberId;
@@ -33,8 +34,8 @@ export function AdminPersonEditor({ person, people, onClose, onReload, onCreateC
   };
   return <>
     <AdminPersonCard person={person} people={people} selfMemberId={selfMemberId}
-      busy={busy || saving} onClose={onClose} onAccess={access => void setAccess(access)}
-      onCreateCard={onCreateCard} onMark={() => setMarkOpen(true)} onReload={() => void onReload()} countTables={countTables} />
+      busy={busy || saving} orderPending={orderPending} onClose={onClose} onAccess={access => void setAccess(access)}
+      onCreateCard={onCreateCard} onMark={() => setMarkOpen(true)} onReload={onReload} countTables={countTables} />
     {markOpen && person.memberId && <MarkModal member={asMarkMember(person)} list={people.filter(row => row.memberId).map(asMarkMember)}
       showTables={countTables} onClose={() => setMarkOpen(false)} onSave={mark => {
         if (saving || !person.memberId) return;

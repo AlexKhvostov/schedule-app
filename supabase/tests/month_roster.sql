@@ -30,7 +30,7 @@ begin
     foreach grp in array array['50-100','250'] loop
       full_source:=load_priority_slice('2026-11-01',kind,grp);
       first_read:=load_month_roster('2026-11-01',kind,grp,array['50','100','250']);
-      select jsonb_agg(jsonb_build_object('memberId',p->'memberId',
+      select jsonb_agg(jsonb_build_object('memberId',p->'memberId','clubOrder',p->'clubOrder',
         'core',p->case when grp='250' then case when kind='nitro' then 'coreNitro250' else 'coreRegular250' end else case when kind='nitro' then 'vipNitro' else 'vipRegular' end end,
         'score',p->'calculation'->'total','excluded',p->case when kind='nitro' then 'excludedNitro' else 'excludedRegular' end) order by p->>'memberId') into expected
         from jsonb_array_elements(full_source->'people') p;

@@ -1,5 +1,5 @@
 import { memberDistanceIds, parseDistanceIds } from "../data/distanceIds";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { UTC_OFFSETS, utcLabel } from "../schedule/cet";
@@ -28,6 +28,9 @@ import { PersonAvatar } from "./PersonAvatar";
 import { loadTheme } from "./theme";
 import { PayMethodsPanel } from "./PayMethodsPanel";
 import { showV2Toast } from "./V2Toast";
+import { isLiveData } from "../data/config";
+import { demoAdminMember } from "../data/demoPeople";
+import { ClubOrderProfileField } from "./members/ClubOrderProfileField";
 
 type Props = {
   person: AdminPerson;
@@ -38,8 +41,9 @@ type Props = {
   onAccess: (access: ClubAccess) => void;
   onCreateCard?: () => void;
   onMark: () => void;
-  onReload: () => void;
+  onReload: () => Promise<void>;
   countTables?: boolean;
+  orderPending?: boolean;
 };
 
 function isClubSeat(row: AdminPerson) {
@@ -198,11 +202,12 @@ function PriorityExclusions({ memberId, disabled }: { memberId: string; disabled
   );
 }
 
-export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onCreateCard, onMark, onReload, countTables = false }: Props) {
+export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, onAccess, onCreateCard, onMark, onReload, countTables = false, orderPending = false }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language.startsWith("en") ? "en" : "ru";
   const canCloseSelf = person.memberId === selfMemberId;
   const canEdit = Boolean(person.memberId);
+  const demoMember = !isLiveData() ? demoAdminMember(person.memberId) : undefined;
 
   const [name, setName] = useState(person.displayName ?? "");
   const [phone, setPhone] = useState(person.phone ?? "");
@@ -230,27 +235,39 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
   const [saving, setSaving] = useState(false);
   const [login, setLogin] = useState(() => packPersonLogin(person));
   const [savedLogin, setSavedLogin] = useState(() => packPersonLogin(person));
+  const previousPerson = useRef(person);
+  const resetAfterSave = useRef(false);
 
   useEffect(() => {
-    setName(person.displayName ?? "");
-    setPhone(person.phone ?? "");
-    setTelegram(person.telegram ?? "");
-    setContactAlt(person.contactAlt ?? "");
-    setCity(person.city ?? "");
-    setCountry(person.country ?? "");
-    setBirthday(person.birthday?.slice(0, 10) ?? "");
-    setExtraUtc(person.extraUtc ?? 3);
-    setChannel(person.notifyChannel ?? "discord");
-    setSavedChannel(person.notifyChannel ?? "discord");
-    setVipNitro(vipText(person.vipNitro));
-    setVipRegular(vipText(person.vipRegular));
-    setCoreNitro250(vipText(person.coreNitro250)); setCoreRegular250(vipText(person.coreRegular250));
-    setCommunity(person.communityStatus === "school" ? "school" : "club");
-    setGuarantorId(person.guarantorId ?? "");
-    setDistanceId(memberDistanceIds(person).join(" "));
-    const nextLogin = packPersonLogin(person);
-    setLogin(nextLogin);
-    setSavedLogin(nextLogin);
+    const previous = previousPerson.current;
+    previousPerson.current = person;
+    const reset = resetAfterSave.current;
+    resetAfterSave.current = false;
+    // Order-only refreshes preserve other drafts. Existing section saves still
+    // accept normalized server values, even when the persisted value is unchanged.
+    const sync = <T,>(read: (row: AdminPerson) => T, set: (value: T) => void) => {
+      const before = read(previous), next = read(person);
+      if (reset || previous.memberId !== person.memberId || !sameJson(before, next)) set(next);
+    };
+    sync(row => row.displayName ?? "", setName);
+    sync(row => row.phone ?? "", setPhone);
+    sync(row => row.telegram ?? "", setTelegram);
+    sync(row => row.contactAlt ?? "", setContactAlt);
+    sync(row => row.city ?? "", setCity);
+    sync(row => row.country ?? "", setCountry);
+    sync(row => row.birthday?.slice(0, 10) ?? "", setBirthday);
+    sync(row => row.extraUtc ?? 3, setExtraUtc);
+    sync(row => row.notifyChannel ?? "discord", setChannel);
+    sync(row => row.notifyChannel ?? "discord", setSavedChannel);
+    sync(row => vipText(row.vipNitro), setVipNitro);
+    sync(row => vipText(row.vipRegular), setVipRegular);
+    sync(row => vipText(row.coreNitro250), setCoreNitro250);
+    sync(row => vipText(row.coreRegular250), setCoreRegular250);
+    sync(row => row.communityStatus === "school" ? "school" : "club", setCommunity);
+    sync(row => row.guarantorId ?? "", setGuarantorId);
+    sync(row => memberDistanceIds(row).join(" "), setDistanceId);
+    sync(packPersonLogin, setLogin);
+    sync(packPersonLogin, setSavedLogin);
   }, [person]);
 
   useEffect(() => {
@@ -263,7 +280,8 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
     }
     let alive = true;
     setPlaysReady(false);
-    void loadMyPlays(person.memberId).then((rows) => {
+    const request = isLiveData() ? loadMyPlays(person.memberId) : Promise.resolve(demoAdminMember(person.memberId)?.plays ?? []);
+    void request.then((rows) => {
       if (!alive) return;
       const next = rows.length ? clonePlays(rows) : [normalizePlay(emptyRoomPlay("winamax"))];
       setPlays(clonePlays(next));
@@ -312,6 +330,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
 
   const fail = () => showV2Toast("err", t("admin.people.saveErr"));
   const ok = () => {
+    resetAfterSave.current = true;
     showV2Toast("ok", t("admin.saved"));
     onReload();
   };
@@ -444,8 +463,13 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
           </button>
         </header>
         <p className="v2-cablike-lead">{t("admin.people.cardLead")}</p>
+        {!isLiveData() && <p className="v2-cablike-lead">{t("admin.people.demoProfileHint")}</p>}
 
         <div className="v2-cab">
+            {person.memberId && person.clubOrder != null && <ClubOrderProfileField
+              key={person.memberId} memberId={person.memberId} number={person.clubOrder}
+              disabled={busy || saving || orderPending} pending={orderPending} onSaved={onReload} />}
+            <fieldset className="v2-profile-fields" disabled={!isLiveData()}>
             <section className="v2-block v2-cab-card v2-staff-card">
               <div className="v2-cab-head">
                 <h2>{t("admin.people.colAccess")}</h2>
@@ -621,7 +645,7 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                         <Field label="250-500 · Nitro"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreNitro250} onChange={(e) => setCoreNitro250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
                         <Field label="250-500 · Expresso"><input className="v2-ctrl w-full px-3" inputMode="numeric" placeholder="—" value={coreRegular250} onChange={(e) => setCoreRegular250(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} /></Field>
                       </div>
-                      {person.memberId && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
+                      {person.memberId && isLiveData() && <PriorityExclusions key={person.memberId} memberId={person.memberId} disabled={saving || busy} />}
                     </div>
                     <div className="v2-cab-facts">
                       <Fact label={t("admin.people.loggedIn")}>{person.loggedIn ? t("admin.people.yes") : t("admin.people.no")}</Fact>
@@ -759,8 +783,9 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   <TablePresetsPanel
                     memberId={person.memberId}
                     fallback={person.tables ?? 1}
-                    live
-                    canEdit={canEdit}
+                    live={isLiveData()}
+                    demoValues={demoMember?.tablePresets}
+                    canEdit={canEdit && isLiveData()}
                   />
                 ) : null}
 
@@ -781,9 +806,10 @@ export function AdminPersonCard({ person, people, selfMemberId, busy, onClose, o
                   }}
                 />
 
-                <PayMethodsPanel memberId={person.memberId} canEdit={canEdit} live />
+                <PayMethodsPanel memberId={person.memberId} canEdit={canEdit && isLiveData()} live={isLiveData()} demoPays={demoMember?.pays} />
               </>
             )}
+            </fieldset>
         </div>
       </aside>
     </div>,

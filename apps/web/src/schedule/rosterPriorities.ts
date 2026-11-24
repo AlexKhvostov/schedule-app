@@ -2,7 +2,7 @@ import { calculatePriority, coreOf, type PriorityGroup, type PriorityKind, type 
 
 export type RosterKind = PriorityKind | "both";
 
-export type RosterPriority = { memberId: string; core: number; tier?: number; score: number; excluded: boolean };
+export type RosterPriority = { memberId: string; core: number; tier?: number; score: number; excluded: boolean; clubOrder?: number | null };
 export type RosterPrioritySource = {
   periodStart: string; kind: RosterKind; group: PriorityGroup; today: string;
   lastMonthEntries: number; calculatedAt?: string; revision: string; people: RosterPriority[];
@@ -11,7 +11,7 @@ export type RosterPrioritySource = {
 /** Demo and contract tests use the same projection as the database RPC. */
 export function compactRosterPriorities(source: PrioritySource, kind: PriorityKind, group: PriorityGroup): RosterPrioritySource {
   const people = source.people.map((person) => ({
-    memberId: person.memberId, core: coreOf(person, kind, group),
+    memberId: person.memberId, core: coreOf(person, kind, group), clubOrder: person.clubOrder,
     score: calculatePriority(person, source.periodStart, kind, group).total,
     excluded: kind === "nitro" ? person.excludedNitro : person.excludedRegular,
   }));

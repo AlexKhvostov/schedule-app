@@ -4,6 +4,7 @@ import { isPastSlot, type CetStamp } from "./cet";
 import type { Occupancy } from "./plan";
 import type { PriorityKind } from "./priorities";
 import type { RosterPrioritySource } from "./rosterPriorities";
+import { compareClubOrder } from "./clubOrder";
 
 export type LimitHours = {
   slots: number;
@@ -33,6 +34,7 @@ export function orderRosterRows(rows: readonly RosterRow[], source: RosterPriori
       row: { ...row, core: person ? person.core : source.group === "250" ? 0 : vipOf(row.mark, kind) ?? 0, excluded: person?.excluded ?? false },
       tier: person?.tier ?? 0,
       score: person?.score ?? 0,
+      clubOrder: person?.clubOrder,
       vip: person ? person.core : source.group === "250" ? 0 : vipOf(row.mark, kind),
     };
   });
@@ -40,6 +42,7 @@ export function orderRosterRows(rows: readonly RosterRow[], source: RosterPriori
     || a.tier - b.tier
     || (a.row.excluded ? 0 : rankKey(a.vip) - rankKey(b.vip))
     || b.score - a.score
+    || compareClubOrder(a.clubOrder, b.clubOrder)
     || a.row.mark.discord.localeCompare(b.row.mark.discord, "ru", { numeric: true, sensitivity: "base" })
     || personKey(a.row.mark).localeCompare(personKey(b.row.mark)));
   return ranked.map(({ row, tier }, index) => ({

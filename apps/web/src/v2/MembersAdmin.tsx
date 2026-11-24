@@ -33,6 +33,9 @@ import { showV2Toast } from "./V2Toast";
 import { MembersRoleSettings } from "./members/MembersRoleSettings";
 import { MembersSystemSettings } from "./members/MembersSystemSettings";
 import { DiscordSnapshotModal } from "./members/DiscordSnapshotModal";
+import { useClubOrderEditor } from "./members/useClubOrderEditor";
+import { demoAdminPeople } from "../data/demoPeople";
+import { subscribeAppChanges } from "../data/appRealtime";
 import {
   filterAndSortPeople,
   peopleCounts,
@@ -201,7 +204,7 @@ export function MembersAdmin() {
   const [busyId, setBusyId] = useState("");
   const [nickQ, setNickQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sort, setSort] = useState<SortKey>("access");
+  const [sort, setSort] = useState<SortKey>("clubOrder");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showBots, setShowBots] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
@@ -217,7 +220,7 @@ export function MembersAdmin() {
 
   const reload = async () => {
     if (!isLiveData()) {
-      setList([]);
+      setList(demoAdminPeople());
       setAsks([]);
       setRoomNicks(new Map());
       setBusyLoad(false);
@@ -232,9 +235,17 @@ export function MembersAdmin() {
     setBusyLoad(false);
   };
 
-  useEffect(() => {
-    void reload();
-  }, []);
+  const orderEditor = useClubOrderEditor(reload);
+  const startOrderEdit = async (firstMove?: { memberId: string; direction: -1 | 1 }) => {
+    if (await orderEditor.start(firstMove)) {
+      setNickQ(""); setStatusFilter("all"); setRoleFilter([]); setShowBots(false);
+      setSort("clubOrder"); setSortDirection("asc");
+    }
+  };
+  useEffect(() => { void reload(); }, []);
+  useEffect(() => subscribeAppChanges(change => {
+    if (!orderEditor.editing && !profileFor && (change.domain === "directory" || change.domain === "access")) void reload();
+  }), [orderEditor.editing, profileFor]);
 
   useEffect(() => {
     let live = true;
@@ -325,15 +336,19 @@ export function MembersAdmin() {
     setRoleFilter((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const rows = useMemo(
-    () => filterAndSortPeople(people, nickQ, statusFilter, sort, rolePicked, sortDirection),
-    [people, nickQ, statusFilter, sort, rolePicked, sortDirection],
-  );
+  const orderNumbers = new Map(orderEditor.rows?.map(row => [row.memberId, row.number]));
+  const orderedPeople = orderEditor.editing ? people.map(row => ({ ...row,
+    clubOrder: row.memberId ? orderNumbers.get(row.memberId) ?? null : null })) : people;
+  const rows = filterAndSortPeople(orderedPeople, nickQ, statusFilter, sort, rolePicked, sortDirection);
+  const numberedRows = rows.filter(row => row.clubOrder != null);
+  const canMoveOrder = orderEditor.editing || (!nickQ.trim() && statusFilter === "all" && !rolePicked.size
+    && sort === "clubOrder" && sortDirection === "asc");
 
   const sortHeader = (key: SortKey, label: string, className?: string, hint?: string) => (
     <th className={className} title={hint} aria-sort={sort === key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
       <button
         type="button"
+        disabled={orderEditor.editing}
         className={`v2-mem-sort${sort === key ? " is-on" : ""}`}
         title={t("admin.people.sortColumnHint")}
         onClick={() => {
@@ -347,7 +362,7 @@ export function MembersAdmin() {
     </th>
   );
 
-  const profile = list.find((row) => row.discordId === profileFor) ?? null;
+  const profile = (orderEditor.editing ? orderedPeople : list).find((row) => row.discordId === profileFor) ?? null;
   const discordPerson = list.find((row) => row.discordId === discordFor) ?? null;
   const shownAsks = showRequestHistory ? asks : asks.filter((ask) => ask.status === "open");
   const bulkEligible = list.filter(
@@ -368,13 +383,7 @@ export function MembersAdmin() {
       <div className="v2-people-bar">
         <h2>{t("nav.adminPeople")}</h2>
       </div>
-      {!isLiveData() ? (
-        <div className="v2-guild-empty mt-6">
-          <i className="fa-brands fa-discord" />
-          <h2>{t("admin.people.needLive.title")}</h2>
-          <p className="v2-muted">{t("admin.people.needLive.lead")}</p>
-        </div>
-      ) : (
+      {(
         <>
           <nav className="v2-people-tabs" aria-label={t("admin.people.tabsLabel")}>
             {([
@@ -383,10 +392,11 @@ export function MembersAdmin() {
               ["roles", "fa-shield-halved", t("admin.people.tabRoles"), null],
               ["discord", "fa-brands fa-discord", t("admin.people.tabDiscord"), snapshotRows.length],
               ["settings", "fa-sliders", t("admin.people.tabSettings"), null],
-            ] as [PeopleTab, string, string, number | null][]).map(([key, icon, label, count]) => (
+            ] as [PeopleTab, string, string, number | null][]).filter(([key]) => isLiveData() || key === "profiles").map(([key, icon, label, count]) => (
               <button
                 key={key}
                 type="button"
+                disabled={orderEditor.editing}
                 className={activeTab === key ? "is-on" : undefined}
                 aria-current={activeTab === key ? "page" : undefined}
                 onClick={() => setActiveTab(key)}
@@ -408,8 +418,18 @@ export function MembersAdmin() {
                 <small>{t("admin.people.profilesLead")}</small>
               </span>
               <span className="v2-section-count">{people.length}</span>
+              <div className="v2-club-order-actions">
+                {orderEditor.editing ? <>
+                  <button type="button" disabled={orderEditor.busy || !orderEditor.valid} onClick={() => void orderEditor.save()}>{t("admin.people.order.save")}</button>
+                  <button type="button" disabled={orderEditor.busy} onClick={() => { orderEditor.cancel(); void reload(); }}>{t("admin.people.order.cancel")}</button>
+                </> : <button type="button" disabled={busyLoad || orderEditor.busy} onClick={() => void startOrderEdit()}>{t("admin.people.order.edit")}</button>}
+              </div>
             </header>
-          <div className="v2-mem-filters">
+            {orderEditor.editing && <p className="v2-club-order-hint">{t("admin.people.order.hint")}</p>}
+            {!orderEditor.editing && <p className="v2-club-order-hint">{t("admin.people.order.filterHint")}</p>}
+            {orderEditor.editing && !orderEditor.valid && <p role="alert" className="v2-club-order-error">{t("admin.people.order.invalid")}</p>}
+            {orderEditor.error && <p role="alert" className="v2-club-order-error">{t(`admin.people.order.${orderEditor.error}`)}</p>}
+          <fieldset className="v2-mem-filters v2-club-order-filters" disabled={orderEditor.editing}>
             <NickFilter value={nickQ} onChange={setNickQ} people={people} roomNicks={roomNicks} />
             <CompactField label={t("admin.people.colAccess")}>
               <NativeSelect className="w-full" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
@@ -436,10 +456,11 @@ export function MembersAdmin() {
                 <span>{t("admin.people.showBots")}</span>
               </label>
             </div>
-          </div>
+          </fieldset>
           <div className="v2-club-scroll">
             <table className="v2-mem-table v2-club-table v2-profiles-table">
               <colgroup>
+                <col className="v2-mem-col-order" />
                 <col className="v2-mem-col-person" />
                 <col className="v2-mem-col-mark" />
                 <col className="v2-mem-col-status" />
@@ -450,6 +471,7 @@ export function MembersAdmin() {
               </colgroup>
               <thead>
                 <tr>
+                  {sortHeader("clubOrder", t("admin.people.order.column"), "v2-mem-h-order", t("admin.people.order.help"))}
                   {sortHeader("nick", t("admin.people.colPerson"))}
                   {sortHeader("mark", t("admin.people.colMark"), "v2-mem-h-mark")}
                   {sortHeader("access", t("admin.people.colAccess"))}
@@ -463,6 +485,21 @@ export function MembersAdmin() {
                 {rows.map((row) => {
                   return (
                     <tr key={row.discordId} data-profile-id={row.discordId} title={t("admin.people.openProfileHint")} onClick={() => setProfileFor(row.discordId)} className={row.accessStatus !== "active" || row.bot || (row.memberId && !row.onGuild) ? "is-dim" : undefined}>
+                      <td className="v2-mem-order">
+                        {row.memberId && row.clubOrder != null ? <div className="v2-club-order-cell"
+                          title={!canMoveOrder ? t("admin.people.order.fullListRequired") : undefined}>
+                          <span className="v2-club-order-number">{row.clubOrder}</span>
+                          {([-1, 1] as const).map(direction => <button key={direction} type="button"
+                            aria-label={t(direction === -1 ? "admin.people.order.up" : "admin.people.order.down", { name: discordPrimary(row) })}
+                            disabled={busyLoad || orderEditor.busy || !canMoveOrder || (orderEditor.editing && !orderEditor.valid)
+                              || (direction === -1 ? numberedRows[0] : numberedRows.at(-1))?.memberId === row.memberId}
+                            onClick={event => {
+                              event.stopPropagation();
+                              if (orderEditor.editing) orderEditor.move(row.memberId!, direction);
+                              else void startOrderEdit({ memberId: row.memberId!, direction });
+                            }}>{direction === -1 ? "↑" : "↓"}</button>)}
+                        </div> : row.clubOrder ?? "—"}
+                      </td>
                       <td>
                         <PersonTip row={row} rooms={roomNickLines(row.memberId, roomNicks)}>
                           <PersonChip
@@ -514,7 +551,7 @@ export function MembersAdmin() {
                 })}
                 {!rows.length && !busyLoad && (
                   <tr>
-                    <td colSpan={7} className="v2-muted py-4 text-center text-[12px]">
+                    <td colSpan={8} className="v2-muted py-4 text-center text-[12px]">
                       {list.length ? t("admin.people.empty") : t("admin.people.noSnapshot")}
                     </td>
                   </tr>
@@ -675,9 +712,10 @@ export function MembersAdmin() {
           key={profile.discordId}
           person={profile}
           people={list}
-          onClose={() => setProfileFor(null)}
+          onClose={() => { setProfileFor(null); void reload(); }}
           onCreateCard={() => void makeCard(profile.discordId)}
           busy={busyId === profile.discordId}
+          orderPending={orderEditor.editing || orderEditor.busy}
           onReload={reload}
           countTables={countTables}
         />

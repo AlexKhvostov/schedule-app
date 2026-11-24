@@ -143,4 +143,13 @@ describe("members admin model", () => {
     expect(filterAndSortPeople(rows, "", "all", "access", new Set()).map((row) => row.discordId)).toEqual(["root", "active", "blocked"]);
     expect(filterAndSortPeople(rows, "", "all", "access", new Set(), "desc").map((row) => row.discordId)).toEqual(["blocked", "active", "root"]);
   });
+  it("sorts global positions without renumbering filtered results", () => {
+    const rows = [person({ discordId: "none", username: "Alpha" }),
+      person({ discordId: "late", username: "Beta", clubOrder: 18 }),
+      person({ discordId: "early", username: "Zulu", clubOrder: 2, accessStatus: "blocked" })];
+    expect(filterAndSortPeople(rows, "", "all", "clubOrder", new Set()).map(row => row.discordId)).toEqual(["early", "late", "none"]);
+    expect(filterAndSortPeople(rows, "", "all", "clubOrder", new Set(), "desc").map(row => row.discordId)).toEqual(["late", "early", "none"]);
+    expect(filterAndSortPeople(rows, "Beta", "active", "clubOrder", new Set()).map(row => row.clubOrder)).toEqual([18]);
+    expect(filterAndSortPeople(rows, "", "blocked", "nick", new Set()).map(row => row.clubOrder)).toEqual([2]);
+  });
 });

@@ -41,11 +41,23 @@ do $$ declare a jsonb; b jsonb; c jsonb; token uuid; frozen jsonb; old_page uuid
  c:=public.external_api_sync(repeat('a',64),p_cursor=>(c->>'cursor')::uuid);
  perform pg_temp.check_priority(c->'items'->0->>'id'='aaaaaaaa-0000-4000-8000-000000000003'
    and c->'items'->1->'state'->'priority'->>'score'='5.5','calculated score descending, preserves half points');
- -- Same scores: deterministic name then ID tie-break, not random map order.
+ -- Same scores without club numbers: deterministic name then ID tie-break.
  update public.priority_rating_cache set payload=jsonb_build_object('revision','api-order-c','people','[]'::jsonb)
  where period_start=(select active_period from public.priority_settings where id) and variant_id='nitro' and limit_group='50-100';
  c:=public.external_api_sync(repeat('a',64),p_cursor=>(c->>'cursor')::uuid);
  perform pg_temp.check_priority(c->'items'->0->>'id'='aaaaaaaa-0000-4000-8000-000000000002','name tie-break');
+ -- Number-only changes must emit person deltas without replaying cells.
+ update public.priority_rating_cache set payload=jsonb_build_object('revision','api-club-order','people',jsonb_build_array(
+   jsonb_build_object('memberId','aaaaaaaa-0000-4000-8000-000000000001','vipNitro',0,'excludedNitro',false,'calculation',jsonb_build_object('total',0)),
+   jsonb_build_object('memberId','aaaaaaaa-0000-4000-8000-000000000002','vipNitro',0,'excludedNitro',false,'calculation',jsonb_build_object('total',0)),
+   jsonb_build_object('memberId','aaaaaaaa-0000-4000-8000-000000000003','vipNitro',0,'excludedNitro',false,'calculation',jsonb_build_object('total',0))
+ )) where period_start=(select active_period from public.priority_settings where id) and variant_id='nitro' and limit_group='50-100';
+ insert into schedule_private.club_order(member_id,ordinal) values
+   ('aaaaaaaa-0000-4000-8000-000000000001',107),('aaaaaaaa-0000-4000-8000-000000000002',200),('aaaaaaaa-0000-4000-8000-000000000003',2);
+ c:=public.external_api_sync(repeat('a',64),p_cursor=>(c->>'cursor')::uuid);
+ perform pg_temp.check_priority(c->>'mode'='delta' and c->'items'->0->>'id'='aaaaaaaa-0000-4000-8000-000000000003'
+   and c->'items'->0->'state'->'priority'->>'club_order'=(select position::text from schedule_private.club_order_positions where member_id='aaaaaaaa-0000-4000-8000-000000000003')
+   and not exists(select 1 from jsonb_array_elements(c->'items') x where x->>'type'<>'person'),'club-order-only person delta');
  perform pg_temp.check_priority(not has_function_privilege('anon','external_api_private.prepare_priority()','EXECUTE')
    and not has_function_privilege('authenticated','external_api_private.read_priority()','EXECUTE'),'private priority helpers');
 end $$;

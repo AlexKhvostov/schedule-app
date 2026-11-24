@@ -4,6 +4,7 @@ import { loadMembers } from "../schedule/members";
 import { isPriorityPeriod, priorityToday } from "../schedule/priorities";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
+import { demoClubOrder } from "./clubOrder";
 import { demoPrioritySlice } from "./priorities";
 import { loadLimitMarks, markOf, type DirectoryRow } from "./players";
 import type { Mark } from "../schedule/marks";
@@ -28,10 +29,11 @@ async function readRoster(query: RosterQuery, previous?: RosterSnapshot): Promis
     let faces: Mark[];
     if (kind === "both") {
       const members = loadMembers();
+      const clubOrder = new Map(demoClubOrder().rows.map(row => [row.memberId, row.number]));
       const directories = await Promise.all((["nitro", "regular"] as const).map((variant) => loadLimitMarks(variant, [...LIMIT_OPTIONS])));
       const people = members.flatMap((member) => {
         const priority = combinedCorePriority(member.id, member.coreNitro250 ?? 0, member.coreRegular250 ?? 0, member.vipNitro, member.vipRegular);
-        return priority ? [priority] : [];
+        return priority ? [{ ...priority, clubOrder: clubOrder.get(member.id) ?? null }] : [];
       });
       const ids = new Set(people.map((person) => person.memberId));
       faces = [...new Map(directories.flatMap((directory) => directory.data ?? [])

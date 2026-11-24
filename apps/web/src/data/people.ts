@@ -9,6 +9,7 @@ import type { NotifyChannel } from "./botSettings";
 export type ClubAccess = "closed" | "member" | "admin" | "staff";
 
 export type AdminPerson = {
+  clubOrder?: number | null;
   discordId: string;
   username: string;
   globalName: string | null;
@@ -79,6 +80,7 @@ type DiscordRow = {
 };
 
 type MemberRow = {
+  club_order?: number | null;
   id: string;
   public_code: string;
   access_status: string;
@@ -289,6 +291,7 @@ export async function listAdminPeople(): Promise<AdminPerson[]> {
       createdAt: member?.created_at ?? null,
       approvedAt: member?.approved_at ?? null,
       gridPriority: member ? member.grid_priority : null,
+      clubOrder: member?.club_order ?? null,
       distanceExtId: member ? member.distance_ext_id : distanceByDiscord.get(discordId) ?? null,
       distanceIds: member?.distance_ids,
       markTag: member?.mark_tag ?? null,

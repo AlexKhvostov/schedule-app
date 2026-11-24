@@ -16989,3 +16989,24 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
   grid-template-columns: 12px auto 10px 1fr;
 }
 .v2-roster-core-divider button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+
+/* Club order preserves intentionally unused numbers. */
+.v2-club-order-actions{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.v2-club-order-actions button,.v2-club-order-cell button{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;background:var(--card);color:inherit}
+.v2-club-order-actions button:disabled,.v2-club-order-cell button:disabled{opacity:.4;cursor:default}
+.v2-club-order-hint,.v2-club-order-error{font-size:11px;line-height:1.35;margin:4px 10px}
+.v2-club-order-error{color:var(--danger,#d94a60)}
+fieldset.v2-club-order-filters{border:0;margin:0;min-width:0}
+.v2-profiles-table .v2-mem-col-order{width:76px}
+.v2-profiles-table .v2-mem-order,.v2-profiles-table .v2-mem-h-order{padding-left:4px;padding-right:4px}
+.v2-mem-order{text-align:right;font-variant-numeric:tabular-nums}
+.v2-club-order-cell{display:flex;align-items:center;gap:2px}
+.v2-club-order-cell .v2-club-order-number{min-width:22px;flex:1}
+.v2-club-order-cell button{width:21px;height:24px;flex:none;padding:0;line-height:1;font-size:14px;cursor:pointer}
+.v2-club-order-cell button:hover:not(:disabled){border-color:var(--title);color:var(--title)}
+.v2-club-order-cell button:focus-visible{outline:2px solid var(--title);outline-offset:1px}
+.v2-mem-h-order button{white-space:normal}
+.v2-club-order-value{font-variant-numeric:tabular-nums;font-size:18px;margin:0}
+.v2-club-order-profile .v2-club-order-actions{justify-content:flex-end}
+.v2-club-order-profile{align-self:start}
+.v2-profile-fields{display:contents}

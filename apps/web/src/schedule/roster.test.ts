@@ -33,6 +33,14 @@ describe("monthly filling order", () => {
     ]);
     expect(rows).toEqual(original);
   });
+  it("uses club order only after Core and score, including zero-score ties", () => {
+    const people = source.people.map(p => ({ ...p, clubOrder: p.memberId === "low" ? 200 : 2 }));
+    const sorted = orderRosterRows(rows, compactRosterPriorities({ ...source, people }, "nitro", "50-100"), "nitro");
+    expect(sorted.map(p => p.mark.memberId)).toEqual(["vip1", "vip3", "high", "low", "missing", "out"]);
+    const tied = { ...source, periodStart: "2026-08-01", people };
+    expect(orderRosterRows(rows, compactRosterPriorities(tied, "nitro", "50-100"), "nitro").map(p => p.mark.memberId))
+      .toEqual(["vip1", "vip3", "high", "low", "missing", "out"]);
+  });
   it("has independent VIP and exclusion settings for Expresso", () => {
     expect(orderRosterRows(rows, compactRosterPriorities(source, "regular", "50-100"), "regular").map((p) => p.mark.memberId)).toEqual(["vip3", "vip1", "out", "high", "low", "missing"]);
   });

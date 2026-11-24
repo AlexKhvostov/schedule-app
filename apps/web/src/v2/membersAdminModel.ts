@@ -2,9 +2,10 @@ import { discordPrimary, hasRoot, peopleRank, personTitle, type AdminPerson } fr
 import type { MemberRoomNick } from "../data/plays";
 import type { ClubMember } from "../schedule/members";
 import { asVip } from "../schedule/marks";
+import { compareClubOrder } from "../schedule/clubOrder";
 
 export type StatusFilter = "all" | "active" | "blocked" | "left" | "root" | "bot";
-export type SortKey = "access" | "nick" | "mark" | "roles" | "distanceId" | "vipNitro" | "vipRegular";
+export type SortKey = "clubOrder" | "access" | "nick" | "mark" | "roles" | "distanceId" | "vipNitro" | "vipRegular";
 export type SortDirection = "asc" | "desc";
 
 export function roomNickLines(memberId: string | null, map: Map<string, MemberRoomNick[]>) {
@@ -92,6 +93,8 @@ export function filterAndSortPeople(
   const compareOptionalText = (a: string, b: string) => Number(!a) - Number(!b) || sign * compareText(a, b);
   copy.sort((a, b) => {
     const byNick = compareText(discordPrimary(a), discordPrimary(b));
+    if (sort === "clubOrder") return Number(a.clubOrder == null) - Number(b.clubOrder == null)
+      || sign * compareClubOrder(a.clubOrder, b.clubOrder) || byNick;
     if (sort === "vipNitro" || sort === "vipRegular") {
       const av = asVip(a[sort]);
       const bv = asVip(b[sort]);

@@ -1,3 +1,4 @@
+import { compareClubOrder } from "./clubOrder";
 export type PriorityKind = "nitro" | "regular";
 export const PRIORITY_DEFAULT_ROLE_ID = "1208022351652986891"; // RedParty
 export type PriorityGroup = "50-100" | "250";
@@ -8,6 +9,7 @@ export function priorityGroupLabel(group: PriorityGroup) {
 }
 export type PriorityEntry = { id: string; month: string; variant: PriorityKind; part: number; values: { limit: string; tournaments: number }[] };
 export type PriorityPerson = {
+  clubOrder?: number | null;
   memberId: string; nick: string; gameNick?: string; avatarUrl: string | null; redParty: boolean; team50: boolean; hasActiveProfile: boolean;
   discordRoles?: { id: string; name: string; color: string | null }[];
   plays: PriorityKind[]; coreNitro250?: number; coreRegular250?: number; calculation?: SavedPriorityCalculation; vipNitro: number; vipRegular: number; excludedNitro: boolean; excludedRegular: boolean; entries: PriorityEntry[];
@@ -90,7 +92,7 @@ export function rankPriorities(people: PriorityPerson[], period: string, kind: P
     row.vip = vipEnabled ? coreOf(row, kind, group) : 0;
     return row;
   });
-  const compare = (a: CalculatedPriority, b: CalculatedPriority) => b.total - a.total || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" }) || a.memberId.localeCompare(b.memberId);
+  const compare = (a: CalculatedPriority, b: CalculatedPriority) => b.total - a.total || (order === "slice" ? compareClubOrder(a.clubOrder, b.clubOrder) : 0) || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" }) || a.memberId.localeCompare(b.memberId);
   if (order !== "legacy-vip-seats") {
     const sorted = rows.sort((a, b) => Number(a.excluded) - Number(b.excluded) || (group === "250" ? (coreOf(a, kind, group) || Infinity) - (coreOf(b, kind, group) || Infinity) : 0) || compare(a, b));
     sorted.forEach((row, index) => { row.rank = row.excluded ? null : index + 1; });
@@ -121,6 +123,7 @@ export function listHighPriorityParticipants(people: PriorityPerson[]) {
     return [{ ...person, excluded: !eligible.length, core: cores.length ? Math.min(...cores) : null }];
   }).sort((a, b) => Number(a.excluded) - Number(b.excluded)
     || (a.core ?? Infinity) - (b.core ?? Infinity)
+    || compareClubOrder(a.clubOrder, b.clubOrder)
     || a.nick.localeCompare(b.nick, "ru", { numeric: true, sensitivity: "base" })
     || a.memberId.localeCompare(b.memberId));
 }

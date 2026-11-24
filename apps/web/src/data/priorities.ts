@@ -1,6 +1,7 @@
 import { createConfigurationCache } from "./scheduleConfiguration";
 import { getAppAccount, getAppAccountKey, subscribeAppAccount, subscribeAppChanges, subscribeAppConnection } from "./appRealtime";
 import { demoActivePriority } from "./activePriority";
+import { demoClubOrder } from "./clubOrder";
 import { loadRoleAccess, rolesWithGrantedAccess } from "./roleAccess";
 import { getSupabase } from "./client";
 import { isLiveData } from "./config";
@@ -23,12 +24,13 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<{ da
   return { data: data as T | null, error: error?.message ?? null };
 }
 export function demoPrioritySource(periodStart: string, canManage: boolean): PrioritySource {
+  const clubOrder = new Map(demoClubOrder().rows.map(row => [row.memberId, row.number]));
   const months = priorityMonths(periodStart);
   const exclusions = readDemo<Record<string, { nitro?: boolean; regular?: boolean }>>(DEMO_EXCLUSIONS, {});
   const members = loadMembers();
   const firstBook = demoDistanceBook(months[0]);
   const people: PriorityPerson[] = firstBook.people.filter((p) => p.memberId).map((p) => ({
-    memberId: p.memberId!, nick: p.nick, gameNick: p.gameNick, avatarUrl: p.avatarUrl, redParty: p.redParty, team50: true, hasActiveProfile: p.hasActiveProfile,
+    memberId: p.memberId!, clubOrder: clubOrder.get(p.memberId!) ?? null, nick: p.nick, gameNick: p.gameNick, avatarUrl: p.avatarUrl, redParty: p.redParty, team50: true, hasActiveProfile: p.hasActiveProfile,
     plays: ["nitro", "regular"], vipNitro: 0, vipRegular: 0, excludedNitro: false, excludedRegular: false,
     entries: months.flatMap((month) => demoDistanceBook(month).people.find((row) => row.memberId === p.memberId)?.slices.map((s) => ({
       id: s.id, month, variant: s.variant, part: s.part, values: Object.entries(s.byLimit).map(([limit, cell]) => ({ limit, tournaments: cell.hands })),
