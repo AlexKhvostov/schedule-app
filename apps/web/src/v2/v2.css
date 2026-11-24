@@ -12262,6 +12262,10 @@ html[data-ui-theme="light"] .v2-opt-tip,
 .v2-profiles-table tbody tr[data-profile-id]:focus-within td { background: color-mix(in srgb, var(--title) 6%, var(--card)); }
 .v2-profiles-table .v2-mem-mark.is-readonly { cursor: inherit; }
 .v2-profiles-table .v2-mem-mark.is-readonly:hover { background: transparent; }
+.v2-profiles-table .v2-ava.is-md { width: 24px; height: 24px; }
+.v2-profiles-table .v2-mem-mark.is-readonly { width: 24px; height: 24px; }
+.v2-profiles-table .v2-club-person b { line-height: 13px; }
+.v2-profiles-table .v2-club-person small { line-height: 11px; }
 .v2-profiles-table .v2-mem-id { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; font-family: var(--font-mono), monospace; color: var(--muted-foreground); }
 .v2-profiles-table th.v2-mem-h-vip, .v2-profiles-table td.v2-mem-vip { text-align: center; }
 .v2-profiles-table .v2-mem-sort {
@@ -16990,7 +16994,7 @@ html[data-ui-theme="light"] .v2-opt-locked-band {
 }
 .v2-roster-core-divider button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 
-/* Club order preserves intentionally unused numbers. */
+/* Global club positions and secondary controls must fit compact profile rows. */
 .v2-club-order-actions{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
 .v2-club-order-actions button,.v2-club-order-cell button{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;background:var(--card);color:inherit}
 .v2-club-order-actions button:disabled,.v2-club-order-cell button:disabled{opacity:.4;cursor:default}
@@ -17001,16 +17005,16 @@ fieldset.v2-club-order-filters{border:0;margin:0;min-width:0}
 .v2-profiles-table .v2-mem-order,.v2-profiles-table .v2-mem-h-order{padding-left:4px;padding-right:4px}
 .v2-mem-order{text-align:right;font-variant-numeric:tabular-nums}
 .v2-club-order-cell{display:flex;align-items:center;gap:6px}
-.v2-club-order-cell .v2-club-order-number{min-width:30px;flex:1;padding-right:2px;font-size:16px;font-weight:700;line-height:28px;color:var(--foreground)}
-.v2-club-order-controls{display:grid;grid-template-rows:repeat(2,14px);width:24px;flex:none;padding-left:4px;border-left:1px solid var(--border)}
-.v2-club-order-cell button{display:flex;align-items:center;justify-content:center;width:19px;height:14px;min-height:0;padding:0;border:0;border-radius:3px;background:transparent;color:var(--muted-foreground);line-height:1;font-size:11px;font-weight:400;cursor:pointer;box-shadow:none}
+.v2-club-order-cell .v2-club-order-number{min-width:30px;flex:1;padding-right:2px;font-size:14px;font-weight:700;line-height:24px;color:var(--foreground)}
+.v2-club-order-controls{display:grid;grid-template-rows:repeat(2,12px);width:24px;flex:none;padding-left:4px;border-left:1px solid var(--border)}
+.v2-club-order-cell button{display:flex;align-items:center;justify-content:center;width:19px;height:12px;min-height:0;padding:0;border:0;border-radius:3px;background:transparent;color:var(--muted-foreground);line-height:1;font-size:10px;font-weight:400;cursor:pointer;box-shadow:none}
 .v2-club-order-cell button:hover:not(:disabled){background:color-mix(in srgb,var(--foreground) 8%,transparent);color:var(--foreground)}
 .v2-club-order-cell button:active:not(:disabled){background:color-mix(in srgb,var(--foreground) 14%,transparent)}
 .v2-club-order-cell button:focus-visible{outline:2px solid var(--title);outline-offset:1px;color:var(--foreground)}
 @media (pointer:coarse){
-  .v2-club-order-controls{width:28px;grid-template-rows:repeat(2,24px);padding-left:3px}
+  .v2-profiles-table .v2-mem-col-order{width:100px}
+  .v2-club-order-controls{width:52px;grid-template-rows:24px;grid-template-columns:repeat(2,24px);padding-left:3px}
   .v2-club-order-cell button{width:24px;height:24px}
-  .v2-club-order-cell .v2-club-order-number{line-height:48px}
 }
 .v2-mem-h-order button{white-space:normal}
 .v2-club-order-value{font-variant-numeric:tabular-nums;font-size:18px;margin:0}

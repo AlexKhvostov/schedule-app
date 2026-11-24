@@ -32,6 +32,8 @@ test("arrows swap neighbours; profile inserts at occupied position and validates
     await page.getByRole("button", { name: "you", exact: true }).first().click();
     await page.getByRole("button", { name: label, exact: true }).click();
     await page.getByRole("button", { name: "you", exact: true }).first().click();
+    const rowBox = await rows.first().boundingBox();
+    expect(rowBox!.height).toBeLessThanOrEqual(33);
     await page.screenshot({ path: info.outputPath(`club-position-hierarchy-${theme}.png`) });
   }
   await expect(page.locator(".v2-profiles-table").getByRole("spinbutton")).toHaveCount(0);
@@ -73,6 +75,26 @@ test("arrows swap neighbours; profile inserts at occupied position and validates
   await profile.getByRole("button", { name: "Переместить", exact: true }).click();
   await expect(profile.locator(".v2-club-order-value")).toHaveText(String(count));
   await page.screenshot({ path: info.outputPath("club-position-profile.png") });
+});
+
+test.describe("compact touch controls", () => {
+  test.use({ hasTouch: true });
+  test("touch arrows stay side by side without enlarging profile rows", async ({ page }) => {
+    await enter(page);
+    const row = positionedRows(page).first();
+    const first = await row.getAttribute("data-profile-id");
+    const up = await row.getByRole("button", { name: /Выше:/ }).boundingBox();
+    const down = await row.getByRole("button", { name: /Ниже:/ }).boundingBox();
+    expect(up!.width).toBeGreaterThanOrEqual(24);
+    expect(down!.height).toBeGreaterThanOrEqual(24);
+    expect(down!.y).toBe(up!.y);
+    expect(down!.x).toBeGreaterThanOrEqual(up!.x + up!.width);
+    expect((await row.boundingBox())!.height).toBeLessThanOrEqual(33);
+    await row.getByRole("button", { name: /Ниже:/ }).click();
+    await expect(positionedRows(page).first()).not.toHaveAttribute("data-profile-id", first!);
+    await page.getByRole("button", { name: "Отмена", exact: true }).click();
+    await expect(positionedRows(page).first()).toHaveAttribute("data-profile-id", first!);
+  });
 });
 
 test("filtering preserves the global position and editing restores the full list", async ({ page }, info) => {
