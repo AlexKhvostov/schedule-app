@@ -17000,10 +17000,11 @@ fieldset.v2-club-order-filters{border:0;margin:0;min-width:0}
 .v2-profiles-table .v2-mem-col-order{width:76px}
 .v2-profiles-table .v2-mem-order,.v2-profiles-table .v2-mem-h-order{padding-left:4px;padding-right:4px}
 .v2-mem-order{text-align:right;font-variant-numeric:tabular-nums}
-.v2-club-order-cell{display:flex;align-items:center;gap:2px}
-.v2-club-order-cell .v2-club-order-number{min-width:22px;flex:1}
-.v2-club-order-cell button{width:21px;height:24px;flex:none;padding:0;line-height:1;font-size:14px;cursor:pointer}
-.v2-club-order-cell button:hover:not(:disabled){border-color:var(--title);color:var(--title)}
+.v2-club-order-cell{display:flex;align-items:center;gap:3px}
+.v2-club-order-cell .v2-club-order-number{min-width:24px;flex:1;padding-right:5px;border-right:1px solid color-mix(in srgb,var(--foreground) 18%,var(--border));font-weight:600;line-height:24px}
+.v2-club-order-cell button{width:19px;height:24px;flex:none;padding:0;border:1px solid color-mix(in srgb,var(--foreground) 22%,var(--border));border-radius:4px;background:color-mix(in srgb,var(--foreground) 7%,var(--card));color:var(--foreground);line-height:1;font-size:14px;cursor:pointer;box-shadow:0 1px 1px #0001}
+.v2-club-order-cell button:hover:not(:disabled){border-color:var(--title);background:color-mix(in srgb,var(--title) 12%,var(--card));color:var(--title)}
+.v2-club-order-cell button:active:not(:disabled){background:color-mix(in srgb,var(--title) 20%,var(--card));box-shadow:inset 0 1px 2px #0002}
 .v2-club-order-cell button:focus-visible{outline:2px solid var(--title);outline-offset:1px}
 .v2-mem-h-order button{white-space:normal}
 .v2-club-order-value{font-variant-numeric:tabular-nums;font-size:18px;margin:0}
