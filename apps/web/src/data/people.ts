@@ -432,7 +432,7 @@ export async function saveMemberDistanceId(memberId: string, value: string, expe
   });
   if (!error) notifyPriorityDistanceChanged();
   if (error?.code === "23505") return { error: "duplicate" as const };
-  if (error?.code === "40001") return { error: "stale" as const };
+  if (error && ["PT409", "40001"].includes(error.code)) return { error: "stale" as const };
   return { error: error?.message ?? null };
 }
 

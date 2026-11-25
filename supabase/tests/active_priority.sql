@@ -43,7 +43,7 @@ begin
     begin perform public.set_active_priority(bad,0); raise exception 'invalid period accepted'; exception when invalid_parameter_value then null; end;
   end loop;
   perform public.set_active_priority('2026-11-01',0);
-  begin perform public.set_active_priority('2026-05-01',0); raise exception 'stale switch accepted'; exception when serialization_failure then null; end;
+  begin perform public.set_active_priority('2026-05-01',0); raise exception 'stale switch accepted'; exception when sqlstate 'PT409' then null; end;
   changed:=public.load_active_month_roster('nitro','50-100',array['50'],roster->>'revision',roster->>'directoryRevision');
   if changed->>'periodStart'<>'2026-11-01' or changed->'people'='null'::jsonb then raise exception 'activation retained old array'; end if;
   unchanged:=public.load_priority_view(null,'regular','50-100');

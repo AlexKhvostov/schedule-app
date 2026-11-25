@@ -34,7 +34,7 @@ begin
   begin
     perform public.save_schedule_hour_load('nitro:50',peach,peach);
     raise exception 'stale write allowed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   foreach bad in array array[null::jsonb,'{}'::jsonb,'[]'::jsonb,
     jsonb_set(empty_row,'{3}','"rgba(1,2,3,.2)"'),jsonb_set(empty_row,'{3}','7')] loop
     begin

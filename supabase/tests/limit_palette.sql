@@ -42,7 +42,7 @@ begin
   begin
     perform public.save_schedule_limit_palette(original, original);
     raise exception 'stale save allowed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   foreach bad in array array[null::jsonb, '{}'::jsonb, original - '25',
     original || '{"999":{"light":"#ffffff","dark":"#ffffff"}}',
     jsonb_set(original, '{50}', 'null'),
@@ -116,11 +116,11 @@ begin
   begin
     perform public.save_schedule_appearance(original, actual, original_tint, original_tint);
     raise exception 'stale tint accepted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   begin
     perform public.save_schedule_appearance(original, original, original_tint, actual_tint);
     raise exception 'stale palette accepted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   foreach bad in array array[null::jsonb, '{}'::jsonb, '[]'::jsonb,
     '{"enabled":"true","strength":8}'::jsonb, '{"enabled":true,"strength":31}'::jsonb,
     '{"enabled":true,"strength":-1}'::jsonb, '{"enabled":true,"strength":8.5}'::jsonb,

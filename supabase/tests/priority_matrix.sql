@@ -127,7 +127,7 @@ begin
   if (cached->'calculation'->>'total')::numeric <> 520 then raise exception 'latest month not refreshed'; end if;
   detail:=get_priority_request(request_id);
   if detail->'snapshot'->>'version'<>'3' or detail->'snapshot'->'people' is distinct from expected then raise exception 'saved request mutated'; end if;
-  begin perform submit_priority_slice_request('2026-08-01','nitro',expected,'50-100','stale',true,source->>'revision'); raise exception 'stale values accepted'; exception when sqlstate '40001' then null; end;
+  begin perform submit_priority_slice_request('2026-08-01','nitro',expected,'50-100','stale',true,source->>'revision'); raise exception 'stale values accepted'; exception when sqlstate 'PT409' then null; end;
   calculated:=source->>'calculatedAt';
   source:=load_priority_slice('2026-08-01','nitro','50-100',true);
   if source->>'calculatedAt'=calculated then raise exception 'manual refresh did not run'; end if;

@@ -54,7 +54,7 @@ begin
   begin
     perform public.save_club_order(before_order->>'revision',changed);
     raise exception 'stale save accepted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   begin
     perform public.save_club_order(after_order->>'revision','[]');
     raise exception 'missing members accepted';

@@ -508,7 +508,7 @@ export async function applyScheduleEdit(input: {
     }).abortSignal(signal), 20000);
     // A transport failure cannot tell whether the transaction committed. Its operation ID
     // must be retained by the caller for safe reconciliation/retry, never replaced blindly.
-    const conflict = error && ["40001", "40P01", "23505"].includes(error.code);
+    const conflict = error && ["PT409", "40001", "40P01", "23505"].includes(error.code);
     const unknown = Boolean(input.expected && error && !conflict && (status === 0 || status >= 500 || status === 408));
     return { error: conflict ? "schedule-conflict" : unknown ? "schedule-write-unknown" : error?.message };
   } catch (cause) {

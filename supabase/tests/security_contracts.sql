@@ -184,4 +184,20 @@ begin
 end;
 $$;
 
+-- Manual retryable SQLSTATEs in RPC business checks can spin forever in PostgREST 14.
+do $$
+declare unsafe_functions text;
+begin
+  select string_agg(p.oid::regprocedure::text, ', ' order by p.proname)
+    into unsafe_functions
+    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.prokind='f'
+      and (p.prosrc ~ 'errcode[[:space:]]*=[[:space:]]*''(40001|40P01)'''
+        or p.prosrc ~* 'raise[[:space:]]+(serialization_failure|deadlock_detected)');
+  if unsafe_functions is not null then
+    raise exception 'RPC business checks use retryable error codes: %', unsafe_functions;
+  end if;
+end;
+$$;
+
 rollback;

@@ -90,7 +90,7 @@ try:
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         pending = pool.submit(b.sql, f"""do $$begin
           perform {save}; raise exception 'stale order accepted';
-          exception when serialization_failure then
+          exception when sqlstate 'PT409' then
             if sqlerrm<>'club-order-stale' then raise; end if;
           end$$""")
         wait_for_lock(b)

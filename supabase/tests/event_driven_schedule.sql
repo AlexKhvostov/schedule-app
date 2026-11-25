@@ -33,7 +33,7 @@ begin
   if cfg->'settings'->>'sync_fallback_minutes'<>'8' or (cfg->>'revision')::bigint<>revision+1 then raise exception 'config revision not advanced'; end if;
   perform save_schedule_sync(true,8,true,8);
   if load_schedule_configuration()->>'revision'<>cfg->>'revision' then raise exception 'no-op advanced config'; end if;
-  begin perform save_schedule_sync(false,5,false,5); raise exception 'stale settings accepted'; exception when serialization_failure then null; end;
+  begin perform save_schedule_sync(false,5,false,5); raise exception 'stale settings accepted'; exception when sqlstate 'PT409' then null; end;
   begin perform save_schedule_sync(true,0,true,8); raise exception 'zero interval accepted'; exception when invalid_parameter_value then null; end;
   begin perform save_schedule_sync(true,61,true,8); raise exception 'unbounded interval accepted'; exception when invalid_parameter_value then null; end;
   perform save_schedule_filter_limits(array['50'],array['50']);
@@ -45,13 +45,13 @@ begin
   if affected<>1 then raise exception 'incorrect v2 result'; end if;
   if apply_schedule_edit_v2(op,kid,mid,cell,'[]','[]',empty_cell)<>1 then raise exception 'lost-response replay failed'; end if;
   if (select count(*) from schedule_private.edit_receipts where actor_id=mid)<>1 then raise exception 'duplicate receipt'; end if;
-  begin perform apply_schedule_edit_v2(op,kid,mid,'[]',cell,'[]',occupied_cell); raise exception 'operation ID reused with new intent'; exception when serialization_failure then null; end;
-  begin perform apply_schedule_edit_v2(gen_random_uuid(),kid,mid,cell,'[]','[]',empty_cell); raise exception 'stale empty cell accepted'; exception when serialization_failure then null; end;
+  begin perform apply_schedule_edit_v2(op,kid,mid,'[]',cell,'[]',occupied_cell); raise exception 'operation ID reused with new intent'; exception when sqlstate 'PT409' then null; end;
+  begin perform apply_schedule_edit_v2(gen_random_uuid(),kid,mid,cell,'[]','[]',empty_cell); raise exception 'stale empty cell accepted'; exception when sqlstate 'PT409' then null; end;
   begin perform apply_schedule_edit_v2(gen_random_uuid(),kid,mid,cell,'[]','[]',empty_cell||empty_cell); raise exception 'duplicate expectation accepted'; exception when invalid_parameter_value then null; end;
   begin perform apply_schedule_edit_v2(gen_random_uuid(),kid,mid,cell,'[]','[]','[]'); raise exception 'missing expectation accepted'; exception when invalid_parameter_value then null; end;
   begin perform apply_schedule_edit_v2(gen_random_uuid(),kid,mid,'[]',cell,'[]',
     jsonb_build_array(jsonb_build_object('date',day,'half',20,'level',0,'member_id',mid,'tables',2)));
-    raise exception 'own deletion ignored changed table count'; exception when serialization_failure then null; end;
+    raise exception 'own deletion ignored changed table count'; exception when sqlstate 'PT409' then null; end;
   if not exists(select 1 from occupancy where kind_id=kid and slot_date=day and half=20 and tables=3) then raise exception 'failed edit changed data'; end if;
 
   snapshot:=load_schedule_snapshot_v2(y,m); versions:=load_schedule_versions(y,m);

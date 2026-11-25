@@ -35,7 +35,7 @@ begin
   begin
     perform public.save_schedule_locked_appearance(original, original);
     raise exception 'stale update permitted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   foreach bad in array array[null::jsonb, '{}'::jsonb, '[]'::jsonb, original - 'short', original || '{"extra":true}',
     jsonb_set(original, '{light}', '"red"'), jsonb_set(original, '{dark}', 'null'), jsonb_set(original, '{merge}', '"true"'),
     jsonb_set(original, '{short}', to_jsonb(repeat('x',13))), jsonb_set(original, '{long}', to_jsonb(repeat('x',121)))] loop

@@ -94,7 +94,7 @@ begin
   end if;
   detail:=get_priority_request(request_id);
   if detail->>'comment'<>'private concern' or (detail->'snapshot'->'people') is distinct from expected then raise exception 'request snapshot changed with distance'; end if;
-  begin perform submit_priority_request('2026-08-01','nitro',expected,'stale',true,source->>'revision'); raise exception 'stale request accepted'; exception when sqlstate '40001' then null; end;
+  begin perform submit_priority_request('2026-08-01','nitro',expected,'stale',true,source->>'revision'); raise exception 'stale request accepted'; exception when sqlstate 'PT409' then null; end;
   source:=load_priorities('2026-08-01');
   if not (source->>'canManage')::boolean then raise exception 'admin not identified'; end if;
   if not exists(select 1 from jsonb_array_elements(source->'people') p where p->>'memberId'=target::text and p->'plays' ? 'nitro') then raise exception 'kind membership incorrectly restricted to selected limits50/100'; end if;
@@ -112,7 +112,7 @@ begin
   begin perform set_priority_exclusion(target,'regular',true); raise exception 'excluded positive VIP player'; exception when sqlstate '23514' then null; end;
   begin perform close_priority_request(request_id,' '); raise exception 'empty response accepted'; exception when sqlstate '22023' then null; end;
   perform close_priority_request(request_id,'Checked, distance corrected');
-  begin perform close_priority_request(request_id,'overwritten'); raise exception 'closed request overwritten'; exception when sqlstate '40001' then null; end;
+  begin perform close_priority_request(request_id,'overwritten'); raise exception 'closed request overwritten'; exception when sqlstate 'PT409' then null; end;
   summary:=list_priority_requests('2026-08-01');
   if summary::text not like '%Checked, distance corrected%' or summary::text like '%private concern%' then raise exception 'public reply missing/private text leaked'; end if;
   perform delete_priority_request(request_id);

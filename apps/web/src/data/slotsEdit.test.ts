@@ -77,6 +77,12 @@ describe("atomic schedule edit data contract", () => {
     rpc.mockResolvedValue({ error: { message: "deadlock detected", code: "40P01" }, status: 500 });
     expect((await applyScheduleEdit({ ...input, operationId: "operation-deadlock", expected })).error).toBe("schedule-conflict");
   });
+  it("returns an HTTP conflict without retrying or changing the v2 operation", async () => {
+    rpc.mockResolvedValue({ error: { message: "schedule-conflict", code: "PT409" }, status: 409 });
+    expect((await applyScheduleEdit({ ...input, operationId: "operation-conflict", expected })).error).toBe("schedule-conflict");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("apply_schedule_edit_v2", expect.objectContaining({ p_operation_id: "operation-conflict", p_expected: expected }));
+  });
   it("does not downgrade v2 to legacy after a missing function or conflict", async () => {
     rpc.mockResolvedValue({ error: { message: "schedule-conflict" }, status: 409 });
     expect((await applyScheduleEdit({ ...input, operationId: "operation-2", expected })).error).toBe("schedule-conflict");

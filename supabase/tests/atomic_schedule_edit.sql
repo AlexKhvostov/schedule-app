@@ -78,7 +78,7 @@ begin
     perform apply_schedule_edit(kind,actor,placements,own_slots,
       jsonb_build_array(jsonb_build_object('date',future,'half',20,'level',0,'member_id',stranger)));
     raise exception 'stale owner confirmation succeeded';
-  exception when sqlstate '40001' then
+  exception when sqlstate 'PT409' then
     if sqlerrm <> 'schedule-conflict' then raise; end if;
   end;
 
@@ -136,7 +136,7 @@ begin
       jsonb_build_object('date',current_date-1,'half',20,'level',0,'tables',1)
     ),'[]','[]');
     raise exception 'ordinary placement accepted an expired seat';
-  exception when sqlstate '40001' then
+  exception when sqlstate 'PT409' then
     if sqlerrm <> 'schedule-conflict' then raise; end if;
   end;
   if exists(select 1 from occupancy where kind_id=kind and slot_date=future and half=30)
@@ -149,7 +149,7 @@ begin
       jsonb_build_object('date',current_date-1,'half',20,'level',0)
     ),'[]');
     raise exception 'ordinary removal accepted an expired seat';
-  exception when sqlstate '40001' then
+  exception when sqlstate 'PT409' then
     if sqlerrm <> 'schedule-conflict' then raise; end if;
   end;
   if not exists(select 1 from occupancy where kind_id=kind and slot_date=future and half=22 and member_id=actor)

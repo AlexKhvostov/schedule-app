@@ -46,7 +46,7 @@ begin
   begin
     perform save_member_distance_ids(first_member,array['990703'],array[]::text[]);
     raise exception 'stale editor accepted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   -- Repeated values still update the nickname and never duplicate tournaments.
   result:=save_distance_dump('winamax','2026-10-01','all',1,'nick-refresh','',replace(rows::text,'FirstNick','NewNick')::jsonb);
   if (result->>'inserted')::int<>0 then raise exception 'repeat duplicated facts'; end if;
