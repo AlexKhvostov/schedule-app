@@ -1,9 +1,14 @@
 -- Vault keeps the encryption key outside database backups. Existing hashes remain valid.
 create extension if not exists supabase_vault with schema vault;
--- The browser can only cross this boundary through the guarded management RPC.
-revoke all on schema vault from public, anon, authenticated;
-revoke all on all tables in schema vault from public, anon, authenticated;
-revoke all on all functions in schema vault from public, anon, authenticated;
+-- Vault is owned by supabase_admin: postgres cannot revoke its internal crypto ACLs.
+-- Keep the extension's managed grants intact and fail closed if browser roles can
+-- resolve its objects. The guarded management RPC is their only entry point.
+do $$ begin
+  if has_schema_privilege('anon', 'vault', 'usage')
+    or has_schema_privilege('authenticated', 'vault', 'usage') then
+    raise exception 'Vault schema must not be accessible to browser roles';
+  end if;
+end $$;
 alter table external_api_private.clients add column key_secret_id uuid
   references vault.secrets(id) on delete set null;
 
