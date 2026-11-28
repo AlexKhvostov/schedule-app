@@ -1,5 +1,11 @@
 # Эксплуатация
 
+## Общий тестовый выпуск истории и API — 28 ноября 2026
+
+Тестовая Git-ветка — `preview/schedule-ui`; сборка Vercel Preview не публикует `main` и не устанавливает SQL. Три связанные миграции: `20261128145000_slot_history.sql`, `20261128152414_external_api_saved_tokens.sql`, `20261128153000_logs_schedule_timezone.sql`. Порядок — по этим версиям. Перед общей установкой нужен успешный настоящий Supabase reset/security contracts/lint и отдельное разрешение, поскольку Preview и основной сайт используют одну Working-базу. Существующие ключи и метки не заменять.
+
+Проверка `8383aa2` успешно завершена в [CI46164635602](https://github.com/AlexKhvostov/schedule-app/actions/runs/46164635602). Первый настоящий reset выявил, что blanket REVOKE внутренних crypto-функций Vault недоступен роли postgres. Миграция исправлена: управляемые ACL расширения сохраняются, наличие доступа anon/authenticated к схеме Vault останавливает установку. Причина описана в [официальной базе знаний Supabase](https://supabase.com/kb/troubleshooting/revoking-privileges-on-storage-pg_cron-vault-and-extension-objects-has-no-effect-916576). Ошибка возникла только в одноразовой базе CI. После полного CI SUCCESS Алексей отдельно разрешил установку; около19:41 все три миграции применены в общую Working-базу. Из-за старого различия сентябрьских версий использован точный транзакционный пакет из8383aa2 через официальный CLI3.4.0, с записью ровно трёх миграций; общий up/repair не выполнялся. Lock timeout5s, statement timeout60s. Root API проверен транзакционно с полным rollback временных записей; реальные6подключений и их отпечаток сохранены. Backup функций и SQL-манифест — в отчёте. [Результаты и тестовый адрес](../memory/tasks/2026-11-28-combined-preview-release.md).
+
 ## Подготовленный выпуск API-инструкции и просмотра токена — 28 ноября 2026
 
 Перед выпуском клиента применить [20261128152414_external_api_saved_tokens.sql](../supabase/migrations/20261128152414_external_api_saved_tokens.sql). Настоящий Supabase reset, `external_api_root_admin.sql`, `security_contracts.sql` и database lint должны пройти с установленным `supabase_vault`. В CI контракт уже входит в существующий шаг API Root. Native PG15 с тестовым Vault-адаптером подтверждает логику и права, но не подменяет эту проверку.
