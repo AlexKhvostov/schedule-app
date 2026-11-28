@@ -11,16 +11,16 @@ export function apiExampleRequests(endpoint: string) {
   };
 }
 
-export function ApiExamples({ endpoint, version = 1 }: { endpoint: string; version?: 1 | 2 }) {
+export function ApiExamples({ endpoint, version = 1, apiKey }: { endpoint: string; version?: 1 | 2; apiKey?: string }) {
   const { t } = useTranslation();
-  if (version === 2) return <ApiV2Examples endpoint={endpoint} />;
+  if (version === 2) return <ApiV2Examples endpoint={endpoint} apiKey={apiKey} />;
   return <section className="v2-api-examples">
     <h3>{t("apiAdmin.examplesTitle")}</h3>
     <p>{t("apiAdmin.examplesIntro")}</p>
     {Object.entries(apiExampleRequests(endpoint)).map(([key, request]) => <div key={key}>
       <h4>{t(`apiAdmin.${key}`)}</h4>
       {key === "requestNext" && <p>{t("apiAdmin.requestNextHint")}</p>}
-      <pre className="v2-api-code"><code>{request}</code></pre>
+      <pre className="v2-api-code"><code>{request.replaceAll("<API_KEY>", apiKey ?? "<API_KEY>")}</code></pre>
     </div>)}
     <h4>{t("apiAdmin.responseExample")}</h4>
     <pre className="v2-api-code" data-testid="api-response-example"><code>{JSON.stringify(scheduleExample, null, 2)}</code></pre>

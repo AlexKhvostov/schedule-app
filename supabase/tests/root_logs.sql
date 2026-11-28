@@ -14,19 +14,23 @@ insert into public.profiles(member_id,display_name) values
 insert into public.identities(member_id,provider,provider_uid,username) values
  ('eeeeeeee-1000-4000-8000-000000000002','discord','999990000000000099','SubjectAlias');
 insert into public.occupancy_events(id,at,action,member_id,actor_id,slot_date,half,level) values
- ('eeeeeeee-2000-4000-8000-000000000001','2090-01-01 20:59:59Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
- ('eeeeeeee-2000-4000-8000-000000000002','2090-01-01 21:00:00Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
- ('eeeeeeee-2000-4000-8000-000000000003','2090-01-01 21:00:00Z','remove','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
- ('eeeeeeee-2000-4000-8000-000000000004','2090-01-02 20:59:59Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
- ('eeeeeeee-2000-4000-8000-000000000005','2090-01-02 21:00:00Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0);
+ ('eeeeeeee-2000-4000-8000-000000000001','2090-01-01 22:59:59Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
+ ('eeeeeeee-2000-4000-8000-000000000002','2090-01-01 23:00:00Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
+ ('eeeeeeee-2000-4000-8000-000000000003','2090-01-01 23:00:00Z','remove','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
+ ('eeeeeeee-2000-4000-8000-000000000004','2090-01-02 22:59:59Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0),
+ ('eeeeeeee-2000-4000-8000-000000000005','2090-01-02 23:00:00Z','place','eeeeeeee-1000-4000-8000-000000000002','eeeeeeee-1000-4000-8000-000000000001','2090-06-01',0,0);
 insert into public.member_distance_id_audit(id,member_id,old_ids,new_ids,actor_id,at) overriding system value values
- (900001,'eeeeeeee-1000-4000-8000-000000000002','{901}','{902,901}','eeeeeeee-1000-4000-8000-000000000001','2090-01-01 21:00:00Z'),
- (900002,'eeeeeeee-1000-4000-8000-000000000002','{902,901}','{903}','eeeeeeee-1000-4000-8000-000000000001','2090-01-01 21:00:00Z'),
- (900003,'eeeeeeee-9999-4000-8000-000000000099','{903}','{}',null,'2090-01-01 21:00:00Z');
+ (900001,'eeeeeeee-1000-4000-8000-000000000002','{901}','{902,901}','eeeeeeee-1000-4000-8000-000000000001','2090-01-01 23:00:00Z'),
+ (900002,'eeeeeeee-1000-4000-8000-000000000002','{902,901}','{903}','eeeeeeee-1000-4000-8000-000000000001','2090-01-01 23:00:00Z'),
+ (900003,'eeeeeeee-9999-4000-8000-000000000099','{903}','{}',null,'2090-01-01 23:00:00Z');
 do $$ begin
  if has_function_privilege('anon','public.root_logs(text,text,text,date,date,text,integer,timestamptz,text)','EXECUTE')
    or has_function_privilege('anon','public.root_logs_cleanup(integer,timestamptz,boolean)','EXECUTE') then raise exception 'anon grant'; end if;
 end $$;
+-- Summer midnight is UTC+2, matching Europe/Madrid in the schedule.
+insert into public.occupancy_events(id,at,action,actor_id,slot_date,half,level) values
+ ('eeeeeeee-2000-4000-8000-000000000101','2090-07-01 21:59:59Z','place','eeeeeeee-1000-4000-8000-000000000001','2090-07-15',0,0),
+ ('eeeeeeee-2000-4000-8000-000000000102','2090-07-01 22:00:00Z','place','eeeeeeee-1000-4000-8000-000000000001','2090-07-15',0,0);
 set local role anon;
 do $$ begin
  begin perform public.root_logs(); raise exception 'anon read'; exception when insufficient_privilege then null; end;
@@ -44,6 +48,8 @@ do $$ begin
 end $$;
 select set_config('request.jwt.claim.sub','eeeeeeee-0000-4000-8000-000000000001',true);
 do $$ declare r jsonb; n jsonb; begin
+ r:=public.root_logs(p_person=>'log root',p_from=>'2090-07-02',p_to=>'2090-07-02');
+ if jsonb_array_length(r->'rows')<>1 or r->'rows'->0->>'id'<>'eeeeeeee-2000-4000-8000-000000000102' then raise exception 'summer CET boundary: %',r; end if;
  r:=public.root_logs(p_person=>'log root',p_from=>'2090-01-02',p_to=>'2090-01-02',p_limit=>2);
  if jsonb_array_length(r->'rows')<>2 or r->>'has_more'<>'true'
    or r->'rows'->0->>'id'<>'eeeeeeee-2000-4000-8000-000000000004'

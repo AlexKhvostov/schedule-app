@@ -6,12 +6,14 @@ export type ApiClient = {
   created_at: string; expires_at: string | null; revoked_at: string | null;
   requests_per_minute: number; scopes: string[];
   guide_version: 1 | 2;
+  has_saved_key?: boolean;
 };
 export type ApiClientDraft = Pick<ApiClient, "name" | "contact" | "notes" | "expires_at" | "requests_per_minute"> & { guide_version?: 1 | 2 };
 export type ApiCredential = { id: string; key: string; hash: string };
 
 // Demo records are deliberately ephemeral. No secret or hash is stored in browser storage.
 let demoClients: ApiClient[] = [];
+const demoKeys = new Map<string, string>();
 export async function generateApiCredential(): Promise<ApiCredential> {
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   const key = `rp_${hex(crypto.getRandomValues(new Uint8Array(32)))}`;
@@ -42,15 +44,27 @@ export async function createApiClient(draft: ApiClientDraft, credential: ApiCred
   if (!db) {
     const existing = demoClients.find((row) => row.id === credential.id);
     if (existing) return existing;
-    const row: ApiClient = { ...draft, guide_version: draft.guide_version ?? 1, id: credential.id, created_at: new Date().toISOString(), revoked_at: null, scopes: ["schedule:read"] };
+    const row: ApiClient = { ...draft, guide_version: draft.guide_version ?? 1, has_saved_key: true, id: credential.id, created_at: new Date().toISOString(), revoked_at: null, scopes: ["schedule:read"] };
+    demoKeys.set(row.id, credential.key);
     demoClients = [row, ...demoClients];
     return row;
   }
   const { data, error } = await db.rpc("root_api_clients", {
-    p_action: "create", p_id: credential.id, p_input: { ...draft, key_hash: credential.hash },
+    p_action: "create", p_id: credential.id, p_input: { ...draft, key_hash: credential.hash, key: credential.key },
   });
   if (error) throw new Error("api-management-failed");
   return (data as ApiClient[])[0];
+}
+
+export async function revealApiClientKey(id: string): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) {
+    const row = demoClients.find((client) => client.id === id);
+    return row && apiClientStatus(row) === "active" ? demoKeys.get(id) ?? null : null;
+  }
+  const { data, error } = await db.rpc("root_api_clients", { p_action: "reveal", p_id: id });
+  if (error) throw new Error("api-key-unavailable");
+  return typeof data === "string" ? data : null;
 }
 
 export async function revokeApiClient(id: string): Promise<ApiClient> {

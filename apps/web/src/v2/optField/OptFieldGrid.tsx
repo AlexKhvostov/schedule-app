@@ -233,6 +233,7 @@ const OptCell = memo(function OptCell({
     <div
       ref={root}
       role="gridcell"
+      tabIndex={-1}
       data-slot=""
       data-day={dayIdx}
       data-d={day}

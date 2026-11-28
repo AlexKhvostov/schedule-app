@@ -20,6 +20,7 @@ export function rosterTableWidth(limitCount: number, showDeadTime: boolean, name
 
 type Props = {
   onNameWidth: (width: number) => void;
+  onScrollbarWidth: (width: number) => void;
   roster: RosterRow[];
   auxiliaryLabels: string[];
   deadTimeByMember: Record<string, DeadTimeBreakdown> | null;
@@ -32,12 +33,27 @@ type Props = {
   onFill?: (row: RosterRow) => void;
 };
 
-export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, showDeadTime, showTables, emptyContent, onPeek, onNameWidth, fillState, fillActor, onFill }: Props) {
+export function ScheduleRoster({ roster, auxiliaryLabels, deadTimeByMember, showDeadTime, showTables, emptyContent, onPeek, onNameWidth, onScrollbarWidth, fillState, fillActor, onFill }: Props) {
   const { t } = useTranslation();
   const table = useRef<HTMLTableElement>(null);
   const [collapsed, setCollapsed] = useState<Partial<Record<number, boolean>>>({});
   const coreHeadings = [t("schedule.rosterCoreHigh"), t("schedule.rosterCoreNitro"), t("schedule.rosterCoreRegular")];
   const columnCount = 5 + auxiliaryLabels.length + Number(showDeadTime);
+  useLayoutEffect(() => {
+    const body = table.current?.closest<HTMLElement>(".v2-float-body");
+    if (!body) return;
+    const measure = () => {
+      const style = getComputedStyle(body);
+      const borders = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+      onScrollbarWidth(Math.max(0, body.offsetWidth - body.clientWidth - borders));
+    };
+    // Classic Windows scrollbars consume layout space; overlay scrollbars do not.
+    // Observing the content box also catches a scrollbar appearing after loading.
+    const observer = new ResizeObserver(measure);
+    observer.observe(body);
+    measure();
+    return () => observer.disconnect();
+  }, [onScrollbarWidth]);
   useLayoutEffect(() => {
     if (!roster.length) return;
     let active = true;

@@ -6,6 +6,7 @@ async function enter(page: Page) {
   await expect(page.locator(".v2-opt-sheet")).toBeVisible();
   await page.goto("/#root-logs");
   await expect(page.getByRole("heading", { name: "Журнал действий" })).toBeVisible();
+  await expect(page.locator(".root-logs-caption")).toContainText("CET");
 }
 test("Root browses pages, filters people and confirms cleanup only in Demo", async ({ page }) => {
   let networkCalls = 0;

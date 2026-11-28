@@ -1,5 +1,5 @@
 import type { MutableRefObject, RefObject } from "react";
-import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { monthGridKey } from "../../data/slots";
 import { hoursOf, weekdayOf } from "../../schedule/capacity";
 import { isPastSlot, readCet } from "../../schedule/cet";
@@ -210,18 +210,11 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
   };
 
   const inspectHit = (hit: SlotHit, rest: TipPoint) => {
-    const p = propsRef.current;
-    const hoursCaps = hoursOf(p.capacity[hit.variant], hit.limit, hit.day, weekdayOf(p.year, p.monthIndex, hit.day));
-    const locked = !levelAllowed(hit.half, hit.level, hoursCaps);
-    const mark = seatsOf(
-      p.grids[monthGridKey(hit.variant, hit.limit)]?.[hit.dayIdx]?.[hit.half],
-      hit.level + 1,
-    )[hit.level];
     if (hit.busyPairs?.length) {
       tipApi.current.show(hit, rest);
       return;
     }
-    if (mark || locked) tipApi.current.show(hit, rest);
+    tipApi.current.show(hit, rest);
   };
 
   const endDrag = (event: PointerEvent<HTMLElement>, apply: boolean) => {
@@ -316,10 +309,18 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
       return;
     }
     tipApi.current.show(
-      hit,
+      { ...hit, focusHistory: event.clientX === 0 && event.clientY === 0 },
       { x: event.clientX, y: event.clientY },
       propsRef.current.canRemoveForeign,
     );
+  }, []);
+
+  const onKeyDown = useCallback((event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+    const hit = hitFromEvent(event.target, rootRef.current, true);
+    if (!hit) return;
+    event.preventDefault();
+    tipApi.current.show({ ...hit, focusHistory: true }, undefined, propsRef.current.canRemoveForeign);
   }, []);
 
   const onPointerOver = useCallback((event: PointerEvent<HTMLElement>) => {
@@ -337,8 +338,6 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     applyNav(root, hit);
     if (hit.busyPairs?.length) {
       tipApi.current.show({ ...hit, x: event.clientX + 12, y: event.clientY + 10 });
-    } else {
-      tipApi.current.hide();
     }
   }, []);
 
@@ -347,7 +346,7 @@ export function useOptFieldPointer({ year, monthIndex, me, self, capacity, grids
     if (dragRef.current && dragRef.current.mode !== "look") return;
     const root = rootRef.current;
     if (root) applyNav(root, null);
-    tipApi.current.hide();
+    tipApi.current.hideSoon();
   }, []);
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu, onPointerOver, onPointerLeave };
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu, onKeyDown, onPointerOver, onPointerLeave };
 }

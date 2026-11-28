@@ -95,6 +95,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
   const [showHours, setShowHours] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [rosterNameWidth, setRosterNameWidth] = useState(100);
+  const [rosterScrollbarWidth, setRosterScrollbarWidth] = useState(0);
   const [rosterSizeBoot] = useState(() => loadWindowSize("people"));
   const [savedRosterWidth, setSavedRosterWidth] = useState(rosterSizeBoot.width ?? 190);
   const [rosterWidthAdjusted, setRosterWidthAdjusted] = useState(rosterSizeBoot.width !== undefined);
@@ -328,9 +329,10 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
     rosterItems.some((item) => item.variant === variant && item.limit === limit),
   ) ?? false;
   const showRosterDeadTime = rosterHasDeadTime && rosterDeadHoursVisible;
-  const rosterMinWidth = Math.max(190, rosterTableWidth(rosterLabels.length, showRosterDeadTime) + 18);
+  const rosterFrameWidth = 18 + rosterScrollbarWidth;
+  const rosterMinWidth = Math.max(190, rosterTableWidth(rosterLabels.length, showRosterDeadTime) + 18) + rosterScrollbarWidth;
   const rosterWidth = Math.max(rosterMinWidth, savedRosterWidth,
-    rosterWidthAdjusted ? 0 : rosterTableWidth(rosterLabels.length, showRosterDeadTime, rosterNameWidth) + 18);
+    rosterWidthAdjusted ? 0 : rosterTableWidth(rosterLabels.length, showRosterDeadTime, rosterNameWidth) + rosterFrameWidth);
   useLayoutEffect(() => {
     // Remember content-driven growth across queues; only an explicit resize may shrink it.
     if (showPeople && rosterWidth > savedRosterWidth) setSavedRosterWidth(rosterWidth);
@@ -685,6 +687,7 @@ export function V2Schedule({ cursor, onCursorChange, capacity: initialCapacity, 
                 : rosterSource.error ? <div role="alert"><p className="v2-people-empty">{t("schedule.rosterLoadError")}</p><Button size="sm" onClick={rosterSource.retry}>{t("priorities.retry")}</Button></div>
                 : undefined}
               onNameWidth={setRosterNameWidth}
+              onScrollbarWidth={setRosterScrollbarWidth}
               auxiliaryLabels={rosterLabels}
               deadTimeByMember={rosterDeadTime}
               showDeadTime={showRosterDeadTime}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { SchedulePlayer } from "../../data/players";
@@ -19,10 +19,13 @@ import { PersonAvatar } from "../PersonAvatar";
 import { MarkFace } from "../ScheduleSlot";
 import { loadTheme, type UiTheme } from "../theme";
 import { usePlayerClock } from "../usePlayerClock";
-import { type SlotHit, type TipApi, type TipPoint } from "./types";
+import { type SlotHit, type TipApi } from "./types";
 import { useClubLimitPalette } from "../ClubLimitPalette";
+import { SlotHistoryDialog } from "./SlotHistoryDialog";
+import type { SlotHistoryTarget } from "../../data/slotHistory";
+import type { Mark } from "../../schedule/marks";
 
-const TIP_SLACK = 12;
+const TIP_CLOSE_DELAY = 200;
 
 export function OptTip({
   year,
@@ -50,7 +53,17 @@ export function OptTip({
   const [hover, setHover] = useState<SlotHit | null>(null);
   const [theme, setTheme] = useState<UiTheme>(() => (typeof window === "undefined" ? "dark" : loadTheme()));
   const nodeRef = useRef<HTMLDivElement>(null);
-  const restRef = useRef<TipPoint | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [history, setHistory] = useState<{ target: SlotHistoryTarget; mark: Mark | null; cell: HTMLElement } | null>(null);
+  const keepOpen = useCallback(() => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  }, []);
+  const hide = useCallback(() => { keepOpen(); setHover(null); }, [keepOpen]);
+  const hideSoon = useCallback(() => {
+    if (nodeRef.current?.contains(document.activeElement) || closeTimer.current !== null) return;
+    closeTimer.current = setTimeout(() => { closeTimer.current = null; setHover(null); }, TIP_CLOSE_DELAY);
+  }, []);
   const clock = usePlayerClock();
 
   useEffect(() => {
@@ -61,60 +74,42 @@ export function OptTip({
 
   useEffect(() => {
     waitRef.current = {
-      hide: () => {
-        restRef.current = null;
-        setHover(null);
-      },
-      show: (hit, rest, force) => {
-        if (!showTip && !hit.busyPairs?.length && !force) {
-          restRef.current = null;
-          setHover(null);
-          return;
-        }
-        restRef.current = rest ?? null;
+      hide, hideSoon,
+      show: (hit, _rest, force) => {
+        keepOpen();
+        if (!showTip && !hit.busyPairs?.length && !force) { setHover(null); return; }
         setHover(hit);
       },
     };
-  }, [showTip, waitRef]);
+    return keepOpen;
+  }, [showTip, waitRef, hide, hideSoon, keepOpen]);
 
   useEffect(() => {
     if (!hover) return;
-    const hide = () => {
-      restRef.current = null;
-      setHover(null);
+    const inside = (target: EventTarget | null) => target instanceof Node
+      && (nodeRef.current?.contains(target) || hover.cell.contains(target));
+    const onMove = (event: globalThis.PointerEvent) => { if (inside(event.target)) keepOpen(); else hideSoon(); };
+    const onDown = (event: globalThis.PointerEvent) => { if (!nodeRef.current?.contains(event.target as Node)) hide(); };
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") { hide(); hover.cell.focus({ preventScroll: true }); }
     };
-    let armed = false;
-    const arm = window.requestAnimationFrame(() => {
-      armed = true;
-    });
-    const onMove = (event: globalThis.PointerEvent) => {
-      if (!armed) return;
-      const rest = restRef.current;
-      if (!rest) return;
-      const dx = event.clientX - rest.x;
-      const dy = event.clientY - rest.y;
-      if (dx * dx + dy * dy >= TIP_SLACK * TIP_SLACK) hide();
-    };
-    const capture = { capture: true } as const;
-    const quiet = { capture: true, passive: true } as const;
-    window.addEventListener("pointermove", onMove, quiet);
-    window.addEventListener("pointerdown", hide, capture);
-    window.addEventListener("wheel", hide, quiet);
-    window.addEventListener("keydown", hide, capture);
+    const onScroll = (event: Event) => { if (!nodeRef.current?.contains(event.target as Node)) hide(); };
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", hide);
-    document.addEventListener("scroll", hide, quiet);
+    document.addEventListener("scroll", onScroll, true);
     document.addEventListener("visibilitychange", hide);
     return () => {
-      window.cancelAnimationFrame(arm);
-      window.removeEventListener("pointermove", onMove, quiet);
-      window.removeEventListener("pointerdown", hide, capture);
-      window.removeEventListener("wheel", hide, quiet);
-      window.removeEventListener("keydown", hide, capture);
+      keepOpen();
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("blur", hide);
-      document.removeEventListener("scroll", hide, quiet);
+      document.removeEventListener("scroll", onScroll, true);
       document.removeEventListener("visibilitychange", hide);
     };
-  }, [hover]);
+  }, [hover, hide, hideSoon, keepOpen]);
 
   useLayoutEffect(() => {
     const node = nodeRef.current;
@@ -130,8 +125,10 @@ export function OptTip({
     if (top < pad) top = pad;
     node.style.left = `${Math.round(left)}px`;
     node.style.top = `${Math.round(top)}px`;
+    if (hover?.focusHistory) node.querySelector<HTMLButtonElement>("button")?.focus();
   }, [hover]);
 
+  if (history) return createPortal(<SlotHistoryDialog target={history.target} mark={history.mark} returnFocus={history.cell} onClose={() => setHistory(null)} />, document.body);
   if (!hover) return null;
   const hoursCaps = hoursOf(capacity[hover.variant], hover.limit, hover.day, weekdayOf(year, monthIndex, hover.day));
   const locked = !levelAllowed(hover.half, hover.level, hoursCaps);
@@ -153,6 +150,12 @@ export function OptTip({
       ref={nodeRef}
       className={`v2-opt-tip theme-${theme}${skin === "theme" ? " is-kit" : ""}`}
       style={{ left: hover.x, top: hover.y }}
+      role="dialog"
+      aria-label={t("slotHistory.slotInfo")}
+      onPointerEnter={keepOpen}
+      onPointerLeave={hideSoon}
+      onFocusCapture={keepOpen}
+      onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) hideSoon(); }}
     >
       <div className="v2-opt-tip-context">
         <div className="v2-opt-tip-meta">
@@ -214,6 +217,11 @@ export function OptTip({
           <strong>{t("v2.tip.empty")}</strong>
         </div>
       )}
+      <div className="v2-opt-tip-actions"><button type="button" onClick={() => {
+        const target: SlotHistoryTarget = { date: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(hover.day).padStart(2, "0")}`, half: hover.half, level: hover.level, variant: hover.variant, limit: hover.limit };
+        setHistory({ target, mark: displayMark, cell: hover.cell });
+        hide();
+      }}><i className="fa-solid fa-clock-rotate-left" aria-hidden />{t("slotHistory.open")}</button></div>
     </div>,
     document.body,
   );

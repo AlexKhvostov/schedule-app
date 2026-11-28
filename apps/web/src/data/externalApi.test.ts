@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revokeApiClient, type ApiClient } from "./externalApi";
+import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revealApiClientKey, revokeApiClient, type ApiClient } from "./externalApi";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), live: true }));
 vi.mock("./client", () => ({ getSupabase: () => mocks.live ? { rpc: mocks.rpc } : null }));
@@ -28,24 +28,34 @@ describe("API client management", () => {
     expect(a.key).not.toBe(b.key);
     expect(a.hash).toBe(createHash("sha256").update(a.key).digest("hex"));
   });
-  it("sends only the hash and reuses the client ID for a safe retry", async () => {
+  it("sends the key for encrypted storage and reuses the client ID for a safe retry", async () => {
     const credential = await generateApiCredential();
     mocks.rpc.mockResolvedValue({ data: [{ ...draft, id: credential.id }], error: null });
     await createApiClient(draft, credential); await createApiClient(draft, credential);
     expect(mocks.rpc.mock.calls[0]).toEqual(mocks.rpc.mock.calls[1]);
-    expect(mocks.rpc).toHaveBeenCalledWith("root_api_clients", { p_action: "create", p_id: credential.id, p_input: { ...draft, key_hash: credential.hash } });
-    expect(JSON.stringify(mocks.rpc.mock.calls)).not.toContain(credential.key);
+    expect(mocks.rpc).toHaveBeenCalledWith("root_api_clients", { p_action: "create", p_id: credential.id, p_input: { ...draft, key_hash: credential.hash, key: credential.key } });
+  });
+  it("retrieves secrets only through an explicit reveal request and reports access failures", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: "rp_example", error: null });
+    expect(await revealApiClientKey("client-id")).toBe("rp_example");
+    expect(mocks.rpc).toHaveBeenCalledWith("root_api_clients", { p_action: "reveal", p_id: "client-id" });
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: null });
+    expect(await revealApiClientKey("legacy-id")).toBeNull();
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "permission denied" } });
+    await expect(revealApiClientKey("client-id")).rejects.toThrow("api-key-unavailable");
   });
   it("never substitutes Demo records when live access fails", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "permission denied" } });
     await expect(listApiClients()).rejects.toThrow();
   });
-  it("runs Demo create/list/revoke without contacting Supabase or retaining credentials", async () => {
+  it("runs Demo create/list/reveal/revoke without contacting Supabase or exposing secrets in lists", async () => {
     mocks.live = false;
     const credential = await generateApiCredential();
     const row = await createApiClient(draft, credential);
     expect(apiClientStatus(row)).toBe("active");
+    expect(await revealApiClientKey(row.id)).toBe(credential.key);
     expect(apiClientStatus(await revokeApiClient(row.id))).toBe("revoked");
+    expect(await revealApiClientKey(row.id)).toBeNull();
     expect(JSON.stringify(await listApiClients())).not.toContain(credential.key);
     expect(JSON.stringify(await listApiClients())).not.toContain(credential.hash);
     expect(mocks.rpc).not.toHaveBeenCalled();

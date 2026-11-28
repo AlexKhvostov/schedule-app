@@ -2,6 +2,7 @@ import { getSupabase } from "./client";
 import { demoFillCompletions } from "./fillQueue";
 import { loadMembers } from "../schedule/members";
 import type { RosterKind } from "../schedule/rosterPriorities";
+import { readCet } from "../schedule/cet";
 
 export type LogSource = "schedule" | "distance";
 export type LogPerson = { id: string | null; name?: string; discord?: string; discord_id?: string; code?: string };
@@ -15,9 +16,12 @@ export type LogPage = { rows: LogEntry[]; has_more: boolean };
 export type CleanupPreview = { cutoff: string; eligible: number; deleted: number; batch_limit: number };
 export const defaultLogFilters: LogFilters = { source: "schedule", person: "", role: "actor", from: "", to: "", action: "", limit: 50 };
 
-export function minskDate(at: string) { return new Date(Date.parse(at) + 3 * 3600000).toISOString().slice(0, 10); }
+export function logDate(at: string) {
+  const { year, monthIndex, day } = readCet(new Date(at));
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 export function matchesLog(row: LogEntry, filters: LogFilters) {
-  const date = minskDate(row.at);
+  const date = logDate(row.at);
   const person = row[filters.role];
   const search = Object.values(person).filter(Boolean).join(" ").toLocaleLowerCase();
   return (!filters.from || date >= filters.from) && (!filters.to || date <= filters.to)
@@ -30,7 +34,7 @@ const demoStart = Date.now();
 let demoSchedule: LogEntry[] = Array.from({ length: 126 }, (_, i) => ({
   id: String(1000 - i), at: new Date(demoStart - (i >= 124 ? (i === 124 ? 75 : 110) * 24 : i) * 3600000).toISOString(), action: i % 3 ? "place" : "remove",
   actor: i % 2 ? demoActor : demoMember, member: demoMember,
-  detail: { date: minskDate(new Date(demoStart).toISOString()), half: 32 + i % 8, level: 0, tables: 2, room: "Winamax", limit: "50", variant: "nitro" },
+  detail: { date: logDate(new Date(demoStart).toISOString()), half: 32 + i % 8, level: 0, tables: 2, room: "Winamax", limit: "50", variant: "nitro" },
 }));
 const demoDistance: LogEntry[] = [{ id: "1", at: new Date(demoStart).toISOString(), action: "distance_ids", actor: demoActor, member: demoMember, detail: { old_ids: ["901"], new_ids: ["902", "901"] } }];
 

@@ -67,6 +67,7 @@ export type SlotHit = {
   mergedEndHalf?: number;
   x: number;
   y: number;
+  focusHistory?: boolean;
 };
 
 export type TipPoint = { x: number; y: number };
@@ -74,4 +75,5 @@ export type TipPoint = { x: number; y: number };
 export type TipApi = {
   show: (hit: SlotHit, rest?: TipPoint, force?: boolean) => void;
   hide: () => void;
+  hideSoon: () => void;
 };

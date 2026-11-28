@@ -27,7 +27,7 @@ describe("portable API v2 instructions", () => {
       };
       const text = apiExamplesText(endpoint, t, 2);
       for (const body of Object.values(apiV2Responses)) expect(text).toContain(JSON.stringify(body, null, 2));
-      for (const term of ["priority.order", "batch_id", "state:null", "Retry-After", "Europe/Madrid", "page=", "cursor=", "410", "24", "1000", "180"]) expect(text).toContain(term);
+      for (const term of ["priority.order", "club_order", "batch_id", "state:null", "Retry-After", "Europe/Madrid", "page=", "cursor=", "410", "24", "1000", "180"]) expect(text).toContain(term);
       expect(text).not.toContain("/v1/schedule");
       expect(text).not.toContain("Google");
     });

@@ -18,6 +18,7 @@ for (const version of [1, 2] as const) test(`root creates a v${version} key with
   await expect(page.getByRole("dialog")).toContainText("менеджере паролей");
   await expect(page.getByRole("dialog").getByLabel("Версия API")).toHaveValue("2");
   if (version === 1) await page.getByRole("dialog").getByLabel("Версия API").selectOption("1");
+  if (version === 2) await page.getByRole("dialog").getByText("Полный ответ: Nitro 50 за один день", { exact: true }).click();
   const example = JSON.parse(await page.getByTestId("api-response-example").innerText());
   if (version === 1) expect(example.days[0].lines[0].slots[0].start).toBe("21:30");
   else {
@@ -58,7 +59,22 @@ for (const version of [1, 2] as const) test(`root creates a v${version} key with
   await expect(page.getByRole("dialog").getByLabel("Версия API")).toHaveValue(String(version));
   await expect(page.getByRole("dialog")).toContainText("<API_KEY>");
   await expect(page.getByRole("dialog")).not.toContainText(key);
+  if (version === 2) await page.getByRole("dialog").getByText("Полный ответ: Nitro 50 за один день", { exact: true }).click();
   expect(JSON.parse(await page.getByTestId("api-response-example").innerText())).toEqual(example);
+  await page.getByRole("dialog").getByRole("button", { name: "Показать токен", exact: true }).click();
+  const keyField = page.getByRole("dialog").getByLabel("Ключ API", { exact: true });
+  await expect(keyField).toHaveValue(key);
+  await page.getByRole("dialog").getByRole("button", { name: "Скрыть токен" }).click();
+  await expect(keyField).toHaveAttribute("type", "password");
+  await page.getByRole("dialog").getByLabel("Добавить токен в инструкцию").check();
+  await page.getByRole("dialog").getByRole("button", { name: "Скопировать инструкцию", exact: true }).click();
+  const withToken = await page.evaluate(() => navigator.clipboard.readText());
+  expect(withToken).toContain(key);
+  expect(withToken).not.toContain("<API_KEY>");
+  await page.getByRole("dialog").getByLabel("Добавить токен в инструкцию").uncheck();
+  await page.getByRole("dialog").getByRole("button", { name: "Скопировать инструкцию", exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain(key);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain(key);
   await page.getByRole("dialog").getByLabel("Версия API").selectOption(String(version === 1 ? 2 : 1));
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Инструкция для подключения" }).click();
@@ -79,6 +95,7 @@ test("API forms and instructions fit a narrow screen", async ({ page }, testInfo
   await expect(dialog.getByRole("button", { name: "Создать ключ" })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Инструкция владельцу" }).click();
+  await dialog.locator("summary").filter({ hasText: "Полный ответ: Nitro 50 за один день" }).click();
   await page.getByTestId("api-response-example").scrollIntoViewIfNeeded();
   await expect(page.getByTestId("api-response-example")).toBeVisible();
   await expect.poll(() => dialog.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
@@ -88,6 +105,7 @@ test("API forms and instructions fit a narrow screen", async ({ page }, testInfo
   await page.reload();
   await page.getByRole("button", { name: "Owner instructions" }).click();
   await expect(dialog).toContainText("Request and response examples");
+  await dialog.locator("summary").filter({ hasText: "Full response:" }).click();
   await page.getByTestId("api-response-example").scrollIntoViewIfNeeded();
   await expect.poll(() => dialog.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("api-instructions-mobile-en.png") });
@@ -98,4 +116,26 @@ test("non-root cannot open the API screen by URL", async ({ page }) => {
   await page.evaluate(() => { const session = JSON.parse(sessionStorage.getItem("v2-session")!); session.role = "member"; session.nick = "polar"; sessionStorage.setItem("v2-session", JSON.stringify(session)); });
   await page.reload();
   await expect(page.getByRole("heading", { name: "API", exact: true })).toHaveCount(0);
+});
+
+for (const theme of ["dark", "light"]) test(`created token opens in ready-to-copy instructions on a phone in ${theme}`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(theme => localStorage.setItem("v2-ui-theme", theme), theme);
+  await enter(page);
+  await page.getByRole("button", { name: "Создать ключ", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Название бота / подключения").fill("Demo integration");
+  await dialog.getByRole("button", { name: "Создать ключ", exact: true }).click();
+  const key = await dialog.getByLabel("Ключ API", { exact: true }).inputValue();
+  await dialog.getByRole("button", { name: "Открыть инструкцию с токеном" }).click();
+  await expect(dialog.getByLabel("Добавить токен в инструкцию")).toBeChecked();
+  await expect(dialog.getByLabel("Ключ API", { exact: true })).toHaveValue(key);
+  await expect(dialog.getByLabel("Ключ API", { exact: true })).toHaveAttribute("type", "password");
+  await expect(dialog.locator(".v2-api-code").first()).toContainText(`X-API-Key: ${key}`);
+  await expect.poll(() => dialog.evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath(`api-guide-token-${theme}.png`) });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Инструкция для подключения" }).click();
+  await expect(dialog.getByLabel("Добавить токен в инструкцию")).not.toBeChecked();
+  await expect(dialog.getByLabel("Ключ API", { exact: true })).toHaveCount(0);
 });

@@ -37,6 +37,8 @@ do $$ begin
   exception when insufficient_privilege then null; end;
   begin perform public.root_api_clients('create','cccccccc-2000-4000-8000-000000000001','{}'); raise exception 'non-root create allowed';
   exception when insufficient_privilege then null; end;
+  begin perform public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000001'); raise exception 'non-root reveal allowed';
+  exception when insufficient_privilege then null; end;
   begin perform public.root_api_clients('revoke','cccccccc-2000-4000-8000-000000000001'); raise exception 'non-root revoke allowed';
   exception when insufficient_privilege then null; end;
   begin perform external_api_private.manage_clients('list',null,'{}'); raise exception 'private direct call allowed';
@@ -109,10 +111,69 @@ do $$ declare result jsonb; begin
   if result->'error'->>'code' is distinct from 'invalid_api_key' then raise exception 'revoked key still reads: %',result; end if;
 end $$;
 reset role;
+-- Recoverable credentials are optional for compatibility, never included in metadata.
+set local role authenticated;
+do $$ declare result jsonb; token text := 'rp_' || repeat('a',64); payload jsonb; begin
+  payload := jsonb_build_object('name','Recoverable bot', 'guide_version',2,
+    'key',token,'key_hash',encode(extensions.digest(token,'sha256'),'hex'));
+  result := public.root_api_clients('create','cccccccc-2000-4000-8000-000000000003',payload);
+  if (result->0->>'has_saved_key')::boolean is distinct from true
+    or result::text like '%' || token || '%' or result::text like '%key_secret_id%' then
+    raise exception 'recoverable metadata boundary broken';
+  end if;
+  if public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000003') #>> '{}' is distinct from token then
+    raise exception 'root cannot retrieve key';
+  end if;
+  if public.root_api_clients('create','cccccccc-2000-4000-8000-000000000003',payload) <> result then
+    raise exception 'recoverable retry changed metadata';
+  end if;
+  if public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000002') is not null then
+    raise exception 'legacy key claims to be recoverable';
+  end if;
+  if public.root_api_clients()::text like '%' || token || '%' then raise exception 'list leaks key'; end if;
+  begin
+    perform public.root_api_clients('create',gen_random_uuid(),payload || '{"key_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}');
+    raise exception 'mismatched credential accepted';
+  exception when invalid_parameter_value then null; end;
+  begin perform 1 from vault.decrypted_secrets; raise exception 'root reads Vault directly';
+  exception when insufficient_privilege then null; end;
+  begin perform vault.create_secret('forbidden'); raise exception 'root writes Vault directly';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+do $$ declare token text := 'rp_' || repeat('a',64); begin
+  if not exists(select 1 from external_api_private.clients c join vault.secrets s on s.id=c.key_secret_id
+    where c.id='cccccccc-2000-4000-8000-000000000003' and s.secret <> token) then
+    raise exception 'key not encrypted at rest';
+  end if;
+  if (select count(*) from vault.decrypted_secrets where decrypted_secret=token) <> 1 then
+    raise exception 'retry duplicated secret';
+  end if;
+end $$;
+update external_api_private.clients set expires_at=now()-interval '1 second'
+ where id='cccccccc-2000-4000-8000-000000000003';
+set local role authenticated;
+do $$ begin
+  if public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000003') is not null then
+    raise exception 'expired key retrieved';
+  end if;
+end $$;
+reset role;
+update external_api_private.clients set expires_at=null where id='cccccccc-2000-4000-8000-000000000003';
+set local role authenticated;
+do $$ begin
+  perform public.root_api_clients('revoke','cccccccc-2000-4000-8000-000000000003');
+  if public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000003') is not null then
+    raise exception 'revoked key retrieved';
+  end if;
+end $$;
+reset role;
 -- A still-valid JWT does not retain root permission after role removal.
 delete from public.member_roles where member_id = 'cccccccc-1000-4000-8000-000000000001';
 set local role authenticated;
 do $$ begin
+  begin perform public.root_api_clients('reveal','cccccccc-2000-4000-8000-000000000003'); raise exception 'removed root can reveal';
+  exception when insufficient_privilege then null; end;
   begin perform public.root_api_clients(); raise exception 'removed root allowed';
   exception when insufficient_privilege then null; end;
 end $$;

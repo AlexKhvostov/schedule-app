@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revokeApiClient, type ApiClient, type ApiCredential, type ApiClientDraft } from "../../data/externalApi";
+import { apiClientStatus, createApiClient, externalApiEndpoint, generateApiCredential, listApiClients, revealApiClientKey, revokeApiClient, type ApiClient, type ApiCredential, type ApiClientDraft } from "../../data/externalApi";
 import { isLiveData } from "../../data/config";
 import { ApiExamples, apiExamplesText } from "./ApiExamples";
 import "./api.css";
@@ -26,6 +26,8 @@ export function ApiAdmin() {
   const [modal, setModal] = useState<"owner" | "create" | "secret" | "guide" | "revoke" | null>(null);
   const [selected, setSelected] = useState<ApiClient | null>(null);
   const [secret, setSecret] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [includeSecret, setIncludeSecret] = useState(false);
   const [saved, setSaved] = useState(false);
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -41,6 +43,7 @@ export function ApiAdmin() {
   const guideIntro = selected ? t(`apiAdmin.${version === 2 ? "developerTextV2" : "developerText"}`, { name: selected.name, endpoint, rpm: selected.requests_per_minute, expiry: formatDate(selected.expires_at), interpolation: { escapeValue: false } }) : "";
   const examplesText = apiExamplesText(endpoint, t, version);
   const guide = `${guideIntro}\n\n${examplesText}`;
+  const guideKey = includeSecret && /^rp_[0-9a-f]{64}$/.test(secret) ? secret : undefined;
   const ownerGuide = `${t("apiAdmin.ownerText")}\n\n${examplesText}`;
 
   const refresh = async () => {
@@ -49,8 +52,18 @@ export function ApiAdmin() {
     finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, []);
-  const close = () => { if (busy) return; setModal(null); setSecret(""); setNotice(""); setError(""); pending.current = null; };
-  const open = (next: typeof modal, client: ApiClient | null = null) => { setSelected(client); setVersion(client?.guide_version ?? (client ? 1 : 2)); setError(""); setNotice(""); setModal(next); };
+  const close = () => { if (busy) return; setModal(null); setSecret(""); setShowSecret(false); setIncludeSecret(false); setNotice(""); setError(""); pending.current = null; };
+  const open = (next: typeof modal, client: ApiClient | null = null) => { setSecret(""); setShowSecret(false); setIncludeSecret(false); setSelected(client); setVersion(client?.guide_version ?? (client ? 1 : 2)); setError(""); setNotice(""); setModal(next); };
+  const reveal = async (client: ApiClient) => {
+    if (requestLock.current) return;
+    requestLock.current = true; setBusy(true); setError(""); setNotice("");
+    try {
+      const key = await revealApiClientKey(client.id);
+      if (key) { setSecret(key); setShowSecret(true); }
+      else setError("keyUnavailable");
+    } catch { setError("keyLoadError"); }
+    finally { setBusy(false); requestLock.current = false; }
+  };
   const versionPicker = <label className="v2-api-version">{t("apiAdmin.version")}<select className="v2-ctrl" value={version} onChange={(event) => { setVersion(Number(event.target.value) as 1 | 2); setNotice(""); }}><option value={2}>{t("apiAdmin.version2")}</option><option value={1}>{t("apiAdmin.version1")}</option></select></label>;
   const copy = async (value: string) => {
     try { await navigator.clipboard.writeText(value); setNotice("copied"); } catch { setNotice("copyError"); }
@@ -66,7 +79,7 @@ export function ApiAdmin() {
       const row = await createApiClient(pending.current.draft, pending.current.credential);
       setClients((rows) => [row, ...rows.filter((item) => item.id !== row.id)]);
       setSelected(row); setVersion(row.guide_version ?? 1); setSecret(pending.current.credential.key); pending.current = null;
-      setSaved(false); setModal("secret"); setName(""); setContact(""); setNotes("");
+      setSaved(false); setShowSecret(false); setIncludeSecret(true); setModal("secret"); setName(""); setContact(""); setNotes("");
     } catch { setError("saveError"); }
     finally { setBusy(false); requestLock.current = false; }
   };
@@ -90,7 +103,7 @@ export function ApiAdmin() {
       <header><h2>{client.name} <small>v{client.guide_version ?? 1}</small></h2><span className={`v2-api-status is-${apiClientStatus(client)}`}>{t(`apiAdmin.${apiClientStatus(client)}`)}</span></header>
       {client.contact && <p>{client.contact}</p>}{client.notes && <p className="v2-api-notes">{client.notes}</p>}
       <dl><div><dt>{t("apiAdmin.createdAt")}</dt><dd>{formatDate(client.created_at)}</dd></div><div><dt>{t("apiAdmin.expiresAt")}</dt><dd>{formatDate(client.expires_at)}</dd></div><div><dt>{t("apiAdmin.rpm")}</dt><dd>{client.requests_per_minute}</dd></div></dl>
-      <div className="v2-api-actions"><button className="v2-ctrl" onClick={() => open("guide", client)}>{t("apiAdmin.developerGuide")}</button><button className="v2-ctrl v2-api-danger" disabled={!!client.revoked_at} onClick={() => open("revoke", client)}>{t("apiAdmin.revoke")}</button></div>
+      <div className="v2-api-actions"><button className="v2-ctrl" onClick={() => open("guide", client)}>{t("apiAdmin.developerGuide")}</button>{client.has_saved_key && apiClientStatus(client) === "active" && <button className="v2-ctrl" onClick={() => { open("guide", client); void reveal(client); }}>{t("apiAdmin.showKey")}</button>}<button className="v2-ctrl v2-api-danger" disabled={!!client.revoked_at} onClick={() => open("revoke", client)}>{t("apiAdmin.revoke")}</button></div>
     </article>)}</div>
     {modal && <ApiModal title={t(`apiAdmin.${modal === "owner" ? "ownerGuide" : modal === "guide" ? "developerGuide" : modal === "secret" ? "created" : modal === "revoke" ? "revokeTitle" : "create"}`)} onClose={close} canClose={!busy && (modal !== "secret" || saved)}>
       {modal === "create" && <form onSubmit={(event) => { event.preventDefault(); void create(); }}>
@@ -105,12 +118,19 @@ export function ApiAdmin() {
         </fieldset><p>{t("apiAdmin.scope")}</p><button className="v2-ctrl v2-primary-action" disabled={busy || !loaded || !name.trim()} type="submit">{busy ? "…" : t("apiAdmin.create")}</button>
       </form>}
       {modal === "owner" && <>{versionPicker}<div className="v2-api-instructions">{t("apiAdmin.ownerText")}</div><ApiExamples endpoint={endpoint} version={version} /><button className="v2-ctrl" onClick={() => void copy(ownerGuide)}>{t("apiAdmin.copy")}</button></>}
-      {modal === "guide" && <>{versionPicker}<div className="v2-api-instructions">{guideIntro}</div><ApiExamples endpoint={endpoint} version={version} /><button className="v2-ctrl" onClick={() => void copy(guide)}>{t("apiAdmin.copy")}</button></>}
-      {modal === "secret" && <><p>{t("apiAdmin.once")}</p>{!live && <p className="v2-api-banner">{t("apiAdmin.demo")}</p>}<div className="v2-api-secret"><label htmlFor="api-created-key">{t("apiAdmin.secret")}</label><textarea id="api-created-key" readOnly autoComplete="off" spellCheck={false} rows={3} value={secret} /></div>
+      {modal === "guide" && <>{versionPicker}<section className="v2-api-key-panel">
+        <div className="v2-api-actions">{selected?.has_saved_key && !secret && <><b>{t("apiAdmin.secret")}</b><button className="v2-ctrl" disabled={busy || apiClientStatus(selected) !== "active"} onClick={() => void reveal(selected)}>{busy ? t("apiAdmin.keyLoading") : t("apiAdmin.showKey")}</button></>}</div>
+        {(!selected?.has_saved_key || secret) && <><label className="v2-api-key-input">{t(selected?.has_saved_key ? "apiAdmin.secret" : "apiAdmin.pasteKey")}<input className="v2-ctrl" type={showSecret ? "text" : "password"} value={secret} readOnly={!!selected?.has_saved_key} autoComplete="off" spellCheck={false} onChange={(event) => { setSecret(event.target.value.trim()); setIncludeSecret(false); }} /></label>
+          <div className="v2-api-actions"><button className="v2-ctrl" disabled={!secret} onClick={() => setShowSecret(!showSecret)}>{t(showSecret ? "apiAdmin.hideKey" : "apiAdmin.showKey")}</button><button className="v2-ctrl" disabled={!/^rp_[0-9a-f]{64}$/.test(secret)} onClick={() => void copy(secret)}>{t("apiAdmin.copyKey")}</button></div></>}
+        <p className="v2-api-key-hint">{t(selected?.has_saved_key ? "apiAdmin.keyPrivacy" : "apiAdmin.legacyKey")}</p>{error && <p role="alert">{t(`apiAdmin.${error}`)}</p>}
+        <label className="v2-api-include"><input type="checkbox" checked={includeSecret} disabled={!/^rp_[0-9a-f]{64}$/.test(secret)} onChange={(event) => setIncludeSecret(event.target.checked)} />{t("apiAdmin.includeKey")}</label>
+      </section><div className="v2-api-actions v2-api-guide-toolbar"><span>{t(guideKey ? "apiAdmin.guideWithKey" : "apiAdmin.guideWithoutKey")}{notice && <span className="v2-api-copy-status" role="status">{t(`apiAdmin.${notice}`)}</span>}</span><button className="v2-ctrl v2-primary-action" onClick={() => void copy(guide.replaceAll("<API_KEY>", guideKey ?? "<API_KEY>"))}>{t("apiAdmin.copy")}</button></div><div className="v2-api-instructions">{guideIntro.replaceAll("<API_KEY>", guideKey ?? "<API_KEY>")}</div><ApiExamples endpoint={endpoint} version={version} apiKey={guideKey} /></>}
+      {modal === "secret" && <><p>{t(selected?.has_saved_key ? "apiAdmin.once" : "apiAdmin.onceLegacy")}</p>{!live && <p className="v2-api-banner">{t("apiAdmin.demo")}</p>}<div className="v2-api-secret"><label htmlFor="api-created-key">{t("apiAdmin.secret")}</label><textarea id="api-created-key" readOnly autoComplete="off" spellCheck={false} rows={3} value={secret} /></div>
         <p>{t("apiAdmin.version")}: v{version}</p><div className="v2-api-actions"><button className="v2-ctrl" onClick={() => void copy(secret)}>{t("apiAdmin.copyKey")}</button><button className="v2-ctrl" onClick={() => void copy(guide.replaceAll("<API_KEY>", secret))}>{t("apiAdmin.copyBundle")}</button></div>
+        <button className="v2-ctrl" disabled={!selected?.has_saved_key && !saved} onClick={() => { setModal("guide"); setIncludeSecret(true); }}>{t("apiAdmin.openGuide")}</button>
         <label className="v2-api-ack"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} />{t("apiAdmin.saved")}</label><button className="v2-ctrl" disabled={!saved} onClick={close}>{t("apiAdmin.close")}</button></>}
       {modal === "revoke" && <><p>{t("apiAdmin.revokeText", { name: selected?.name })}</p><div className="v2-api-actions"><button className="v2-ctrl" disabled={busy} onClick={close}>{t("apiAdmin.cancel")}</button><button className="v2-ctrl v2-api-danger" disabled={busy} onClick={() => void revoke()}>{t("apiAdmin.revoke")}</button></div></>}
-      {error && <p role="alert">{t(`apiAdmin.${error}`)}</p>}{notice && <p role="status">{t(`apiAdmin.${notice}`)}</p>}
+      {modal !== "guide" && <>{error && <p role="alert">{t(`apiAdmin.${error}`)}</p>}{notice && <p role="status">{t(`apiAdmin.${notice}`)}</p>}</>}
     </ApiModal>}
   </div>;
 }

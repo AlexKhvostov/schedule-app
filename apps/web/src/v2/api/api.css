@@ -33,4 +33,22 @@
 .v2-api-examples h3 { font-size: 16px; font-weight: 650; margin-top: 24px; }
 .v2-api-examples h4 { font-size: 14px; font-weight: 650; margin: 20px 0 8px; }
 .v2-api-code { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 monospace; background: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0 18px; }
+.v2-api-key-panel { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); }
+.v2-api-key-panel .v2-api-actions { margin: 0 0 8px; }
+.v2-api-key-input { display: grid; gap: 6px; font-size: 13px; }
+.v2-api-key-input input { width: 100%; min-width: 0; font-family: monospace; }
+.v2-api-modal .v2-api-key-hint { font-size: 12px; color: var(--muted-foreground); margin: 8px 0; }
+.v2-api-include { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.v2-api-guide-toolbar { justify-content: space-between; font-size: 12px; color: var(--muted-foreground); }
+.v2-api-guide-text { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.v2-api-guide-text p { font-size: inherit; margin: 8px 0; }
+.v2-api-guide-text ul { list-style: disc; padding-left: 20px; margin: 8px 0; }
+.v2-api-guide-text li + li { margin-top: 5px; }
+.v2-api-examples > section { padding-bottom: 8px; }
+.v2-api-examples h3 { margin-top: 18px; }
+.v2-api-detail { border-top: 1px solid var(--border); padding: 10px 0; }
+.v2-api-detail summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.v2-api-detail summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 2px; }
 @media (max-width: 600px) { .v2-api { padding: 16px; } .v2-api-head { align-items: flex-start; flex-direction: column; gap: 0; } .v2-api-client > header { align-items: flex-start; } .v2-api-modal { padding: 16px; } }
+
+.v2-api-copy-status { display: block; margin-top: 4px; color: var(--foreground); }

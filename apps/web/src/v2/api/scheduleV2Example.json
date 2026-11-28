@@ -64,6 +64,7 @@
         },
         "priority": {
           "order": 1,
+          "club_order": 3,
           "core": 2,
           "score": 1250.5,
           "excluded": false,

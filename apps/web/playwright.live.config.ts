@@ -7,7 +7,7 @@ if (!server || Array.isArray(server)) throw new Error("Expected one test web ser
 // All requests to this synthetic project are intercepted by the test fixture.
 export default defineConfig({
   ...base,
-  testMatch: ["**/club-order-profile.live.ts", "**/distance-links.live.ts", "**/schedule-scroll.live.ts", "**/auth-recovery.live.ts", "**/access-errors.live.ts", "**/schedule-loading.live.ts", "**/schedule-act-as.live.ts", "**/schedule-sync.live.ts", "**/presence.live.ts", "**/dashboard-role-access.live.ts"],
+  testMatch: ["**/api-admin.live.ts", "**/slot-history.live.ts", "**/club-order-profile.live.ts", "**/distance-links.live.ts", "**/schedule-scroll.live.ts", "**/auth-recovery.live.ts", "**/access-errors.live.ts", "**/schedule-loading.live.ts", "**/schedule-act-as.live.ts", "**/schedule-sync.live.ts", "**/presence.live.ts", "**/dashboard-role-access.live.ts"],
   outputDir: "playwright-report/live-results",
   webServer: {
     ...server,

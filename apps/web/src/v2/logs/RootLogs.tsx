@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cleanupRootLogs, defaultLogFilters, loadRootLogs, type CleanupPreview, type LogEntry, type LogFilters, type LogPerson } from "../../data/rootLogs";
 import "./logs.css";
+import { CET } from "../../schedule/cet";
 
 export function RootLogs() {
   const { t, i18n } = useTranslation();
@@ -19,7 +20,7 @@ export function RootLogs() {
   const request = useRef(0);
   const dialog = useRef<HTMLDialogElement>(null);
   const table = useRef<HTMLDivElement>(null);
-  const formatTime = (at: string) => new Intl.DateTimeFormat(i18n.language, { timeZone: "Europe/Minsk", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(at));
+  const formatTime = (at: string) => new Intl.DateTimeFormat(i18n.language, { timeZone: CET, year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date(at));
   const load = useCallback(async (filters: LogFilters, before?: LogEntry) => {
     const id = ++request.current;
     setBusy(true); setError("");

@@ -59,7 +59,7 @@ export const OptField = memo(function OptField({
 }: OptFieldProps) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
-  const tipApi = useRef<TipApi>({ show: () => { }, hide: () => { } });
+  const tipApi = useRef<TipApi>({ show: () => { }, hide: () => { }, hideSoon: () => { } });
   const [cet, setCet] = useState<CetStamp>(() => readCet());
   const daysRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
@@ -77,7 +77,7 @@ export const OptField = memo(function OptField({
     [visibleHalves],
   );
   const visibleSlotCount = visibleHalves.length;
-  const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu, onPointerOver, onPointerLeave } = useOptFieldPointer({
+  const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu, onKeyDown, onPointerOver, onPointerLeave } = useOptFieldPointer({
     year, monthIndex, me, self, capacity, grids, onGridChange, dimPast, canEdit, onEditBlocked, skin, busy, canRemoveForeign, onOverwriteAsk, onForeignKept, workHours,
   }, rootRef, tipApi);
   const { onTouchStart, onTouchMove, onTouchEnd } = useOptFieldZoom({
@@ -185,6 +185,7 @@ export const OptField = memo(function OptField({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onContextMenu={onContextMenu}
+      onKeyDown={onKeyDown}
       onPointerOver={onPointerOver}
       onPointerLeave={onPointerLeave}
       onTouchStart={onTouchStart}
